@@ -1,0 +1,147 @@
+:root {
+  /* Plane brand — monochrome */
+  --accent: #121212;
+  --accent-hover: #2b2b2b;
+  --accent-contrast: #ffffff;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --muted: #6b7280;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--text);
+}
+.pop {
+  width: 260px;
+  padding: 14px;
+}
+.pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pop-head strong {
+  font-size: 14px;
+}
+.pop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pop-toggle span:first-child {
+  flex: 1;
+}
+.pop-toggle input {
+  display: none;
+}
+.switch {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  border-radius: 999px;
+  background: #d1d5db;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+input:checked + .switch {
+  background: var(--accent);
+}
+input:checked + .switch::after {
+  transform: translateX(17px);
+}
+.pop-status {
+  margin: 10px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pop-status.on {
+  color: #16a34a;
+  font-weight: 600;
+}
+.pop-status.off {
+  color: #d97706;
+  font-weight: 600;
+}
+.pop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pop-badge {
+  background: #f1f2f4;
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-weight: 700;
+  color: var(--text);
+}
+.pop-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+}
+.primary:hover {
+  background: var(--accent-hover);
+}
+.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.ghost:hover {
+  background: #f3f4f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #f4f4f5;
+    --accent-hover: #ffffff;
+    --accent-contrast: #14171b;
+    --border: #2c3238;
+    --text: #e5e7eb;
+    --muted: #9aa4b2;
+  }
+  body {
+    background: #1b1f24;
+  }
+  .pop-badge {
+    background: #262b31;
+  }
+  .ghost:hover {
+    background: #262b31;
+  }
+}

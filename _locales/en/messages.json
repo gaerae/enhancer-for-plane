@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Enhancer for Plane — Projects, Wiki & Issues",
+    "description": "Extension name shown in the Chrome Web Store and browser."
+  },
+  "extDesc": {
+    "message": "Tweaks for Plane (makeplane/plane.so) — open-source project management, issues & wiki. Title/body templates + width rules.",
+    "description": "Short description shown in the Chrome Web Store."
+  }
+}

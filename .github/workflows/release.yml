@@ -1,0 +1,70 @@
+name: Release extension
+
+# Cuts a release straight from the version in manifest.json — no manual tagging.
+# Bump "version" in manifest.json and push to main: CI reads it, and if that
+# version has no release yet, it packages the zip, creates the v<version> tag,
+# and publishes a GitHub Release with the zip attached. Unchanged version = skip.
+on:
+  push:
+    branches: [main]
+    paths: ["manifest.json"] # only a version (or manifest) change can start a release
+  workflow_dispatch: # manual run also works (ignores the path filter)
+
+permissions:
+  contents: write # create tags + releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from manifest
+        id: ver
+        run: echo "version=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v${{ steps.ver.outputs.version }} already released — skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package extension
+        if: steps.check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          ZIP="enhancer-for-plane-${VERSION}.zip"
+          zip -r "$ZIP" \
+            manifest.json common.js content.js content.css background.js \
+            options.html options.js options.css \
+            popup.html popup.js popup.css icons _locales \
+            -x "icons/icon.svg"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          unzip -l "$ZIP"
+
+      - name: Create tag + Release with zip
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" "$ZIP" \
+            --target "${{ github.sha }}" \
+            --title "Enhancer for Plane v${VERSION}" \
+            --generate-notes
+
+      - name: Upload build artifact
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: enhancer-for-plane-${{ steps.ver.outputs.version }}
+          path: ${{ env.ZIP }}
+          if-no-files-found: error

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Enhancer for Plane — 프로젝트·위키·이슈",
+    "description": "Extension name shown in the Chrome Web Store and browser."
+  },
+  "extDesc": {
+    "message": "Plane(makeplane/plane.so)용 보조 도구 — 제목·본문 템플릿 원클릭 삽입과 이름 폭 조정 규칙을 추가합니다.",
+    "description": "Short description shown in the Chrome Web Store."
+  }
+}

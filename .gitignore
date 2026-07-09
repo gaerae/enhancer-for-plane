@@ -1,0 +1,19 @@
+# Built extension package (regenerate from source when needed)
+*.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Local tooling / assistant session data
+.claude/
+
+# Node (future-proofing; none committed today)
+node_modules/
+npm-debug.log*
+
+# Source SVG kept, but rasterized scratch artifacts are not
+scratchpad/

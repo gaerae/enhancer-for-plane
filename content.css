@@ -1,0 +1,268 @@
+/* content.css — template button/menu + element-picker/selector-menu styles (neutral design matching Plane's UI tone) */
+
+/* element picker */
+#pe-picker-box {
+  position: fixed;
+  z-index: 2147483040;
+  pointer-events: none;
+  background: rgba(18, 18, 18, 0.08);
+  border: 2px solid #121212;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+  transition: all 0.04s linear;
+}
+#pe-picker-hint,
+.pe-toast {
+  position: fixed;
+  z-index: 2147483041;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #121212;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+#pe-picker-hint {
+  top: 16px;
+}
+.pe-toast {
+  bottom: 24px;
+  max-width: 80vw;
+  transition: opacity 0.35s ease;
+}
+
+/* Template button for toolbar-less editors: header-row (create-work-item modal) or floating */
+.pe-body-tmpl-btn.pe-tmpl-header,
+.pe-body-tmpl-btn.pe-tmpl-floating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 3px 9px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #374151;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+/* floating variant: pinned to the editor box top-right */
+.pe-body-tmpl-btn.pe-tmpl-floating {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 30;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+.pe-body-tmpl-btn.pe-tmpl-header:hover,
+.pe-body-tmpl-btn.pe-tmpl-floating:hover {
+  opacity: 1;
+  border-color: rgba(18, 18, 18, 0.4);
+  color: #121212;
+}
+@media (prefers-color-scheme: dark) {
+  .pe-body-tmpl-btn.pe-tmpl-header,
+  .pe-body-tmpl-btn.pe-tmpl-floating {
+    background: #1f2328;
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #cbd2da;
+  }
+  .pe-body-tmpl-btn.pe-tmpl-header:hover,
+  .pe-body-tmpl-btn.pe-tmpl-floating:hover {
+    color: #f4f4f5;
+  }
+}
+
+/* selector chooser menu */
+#pe-pick-menu {
+  position: fixed;
+  z-index: 2147483042;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  padding: 4px;
+}
+#pe-pick-menu .pe-pick-header {
+  padding: 8px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+#pe-pick-menu .pe-pick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+#pe-pick-menu .pe-pick-item:hover {
+  background: #f3f4f6;
+}
+#pe-pick-menu .pe-pick-sel {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#pe-pick-menu .pe-pick-count {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: #9ca3af;
+  background: #f1f2f4;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+@media (prefers-color-scheme: dark) {
+  #pe-pick-menu {
+    background: #1b1f24;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  #pe-pick-menu .pe-pick-item:hover {
+    background: #262b31;
+  }
+  #pe-pick-menu .pe-pick-sel {
+    color: #f3f4f6;
+  }
+  #pe-pick-menu .pe-pick-count {
+    background: #262b31;
+    color: #9aa4b2;
+  }
+}
+
+#pe-tmpl-menu {
+  position: absolute;
+  z-index: 2147483001;
+  display: none;
+  max-width: 320px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-size: 12px;
+  color: #1f2937;
+}
+
+#pe-tmpl-menu .pe-menu-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+#pe-tmpl-menu .pe-menu-list {
+  /* ~8 items before scrolling, capped to the viewport on short screens */
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+  padding: 4px;
+}
+
+#pe-tmpl-menu .pe-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+#pe-tmpl-menu .pe-menu-item:hover {
+  background: #f3f4f6;
+}
+#pe-tmpl-menu .pe-menu-item-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#pe-tmpl-menu .pe-menu-item-preview {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#pe-tmpl-menu .pe-menu-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+#pe-tmpl-menu .pe-menu-footer {
+  padding: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+#pe-tmpl-menu .pe-menu-config {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #121212;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+#pe-tmpl-menu .pe-menu-config:hover {
+  background: #f2f2f3;
+}
+
+/* dark mode */
+@media (prefers-color-scheme: dark) {
+  #pe-tmpl-menu {
+    background: #1b1f24;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e5e7eb;
+  }
+  #pe-tmpl-menu .pe-menu-item-title {
+    color: #f3f4f6;
+  }
+  #pe-tmpl-menu .pe-menu-item:hover {
+    background: #262b31;
+  }
+  #pe-tmpl-menu .pe-menu-config {
+    color: #f4f4f5;
+  }
+  #pe-tmpl-menu .pe-menu-config:hover {
+    background: #262b31;
+  }
+  #pe-tmpl-menu .pe-menu-header,
+  #pe-tmpl-menu .pe-menu-footer {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
