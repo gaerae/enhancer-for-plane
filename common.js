@@ -154,3 +154,19 @@ function peIsActiveOn(settings, host) {
   if (settings.allDomains) return true;
   return peDomainMatches(settings.domains, host);
 }
+
+// Convert the active-domain settings into origin match patterns (e.g. "*://host/*").
+// Used both for optional host-permission requests and for dynamic content-script
+// registration, so the extension holds host access only for domains the user granted.
+function peOriginPatterns(settings) {
+  if (!settings) return [];
+  if (settings.allDomains) return ["*://*/*"];
+  const out = [];
+  for (const raw of settings.domains || []) {
+    const d = (raw || "").trim().toLowerCase();
+    // Allow host chars and a leading "*." wildcard only; skip anything malformed.
+    if (!d || /[^a-z0-9.*-]/.test(d)) continue;
+    out.push("*://" + d + "/*");
+  }
+  return [...new Set(out)];
+}

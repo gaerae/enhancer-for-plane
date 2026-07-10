@@ -2,6 +2,11 @@
 (function () {
   "use strict";
 
+  // Registered on granted origins AND injected programmatically into already-open
+  // tabs on a fresh grant. Guard so a second injection into the same page is a no-op.
+  if (window.__peLoaded) return;
+  window.__peLoaded = true;
+
   let settings = null;
 
   // styles
@@ -894,7 +899,7 @@
   /* 4. Load settings + watch                                           */
   /* ================================================================== */
   // Observing the whole document subtree is costly, so connect only on active domains.
-  // (the content script is injected on <all_urls> but stays inactive on most sites)
+  // (the script is registered only on granted origins, but this stays defensive)
   // When a modal or editor is added to the DOM, inject right away with a short retry
   // burst — React mounts the "Create work item" modal in stages, so a single delayed
   // pass can miss it and leave a perceptible gap. Ordinary DOM churn keeps using the

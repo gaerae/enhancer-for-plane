@@ -276,17 +276,42 @@
     if (nodes.length) nodes[nodes.length - 1].focus();
   }
 
+  // Ensure host access matches the active-domain list. Requesting already-granted
+  // origins is a silent no-op, so the user is only prompted for newly added domains.
+  // Called first (before any other await) so the Save click still counts as a gesture.
+  async function syncHostPermissions() {
+    const desired = peOriginPatterns(state);
+    if (desired.length) {
+      let ok = false;
+      try {
+        ok = await chrome.permissions.request({ origins: desired });
+      } catch (_) {}
+      if (!ok) return false;
+    }
+    // Drop grants for domains no longer listed (no user gesture required).
+    try {
+      const perms = await chrome.permissions.getAll();
+      const stale = (perms.origins || []).filter((o) => /^\*:\/\//.test(o) && !desired.includes(o));
+      if (stale.length) await chrome.permissions.remove({ origins: stale });
+    } catch (_) {}
+    return true;
+  }
+
   async function saveAll() {
     // drop empty rules/templates
     state.rules = (state.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
     state.templates = (state.templates || []).filter(
       (t) => (t.name && t.name.trim()) || (t.title && t.title.trim()) || (t.content && t.content.trim())
     );
+    const permOk = await syncHostPermissions();
     try {
       savingSelf = true;
       await peSaveSettings(state);
       render();
-      flash("Saved.");
+      flash(
+        permOk ? "Saved." : "Saved — but site access was denied, so listed domains stay inactive until you grant it.",
+        !permOk
+      );
     } catch (e) {
       savingSelf = false;
       const msg = e && e.message ? e.message : String(e);

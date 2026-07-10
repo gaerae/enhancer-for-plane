@@ -78,10 +78,11 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ## Built for self-hosted Plane
 
-This extension targets **self-hosted Plane**. It ships with **no active domain**,
-so it does nothing until you add your instance (e.g. `plane.your-company.com`) via
-the popup's **Enable on this site** or the active-domains list in Settings. It
-stays completely inert on every other site.
+This extension targets **self-hosted Plane**. It ships with **no active domain and
+no host access**, so it does nothing until you add your instance (e.g.
+`plane.your-company.com`) via the popup's **Enable on this site** or the
+active-domains list in Settings — enabling a domain prompts Chrome for one-time
+access to that one site. It stays completely inert on every other site.
 
 ## Install (developer mode)
 
@@ -110,12 +111,18 @@ stays completely inert on every other site.
 | `manifest.json` | MV3 manifest |
 | `common.js` | Settings defaults / storage / domain matching (shared) |
 | `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
-| `background.js` | Handles the "open options" message from content |
+| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page |
 | `options.html/js/css` | Full settings page |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
 
 ## How it works (notes)
 
+- **No host access until you grant it.** There are no static content scripts.
+  When you enable a domain, the extension requests that origin, and the service
+  worker registers the content script + CSS for it via `chrome.scripting`
+  (injecting any already-open matching tab so no reload is needed). Registration
+  persists across restarts and is reconciled whenever permissions or settings
+  change; removing a domain drops its access.
 - **Styles are injected via `adoptedStyleSheets` (constructed stylesheets).**
   Plane is a Next.js/React SPA — inserting a `<style>` DOM node into
   `<head>`/`<body>` can trigger a hydration mismatch and get the node removed, so
@@ -137,7 +144,7 @@ stays completely inert on every other site.
   doesn't appear, it recovers without a reload: focusing the description editor
   (or pressing Alt/⌥+T) re-scans, and the popup's **↻ Re-scan this page** forces a
   fresh injection. If the content script never loaded at all (e.g. a tab opened
-  before the extension was installed), Re-scan reports it so you can reload.
+  before you enabled this domain), Re-scan reports it so you can reload.
 
 ## Permissions
 
@@ -145,9 +152,15 @@ stays completely inert on every other site.
 - `activeTab` — when you click the toolbar icon, the popup reads the current
   tab's hostname to show status and offer "Enable on this site," and messages the
   tab to start the element picker. Limited to the tab you invoked it on.
-- Content scripts match `<all_urls>` because a self-hosted Plane host cannot be
-  known at build time; the script does nothing unless the current host matches a
-  domain you enabled.
+- `scripting` — registers/injects the content script on the specific origins you
+  grant (see below).
+- **Optional host permissions, requested per site.** The extension ships with
+  **no host access at all**. When you enable a domain (popup or Settings), it asks
+  Chrome for access to *that origin only* — you see a permission prompt naming the
+  site. It never requests all-sites access up front, holds access only for the
+  domains you granted, and drops that access when you remove a domain. (A
+  self-hosted Plane host isn't known at build time, so it can't be a fixed match
+  list — this per-site grant is the least-privilege way to support any host.)
 
 No accounts, no tracking, no analytics, no external servers, no remote code. See
 [PRIVACY.md](PRIVACY.md).
@@ -183,7 +196,7 @@ are excluded), and publishes the Release.
 
 To ship a new version:
 
-1. Bump `"version"` in `manifest.json` (e.g. `1.0.0` → `1.0.1`).
+1. Bump `"version"` in `manifest.json` (e.g. `1.1.0` → `1.1.1`).
 2. Commit and push to `main`.
 3. CI creates the `v<version>` tag and a GitHub Release with
    `enhancer-for-plane-<version>.zip` attached. If that version was already

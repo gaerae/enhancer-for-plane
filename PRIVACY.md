@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-10_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
@@ -26,10 +26,12 @@ storage for your account and is never sent to the developer or any third party.
 
 ## What is accessed
 
-- **Page content on matched Plane pages.** To apply your width/style rules and
-  add the template button, the extension reads and modifies the page's DOM — but
-  only on the domains you have enabled. On all other websites it stays inert and
-  reads nothing.
+- **Page content on domains you grant.** To apply your width/style rules and add
+  the template button, the extension reads and modifies the page's DOM — but only
+  on origins you have explicitly granted. It ships with no host access; when you
+  enable a domain, Chrome asks you to grant access to that single site, and the
+  extension is registered only there. It has no access to any other website and
+  reads nothing on them.
 - **The current tab's address (activeTab).** When you click the toolbar icon,
   the popup reads the active tab's hostname to tell you whether the extension is
   active there. This value is used only in that moment and is not stored or

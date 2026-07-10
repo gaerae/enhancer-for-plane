@@ -90,13 +90,33 @@
       }
     });
 
-    $("addDomain").addEventListener("click", async () => {
+    $("addDomain").addEventListener("click", () => {
       if (!currentHost) return;
+      // Persist the domain FIRST. Requesting a permission from a popup closes the
+      // popup when the prompt appears, which would kill anything after an await —
+      // so we don't await. storage.set is dispatched synchronously and completes
+      // in the browser process even after the popup is gone.
       if (!state.domains.includes(currentHost)) state.domains.push(currentHost);
       state.enabled = true;
-      $("enabled").checked = true;
-      await peSaveSettings(state);
-      updateDomainStatus();
+      peSaveSettings(state);
+      // Request access to just this origin. Called synchronously (no prior await)
+      // so the click still counts as the required user gesture. On grant, the
+      // service worker (permissions.onAdded) registers the script + injects the tab.
+      try {
+        chrome.permissions.request({ origins: ["*://" + currentHost + "/*"] }, (granted) => {
+          // Runs only if the popup is still open. If denied, roll back the domain.
+          if (!granted) {
+            state.domains = (state.domains || []).filter((d) => d !== currentHost);
+            peSaveSettings(state);
+            const statusEl = $("domainStatus");
+            statusEl.textContent = "Permission needed to run on " + currentHost + ".";
+            statusEl.className = "pop-status off";
+            return;
+          }
+          $("enabled").checked = true;
+          updateDomainStatus();
+        });
+      } catch (_) {}
     });
   }
 
