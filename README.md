@@ -2,6 +2,10 @@
 
 **English** · [한국어](README.ko.md)
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/dicjfphghjfljkifogkplgdeefjdkhbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=121212)](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)
+
+**➜ [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)** — or [load unpacked from source](#install).
+
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
 open-source **project management, issues & wiki** tool and a self-hosted
@@ -84,7 +88,14 @@ no host access**, so it does nothing until you add your instance (e.g.
 active-domains list in Settings — enabling a domain prompts Chrome for one-time
 access to that one site. It stays completely inert on every other site.
 
-## Install (developer mode)
+## Install
+
+**From the Chrome Web Store (recommended)**
+
+[Install Enhancer for Plane](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo),
+then click the toolbar icon and **Enable on this site** on your Plane instance.
+
+**Developer mode (from source)**
 
 1. Open `chrome://extensions` in Chrome.
 2. Turn on **Developer mode** (top right).

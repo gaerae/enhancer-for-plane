@@ -2,6 +2,10 @@
 
 [English](README.md) · **한국어**
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/dicjfphghjfljkifogkplgdeefjdkhbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=121212)](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)
+
+**➜ [Chrome 웹 스토어에서 설치](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)** — 또는 [소스에서 직접 로드](#설치).
+
 [Plane](https://github.com/makeplane/plane)(makeplane / plane.so) — 오픈소스
 **프로젝트 관리·이슈·위키** 도구이자 Jira의 자체 호스팅 대안 — 을 위한 가벼운
 비공식 크롬 익스텐션(Manifest V3)입니다. **Plane 서버를 전혀 수정하지 않고**,
@@ -72,7 +76,14 @@ this site** 또는 설정의 활성 도메인에서 추가하기 전까지는 �
 (도메인 추가 시 Chrome이 그 사이트 하나에 대한 1회성 접근 권한을 묻습니다). 그 외 사이트에서는
 완전히 비활성 상태로 남습니다.
 
-## 설치(개발자 모드)
+## 설치
+
+**Chrome 웹 스토어에서 설치(권장)**
+
+[Enhancer for Plane 설치](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo) →
+툴바 아이콘 클릭 후 사용하는 Plane 인스턴스에서 **Enable on this site**.
+
+**개발자 모드(소스에서)**
 
 1. Chrome에서 `chrome://extensions` 접속.
 2. 우측 상단 **개발자 모드** 켜기.
