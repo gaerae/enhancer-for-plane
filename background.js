@@ -246,26 +246,37 @@ async function pruneSyncCacheNow() {
 // Committing per source (rather than once at the end of the loop) also means a run that
 // is cut short — the worker is evicted, or a later source hangs — keeps what it already
 // fetched instead of throwing the whole round away.
+// Never throws. storage.local.set rejects on quota (the caps allow far more than its
+// 10 MB), and a throw here would abort the loop: every source after this one would go
+// unfetched, this run and every later one, since a full disk stays full. Worse, the run
+// is started by alarms and permission grants that do not await it, so the rejection went
+// nowhere at all — sync simply stopped, with nothing said. Report it as this source's
+// failure and let the rest of the run continue.
 async function commitSource(id, entry) {
-  const fresh = await peGetSettings();
-  const freshSources = ((fresh.templateSync || {}).sources) || [];
-  const live = new Set(freshSources.map((s) => s && s.id).filter(Boolean));
-  const out = await peGetSyncCache();
-  out.bySource = out.bySource || {};
+  try {
+    const fresh = await peGetSettings();
+    const freshSources = ((fresh.templateSync || {}).sources) || [];
+    const live = new Set(freshSources.map((s) => s && s.id).filter(Boolean));
+    const out = await peGetSyncCache();
+    out.bySource = out.bySource || {};
 
-  let mutated = false;
-  if (live.has(id)) {
-    // deleted mid-fetch → its result is not ours to store
-    if (entry.error) {
-      // Keep the last good templates; only flip status/error.
-      out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
-    } else {
-      out.bySource[id] = entry;
+    let mutated = false;
+    if (live.has(id)) {
+      // deleted mid-fetch → its result is not ours to store
+      if (entry.error) {
+        // Keep the last good templates; only flip status/error.
+        out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
+      } else {
+        out.bySource[id] = entry;
+      }
+      mutated = true;
     }
-    mutated = true;
+    if (pruneCacheEntries(out, freshSources)) mutated = true;
+    if (mutated) await peSaveSyncCache(out);
+    return true;
+  } catch (e) {
+    return false;
   }
-  if (pruneCacheEntries(out, freshSources)) mutated = true;
-  if (mutated) await peSaveSyncCache(out);
 }
 
 // force=true ignores per-source intervals (used by "Sync now" / install).
@@ -294,7 +305,7 @@ async function syncOnce(force) {
         // the stored copy" optimization let `count` (fresh) and `templates` (stale)
         // diverge whenever a file was edited without bumping `version` — and it only
         // ever saved one storage write per interval, which is not worth the risk.
-        await commitSource(src.id, {
+        const stored = await commitSource(src.id, {
           version: res.version,
           remoteName: res.name || "",
           fetchedAt: Date.now(),
@@ -304,7 +315,10 @@ async function syncOnce(force) {
           count: res.templates.length,
           templates: res.templates
         });
-        ok++;
+        // Fetched but not stored is not a success: the picker reads the cache, so the
+        // user would be told a source synced while nothing about it changed.
+        if (stored) ok++;
+        else err++;
       } else {
         await commitSource(src.id, { error: res.lastError || "Error" });
         err++;

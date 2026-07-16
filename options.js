@@ -139,7 +139,6 @@
     const ok = !v || !!peOriginPatternForUrl(v);
     input.classList.toggle("invalid", !ok);
     input.title = ok ? "" : peMsg("msgInvalidSrcUrl");
-    return ok;
   }
 
   function renderTemplates() {
@@ -608,6 +607,22 @@
   }
 
   async function saveAll() {
+    // Refuse BEFORE touching state. A URL we cannot turn into a host permission is one
+    // the worker will never fetch, so the save cannot go ahead — but bailing out after
+    // the filters below have already rebuilt state.rules/templates/variables leaves every
+    // rendered row bound to an index that has shifted underneath it. That cost a user
+    // their work: an empty template row is dropped from state, the DOM still shows it,
+    // typing into it writes to state.templates[undefined], and the next save reports
+    // "Saved" with the template silently gone. Nothing here may mutate state until we
+    // know we are going through with it.
+    const badSrc = (ensureSync().sources || []).find(
+      (s) => s && s.url && s.url.trim() && !peOriginPatternForUrl(s.url.trim())
+    );
+    if (badSrc) {
+      flash(peMsg("msgInvalidSrcUrl"), true);
+      return; // state untouched, so every row's bindings still line up
+    }
+
     // drop empty rules/templates
     state.rules = (state.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
     state.templates = (state.templates || []).filter(
@@ -627,17 +642,8 @@
       })
       .slice(0, PE_MAX_VARIABLES);
 
-    // A URL we cannot turn into a host permission is one the worker will never fetch.
-    // Refuse the save and name it, rather than dropping the row on the user's behalf.
-    const sync = ensureSync();
-    const badSrc = (sync.sources || []).find((s) => s && s.url && s.url.trim() && !peOriginPatternForUrl(s.url.trim()));
-    if (badSrc) {
-      flash(peMsg("msgInvalidSrcUrl"), true);
-      renderSources();
-      return;
-    }
-
     // drop empty sources; enforce the source cap
+    const sync = ensureSync();
     sync.sources = (sync.sources || [])
       .filter((s) => s && s.url && s.url.trim())
       // Backstop only: the Add button stops at the cap, so this can bite only for

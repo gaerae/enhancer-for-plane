@@ -63,8 +63,12 @@ one in Settings, and adding one prompts Chrome for access to that origin.
 
 When it runs (on the interval you pick, and when you press "Sync now"):
 
-- **What is requested:** a plain `GET` of the exact URL you entered — nothing
-  else, on no other address.
+- **What is requested:** a plain `GET` of the exact URL you entered, and nothing
+  else. If that server answers with a redirect, the browser follows it, so the
+  request reaches wherever your source points — that is the one way a request can
+  touch an address you did not type. The extension will not *use* what comes back
+  from an origin you have not granted: it checks where the request landed and
+  refuses anything else. Templates only ever come from a host you approved.
 - **What is sent:** nothing of yours. The extension transmits no settings, no
   templates, no page content, and no identifiers. It sends no cookies or
   credentials for that site either: the request runs from the extension's own
@@ -72,10 +76,11 @@ When it runs (on the interval you pick, and when you press "Sync now"):
   matches your source's origin.
 - **What that server can see:** what any HTTP request unavoidably reveals to the
   host you are asking — your IP address, your browser's user-agent, and the fact
-  that the file was requested. If that matters to you, choose a source URL whose
-  operator you are willing to reveal that to (for most users this is their own
-  company's server). The developer of this extension is not that operator and
-  learns nothing from your syncs.
+  that the file was requested. A host your source redirects to sees the same. If
+  that matters to you, choose a source URL whose operator you are willing to
+  reveal that to (for most users this is their own company's server). The
+  developer of this extension is not that operator and learns nothing from your
+  syncs.
 - **What comes back is treated as untrusted.** The downloaded file is capped in
   size, parsed as data, and rendered as plain text — never executed as code and
   never inserted as markup.

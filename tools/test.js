@@ -119,6 +119,14 @@ function loadWorker({ settings, respond, granted = true }) {
         local: {
           get: (k, cb) => cb({ peSyncCache: clone(state.cache) }),
           set: (o, cb) => {
+            // `failSaves` stands in for the quota being full: chrome reports it through
+            // lastError, which peSaveSyncCache turns into a rejection.
+            if (state.failSaves) {
+              ctx.chrome.runtime.lastError = { message: "QUOTA_BYTES quota exceeded" };
+              cb();
+              ctx.chrome.runtime.lastError = null;
+              return;
+            }
             state.cache = clone(o.peSyncCache);
             state.writes.push(Object.keys(state.cache.bySource || {}).sort());
             cb();
@@ -149,11 +157,11 @@ function bodyStream(str, chunks = 1) {
   });
 }
 
+// Deliberately no text(): the worker reads bodies through the stream, and offering the
+// shortcut let a buffer-it-all implementation satisfy the cap tests without ever touching
+// a chunk. A stub should expose what the code under test actually uses, and no more.
 const jsonResponse = (body, over = {}) =>
-  Object.assign(
-    { ok: true, status: 200, headers: { get: () => null }, body: bodyStream(body), text: async () => body },
-    over
-  );
+  Object.assign({ ok: true, status: 200, headers: { get: () => null }, body: bodyStream(body) }, over);
 const feed = (templates, extra = {}) =>
   JSON.stringify(Object.assign({ schema: 1, name: "Feed", version: "v1", templates }, extra));
 
@@ -345,7 +353,11 @@ test("source name: two sources on one host stay distinguishable", () => {
 test("origin pattern: only http(s) URLs produce a permission pattern", () => {
   const { peOriginPatternForUrl: P } = loadCommon();
   eq(P("https://plane.acme.com/t.json"), "https://plane.acme.com/*");
-  eq(P("http://localhost:8731/t.json"), "http://localhost:8731/*", "port is kept");
+  // The port is dropped on purpose, and that is what makes a ported source work: a match
+  // pattern's host carries no hostname:port form, and chrome's own advice for "any
+  // localhost port" is the portless pattern. Keeping it built an invalid pattern that
+  // permissions.contains() throws on, which fetchSource cannot tell from "not granted".
+  eq(P("http://localhost:8731/t.json"), "http://localhost/*", "port dropped, so every port is covered");
   eq(P("ftp://x/y"), null);
   eq(P("not a url"), null);
   eq(P(""), null);
@@ -480,9 +492,7 @@ test("sync: a chunked response is cut off at the cap, not buffered whole", async
       const bytes = new TextEncoder().encode(huge);
       const step = 64 * 1024;
       let at = 0;
-      // Deliberately no text(): a real body can only be had by reading the stream, and
-      // offering the shortcut let a buffer-it-all implementation pass this test without
-      // ever touching a chunk — `delivered` stayed 0 and every assertion held vacuously.
+      // Hand-rolled rather than jsonResponse() so the chunks can be counted as they go.
       return {
         ok: true,
         status: 200,
@@ -580,6 +590,49 @@ test("sync: a result is stored as soon as it lands, not at the end of the run", 
   g.release();
   await run;
   eq(state.cache.bySource.src2.status, "ok", "and src2 lands when it lands");
+});
+
+test("origin pattern: a port never reaches the pattern, so a ported source can be granted", () => {
+  const ctx = loadCommon();
+  const P = ctx.peOriginPatternForUrl;
+  // This extension is built for self-hosted Plane, so a non-default port is an ordinary
+  // input. A pattern's host is a hostname — "https://plane.internal:8443/*" is not valid
+  // and chrome throws on it, which fetchSource cannot distinguish from "not granted": the
+  // source would sit on "Site access not granted" with no way to ever grant it.
+  eq(P("https://plane.internal:8443/t.json"), "https://plane.internal/*", "explicit https port");
+  eq(P("http://h.test:8080/t.json"), "http://h.test/*", "explicit http port");
+  eq(P("https://h.test:443/t.json"), "https://h.test/*", "default port URL normalizes away");
+  eq(P("https://h.test/t.json"), "https://h.test/*", "no port");
+  // The permission a ported source needs is the one we now ask for, and the settings page
+  // must not flag it as unusable.
+  ok(!!P("https://plane.internal:8443/t.json"), "a ported source is valid, not refused");
+});
+
+test("import: a ported source URL survives, with the port dropped from its pattern", () => {
+  const ctx = loadCommon();
+  const out = ctx.peSanitizeSettings({
+    templateSync: { enabled: true, sources: [{ id: "p", url: "https://plane.internal:8443/t.json" }] }
+  });
+  eq(out.templateSync.sources.length, 1, "a self-hosted instance on a port is importable");
+  eq(out.templateSync.sources[0].url, "https://plane.internal:8443/t.json", "the URL itself keeps its port");
+});
+
+test("sync: a source that cannot be stored is reported failed, and does not kill the run", async () => {
+  const settings = oneSource();
+  settings.templateSync.sources.push({ id: "src2", url: "https://y.test/t.json", intervalMinutes: 360, enabled: true });
+  const { ctx, state } = loadWorker({
+    settings,
+    respond: () => jsonResponse(feed([{ id: "a", name: "A", content: "c" }]))
+  });
+  // storage.local is 10 MB and the caps allow far more, so quota failures are reachable.
+  state.failSaves = true;
+
+  const r = await ctx.syncSources(true);
+  // Old behaviour: the rejection propagated out of an un-awaited call and vanished, and
+  // the loop died at the first source.
+  eq(state.fetched.length, 2, "the run kept going and still fetched every source");
+  eq(r.ok, 0, "nothing was stored, so nothing synced");
+  eq(r.err, 2, "and both are reported failed rather than silently dropped");
 });
 
 test("sync: a redirect within a granted origin still works", async () => {

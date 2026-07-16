@@ -378,7 +378,7 @@ function peClampStr(v, max) {
 }
 
 // Build a host-permission match pattern for a source URL (e.g. "https://host/*").
-// Returns null for anything that isn't a plain http(s) URL.
+// Returns null for anything Chrome cannot turn into a host permission.
 function peOriginPatternForUrl(url) {
   let u;
   try {
@@ -387,7 +387,14 @@ function peOriginPatternForUrl(url) {
     return null;
   }
   if (!/^https?:$/.test(u.protocol)) return null;
-  return u.protocol + "//" + u.host + "/*";
+  // hostname, not host: a match pattern's host is a hostname and carries no port, and
+  // Chrome's docs say the way to match any port is to leave it out ("To match any
+  // localhost port during development, use http://localhost/*"). Keeping the port
+  // produced "http://localhost:8731/*", which is not a valid pattern — chrome throws on
+  // it, fetchSource reads the throw as "not granted", and a self-hosted Plane on a
+  // non-default port could never be granted at all. Dropping it grants the host on every
+  // port, which is what the ported URL needed anyway.
+  return u.protocol + "//" + u.hostname + "/*";
 }
 
 // Short label for a source (its host) shown in the picker/settings.

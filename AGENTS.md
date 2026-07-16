@@ -70,6 +70,38 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   and `grep` skips the whole file silently. Write control characters as escapes.
 - **A migration gate keyed on shape** (`if (raw.rules) return raw`) blocked every future
   migration and froze the stored `schema` stamp. Gate on the version number.
+- **State read before an `await` is stale after it.** A sync run kept the settings it read
+  before the fetch. While it was on the network the user deleted a source, the prune
+  removed it — and the run's write-back put it straight back, templates and all. Nothing
+  showed it, because the picker reads settings rather than the cache. Re-read after the
+  await and decide against that; never write a whole snapshot back over newer state.
+- **Reporting "already running" and returning zeroes.** The counts were real numbers, so
+  the caller rendered them: a green "Synced 0 source(s)" while a sync was in fact running,
+  and — because the permission grant starts a run before Save writes settings — a source
+  the user had just added was fetched by neither run. If a caller cannot act on a status,
+  do not invent one: queue the work and hand back a real result.
+- **A cap in the wrong unit, checked too late.** `text.length` counts UTF-16 code units
+  and the limit was named `maxResponseBytes`, so a Korean feed passed at ~3x; and
+  `resp.text()` had already buffered the whole stream before the check could run, which is
+  no cap at all for a chunked response. Count bytes, and count them as they arrive.
+- **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
+  and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
+  so you cannot follow it, report it, or even say it happened. Follow the redirect and
+  check the origin you landed on.
+
+The harness has its own traps, and they are worse, because a broken check is a check that
+lies:
+
+- **A hanging test is indistinguishable from a passing one.** Nothing fails: node runs out
+  of work, exits 0 and prints nothing, so CI reports green having run no assertions.
+  `tools/test.js` catches this in `beforeExit` and names the test — do not remove it.
+- **A stub that offers more than production uses.** The fetch stub still had `text()` after
+  the worker moved to streaming, so an implementation that buffered the whole body passed
+  the byte-cap tests without ever reading a chunk. Expose what the code actually calls.
+- **A test that only acts after the work is done.** "deleting a source drops its cached
+  templates" asserted the exact property the resurrection bug broke, and stayed green the
+  whole time — because it deleted only once the sync had finished. Everything a user does
+  happens mid-flight. Drive that window: hold a fetch open and act while it is in the air.
 
 ## Conventions
 
