@@ -215,6 +215,9 @@
   "msgInvalidSelector": {
     "message": "올바르지 않은 CSS 선택자"
   },
+  "msgInvalidSrcUrl": {
+    "message": "소스 주소는 http:// 또는 https:// 로 시작해야 합니다"
+  },
   "msgUngrouped": {
     "message": "그룹 없음"
   },

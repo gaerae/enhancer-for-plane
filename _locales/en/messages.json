@@ -215,6 +215,9 @@
   "msgInvalidSelector": {
     "message": "Invalid CSS selector"
   },
+  "msgInvalidSrcUrl": {
+    "message": "A source URL must start with http:// or https://"
+  },
   "msgUngrouped": {
     "message": "Ungrouped"
   },

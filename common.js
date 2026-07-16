@@ -44,6 +44,18 @@ const PE_SYNC_LIMITS = {
   maxResponseBytes: 1048576 // 1 MB per fetch
 };
 
+// Count caps for an imported settings file. The real ceiling is the ~8 KB sync quota, so
+// these are far above anything that can actually be saved — they are here to bound the
+// work done on a file that is hostile or simply corrupt, not to tell a user how many
+// templates they may keep. Without them, sanitizing was asymmetric: the two newest
+// fields (variables, sources) were count-capped and the three older ones were not.
+const PE_IMPORT_LIMITS = {
+  maxTemplates: 500,
+  maxRules: 500,
+  maxDomains: 200,
+  maxHiddenGroups: 100
+};
+
 const PE_DEFAULTS = {
   schema: PE_SCHEMA,
   enabled: true,
@@ -231,7 +243,8 @@ function peSanitizeSettings(raw) {
   out.allDomains = bool(raw.allDomains, false);
   out.domains = arr(raw.domains)
     .map((d) => str(d, L.maxFieldLen).trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, PE_IMPORT_LIMITS.maxDomains);
 
   out.rules = arr(raw.rules)
     .filter((r) => r && typeof r === "object")
@@ -243,7 +256,8 @@ function peSanitizeSettings(raw) {
       property: str(r.property, L.maxFieldLen),
       value: str(r.value, L.maxFieldLen)
     }))
-    .filter((r) => r.selector.trim() || r.label.trim());
+    .filter((r) => r.selector.trim() || r.label.trim())
+    .slice(0, PE_IMPORT_LIMITS.maxRules);
 
   out.templates = arr(raw.templates)
     .filter((t) => t && typeof t === "object")
@@ -253,7 +267,8 @@ function peSanitizeSettings(raw) {
       title: str(t.title, L.maxFieldLen),
       content: str(t.content, L.maxContentLen)
     }))
-    .filter((t) => t.name.trim() || t.title.trim() || t.content.trim());
+    .filter((t) => t.name.trim() || t.title.trim() || t.content.trim())
+    .slice(0, PE_IMPORT_LIMITS.maxTemplates);
 
   const seenVar = new Set();
   out.variables = arr(raw.variables)
@@ -281,7 +296,10 @@ function peSanitizeSettings(raw) {
         name: str(s.name, L.maxFieldLen).trim(),
         intervalMinutes: parseInt(s.intervalMinutes, 10) || 360,
         enabled: bool(s.enabled, true),
-        hiddenGroups: [...new Set(arr(s.hiddenGroups).map((g) => str(g, L.maxFieldLen)))]
+        hiddenGroups: [...new Set(arr(s.hiddenGroups).map((g) => str(g, L.maxFieldLen)))].slice(
+        0,
+        PE_IMPORT_LIMITS.maxHiddenGroups
+      )
       }))
       // A source whose URL is not a plain http(s) address can never be fetched.
       .filter((s) => peOriginPatternForUrl(s.url))

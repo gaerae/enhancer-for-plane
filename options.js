@@ -131,6 +131,17 @@
     input.title = ok ? "" : peMsg("msgInvalidSelector");
   }
 
+  // A source URL must be one the worker can actually ask for: http(s), so it maps to a
+  // host permission. Import already drops anything else — but dropping a URL the user
+  // typed would make their row vanish on Save with a cheerful "Saved". Show it instead.
+  function markSourceUrl(input) {
+    const v = input.value.trim();
+    const ok = !v || !!peOriginPatternForUrl(v);
+    input.classList.toggle("invalid", !ok);
+    input.title = ok ? "" : peMsg("msgInvalidSrcUrl");
+    return ok;
+  }
+
   function renderTemplates() {
     el.templateList.innerHTML = "";
     const list = state.templates || [];
@@ -269,8 +280,10 @@
 
       enabled.addEventListener("change", () => (sync.sources[idx].enabled = enabled.checked));
       nameInput.addEventListener("input", () => (sync.sources[idx].name = nameInput.value));
+      markSourceUrl(url);
       url.addEventListener("input", () => {
         sync.sources[idx].url = url.value.trim();
+        markSourceUrl(url);
         const s = sourceStatusText(sync.sources[idx]);
         statusEl.textContent = s.text;
         statusEl.className = "src-status " + s.cls;
@@ -614,8 +627,17 @@
       })
       .slice(0, PE_MAX_VARIABLES);
 
-    // drop empty sources; enforce the source cap
+    // A URL we cannot turn into a host permission is one the worker will never fetch.
+    // Refuse the save and name it, rather than dropping the row on the user's behalf.
     const sync = ensureSync();
+    const badSrc = (sync.sources || []).find((s) => s && s.url && s.url.trim() && !peOriginPatternForUrl(s.url.trim()));
+    if (badSrc) {
+      flash(peMsg("msgInvalidSrcUrl"), true);
+      renderSources();
+      return;
+    }
+
+    // drop empty sources; enforce the source cap
     sync.sources = (sync.sources || [])
       .filter((s) => s && s.url && s.url.trim())
       // Backstop only: the Add button stops at the cap, so this can bite only for

@@ -41,7 +41,7 @@ function match(actual, re, what) {
 function loadCommon() {
   const ctx = { console, URL, Date };
   vm.createContext(ctx);
-  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;", ctx);
+  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;", ctx);
   return ctx;
 }
 
@@ -68,14 +68,24 @@ function loadWorker({ settings, respond, granted = true }) {
     Date,
     setTimeout,
     clearTimeout,
-    fetch: async (url) => {
+    fetch: async (url, init) => {
       state.fetched.push(url);
-      const r = await respond(url);
+      // Honour the abort signal the way a real fetch does, so a hanging source in a test
+      // actually hangs instead of being a promise the harness quietly resolves.
+      const aborted = new Promise((_, reject) => {
+        const sig = init && init.signal;
+        if (!sig) return;
+        const fail = () => reject(Object.assign(new Error("signal timed out"), { name: "TimeoutError" }));
+        if (sig.aborted) fail();
+        else sig.addEventListener("abort", fail);
+      });
+      const r = await Promise.race([respond(url), aborted]);
       // A real Response always reports where it ended up; a test overrides `url` to
       // stand in for a redirect.
       if (r && typeof r === "object" && !r.url) r.url = url;
       return r;
     },
+    AbortSignal,
     ReadableStream,
     TextEncoder,
     TextDecoder,
@@ -516,6 +526,62 @@ test("sync: a redirect to an origin the user did not grant is refused", async ()
   ok(!state.cache.bySource.src1.templates, "nothing from the unapproved origin was stored");
 });
 
+test("sync: a source that never answers cannot block the ones after it", async () => {
+  const settings = oneSource({ id: "hang", url: "https://hang.test/t.json" });
+  settings.templateSync.sources.push({ id: "src2", url: "https://ok.test/t.json", intervalMinutes: 360, enabled: true });
+  const { ctx, state } = loadWorker({
+    settings,
+    // hang.test accepts the connection and then says nothing — the fetch only ends
+    // because of the timeout. Sources are fetched in order, so without one this run
+    // never reaches src2, on this tick or any other.
+    respond: (url) =>
+      url.includes("hang.test") ? new Promise(() => {}) : jsonResponse(feed([{ id: "a", name: "A", content: "c" }]))
+  });
+  // 30s is right in production and useless in a test; abort almost immediately instead.
+  // Not AbortSignal.timeout(): node un-refs its timer, so with the fetch above pending
+  // forever and nothing else holding the loop open, node would exit before the abort
+  // ever fired — the suite ended silently with status 0 and printed nothing. A plain
+  // setTimeout keeps the loop alive, which is what Chrome's behaviour looks like here.
+  ctx.AbortSignal = {
+    timeout: () => {
+      const c = new AbortController();
+      setTimeout(() => c.abort(), 1);
+      return c.signal;
+    }
+  };
+
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.hang.status, "error", "the hanging source fails on its own");
+  match(state.cache.bySource.hang.lastError, /timed out/i, "and says why");
+  eq(state.cache.bySource.src2.status, "ok", "the source behind it still synced");
+});
+
+test("sync: a result is stored as soon as it lands, not at the end of the run", async () => {
+  const g = gate();
+  const settings = oneSource();
+  settings.templateSync.sources.push({ id: "src2", url: "https://slow.test/t.json", intervalMinutes: 360, enabled: true });
+  const { ctx, state } = loadWorker({
+    settings,
+    respond: async (url) => {
+      if (url.includes("slow.test")) await g.held;
+      return jsonResponse(feed([{ id: "a", name: "A", content: "c" }]));
+    }
+  });
+  const run = ctx.syncSources(true);
+  await tick();
+  await tick();
+
+  // src1 is done; src2 is still out on the network. A worker evicted right now — or a
+  // src2 that never returns — must not cost us src1, which the single terminal write
+  // used to do: nothing was persisted until every source had finished.
+  eq(state.cache.bySource.src1 && state.cache.bySource.src1.status, "ok", "src1 is already durable");
+  ok(!state.cache.bySource.src2, "precondition: src2 has not landed yet");
+
+  g.release();
+  await run;
+  eq(state.cache.bySource.src2.status, "ok", "and src2 lands when it lands");
+});
+
 test("sync: a redirect within a granted origin still works", async () => {
   const { ctx, state } = loadWorker({
     settings: oneSource(),
@@ -860,6 +926,28 @@ test("import: sources are capped and unfetchable URLs are dropped", () => {
   ok(!out.templateSync.sources.some((s) => /^(javascript|ftp):/.test(s.url)), "only http(s) survives");
 });
 
+test("import: every list is count-capped, not just the newest two", () => {
+  const ctx = loadCommon();
+  const L = ctx.__IMPORT_LIMITS;
+  const raw = { domains: [], rules: [], templates: [], templateSync: { enabled: true, sources: [] } };
+  for (let i = 0; i < L.maxDomains + 50; i++) raw.domains.push("d" + i + ".test");
+  for (let i = 0; i < L.maxRules + 50; i++) raw.rules.push({ id: "r" + i, selector: ".x" + i, property: "width", value: "1px" });
+  for (let i = 0; i < L.maxTemplates + 50; i++) raw.templates.push({ id: "t" + i, name: "n" + i, content: "c" });
+  raw.templateSync.sources.push({
+    id: "s",
+    url: "https://h.test/t.json",
+    hiddenGroups: Array.from({ length: L.maxHiddenGroups + 50 }, (_, i) => "g" + i)
+  });
+
+  const out = ctx.peSanitizeSettings(raw);
+  // variables and sources were capped from the start; these three were not, so a corrupt
+  // or hostile file was mapped and clamped item by item with no bound at all.
+  eq(out.domains.length, L.maxDomains, "domains");
+  eq(out.rules.length, L.maxRules, "rules");
+  eq(out.templates.length, L.maxTemplates, "templates");
+  eq(out.templateSync.sources[0].hiddenGroups.length, L.maxHiddenGroups, "hiddenGroups");
+});
+
 test("import: a genuine export round-trips unchanged", () => {
   const ctx = loadCommon();
   const original = ctx.peDeepMerge(ctx.__DEFAULTS, {});
@@ -877,8 +965,23 @@ test("import: sanitizing keeps every key the form renders", () => {
 });
 
 /* ---------- run ---------- */
+
+// A test that awaits something which never settles does not fail — node runs out of work
+// and exits 0, printing nothing at all. That is the worst possible outcome: CI reports a
+// green suite that never ran a single assertion. beforeExit fires exactly in that case
+// (never after an explicit process.exit), so it is where we catch it.
+let finished = false;
+let running = "";
+process.on("beforeExit", () => {
+  if (finished) return;
+  console.log(`\ntests: DID NOT FINISH — "${running}" never settled (node exited with an empty event loop).`);
+  console.log("       A hanging test is a failing test; it must not look like a pass.");
+  process.exit(1);
+});
+
 (async () => {
   for (const t of tests) {
+    running = t.name;
     try {
       await t.fn();
       pass++;
@@ -888,5 +991,6 @@ test("import: sanitizing keeps every key the form renders", () => {
   }
   for (const f of fails) console.log(`  FAIL  ${f.name}\n          ${f.message}`);
   console.log(`\ntests: ${pass} passed, ${fails.length} failed, ${tests.length} total`);
+  finished = true;
   process.exit(fails.length ? 1 : 0);
 })();

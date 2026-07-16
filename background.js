@@ -92,6 +92,10 @@ async function injectExistingTabs(origins) {
 // no network, works offline, and never surprises the user with a permission prompt.
 
 const PE_SYNC_ALARM = "pe-template-sync";
+// Sources are fetched one after another, so a server that accepts the connection and
+// then says nothing does not just fail itself — it blocks every source after it in the
+// list, on every run, forever. fetch() has no timeout of its own.
+const PE_FETCH_TIMEOUT_MS = 30000;
 
 // Read a response body with a byte cap, stopping as soon as it is exceeded. Returns the
 // text, or null if the source went over.
@@ -134,7 +138,12 @@ async function fetchSource(src) {
   if (!allowed) return { status: "error", lastError: "Site access not granted" };
 
   try {
-    const resp = await fetch(src.url, { method: "GET", cache: "no-store", redirect: "follow" });
+    const resp = await fetch(src.url, {
+      method: "GET",
+      cache: "no-store",
+      redirect: "follow",
+      signal: AbortSignal.timeout(PE_FETCH_TIMEOUT_MS)
+    });
 
     // Check where we LANDED, not where we asked. The grant above covers src.url, but a
     // redirect can go anywhere, and the target only has to send
@@ -191,6 +200,10 @@ async function fetchSource(src) {
     }
     return { status: "ok", version, templates: norm.templates, dropped: norm.dropped, name: norm.name };
   } catch (e) {
+    // AbortSignal.timeout raises TimeoutError; its own message ("signal timed out") does
+    // not tell the user which of the two things went wrong, so name it here.
+    if (e && e.name === "TimeoutError")
+      return { status: "error", lastError: "Timed out after " + PE_FETCH_TIMEOUT_MS / 1000 + "s" };
     return { status: "error", lastError: (e && e.message) || "Fetch failed" };
   }
 }
@@ -220,6 +233,41 @@ async function pruneSyncCacheNow() {
   } catch (_) {}
 }
 
+// Store one source's result, and prune, against state read right now.
+//
+// Read-then-write rather than reusing the snapshot the run started with: a fetch takes
+// seconds, and the user may have deleted a source or hit "Restore defaults" meanwhile.
+// pruneSyncCacheNow() would have cleared it, and writing back the pre-fetch snapshot put
+// it straight back, templates and all — invisibly, since the picker reads settings, not
+// the cache. When the deleted source was the last one, ensureSyncAlarm() clears the
+// alarm, so no later run cleaned it up either: the orphan sat in storage.local until the
+// next browser start.
+//
+// Committing per source (rather than once at the end of the loop) also means a run that
+// is cut short — the worker is evicted, or a later source hangs — keeps what it already
+// fetched instead of throwing the whole round away.
+async function commitSource(id, entry) {
+  const fresh = await peGetSettings();
+  const freshSources = ((fresh.templateSync || {}).sources) || [];
+  const live = new Set(freshSources.map((s) => s && s.id).filter(Boolean));
+  const out = await peGetSyncCache();
+  out.bySource = out.bySource || {};
+
+  let mutated = false;
+  if (live.has(id)) {
+    // deleted mid-fetch → its result is not ours to store
+    if (entry.error) {
+      // Keep the last good templates; only flip status/error.
+      out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
+    } else {
+      out.bySource[id] = entry;
+    }
+    mutated = true;
+  }
+  if (pruneCacheEntries(out, freshSources)) mutated = true;
+  if (mutated) await peSaveSyncCache(out);
+}
+
 // force=true ignores per-source intervals (used by "Sync now" / install).
 async function syncOnce(force) {
   const settings = await peGetSettings();
@@ -230,10 +278,6 @@ async function syncOnce(force) {
   let ok = 0;
   let err = 0;
   let skipped = 0;
-  // Collect results instead of mutating the cache we read: a fetch takes seconds, and
-  // the snapshot goes stale while we are on the network. What to keep is decided
-  // against freshly-read state below.
-  const results = new Map();
 
   if (sync.enabled) {
     for (const src of sync.sources || []) {
@@ -250,10 +294,10 @@ async function syncOnce(force) {
         // the stored copy" optimization let `count` (fresh) and `templates` (stale)
         // diverge whenever a file was edited without bumping `version` — and it only
         // ever saved one storage write per interval, which is not worth the risk.
-        results.set(src.id, {
+        await commitSource(src.id, {
           version: res.version,
           remoteName: res.name || "",
-          fetchedAt: now,
+          fetchedAt: Date.now(),
           status: "ok",
           lastError: "",
           dropped: res.dropped || 0,
@@ -262,38 +306,15 @@ async function syncOnce(force) {
         });
         ok++;
       } else {
-        results.set(src.id, { error: res.lastError || "Error" });
+        await commitSource(src.id, { error: res.lastError || "Error" });
         err++;
       }
     }
   }
 
-  // Re-read before writing. The user may have deleted a source, or hit "Restore
-  // defaults", while we were fetching — pruneSyncCacheNow() would have cleared it, and
-  // writing back the pre-fetch snapshot put it straight back, templates and all. That
-  // resurrection is invisible (the picker reads settings, not the cache), and when the
-  // deleted source was the last one ensureSyncAlarm() clears the alarm, so no later run
-  // cleans it up either: the orphan sits in storage.local until the next browser start.
-  const fresh = await peGetSettings();
-  const freshSources = ((fresh.templateSync || {}).sources) || [];
-  const live = new Set(freshSources.map((s) => s && s.id).filter(Boolean));
-  const out = await peGetSyncCache();
-  out.bySource = out.bySource || {};
-  let mutated = false;
-
-  for (const [id, entry] of results) {
-    if (!live.has(id)) continue; // deleted mid-fetch — its result is not ours to store
-    if (entry.error) {
-      // Keep the last good templates; only flip status/error.
-      out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
-    } else {
-      out.bySource[id] = entry;
-    }
-    mutated = true;
-  }
-
-  if (pruneCacheEntries(out, freshSources)) mutated = true;
-  if (mutated) await peSaveSyncCache(out);
+  // Nothing fetched (all skipped, or sync switched off) still has to honour a deletion
+  // that landed while we were reading.
+  await commitSource(null, {});
   return { ok, err, skipped };
 }
 
