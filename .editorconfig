@@ -1,0 +1,19 @@
+# The formatting a linter would otherwise argue about. This repo has no formatter and
+# no build step on purpose, so the conventions live here instead — every mainstream
+# editor honours this file natively, with nothing to install.
+#
+# The tree is already uniform (2-space, LF, UTF-8, no trailing whitespace). This keeps
+# it that way when someone arrives with a differently configured editor.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Two trailing spaces are a hard line break in Markdown — trimming them changes meaning.
+trim_trailing_whitespace = false

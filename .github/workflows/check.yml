@@ -1,0 +1,44 @@
+name: Checks
+
+# Runs on every push/PR so a feature change cannot quietly ship a missing
+# translation, an undeclared placeholder, or an inconsistent term.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax-check sources
+        run: |
+          for f in common.js background.js content.js options.js popup.js tools/*.js; do
+            node --check "$f"
+          done
+
+      - name: Validate JSON
+        run: |
+          for f in manifest.json _locales/*/messages.json examples/*.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1
+          done
+
+      # --strict: terminology and unused-key warnings fail here, so they get fixed
+      # rather than scrolled past.
+      - name: i18n contract
+        run: node tools/check-i18n.js --strict
+
+      - name: Architectural invariants
+        run: node tools/check-source.js
+
+      - name: Behaviour tests
+        run: node tools/test.js
