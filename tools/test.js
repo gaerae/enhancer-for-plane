@@ -70,8 +70,15 @@ function loadWorker({ settings, respond, granted = true }) {
     clearTimeout,
     fetch: async (url) => {
       state.fetched.push(url);
-      return respond(url);
+      const r = await respond(url);
+      // A real Response always reports where it ended up; a test overrides `url` to
+      // stand in for a redirect.
+      if (r && typeof r === "object" && !r.url) r.url = url;
+      return r;
     },
+    ReadableStream,
+    TextEncoder,
+    TextDecoder,
     importScripts() {
       vm.runInContext(COMMON, ctx);
     },
@@ -81,7 +88,12 @@ function loadWorker({ settings, respond, granted = true }) {
       permissions: {
         onAdded: noop,
         onRemoved: noop,
-        contains: async () => granted,
+        // `granted` is a boolean for "all"/"none", or a list of patterns when a test
+        // needs one origin allowed and another not.
+        contains: async (q) =>
+          typeof granted === "boolean"
+            ? granted
+            : ((q && q.origins) || []).every((o) => granted.includes(o)),
         getAll: async () => ({ origins: [] }),
         remove: async () => {}
       },
@@ -111,7 +123,27 @@ function loadWorker({ settings, respond, granted = true }) {
   return { ctx, state };
 }
 
-const jsonResponse = (body) => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => body });
+// A body the worker reads the way it reads a real one: as a byte stream. `chunks` splits
+// it, so a test can prove the cap bites mid-stream rather than after the whole thing has
+// already been buffered.
+function bodyStream(str, chunks = 1) {
+  const bytes = new TextEncoder().encode(str);
+  const size = Math.ceil(bytes.length / chunks) || 1;
+  let at = 0;
+  return new ReadableStream({
+    pull(c) {
+      if (at >= bytes.length) return c.close();
+      c.enqueue(bytes.slice(at, at + size));
+      at += size;
+    }
+  });
+}
+
+const jsonResponse = (body, over = {}) =>
+  Object.assign(
+    { ok: true, status: 200, headers: { get: () => null }, body: bodyStream(body), text: async () => body },
+    over
+  );
 const feed = (templates, extra = {}) =>
   JSON.stringify(Object.assign({ schema: 1, name: "Feed", version: "v1", templates }, extra));
 
@@ -407,6 +439,92 @@ test("sync: an oversized response is refused", async () => {
   await ctx.syncSources(true);
   eq(state.cache.bySource.src1.status, "error");
   match(state.cache.bySource.src1.lastError, /too large/i);
+});
+
+test("sync: the response cap counts bytes, not UTF-16 units", async () => {
+  const ctx0 = loadCommon();
+  const cap = ctx0.__LIMITS.maxResponseBytes;
+  // Well under the cap as a JS string, comfortably over it on the wire: "가" is one code
+  // unit and three UTF-8 bytes. The old check compared text.length, so a Korean feed —
+  // the realistic case for this extension — passed at ~3x the limit it advertises.
+  const korean = feed([{ id: "a", name: "A", content: "가".repeat(Math.floor(cap * 0.6)) }]);
+  ok(korean.length < cap, "precondition: under the cap by string length");
+  ok(Buffer.byteLength(korean, "utf8") > cap, "precondition: over the cap in bytes");
+
+  const { ctx, state } = loadWorker({ settings: oneSource(), respond: () => jsonResponse(korean) });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.status, "error");
+  match(state.cache.bySource.src1.lastError, /too large/i);
+});
+
+test("sync: a chunked response is cut off at the cap, not buffered whole", async () => {
+  const ctx0 = loadCommon();
+  const cap = ctx0.__LIMITS.maxResponseBytes;
+  const huge = feed([{ id: "a", name: "A", content: "c" }]) + " ".repeat(cap * 3);
+  let delivered = 0;
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    // No content-length, so the pre-check cannot help: exactly the case the cap exists
+    // for. Chunks are counted as the worker pulls them.
+    respond: () => {
+      const bytes = new TextEncoder().encode(huge);
+      const step = 64 * 1024;
+      let at = 0;
+      // Deliberately no text(): a real body can only be had by reading the stream, and
+      // offering the shortcut let a buffer-it-all implementation pass this test without
+      // ever touching a chunk — `delivered` stayed 0 and every assertion held vacuously.
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        body: new ReadableStream({
+          pull(c) {
+            if (at >= bytes.length) return c.close();
+            const chunk = bytes.slice(at, at + step);
+            at += step;
+            delivered += chunk.byteLength;
+            c.enqueue(chunk);
+          }
+        })
+      };
+    }
+  });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.status, "error");
+  match(state.cache.bySource.src1.lastError, /too large/i);
+  // Slack is deliberate: a ReadableStream keeps a chunk queued ahead of the reader, so
+  // the cut lands a chunk or two past the cap rather than exactly on it. What matters is
+  // that it stops there instead of buffering the whole 3x-oversized body.
+  const total = Buffer.byteLength(huge, "utf8");
+  ok(delivered <= cap * 1.5, `stopped near the cap: took ${delivered}, cap ${cap}`);
+  ok(delivered < total / 2, `did not buffer the whole body: took ${delivered} of ${total}`);
+});
+
+test("sync: a redirect to an origin the user did not grant is refused", async () => {
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    granted: ["https://x.test/*"], // the source's own origin, and nothing else
+    // The grant covers x.test; the server 302s to a host the user never approved. It
+    // only has to answer with Access-Control-Allow-Origin: * for the body to be
+    // readable — raw.githubusercontent.com does exactly that.
+    respond: () => jsonResponse(feed([{ id: "a", name: "Not ours", content: "c" }]), { url: "https://evil.test/t.json" })
+  });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.status, "error");
+  match(state.cache.bySource.src1.lastError, /redirect/i, "the error names what happened");
+  match(state.cache.bySource.src1.lastError, /evil\.test/, "and where it went, so it can be fixed");
+  ok(!state.cache.bySource.src1.templates, "nothing from the unapproved origin was stored");
+});
+
+test("sync: a redirect within a granted origin still works", async () => {
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    granted: ["https://x.test/*"],
+    respond: () => jsonResponse(feed([{ id: "a", name: "A", content: "c" }]), { url: "https://x.test/elsewhere.json" })
+  });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.status, "ok", "a redirect the grant covers is not a problem");
+  eq(state.cache.bySource.src1.count, 1);
 });
 
 test("sync: without host permission nothing is fetched", async () => {

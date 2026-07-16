@@ -93,6 +93,36 @@ async function injectExistingTabs(origins) {
 
 const PE_SYNC_ALARM = "pe-template-sync";
 
+// Read a response body with a byte cap, stopping as soon as it is exceeded. Returns the
+// text, or null if the source went over.
+//
+// Two things this fixes over `await resp.text()` and a length check:
+//   - Bytes, not UTF-16 code units. The cap is named maxResponseBytes, but text.length
+//     counts code units, so a Korean/CJK feed sailed through at ~3x the limit.
+//   - The check has to happen DURING the read. text() buffers the whole stream first, so
+//     for a chunked response (no content-length to pre-check) the cap protected nothing:
+//     by the time we could compare, the worker had already swallowed it all.
+async function readCapped(resp, cap) {
+  const reader = resp.body && typeof resp.body.getReader === "function" ? resp.body.getReader() : null;
+  if (!reader) return ""; // no body (e.g. 204) — let the JSON parse report it
+  const decoder = new TextDecoder("utf-8");
+  let text = "";
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > cap) {
+      try {
+        await reader.cancel();
+      } catch (_) {}
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 async function fetchSource(src) {
   const pattern = peOriginPatternForUrl(src.url);
   if (!pattern) return { status: "error", lastError: "Invalid URL" };
@@ -105,13 +135,32 @@ async function fetchSource(src) {
 
   try {
     const resp = await fetch(src.url, { method: "GET", cache: "no-store", redirect: "follow" });
+
+    // Check where we LANDED, not where we asked. The grant above covers src.url, but a
+    // redirect can go anywhere, and the target only has to send
+    // "Access-Control-Allow-Origin: *" for the response to be readable — which
+    // raw.githubusercontent.com, the host our own README suggests, does. Without this a
+    // source could hand its templates over to an origin the user never approved.
+    // (redirect: "manual" refuses redirects outright, but Chrome returns an opaque
+    // response for it — status 0, no headers, no Location — so we could not tell the
+    // user where their source went, or even that it moved. Landing check it is.)
+    const landed = peOriginPatternForUrl(resp.url || src.url);
+    if (!landed) return { status: "error", lastError: "Invalid redirect target" };
+    if (landed !== pattern) {
+      let landedOk = false;
+      try {
+        landedOk = await chrome.permissions.contains({ origins: [landed] });
+      } catch (_) {}
+      if (!landedOk)
+        return { status: "error", lastError: "Redirected to " + peSourceLabel(resp.url) + ", which you have not granted" };
+    }
+
     if (!resp.ok) return { status: "error", lastError: "HTTP " + resp.status };
     const declared = parseInt(resp.headers.get("content-length") || "", 10);
     if (declared && declared > PE_SYNC_LIMITS.maxResponseBytes)
       return { status: "error", lastError: "Response too large" };
-    const text = await resp.text();
-    if (text.length > PE_SYNC_LIMITS.maxResponseBytes)
-      return { status: "error", lastError: "Response too large" };
+    const text = await readCapped(resp, PE_SYNC_LIMITS.maxResponseBytes);
+    if (text === null) return { status: "error", lastError: "Response too large" };
     let json;
     try {
       json = JSON.parse(text);
