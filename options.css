@@ -118,7 +118,8 @@ body {
 }
 
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="url"] {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -129,8 +130,20 @@ input[type="text"] {
   resize: vertical;
   background: #fff;
 }
+select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+  cursor: pointer;
+}
 textarea:focus,
 input[type="text"]:focus,
+input[type="url"]:focus,
+select:focus,
 input[type="number"]:focus {
   outline: none;
   border-color: var(--accent);
@@ -350,6 +363,174 @@ input:checked + .switch.sm::after {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
 }
+/* template variables */
+.var-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.var-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fcfcfd;
+}
+.var-token {
+  flex: 0 0 auto;
+  min-width: 108px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.var-name {
+  flex: 0 0 150px;
+  font-weight: 600;
+}
+.var-value {
+  flex: 1;
+  min-width: 0;
+}
+
+/* template sync sources */
+.src-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.src-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fcfcfd;
+}
+.src-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.src-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.src-url {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+.src-interval {
+  flex: 0 0 auto;
+  width: 130px;
+}
+.sync-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  cursor: pointer;
+}
+.sync-toggle-label {
+  font-size: 13px;
+  color: var(--muted-2);
+}
+
+/* collapsed file-format reference — docs shouldn't crowd the controls */
+.fmt {
+  margin: 0 0 12px;
+}
+.fmt > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted-2);
+  user-select: none;
+}
+.fmt > summary:hover {
+  color: var(--text);
+}
+.fmt-pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: #f1f2f4;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.src-status {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+/* read-only view of what a source delivered, with per-group show/hide */
+.src-detail {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.src-detail > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted-2);
+  user-select: none;
+}
+.src-detail > summary:hover {
+  color: var(--text);
+}
+.src-group {
+  margin-top: 8px;
+}
+.src-group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+.src-group-head input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+.src-group-name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.src-group-count {
+  font-size: 11px;
+  color: var(--muted);
+  background: #f1f2f4;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.src-group-items {
+  margin: 3px 0 0 21px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.src-group.off .src-group-name,
+.src-group.off .src-group-items {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.src-group.off .src-group-items {
+  text-decoration: none;
+}
+.src-status.ok {
+  color: #16a34a;
+}
+.src-status.err {
+  color: #dc2626;
+}
+
 .tpl-empty {
   padding: 20px;
   text-align: center;
@@ -469,13 +650,26 @@ kbd {
   }
   textarea,
   input[type="text"],
+  input[type="url"],
+  select,
   .row-ctrl input[type="number"] {
     background: #14171b;
     color: var(--text);
   }
   .tpl-item,
-  .rule-item {
+  .rule-item,
+  .src-item {
     background: #171b20;
+  }
+  .src-status.ok {
+    color: #4ade80;
+  }
+  .src-status.err {
+    color: #f87171;
+  }
+  .fmt-pre,
+  .src-group-count {
+    background: #14171b;
   }
   .chip {
     background: #14171b;

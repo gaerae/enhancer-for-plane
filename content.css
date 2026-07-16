@@ -167,15 +167,6 @@
   color: #1f2937;
 }
 
-#pe-tmpl-menu .pe-menu-header {
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #9ca3af;
-  letter-spacing: 0.02em;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
 #pe-tmpl-menu .pe-menu-list {
   /* ~8 items before scrolling, capped to the viewport on short screens */
   max-height: min(360px, 60vh);
@@ -261,8 +252,95 @@
   #pe-tmpl-menu .pe-menu-config:hover {
     background: #262b31;
   }
-  #pe-tmpl-menu .pe-menu-header,
   #pe-tmpl-menu .pe-menu-footer {
     border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* grouped picker: filter box, section headers, source markers */
+#pe-tmpl-menu .pe-menu-filter {
+  padding: 8px 8px 4px;
+}
+#pe-tmpl-menu .pe-menu-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: #1f2937;
+  background: #f6f7f9;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  outline: none;
+}
+#pe-tmpl-menu .pe-menu-filter-input:focus {
+  border-color: #9ca3af;
+  background: #fff;
+}
+/* Level 1 — block header ("Yours" or a source): a full-bleed band. The band is what
+   makes the block boundary unmistakable; group sub-headers below are plain indented
+   text with no background, so the two levels can never read as the same thing.
+   Authored names are shown as written (no uppercasing, which mangles intent). */
+#pe-tmpl-menu .pe-menu-section {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px -4px 2px;
+  padding: 6px 14px;
+  background: #f1f2f4;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#pe-tmpl-menu .pe-menu-list > .pe-menu-section:first-child {
+  margin-top: -4px;
+  border-top: none;
+}
+/* Synced blocks carry the accent; your own stay neutral. */
+#pe-tmpl-menu .pe-menu-section-synced .pe-menu-section-label {
+  color: #4f46e5;
+}
+/* Level 2 — a group inside a source. Plain text, no band: the contrast against the
+   banded block header above is what separates the levels. */
+#pe-tmpl-menu .pe-menu-subsection {
+  padding: 8px 10px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Level 3 — items belonging to a group sit one step in, so the group label reads as
+   their parent. Items directly under a block header keep the base indent. */
+#pe-tmpl-menu .pe-menu-subsection + .pe-menu-group .pe-menu-item {
+  padding-left: 22px;
+}
+
+@media (prefers-color-scheme: dark) {
+  #pe-tmpl-menu .pe-menu-filter-input {
+    color: #e5e7eb;
+    background: #262b31;
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+  #pe-tmpl-menu .pe-menu-filter-input:focus {
+    background: #1b1f24;
+    border-color: #6b7280;
+  }
+  #pe-tmpl-menu .pe-menu-section {
+    background: #23262b;
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #7c8593;
+  }
+  #pe-tmpl-menu .pe-menu-section-synced .pe-menu-section-label {
+    color: #a5b4fc;
+  }
+  #pe-tmpl-menu .pe-menu-subsection {
+    color: #9aa4b2;
   }
 }

@@ -13,22 +13,22 @@
       </header>
 
       <label class="pop-toggle">
-        <span>Enabled</span>
+        <span data-i18n="popEnabled">Enabled</span>
         <input type="checkbox" id="enabled" />
         <span class="switch"></span>
       </label>
 
-      <div class="pop-status" id="domainStatus">Current site: checking…</div>
+      <div class="pop-status" id="domainStatus" data-i18n="popChecking">Current site: checking…</div>
 
       <div class="pop-row">
-        <span class="pop-row-label">Templates</span>
+        <span class="pop-row-label" data-i18n="popTemplates">Templates</span>
         <span class="pop-badge" id="tplCount">0</span>
       </div>
 
-      <button class="pop-btn ghost" id="pickEl" hidden>🎯 Pick element → add rule</button>
-      <button class="pop-btn ghost" id="rescan" hidden>↻ Re-scan this page</button>
-      <button class="pop-btn primary" id="openOptions">Settings · Manage templates</button>
-      <button class="pop-btn ghost" id="addDomain" hidden>Enable on this site</button>
+      <button class="pop-btn ghost" id="pickEl" hidden data-i18n="popPick">🎯 Pick element → add rule</button>
+      <button class="pop-btn ghost" id="rescan" hidden data-i18n="popRescan">↻ Re-scan this page</button>
+      <button class="pop-btn primary" id="openOptions" data-i18n="popSettings">Settings · Manage templates</button>
+      <button class="pop-btn ghost" id="addDomain" hidden data-i18n="popEnableSite">Enable on this site</button>
     </div>
     <script src="common.js"></script>
     <script src="popup.js"></script>
