@@ -171,68 +171,119 @@ async function pruneSyncCacheNow() {
   } catch (_) {}
 }
 
-let syncing = false;
 // force=true ignores per-source intervals (used by "Sync now" / install).
-async function syncSources(force) {
-  if (syncing) return { ok: 0, err: 0, skipped: 0, busy: true };
-  syncing = true;
-  try {
-    const settings = await peGetSettings();
-    const sync = settings.templateSync || {};
-    const cache = await peGetSyncCache();
-    cache.bySource = cache.bySource || {};
-    const now = Date.now();
-    let ok = 0;
-    let err = 0;
-    let skipped = 0;
-    let mutated = false;
+async function syncOnce(force) {
+  const settings = await peGetSettings();
+  const sync = settings.templateSync || {};
+  const cache = await peGetSyncCache();
+  cache.bySource = cache.bySource || {};
+  const now = Date.now();
+  let ok = 0;
+  let err = 0;
+  let skipped = 0;
+  // Collect results instead of mutating the cache we read: a fetch takes seconds, and
+  // the snapshot goes stale while we are on the network. What to keep is decided
+  // against freshly-read state below.
+  const results = new Map();
 
-    if (sync.enabled) {
-      for (const src of sync.sources || []) {
-        if (!src || !src.id || !src.url || src.enabled === false) continue;
-        const prev = cache.bySource[src.id];
-        const interval = Math.max(30, src.intervalMinutes || 360) * 60000;
-        if (!force && prev && prev.fetchedAt && now - prev.fetchedAt < interval) {
-          skipped++;
-          continue;
-        }
-        const res = await fetchSource(src);
-        if (res.status === "ok") {
-          // Always store exactly what was just fetched. An earlier "same version → keep
-          // the stored copy" optimization let `count` (fresh) and `templates` (stale)
-          // diverge whenever a file was edited without bumping `version` — and it only
-          // ever saved one storage write per interval, which is not worth the risk.
-          cache.bySource[src.id] = {
-            version: res.version,
-            remoteName: res.name || "",
-            fetchedAt: now,
-            status: "ok",
-            lastError: "",
-            dropped: res.dropped || 0,
-            count: res.templates.length,
-            templates: res.templates
-          };
-          mutated = true;
-          ok++;
-        } else {
-          // Keep the last good templates; only flip status/error.
-          cache.bySource[src.id] = Object.assign({}, prev, {
-            status: "error",
-            lastError: res.lastError || "Error"
-          });
-          mutated = true;
-          err++;
-        }
+  if (sync.enabled) {
+    for (const src of sync.sources || []) {
+      if (!src || !src.id || !src.url || src.enabled === false) continue;
+      const prev = cache.bySource[src.id];
+      const interval = Math.max(30, src.intervalMinutes || 360) * 60000;
+      if (!force && prev && prev.fetchedAt && now - prev.fetchedAt < interval) {
+        skipped++;
+        continue;
+      }
+      const res = await fetchSource(src);
+      if (res.status === "ok") {
+        // Always store exactly what was just fetched. An earlier "same version → keep
+        // the stored copy" optimization let `count` (fresh) and `templates` (stale)
+        // diverge whenever a file was edited without bumping `version` — and it only
+        // ever saved one storage write per interval, which is not worth the risk.
+        results.set(src.id, {
+          version: res.version,
+          remoteName: res.name || "",
+          fetchedAt: now,
+          status: "ok",
+          lastError: "",
+          dropped: res.dropped || 0,
+          count: res.templates.length,
+          templates: res.templates
+        });
+        ok++;
+      } else {
+        results.set(src.id, { error: res.lastError || "Error" });
+        err++;
       }
     }
-
-    if (pruneCacheEntries(cache, sync.sources)) mutated = true;
-
-    if (mutated) await peSaveSyncCache(cache);
-    return { ok, err, skipped };
-  } finally {
-    syncing = false;
   }
+
+  // Re-read before writing. The user may have deleted a source, or hit "Restore
+  // defaults", while we were fetching — pruneSyncCacheNow() would have cleared it, and
+  // writing back the pre-fetch snapshot put it straight back, templates and all. That
+  // resurrection is invisible (the picker reads settings, not the cache), and when the
+  // deleted source was the last one ensureSyncAlarm() clears the alarm, so no later run
+  // cleans it up either: the orphan sits in storage.local until the next browser start.
+  const fresh = await peGetSettings();
+  const freshSources = ((fresh.templateSync || {}).sources) || [];
+  const live = new Set(freshSources.map((s) => s && s.id).filter(Boolean));
+  const out = await peGetSyncCache();
+  out.bySource = out.bySource || {};
+  let mutated = false;
+
+  for (const [id, entry] of results) {
+    if (!live.has(id)) continue; // deleted mid-fetch — its result is not ours to store
+    if (entry.error) {
+      // Keep the last good templates; only flip status/error.
+      out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
+    } else {
+      out.bySource[id] = entry;
+    }
+    mutated = true;
+  }
+
+  if (pruneCacheEntries(out, freshSources)) mutated = true;
+  if (mutated) await peSaveSyncCache(out);
+  return { ok, err, skipped };
+}
+
+let running = null; // the sync in progress
+let waiting = null; // at most one run queued behind it
+let waitingForce = false;
+
+// Serialize runs. Reporting "already running" and returning zero counts looked tidy but
+// was a silent no-op with two faces: "Sync now" flashed "Synced 0 source(s)" as success
+// while a sync was in fact running, and — worse — adding a source fetched nothing. That
+// second one is the whole feature's entry point: saveAll() requests the host permission
+// BEFORE it writes settings, so permissions.onAdded starts a run that cannot see the new
+// source, and the "sync now" the save then sends was rejected as busy. Neither run
+// fetched it and the UI said the save succeeded. Queueing instead means a caller always
+// gets a real run against the settings as they are when its turn comes.
+function syncSources(force) {
+  if (!running) {
+    running = syncOnce(force).finally(() => {
+      running = null;
+    });
+    return running;
+  }
+  // One queued run absorbs every caller that arrives while this one waits; if any of
+  // them asked to force, the queued run forces.
+  waitingForce = waitingForce || !!force;
+  if (!waiting) {
+    waiting = running
+      .catch(() => {})
+      .then(() => {
+        const f = waitingForce;
+        waiting = null;
+        waitingForce = false;
+        running = syncOnce(f).finally(() => {
+          running = null;
+        });
+        return running;
+      });
+  }
+  return waiting;
 }
 
 // One repeating alarm at the smallest source interval; each tick only fetches

@@ -47,16 +47,31 @@ function loadCommon() {
 
 // background.js as a service worker: stubbed storage, permissions, alarms and fetch.
 // `respond` maps a URL to a Response-ish object (or throws, to simulate offline).
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+// A fetch we can hold open, so a test can act "while the network is slow".
+function gate() {
+  let release;
+  const held = new Promise((r) => (release = r));
+  return { held, release };
+}
+
+// Let the worker reach its first await (the fetch) before the test acts.
+const tick = () => new Promise((r) => setImmediate(r));
+
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
-  const state = { settings, cache: { bySource: {} } };
+  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [] };
   const ctx = {
     console,
     URL,
     Date,
     setTimeout,
     clearTimeout,
-    fetch: async (url) => respond(url),
+    fetch: async (url) => {
+      state.fetched.push(url);
+      return respond(url);
+    },
     importScripts() {
       vm.runInContext(COMMON, ctx);
     },
@@ -73,11 +88,17 @@ function loadWorker({ settings, respond, granted = true }) {
       scripting: { unregisterContentScripts: async () => {}, registerContentScripts: async () => {} },
       tabs: { query: async () => [] },
       storage: {
-        sync: { get: (k, cb) => cb({ peSettings: state.settings }) },
+        // Hand back a copy, exactly as chrome.storage does — it structured-clones on
+        // read, so a caller can never mutate stored state by writing to what it read.
+        // (Realism only: the by-reference version did not actually hide the resurrection
+        // bug below, because `set` replaced the stored object each time and broke the
+        // aliasing. What hid that bug was that no test drove the in-flight window.)
+        sync: { get: (k, cb) => cb({ peSettings: clone(state.settings) }) },
         local: {
-          get: (k, cb) => cb({ peSyncCache: state.cache }),
+          get: (k, cb) => cb({ peSyncCache: clone(state.cache) }),
           set: (o, cb) => {
-            state.cache = JSON.parse(JSON.stringify(o.peSyncCache));
+            state.cache = clone(o.peSyncCache);
+            state.writes.push(Object.keys(state.cache.bySource || {}).sort());
             cb();
           }
         },
@@ -456,6 +477,111 @@ test("cache: restoring defaults clears the synced templates", async () => {
   state.settings.templateSync = { enabled: false, sources: [] };
   await ctx.pruneSyncCacheNow();
   eq(Object.keys(state.cache.bySource), [], "cache cleared");
+});
+
+/* ---------- concurrency ----------
+   The two tests above delete only AFTER the sync has finished. Everything the user
+   actually does happens while a fetch is in flight — a fetch takes seconds, and the
+   alarm, the permission grant and the Save button all start runs the user never sees.
+   These drive that window, which is where every bug in this section lived. */
+
+test("sync: a source deleted mid-fetch is not resurrected by the run in flight", async () => {
+  const g = gate();
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    respond: async () => {
+      await g.held;
+      return jsonResponse(feed([{ id: "a", name: "Secret", content: "c" }]));
+    }
+  });
+  const inFlight = ctx.syncSources(true);
+  await tick();
+
+  // The user deletes the source and Settings prunes the cache, all while we are fetching.
+  state.settings.templateSync.sources = [];
+  await ctx.pruneSyncCacheNow();
+  eq(Object.keys(state.cache.bySource), [], "precondition: prune cleared it");
+
+  g.release();
+  await inFlight;
+  eq(Object.keys(state.cache.bySource), [], "deleted source stays deleted");
+});
+
+test("sync: restoring defaults mid-fetch is not undone by the run in flight", async () => {
+  const g = gate();
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    respond: async () => {
+      await g.held;
+      return jsonResponse(feed([{ id: "a", name: "A", content: "c" }]));
+    }
+  });
+  const inFlight = ctx.syncSources(true);
+  await tick();
+
+  state.settings.templateSync = { enabled: false, sources: [] };
+  await ctx.pruneSyncCacheNow();
+
+  g.release();
+  await inFlight;
+  // Nothing self-heals this one: with no sources left, ensureSyncAlarm clears the alarm,
+  // so a resurrected orphan would sit in storage.local until the next browser start.
+  eq(Object.keys(state.cache.bySource), [], "cache stays cleared");
+});
+
+test("sync: a second call runs for real instead of reporting a no-op", async () => {
+  const g = gate();
+  const { ctx } = loadWorker({
+    settings: oneSource(),
+    respond: async () => {
+      await g.held;
+      return jsonResponse(feed([{ id: "a", name: "A", content: "c" }]));
+    }
+  });
+  const first = ctx.syncSources(true);
+  await tick();
+  const second = ctx.syncSources(true); // "Sync now" while the first is still fetching
+  g.release();
+
+  const [r1, r2] = await Promise.all([first, second]);
+  eq(r1.ok, 1, "first run fetched");
+  // The old code returned {ok:0, busy:true} here, and the options page rendered that as
+  // a success: "Synced 0 source(s)." while a sync was in fact running.
+  eq(r2.ok, 1, "second run fetched too, rather than reporting zero");
+  ok(!("busy" in r2), "no busy flag for a caller to forget to read");
+});
+
+test("sync: a source added while a run is in flight is still fetched", async () => {
+  const g = gate();
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    respond: async (url) => {
+      if (url.includes("x.test")) await g.held; // the existing source is slow
+      return jsonResponse(feed([{ id: "a", name: "A", content: "c" }]));
+    }
+  });
+
+  // saveAll() asks for the host permission BEFORE it writes settings, so this run —
+  // started by permissions.onAdded — reads settings that do not know about src2 yet.
+  const granted = ctx.syncSources(true);
+  await tick();
+
+  state.settings.templateSync.sources.push({
+    id: "src2",
+    url: "https://new.test/t.json",
+    intervalMinutes: 360,
+    enabled: true
+  });
+  const saveSync = ctx.syncSources(true); // the "sync now" that saveAll sends afterwards
+
+  g.release();
+  await Promise.all([granted, saveSync]);
+
+  ok(
+    state.fetched.some((u) => u.includes("new.test")),
+    "the source the user just added was actually fetched"
+  );
+  eq(Object.keys(state.cache.bySource).sort(), ["src1", "src2"], "and it reached the cache");
 });
 
 /* ================================================================== */
