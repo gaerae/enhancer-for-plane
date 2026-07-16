@@ -36,13 +36,27 @@ const PE_MAX_VARIABLES = 5;
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it
 // to protect quota, memory, and picker render time (and to blunt a bad endpoint).
+//
+// The binding one is maxResponseBytes: a source's cached entry is built from a single
+// response, so it cannot hold more than one response's worth however generous the other
+// caps look. That makes the storage budget maxSources x maxResponseBytes — and it has to
+// fit chrome.storage.local's QUOTA_BYTES, which is 10 MB (5 MB on Chrome 113 and
+// earlier). At 10 x 1 MB it did not: a measured worst case of 9.69 MB against a 10 MB
+// quota, and over the line on older Chrome. Exceeding it does not corrupt anything — the
+// save is refused and the source is reported failed — but a limit you can reach by using
+// the feature as documented is not a limit. 10 x 512 KB leaves half the quota spare.
+// tools/test.js asserts this arithmetic; change a number there and it will tell you.
 const PE_SYNC_LIMITS = {
   maxSources: 10,
   maxTemplatesPerSource: 200,
   maxContentLen: 20000, // per-template body
   maxFieldLen: 300, // name / title / group
-  maxResponseBytes: 1048576 // 1 MB per fetch
+  maxResponseBytes: 524288 // 512 KB per fetch
 };
+
+// What chrome.storage.local will hold, for the budget check above (10 MB; 5 MB on
+// Chrome <= 113). Not a cap we enforce — a fact we have to design against.
+const PE_LOCAL_QUOTA_BYTES = 10485760;
 
 // Count caps for an imported settings file. The real ceiling is the ~8 KB sync quota, so
 // these are far above anything that can actually be saved — they are here to bound the

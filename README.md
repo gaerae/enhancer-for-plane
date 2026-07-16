@@ -148,10 +148,17 @@ every time. That is deliberate: a version-gated cache means one forgotten bump
 serves stale templates to the whole team, and this project shipped exactly that bug
 once (`count: 11 / stored: 3`) before the check was removed.
 
-Limits, enforced on download: **10 sources**, **200 templates** per source, **1 MB**
+Limits, enforced on download: **10 sources**, **200 templates** per source, **512 KB**
 per response, **20,000 chars** per body, **300 chars** per name/title/group. Anything
 over a cap is clamped or dropped, not rejected wholesale — one oversized entry never
-costs you the rest of the file.
+costs you the rest of the file. (The response cap is what bounds a source on disk, so
+10 × 512 KB is the storage budget — half of what `chrome.storage.local` holds.)
+
+**If your source redirects, use the address it lands on.** Redirects are followed, but
+templates are only accepted from an origin you granted — so a URL that hops to another
+host reports `Redirected to <host>, which you have not granted` rather than syncing.
+The common case is a Git host: `github.com/<org>/<repo>/raw/main/t.json` redirects to
+`raw.githubusercontent.com`, so enter the `raw.githubusercontent.com` URL directly.
 
 Group ordering follows first appearance in the file; ungrouped items come first.
 Working examples: [`examples/team-templates.json`](examples/team-templates.json) and

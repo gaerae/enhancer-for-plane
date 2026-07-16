@@ -41,7 +41,7 @@ function match(actual, re, what) {
 function loadCommon() {
   const ctx = { console, URL, Date };
   vm.createContext(ctx);
-  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;", ctx);
+  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;", ctx);
   return ctx;
 }
 
@@ -590,6 +590,45 @@ test("sync: a result is stored as soon as it lands, not at the end of the run", 
   g.release();
   await run;
   eq(state.cache.bySource.src2.status, "ok", "and src2 lands when it lands");
+});
+
+test("limits: every source at its cap still fits chrome.storage.local", () => {
+  const ctx = loadCommon();
+  const L = ctx.__LIMITS;
+  // A cached entry is built from one response, so maxResponseBytes — not the far larger
+  // maxTemplatesPerSource x maxContentLen — is what actually bounds a source on disk.
+  // The budget is therefore maxSources x maxResponseBytes, and it must fit QUOTA_BYTES
+  // with room to spare. At 10 x 1 MB the measured worst case was 9.69 MB against a 10 MB
+  // quota, and past the 5 MB quota of Chrome 113 and earlier. This test is here so that
+  // raising either number has to be a decision rather than an accident.
+  const budget = L.maxSources * L.maxResponseBytes;
+  ok(
+    budget <= ctx.__LOCAL_QUOTA / 2,
+    `sync budget ${(budget / 1048576).toFixed(1)} MB must stay under half of the ` +
+      `${(ctx.__LOCAL_QUOTA / 1048576).toFixed(0)} MB storage.local quota`
+  );
+});
+
+test("limits: a source cannot store more than its response cap allows", async () => {
+  const ctx0 = loadCommon();
+  const L = ctx0.__LIMITS;
+  // Pack a feed as full as the response cap permits and measure what actually lands.
+  // This is the number the budget above is built on; if normalization ever starts
+  // inflating what it stores, the budget stops being true and this catches it.
+  const per = Math.floor(L.maxResponseBytes / 100) - 120;
+  const templates = Array.from({ length: 100 }, (_, i) => ({ id: "t" + i, group: "G", name: "n" + i, content: "x".repeat(per) }));
+  const body = feed(templates);
+  ok(Buffer.byteLength(body, "utf8") <= L.maxResponseBytes, "precondition: the feed fits the cap");
+
+  const { ctx, state } = loadWorker({ settings: oneSource(), respond: () => jsonResponse(body) });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.status, "ok", "precondition: it synced");
+
+  const stored = Buffer.byteLength(JSON.stringify(state.cache.bySource.src1), "utf8");
+  ok(
+    stored <= L.maxResponseBytes * 1.1,
+    `a source stored ${(stored / 1024).toFixed(0)} KB from a ${(L.maxResponseBytes / 1024).toFixed(0)} KB cap`
+  );
 });
 
 test("origin pattern: a port never reaches the pattern, so a ported source can be granted", () => {
