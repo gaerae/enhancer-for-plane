@@ -1,0 +1,8 @@
+# .editorconfig asks the editor nicely; this makes git enforce it. Without it, a
+# contributor whose git has core.autocrlf=true commits CRLF and every file shows up
+# as fully rewritten.
+* text=auto eol=lf
+
+# Icons and store artwork are binary: never diff, never merge, never touch line endings.
+*.png binary
+*.zip binary

@@ -8,6 +8,7 @@
   window.__peLoaded = true;
 
   let settings = null;
+  let syncCache = { bySource: {} }; // synced templates (chrome.storage.local)
 
   // styles
   let sheetObj = null;
@@ -23,6 +24,20 @@
   let injectScheduled = false;
 
   const isActive = () => peIsActiveOn(settings, location.hostname);
+
+  // Any template available to insert? (personal OR synced). injectAll runs on every
+  // relevant DOM mutation, so this must be O(1) — rebuilding the sections here would
+  // re-bucket every template (up to 10 sources x 200) on each mutation burst. Recomputed
+  // only when settings or the sync cache actually change.
+  let templatesAvailable = false;
+  function recountTemplates() {
+    try {
+      templatesAvailable = peCountTemplates(peBuildTemplateSections(settings || {}, syncCache)) > 0;
+    } catch (_) {
+      templatesAvailable = false;
+    }
+  }
+  const hasAnyTemplates = () => templatesAvailable;
 
   /* ================================================================== */
   /* 1. Inject user-defined style rules (adoptedStyleSheets)              */
@@ -176,9 +191,9 @@
     // our button carries no <input> and is never mistaken for an attach button.
     btn.querySelectorAll("input, textarea, select").forEach((n) => n.remove());
     btn.setAttribute("type", "button");
-    btn.setAttribute("aria-label", "Insert title & body template (Alt/⌥+T)");
-    btn.setAttribute("title", "Insert title & body template  ·  Alt/⌥+T");
-    relabel(btn, "Template");
+    btn.setAttribute("aria-label", peMsg("menuBtnAria"));
+    btn.setAttribute("title", peMsg("menuBtnTitle"));
+    relabel(btn, peMsg("menuBtnLabel"));
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -197,14 +212,15 @@
     const b = document.createElement("button");
     b.type = "button";
     b.className = "pe-body-tmpl-btn";
-    b.setAttribute("aria-label", "Insert title & body template (Alt/⌥+T)");
-    b.setAttribute("title", "Insert title & body template  ·  Alt/⌥+T");
+    b.setAttribute("aria-label", peMsg("menuBtnAria"));
+    b.setAttribute("title", peMsg("menuBtnTitle"));
     b.innerHTML =
       '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
       '<path d="M4.75 2h4.09a1 1 0 0 1 .7.29l2.17 2.17a1 1 0 0 1 .29.7V13.5a.5.5 0 0 1-.5.5H4.75a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5Z" fill="none" stroke="currentColor" stroke-width="1.1"/>' +
       '<path d="M9 2.2V5h2.8" fill="none" stroke="currentColor" stroke-width="1.1"/>' +
       '<path d="M6.2 8.4h3.6M6.2 10.6h3.6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>' +
-      "<span>Template</span>";
+      "<span></span>";
+    b.querySelector("span:last-child").textContent = peMsg("menuBtnLabel");
     b.addEventListener("mousedown", (e) => e.preventDefault());
     b.addEventListener("click", (e) => {
       e.preventDefault();
@@ -258,7 +274,7 @@
   }
 
   function injectAll() {
-    if (!isActive() || !settings.templates || settings.templates.length === 0) {
+    if (!isActive() || !hasAnyTemplates()) {
       removeButtons();
       return;
     }
@@ -296,44 +312,160 @@
 
   function renderMenu() {
     menu.innerHTML = "";
-    const header = document.createElement("div");
-    header.className = "pe-menu-header";
-    header.textContent = "Templates (title + body)";
-    menu.appendChild(header);
+    const sections = peBuildTemplateSections(settings || {}, syncCache);
+    const total = peCountTemplates(sections);
+    const hasSynced = sections.some((s) => s.kind === "synced");
+
+    // Filter box — only worth showing once the list is long (a source can push many).
+    let filterInput = null;
+    if (total > 8) {
+      const fwrap = document.createElement("div");
+      fwrap.className = "pe-menu-filter";
+      filterInput = document.createElement("input");
+      filterInput.type = "text";
+      filterInput.placeholder = peMsg("menuFilterPh");
+      filterInput.className = "pe-menu-filter-input";
+      filterInput.addEventListener("mousedown", (e) => e.stopPropagation());
+      fwrap.appendChild(filterInput);
+      menu.appendChild(fwrap);
+    }
 
     const list = document.createElement("div");
     list.className = "pe-menu-list";
-    (settings.templates || []).forEach((t) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "pe-menu-item";
-      const title = document.createElement("div");
-      title.className = "pe-menu-item-title";
-      title.textContent = t.name || "(untitled)";
-      const preview = document.createElement("div");
-      preview.className = "pe-menu-item-preview";
+
+    // Build one wrap per group of items; `headerEl` is that group's own header (may be
+    // null) and `ownerEl` is the source header the group belongs to (may be null).
+    // The filter uses these to hide empty headers, and a source header once all of its
+    // groups are filtered out.
+    const wraps = []; // { wrap, headerEl, ownerEl }
+
+    // One-line preview. The body is Markdown, so strip the syntax rather than showing
+    // "## Environment - Version:" — the markers carry no meaning at a glance.
+    function previewOf(t) {
       const parts = [];
-      if (t.title && t.title.trim()) parts.push("Title: " + t.title.trim());
-      if (t.content && t.content.trim()) parts.push(t.content.replace(/\s+/g, " ").trim());
-      preview.textContent = parts.join(" · ").slice(0, 90);
-      item.appendChild(title);
-      item.appendChild(preview);
-      item.addEventListener("mousedown", (e) => e.preventDefault());
-      item.addEventListener("click", (e) => {
-        e.preventDefault();
-        applyTemplate(t, menuOwnerBtn);
-        hideMenu();
+      if (t.title && t.title.trim()) parts.push(peMsg("menuTitlePrefix", [t.title.trim()]));
+      if (t.content && t.content.trim()) {
+        const plain = String(t.content)
+          .replace(/```[\s\S]*?```/g, " ") // fenced code blocks
+          .replace(/^\s*#{1,6}\s+/gm, "") // headings
+          .replace(/^\s*[-*]\s+\[[ xX]\]\s+/gm, "") // task items
+          .replace(/^\s*[-*]\s+/gm, "") // bullets
+          .replace(/^\s*\d+\.\s+/gm, "") // ordered items
+          .replace(/^\s*-{3,}\s*$/gm, " ") // rules
+          .replace(/[*_`>]/g, "") // inline markers
+          .replace(/\s+/g, " ")
+          .trim();
+        if (plain) parts.push(plain);
+      }
+      return parts.join(" · ").slice(0, 90);
+    }
+
+    function addItems(items, headerEl, ownerEl) {
+      const wrap = document.createElement("div");
+      wrap.className = "pe-menu-group";
+      items.forEach((t) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "pe-menu-item";
+        const title = document.createElement("div");
+        title.className = "pe-menu-item-title";
+        title.textContent = t.name || peMsg("menuUntitled");
+        const preview = document.createElement("div");
+        preview.className = "pe-menu-item-preview";
+        preview.textContent = previewOf(t);
+        item._haystack = ((t.name || "") + " " + (t.title || "") + " " + (t.content || "")).toLowerCase();
+        item.appendChild(title);
+        item.appendChild(preview);
+        item.addEventListener("mousedown", (e) => e.preventDefault());
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          applyTemplate(t, menuOwnerBtn);
+          hideMenu();
+        });
+        wrap.appendChild(item);
       });
-      list.appendChild(item);
+      list.appendChild(wrap);
+      wraps.push({ wrap, headerEl, ownerEl });
+    }
+
+    sections.forEach((section) => {
+      if (section.kind === "personal") {
+        let head = null;
+        if (hasSynced) {
+          // Only label your own templates when synced blocks follow them.
+          head = document.createElement("div");
+          head.className = "pe-menu-section";
+          const label = document.createElement("span");
+          label.className = "pe-menu-section-label";
+          label.textContent = peMsg("menuYours");
+          head.appendChild(label);
+          list.appendChild(head);
+        }
+        addItems(section.items, head, null);
+        return;
+      }
+
+      // Synced source: one header named after the source, then a sub-header per group.
+      // No generic prefix (every synced block would carry it, so it identifies nothing)
+      // and no lock (read-only only matters in Settings — here you can only insert).
+      // The full URL rides along as a tooltip for provenance.
+      const srcHead = document.createElement("div");
+      srcHead.className = "pe-menu-section pe-menu-section-synced";
+      const label = document.createElement("span");
+      label.className = "pe-menu-section-label";
+      label.textContent = section.source || peMsg("menuSynced");
+      srcHead.appendChild(label);
+      if (section.url) srcHead.title = section.url;
+      list.appendChild(srcHead);
+
+      section.groups.forEach((g) => {
+        let sub = null;
+        if (g.label) {
+          sub = document.createElement("div");
+          sub.className = "pe-menu-subsection";
+          sub.textContent = g.label;
+          list.appendChild(sub);
+        }
+        addItems(g.items, sub, srcHead);
+      });
     });
+
     menu.appendChild(list);
+
+    if (filterInput) {
+      const noHits = document.createElement("div");
+      noHits.className = "pe-menu-empty";
+      noHits.textContent = peMsg("menuNoMatch");
+      noHits.style.display = "none";
+      list.appendChild(noHits);
+      filterInput.addEventListener("input", () => {
+        const q = filterInput.value.trim().toLowerCase();
+        let shown = 0;
+        const ownerHits = new Map(); // source header → surviving item count
+        wraps.forEach(({ wrap, headerEl, ownerEl }) => {
+          let groupShown = 0;
+          wrap.querySelectorAll(".pe-menu-item").forEach((it) => {
+            const hit = !q || it._haystack.indexOf(q) !== -1;
+            it.style.display = hit ? "" : "none";
+            if (hit) groupShown++;
+          });
+          wrap.style.display = groupShown ? "" : "none";
+          if (headerEl) headerEl.style.display = groupShown ? "" : "none";
+          if (ownerEl) ownerHits.set(ownerEl, (ownerHits.get(ownerEl) || 0) + groupShown);
+          shown += groupShown;
+        });
+        // A source header disappears only when every group under it is empty.
+        ownerHits.forEach((n, el) => (el.style.display = n ? "" : "none"));
+        noHits.style.display = shown ? "none" : "block";
+      });
+    }
 
     const footer = document.createElement("div");
     footer.className = "pe-menu-footer";
     const cfg = document.createElement("button");
     cfg.type = "button";
     cfg.className = "pe-menu-config";
-    cfg.textContent = "＋ Manage templates";
+    cfg.textContent = peMsg("menuManage");
     cfg.addEventListener("mousedown", (e) => e.preventDefault());
     cfg.addEventListener("click", (e) => {
       e.preventDefault();
@@ -400,28 +532,60 @@
   const pad2 = (n) => String(n).padStart(2, "0");
   const fmtDate = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   const shiftDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-  function expandVars(text) {
+  //   {{var.<name>}}  → a value from Settings (see PE_VAR_PREFIX)
+  function expandVars(text, vars) {
     if (!text) return "";
     const d = new Date();
     // Monday of the current week (ISO week: Monday is day 0).
     const monday = shiftDays(d, -((d.getDay() + 6) % 7));
     const week = fmtDate(monday) + " ~ " + fmtDate(shiftDays(monday, 6));
-    return String(text)
-      .replace(/\{\{\s*date\s*([+-]\s*\d+)\s*\}\}/gi, (_, off) =>
-        fmtDate(shiftDays(d, parseInt(String(off).replace(/\s+/g, ""), 10)))
-      )
-      .replace(/\{\{\s*date\s*\}\}/gi, fmtDate(d))
-      .replace(/\{\{\s*week\s*\}\}/gi, week)
-      .replace(/\{\{\s*month\s*\}\}/gi, d.getFullYear() + "-" + pad2(d.getMonth() + 1));
+    return (
+      String(text)
+        .replace(/\{\{\s*date\s*([+-]\s*\d+)\s*\}\}/gi, (_, off) =>
+          fmtDate(shiftDays(d, parseInt(String(off).replace(/\s+/g, ""), 10)))
+        )
+        .replace(/\{\{\s*date\s*\}\}/gi, fmtDate(d))
+        .replace(/\{\{\s*week\s*\}\}/gi, week)
+        .replace(/\{\{\s*month\s*\}\}/gi, d.getFullYear() + "-" + pad2(d.getMonth() + 1))
+        // One pass, no recursion: a value is inserted as written, so {{var.a}} = "{{var.b}}"
+        // stays literal instead of chaining. An unknown name is returned untouched, which
+        // is what every other unrecognised {{…}} already does — a variable you forgot to
+        // define stays visible rather than quietly becoming an empty string.
+        .replace(/\{\{\s*var\.([a-zA-Z0-9_-]+)\s*\}\}/gi, (m, name) => {
+          const hit = (vars || []).find((v) => v && String(v.name).toLowerCase() === name.toLowerCase());
+          return hit ? String(hit.value) : m;
+        })
+    );
   }
 
-  // Title etc. (input/textarea): insert at the cursor if focused, otherwise at the end (non-destructive)
+  // Title etc. (input/textarea): insert at the cursor if focused, otherwise at the end —
+  // the same rule insertIntoEditor uses for the body, so both halves of a template land
+  // by one predictable law.
+  //
+  // Tempting and wrong: treating a title as a prefix and prepending it when the field is
+  // not empty. That the sample reads "[Bug] " is an accident of the sample; a title can
+  // be any text, and nothing in it says where the author meant it to go. Guessing from
+  // its shape — or moving it depending on whether the field is empty — trades a rule the
+  // user can predict for one they cannot. It appends; Ctrl/Cmd+Z takes it back.
   function insertIntoInput(el, text) {
     const was = document.activeElement === el;
     el.focus();
     const v = el.value || "";
     const s = was && el.selectionStart != null ? el.selectionStart : v.length;
     const e = was && el.selectionEnd != null ? el.selectionEnd : s;
+
+    // Select the span we are about to write over, then let the browser make the edit:
+    // execCommand puts it on the undo stack, so Ctrl/Cmd+Z takes the template back out.
+    // Assigning .value (the fallback below) is invisible to undo — the body has always
+    // been undoable through ProseMirror, and the title should not be the one field where
+    // a mis-picked template cannot be taken back.
+    try {
+      el.setSelectionRange(s, e);
+      if (document.execCommand("insertText", false, text) && el.value !== v) return;
+    } catch (_) {}
+
+    // Fallback: React keeps its own copy of the value, so a plain assignment goes
+    // unnoticed — the native setter plus an input event is what makes it look real.
     setNativeValue(el, v.slice(0, s) + text + v.slice(e));
     const p = s + text.length;
     try {
@@ -593,13 +757,14 @@
   }
 
   function applyTemplate(tpl, btn) {
+    const vars = (settings && settings.variables) || [];
     if (tpl.title && tpl.title.length) {
       const ta = findTitleField(btn);
-      if (ta) insertIntoInput(ta, expandVars(tpl.title));
+      if (ta) insertIntoInput(ta, expandVars(tpl.title, vars));
     }
     if (tpl.content && tpl.content.length) {
       const ed = findEditorFor(btn);
-      if (ed) insertIntoEditor(ed, expandVars(tpl.content));
+      if (ed) insertIntoEditor(ed, expandVars(tpl.content, vars));
     }
   }
 
@@ -691,7 +856,7 @@
     pickerBox.id = "pe-picker-box";
     pickerHint = document.createElement("div");
     pickerHint.id = "pe-picker-hint";
-    pickerHint.textContent = "Click an element to create a rule · Esc to cancel";
+    pickerHint.textContent = peMsg("pickerHint");
     document.body.appendChild(pickerBox);
     document.body.appendChild(pickerHint);
     document.addEventListener("mousemove", pickerMove, true);
@@ -742,7 +907,7 @@
     stopPicker();
     const cands = buildCandidates(el);
     if (!cands.length) {
-      toast("Couldn't build a selector for that element.");
+      toast(peMsg("pickNoSelector"));
       return;
     }
     showChooser(cands, x, y);
@@ -765,7 +930,7 @@
     chooserEl.id = "pe-pick-menu";
     const h = document.createElement("div");
     h.className = "pe-pick-header";
-    h.textContent = "Create a rule from a selector  ·  Esc to cancel";
+    h.textContent = peMsg("pickHeader");
     chooserEl.appendChild(h);
     cands.forEach((c) => {
       const it = document.createElement("button");
@@ -776,7 +941,7 @@
       s.textContent = c.sel;
       const n = document.createElement("span");
       n.className = "pe-pick-count";
-      n.textContent = "matches " + c.count;
+      n.textContent = peMsg("pickMatches", [String(c.count)]);
       it.appendChild(s);
       it.appendChild(n);
       it.addEventListener("click", (ev) => {
@@ -822,8 +987,8 @@
         });
         return peSaveSettings(s);
       })
-      .then(() => toast("Rule added: " + sel + " — open Settings to set the value."))
-      .catch(() => toast("Failed to save the rule (storage error)."));
+      .then(() => toast(peMsg("pickRuleAdded", [sel])))
+      .catch(() => toast(peMsg("pickRuleFailed")));
   }
 
   /* ---- global events ---- */
@@ -978,8 +1143,10 @@
 
   let bootstrapTimer = null;
   function refresh() {
-    return peGetSettings().then((s) => {
+    return Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
       settings = s;
+      syncCache = c;
+      recountTemplates();
       applyStyles();
       syncObserver();
       injectAll();
@@ -1002,7 +1169,19 @@
 
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === "sync" && changes[PE_STORAGE_KEY]) refresh();
+      if (area === "sync" && changes[PE_STORAGE_KEY]) {
+        refresh();
+      } else if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
+        // Synced templates updated by the service worker → refresh cache, re-render an
+        // open menu, and re-evaluate whether the toolbar button should exist.
+        const nv = changes[PE_SYNC_CACHE_KEY].newValue;
+        syncCache = { bySource: (nv && nv.bySource) || {} };
+        recountTemplates();
+        if (menuOpen && menu) renderMenu();
+        try {
+          injectAll();
+        } catch (_) {}
+      }
     });
   } catch (_) {}
 

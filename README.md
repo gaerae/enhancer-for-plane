@@ -48,7 +48,30 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    the template menu while editing a description with `Alt/⌥+T`.
    On macOS, Option+T changes `e.key` to a special
    character, so the shortcut is detected via `e.code === "KeyT"`.
-3. **Style rules (width / length) — a generic engine**
+   - **Your own variables (up to 5)** — define `name` → `value` pairs in Settings
+     and use them as `{{var.name}}`, e.g. `{{var.team}}` → `Platform`. The `var.`
+     prefix is what keeps them from ever colliding with a built-in: a future
+     `{{quarter}}` can be added without breaking anyone's `{{var.quarter}}`.
+     Unknown names are left untouched rather than blanked, so a typo is visible
+     instead of silently eating text. This pairs with sync — a shared template can
+     say `{{var.team}}` and resolve differently for each person who inserts it,
+     with no per-user data ever leaving the browser.
+3. **Team template sync** — point the extension at a JSON file (your intranet, a
+   Git host, any URL) and everyone pulls the same templates. Off by default.
+   - Add a source in Settings → Chrome asks for access to that one origin →
+     templates appear in the picker under a header for that source.
+   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
+     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
+     independently with its own interval and on/off switch.
+   - **Synced templates are read-only** — they're edited at the source, not here.
+     What is local is the *view*: hide any group you don't need (per source), and
+     it stays hidden across syncs without touching the file.
+   - **The picker reads the cache, never the network.** Inserting a template costs
+     no request and works offline. A failed sync keeps the last good copy.
+   - **Remote data is treated as untrusted**: size-capped, rendered as text only
+     (never markup), ids namespaced per source so they can't collide with your own.
+   - See [the file format](#team-template-file-format) and `examples/`.
+4. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -63,7 +86,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-4. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+5. **Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -74,11 +97,72 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-5. **Active domains** — runs only on the domains you specify. Wildcards
+6. **Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-6. **Backup (Import / Export)** — export all domains, rules, and templates to a
-   JSON file from the "Backup" section, and import them back. Imported settings
+7. **Backup (Import / Export)** — export your settings to a JSON file from the
+   "Backup" section, and import them back. It carries everything you configured:
+   domains, rules, templates, variables, and sync sources (URLs, intervals, hidden
+   groups). It does **not** carry downloaded templates or sync status — those are a
+   per-device cache that the next sync refetches, so a backup stays a backup of
+   your settings rather than a snapshot of someone else's file. Imported settings
    load into the form — review, then `Save` to apply.
+
+## Team template file format
+
+Host a JSON file anywhere your team can reach over `http(s)` — an intranet path, a
+Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Team template sync.
+
+```json
+{
+  "schema": 1,
+  "name": "QA & Delivery standards",
+  "version": "2026-07-15b",
+  "templates": [
+    {
+      "id": "bug-detailed",
+      "group": "QA Templates",
+      "name": "🐞 Bug (detailed)",
+      "title": "[Bug] ",
+      "content": "## Steps to reproduce\n1. \n\n## Expected\n\n## Actual\n"
+    }
+  ]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `name` | no | The collection's label. Shown as the picker's header for this source unless you give the source your own name in Settings. |
+| `version` | no | Free-form string. Informational only — see the note below. |
+| `templates[]` | **yes** | A flat array. `{ "groups": [...] }` is *not* the shape; grouping is a field on each item. |
+| `.name` | yes¹ | What the picker lists. |
+| `.title` | no | Prefilled work-item title. |
+| `.content` | no | Body, in Markdown. `{{date}}`, `{{var.team}}` etc. resolve on insert. |
+| `.group` | no | Sub-heading within this source. Omit (or `""`) and the item sits directly under the source header, above any named group. |
+| `.id` | no | Stable id. Omit it and one is derived from the content — but then editing an item makes it a "new" item, which loses the group-hidden preference someone set on it. Set ids for anything long-lived. |
+
+¹ At least one of `name` / `title` / `content` must be non-empty; entries with all
+three blank are dropped. An item with no `name` lists as `(untitled)`.
+
+**`version` does not control freshness.** The extension stores whatever it fetched,
+every time. That is deliberate: a version-gated cache means one forgotten bump
+serves stale templates to the whole team, and this project shipped exactly that bug
+once (`count: 11 / stored: 3`) before the check was removed.
+
+Limits, enforced on download: **10 sources**, **200 templates** per source, **512 KB**
+per response, **20,000 chars** per body, **300 chars** per name/title/group. Anything
+over a cap is clamped or dropped, not rejected wholesale — one oversized entry never
+costs you the rest of the file. (The response cap is what bounds a source on disk, so
+10 × 512 KB is the storage budget — half of what `chrome.storage.local` holds.)
+
+**If your source redirects, use the address it lands on.** Redirects are followed, but
+templates are only accepted from an origin you granted — so a URL that hops to another
+host reports `Redirected to <host>, which you have not granted` rather than syncing.
+The common case is a Git host: `github.com/<org>/<repo>/raw/main/t.json` redirects to
+`raw.githubusercontent.com`, so enter the `raw.githubusercontent.com` URL directly.
+
+Group ordering follows first appearance in the file; ungrouped items come first.
+Working examples: [`examples/team-templates.json`](examples/team-templates.json) and
+[`examples/team-templates-design.json`](examples/team-templates-design.json).
 
 ## Built for self-hosted Plane
 
@@ -120,11 +204,30 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 | File | Role |
 |------|------|
 | `manifest.json` | MV3 manifest |
-| `common.js` | Settings defaults / storage / domain matching (shared) |
+| `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
 | `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
-| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page |
+| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
 | `options.html/js/css` | Full settings page |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
+| `_locales/` | `en` + `ko` message catalogues |
+| `tools/` | Checks (not shipped) — see below |
+| `examples/` | Sample team-template files (not shipped) |
+
+## Checks
+
+No dependencies, no build step — stock node:
+
+```sh
+node tools/test.js          # behaviour: sync engine, normalization, sections, counts
+node tools/check-i18n.js    # translation contract (--strict in CI)
+node tools/check-source.js  # architectural invariants
+```
+
+CI runs all three on every push and PR. `check-source.js` enforces what a reviewer
+would otherwise have to remember — network access confined to the worker, no
+`innerHTML` for data that isn't ours, every remote field clamped, and that the
+release zip actually contains every file the extension loads. Contributor rules
+live in [AGENTS.md](AGENTS.md).
 
 ## How it works (notes)
 
@@ -134,6 +237,13 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
   (injecting any already-open matching tab so no reload is needed). Registration
   persists across restarts and is reconciled whenever permissions or settings
   change; removing a domain drops its access.
+- **Sync is a worker + cache, not a live fetch.** `chrome.alarms` wakes the service
+  worker (an MV3 worker is evicted when idle, so a timer would never fire), which
+  fetches each due source, validates and clamps it, and writes it to
+  `chrome.storage.local`. Everything else — picker, popup, settings — reads that
+  cache. So inserting a template makes no request, works offline, and a source that
+  is down or malformed leaves the last good copy in place with the error shown in
+  Settings. Removing a source drops its cached templates immediately.
 - **Styles are injected via `adoptedStyleSheets` (constructed stylesheets).**
   Plane is a Next.js/React SPA — inserting a `<style>` DOM node into
   `<head>`/`<body>` can trigger a hydration mismatch and get the node removed, so
@@ -159,7 +269,12 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 
 ## Permissions
 
-- `storage` — persists your own settings (domains, rules, templates).
+- `storage` — persists your own settings (domains, rules, templates, variables,
+  sync sources) and caches downloaded team templates on this device.
+- `alarms` — wakes the service worker on your chosen interval to refresh team
+  templates. An MV3 worker is evicted when idle, so a `setTimeout` would never
+  fire; this is the only way to sync on a schedule. Chrome shows no install
+  warning for it.
 - `activeTab` — when you click the toolbar icon, the popup reads the current
   tab's hostname to show status and offer "Enable on this site," and messages the
   tab to start the element picker. Limited to the tab you invoked it on.
@@ -172,20 +287,30 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
   domains you granted, and drops that access when you remove a domain. (A
   self-hosted Plane host isn't known at build time, so it can't be a fixed match
   list — this per-site grant is the least-privilege way to support any host.)
+  A team-template source URL is granted the same way: adding one prompts for that
+  origin, and the worker refuses to fetch a source whose origin you haven't granted.
 
-No accounts, no tracking, no analytics, no external servers, no remote code. See
-[PRIVACY.md](PRIVACY.md).
+No accounts, no tracking, no analytics, no remote code. The developer runs no
+server and receives nothing from you; the only request the extension can make is
+downloading the team-template file from a URL you configured yourself, and it
+carries none of your data. See [PRIVACY.md](PRIVACY.md).
 
 ## Limits & constraints
 
 - **Chrome / Chromium, Manifest V3** — not built for Firefox or Safari.
 - **Self-hosted Plane, inactive by default** — no domain ships enabled; add yours
   in the popup or Settings. It never touches non-Plane sites.
-- **Sync storage cap (~8 KB).** All settings (domains + rules + templates) live in
-  a single `chrome.storage.sync` item, which Chrome caps at ~8 KB — roughly a
-  couple dozen typical templates. The Settings page shows a live storage meter and
-  warns before you hit it; if a save fails, shorten/remove templates or keep a
-  JSON backup (Export). Settings sync across your signed-in Chrome devices.
+- **Sync storage cap (~8 KB).** All settings (domains + rules + templates +
+  variables + sync sources) live in a single `chrome.storage.sync` item, which
+  Chrome caps at ~8 KB — roughly a couple dozen typical templates. The Settings
+  page shows a live storage meter and warns before you hit it; if a save fails,
+  shorten/remove templates or keep a JSON backup (Export). Settings sync across
+  your signed-in Chrome devices. **Team templates don't count against it** — they
+  live in `chrome.storage.local` (5 MB, this device only), which is why sync is the
+  way to carry a large shared library.
+- **Synced templates are read-only.** They're edited at the source file, not in
+  Settings. An edit here would be silently reverted by the next sync, so the UI
+  doesn't offer one; hiding a group is local and does survive.
 - **Markdown rendering depends on the editor** — template bodies are pasted as HTML
   so Plane renders headings/lists/checkboxes; if a build rejects the paste, it
   falls back to literal text.

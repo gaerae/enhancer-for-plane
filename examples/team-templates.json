@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "name": "QA & Delivery standards",
+  "version": "2026-07-15b",
+  "templates": [
+    {
+      "id": "bug-detailed",
+      "group": "QA Templates",
+      "name": "🐞 Bug (detailed)",
+      "title": "[Bug] ",
+      "content": "## Environment\n- Version: \n- OS / Browser: \n\n## Steps to reproduce\n1. \n2. \n3. \n\n## Expected\n\n## Actual\n\n## Logs\n- \n"
+    },
+    {
+      "id": "bug-quick",
+      "group": "QA Templates",
+      "name": "⚡ Bug (quick)",
+      "title": "[Bug] ",
+      "content": "## What happened\n\n## Where\n\n## Reported\n{{date}}\n"
+    },
+    {
+      "id": "qa-checklist",
+      "group": "QA Templates",
+      "name": "🧪 QA checklist",
+      "title": "[QA] ",
+      "content": "## Cases\n- [ ] Happy path\n- [ ] Edge cases\n- [ ] Regression\n- [ ] Accessibility\n\n## Sign-off\n- [ ] Reviewed by QA ({{date}})\n"
+    },
+    {
+      "id": "spec",
+      "group": "Planning",
+      "name": "📋 Feature spec",
+      "title": "[Spec] ",
+      "content": "## Problem\n\n## Proposal\n\n## Out of scope\n\n## Open questions\n- \n\n## Definition of Done\n- [ ] \n- [ ] \n"
+    },
+    {
+      "id": "epic",
+      "group": "Planning",
+      "name": "🗺️ Epic",
+      "title": "[Epic] ",
+      "content": "## Goal\n\n## Success metrics\n- \n\n## Milestones\n- [ ] \n- [ ] \n\n## Target\n{{month}}\n"
+    },
+    {
+      "id": "spike",
+      "group": "Planning",
+      "name": "🔍 Research spike",
+      "title": "[Spike] ",
+      "content": "## Question\n\n## Timebox\n{{date}} ~ {{date+3}}\n\n## Findings\n\n## Recommendation\n"
+    },
+    {
+      "id": "release-note",
+      "group": "Release",
+      "name": "🚀 Release note",
+      "title": "[Release] ",
+      "content": "## Highlights\n\n## Breaking changes\n\n## Fixes\n\n## Rollout\n- Window: {{week}}\n"
+    },
+    {
+      "id": "hotfix",
+      "group": "Release",
+      "name": "🔥 Hotfix",
+      "title": "[Hotfix] ",
+      "content": "## Impact\n\n## Root cause\n\n## Fix\n\n## Verification\n- [ ] Verified on staging\n- [ ] Verified on production\n"
+    },
+    {
+      "id": "incident",
+      "group": "Ops",
+      "name": "🚨 Incident report",
+      "title": "[Incident] ",
+      "content": "## Summary\n\n## Timeline\n- {{date}} — detected\n- {{date}} — mitigated\n\n## Impact\n\n## Root cause\n\n## Action items\n- [ ] \n"
+    },
+    {
+      "id": "runbook",
+      "group": "Ops",
+      "name": "📗 Runbook entry",
+      "title": "[Runbook] ",
+      "content": "## Trigger\n\n## Checks\n1. \n2. \n\n## Remediation\n\n## Escalation\n"
+    },
+    {
+      "id": "chore",
+      "group": "",
+      "name": "🧹 Chore",
+      "title": "",
+      "content": "## What\n\n## Why now\n\n## Notes\n"
+    }
+  ]
+}

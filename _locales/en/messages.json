@@ -6,5 +6,532 @@
   "extDesc": {
     "message": "Tweaks for Plane (makeplane/plane.so) — open-source project management, issues & wiki. Title/body templates + width rules.",
     "description": "Short description shown in the Chrome Web Store."
+  },
+  "optPageTitle": {
+    "message": "Enhancer for Plane — Settings (makeplane / plane.so)"
+  },
+  "optTagline": {
+    "message": "Body templates & style rules for Plane — the open-source project management, issues & wiki tool (makeplane / plane.so)."
+  },
+  "optGitHub": {
+    "message": "GitHub"
+  },
+  "optReportIssue": {
+    "message": "Report an issue"
+  },
+  "optEnabled": {
+    "message": "Enabled"
+  },
+  "optDomainsTitle": {
+    "message": "Active domains"
+  },
+  "optDomainsDesc": {
+    "message": "Runs only on the domains listed below. One per line. Wildcards like <code>*.example.com</code> are supported. Saving prompts Chrome to grant access to each newly added domain."
+  },
+  "optDomainsAll": {
+    "message": "Run on all sites (ignore the list below)"
+  },
+  "optDomainsTip": {
+    "message": "Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b>"
+  },
+  "optRulesTitle": {
+    "message": "Style rules (width / length)"
+  },
+  "optRulesAdd": {
+    "message": "＋ Add rule"
+  },
+  "optRulesDesc": {
+    "message": "Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>). If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
+  },
+  "optRulesEmpty": {
+    "message": "No rules yet. Click “Add rule” to start."
+  },
+  "optQuickAdd": {
+    "message": "Quick add:"
+  },
+  "optPresetModuleName": {
+    "message": "Module / item name width"
+  },
+  "optPresetCycleName": {
+    "message": "Cycle / breadcrumb name width"
+  },
+  "optPresetDropdown": {
+    "message": "Search dropdown width"
+  },
+  "optRuleLabelPh": {
+    "message": "Description (e.g. Module name width)"
+  },
+  "optRuleSelectorPh": {
+    "message": "CSS selector (e.g. .max-w-40)"
+  },
+  "optRulePropPh": {
+    "message": "Property"
+  },
+  "optRuleValuePh": {
+    "message": "Value (e.g. 320px)"
+  },
+  "optTplTitle": {
+    "message": "Body templates (title + body)"
+  },
+  "optTplAdd": {
+    "message": "＋ Add template"
+  },
+  "optTplDesc1": {
+    "message": "Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional."
+  },
+  "optTplDesc2": {
+    "message": "The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>."
+  },
+  "optTplDesc3": {
+    "message": "Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description."
+  },
+  "optTplEmpty": {
+    "message": "No templates yet. Click “Add template” to start."
+  },
+  "optTplNamePh": {
+    "message": "Template name (e.g. 🐞 Bug report)"
+  },
+  "optTplTitlePh": {
+    "message": "Title (e.g. [Bug] — leave empty to skip the title)"
+  },
+  "optTplContentPh": {
+    "message": "Body content"
+  },
+  "optVarsTitle": {
+    "message": "Template variables"
+  },
+  "optVarsAdd": {
+    "message": "＋ Add variable"
+  },
+  "optVarsDesc": {
+    "message": "Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>. A synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it."
+  },
+  "optVarsUndefined": {
+    "message": "The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>. A variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string."
+  },
+  "optVarsEmpty": {
+    "message": "No variables yet. Click “Add variable” to start."
+  },
+  "optVarNamePh": {
+    "message": "name (e.g. team)"
+  },
+  "optVarValuePh": {
+    "message": "value inserted in its place"
+  },
+  "msgVarBadName": {
+    "message": "Use letters, numbers, hyphen or underscore only."
+  },
+  "msgVarDupe": {
+    "message": "Another variable already uses this name."
+  },
+  "msgVarLimit": {
+    "message": "Up to $MAX$ variables. Remove one to add another.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcLimit": {
+    "message": "Up to $MAX$ sync sources. Remove one to add another.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "optSyncTitle": {
+    "message": "Template sync"
+  },
+  "optSyncDesc": {
+    "message": "Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page. Synced templates are <b>read-only</b> — edit them at the source. Host the file on the <b>same domain as Plane</b> to avoid a separate access prompt."
+  },
+  "optSyncFormat": {
+    "message": "File format"
+  },
+  "optSyncFormatDesc": {
+    "message": "A flat list; each item carries its own <code>group</code> string. The top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank."
+  },
+  "optSyncEmpty": {
+    "message": "No sources yet. Click “Add source”."
+  },
+  "optSyncAddSource": {
+    "message": "＋ Add source"
+  },
+  "optSyncNow": {
+    "message": "↻ Sync now"
+  },
+  "optSrcEnableTitle": {
+    "message": "Enable this source"
+  },
+  "optSrcNamePh": {
+    "message": "Name (e.g. QA standards)"
+  },
+  "optSrcUrlPh": {
+    "message": "https://plane.example.com/templates.json"
+  },
+  "optSrcInterval": {
+    "message": "Sync interval"
+  },
+  "optInterval1h": {
+    "message": "Every hour"
+  },
+  "optInterval6h": {
+    "message": "Every 6 hours"
+  },
+  "optInterval12h": {
+    "message": "Every 12 hours"
+  },
+  "optIntervalDaily": {
+    "message": "Daily"
+  },
+  "optBackupTitle": {
+    "message": "Backup"
+  },
+  "optBackupDesc1": {
+    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, and <b>sync source URLs</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
+  },
+  "optBackupDesc2": {
+    "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save."
+  },
+  "optBackupExport": {
+    "message": "↓ Export JSON"
+  },
+  "optBackupImport": {
+    "message": "↑ Import JSON…"
+  },
+  "optStorageNote": {
+    "message": "Settings sync across your devices via Chrome, which caps each item at ~8 KB. If you hit it, shorten/remove templates or keep a JSON backup."
+  },
+  "optDelete": {
+    "message": "Delete"
+  },
+  "optRestoreDefaults": {
+    "message": "Restore defaults"
+  },
+  "optSave": {
+    "message": "Save"
+  },
+  "msgInvalidSelector": {
+    "message": "Invalid CSS selector"
+  },
+  "msgInvalidSrcUrl": {
+    "message": "A source URL must start with http:// or https://"
+  },
+  "msgUngrouped": {
+    "message": "Ungrouped"
+  },
+  "msgSrcEnterUrl": {
+    "message": "Enter a URL, then Save to sync."
+  },
+  "msgSrcNotSynced": {
+    "message": "Not synced yet — Save, then “Sync now”."
+  },
+  "msgSrcSynced": {
+    "message": "Synced $TIME$ · $COUNT$ templates",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSrcSkipped": {
+    "message": " ($COUNT$ skipped over limit)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcFailed": {
+    "message": "Sync failed: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcLastGood": {
+    "message": " — using last good copy ($TIME$)",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcSummaryOne": {
+    "message": "$COUNT$ templates · 1 group",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcSummaryMany": {
+    "message": "$COUNT$ templates · $GROUPS$ groups",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "groups": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSrcHidden": {
+    "message": " ($COUNT$ hidden)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgChangedElsewhere": {
+    "message": "Settings changed elsewhere (e.g. the picker). Reload this page to apply them — unsaved edits will be lost."
+  },
+  "msgLoadedPicked": {
+    "message": "Loaded the rule added by the picker."
+  },
+  "msgExported": {
+    "message": "Exported settings JSON."
+  },
+  "msgImported": {
+    "message": "Imported — review, then click Save to apply."
+  },
+  "msgImportInvalid": {
+    "message": "Import failed: not a valid settings JSON."
+  },
+  "msgImportNotOurs": {
+    "message": "Import failed: that file was not exported by this extension."
+  },
+  "msgImportIsSyncFile": {
+    "message": "That looks like a template sync feed, not a settings backup. Add its URL under Template sync instead."
+  },
+  "msgImportNewer": {
+    "message": "Import failed: that backup is from a newer version (schema $FILE$, this build reads $HERE$). Update the extension first.",
+    "placeholders": {
+      "file": {
+        "content": "$1"
+      },
+      "here": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgImportUnreadable": {
+    "message": "Import failed: could not read file."
+  },
+  "msgSaveFirst": {
+    "message": "Save first — “Sync now” fetches the saved sources."
+  },
+  "msgSyncing": {
+    "message": "Syncing…"
+  },
+  "msgSyncFailed": {
+    "message": "Sync failed: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSyncDone": {
+    "message": "Synced $COUNT$ source(s).",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSyncDoneErrors": {
+    "message": "Synced $COUNT$ source(s), $FAILED$ failed.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSyncFinished": {
+    "message": "Sync finished."
+  },
+  "msgResetConfirm": {
+    "message": "Reset all settings to defaults. Continue?"
+  },
+  "msgResetDone": {
+    "message": "Restored defaults. Click “Save” to apply."
+  },
+  "msgSaved": {
+    "message": "Saved."
+  },
+  "msgSavedNoPerm": {
+    "message": "Saved — but site access was denied, so listed domains stay inactive until you grant it."
+  },
+  "msgSaveQuota": {
+    "message": "Save failed: settings exceed Chrome sync's ~8 KB limit. Shorten or remove templates (or keep a JSON backup)."
+  },
+  "msgSaveFailed": {
+    "message": "Save failed: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgStorageUsed": {
+    "message": "$SIZE$ / 8 KB used",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgStorageOver": {
+    "message": " — over the sync limit; saving may fail"
+  },
+  "msgStorageNear": {
+    "message": " — approaching the limit"
+  },
+  "popEnabled": {
+    "message": "Enabled"
+  },
+  "popTemplates": {
+    "message": "Templates"
+  },
+  "popPick": {
+    "message": "🎯 Pick element → add rule"
+  },
+  "popRescan": {
+    "message": "↻ Re-scan this page"
+  },
+  "popSettings": {
+    "message": "Settings · Manage templates"
+  },
+  "popEnableSite": {
+    "message": "Enable on this site"
+  },
+  "popChecking": {
+    "message": "Current site: checking…"
+  },
+  "popUnknown": {
+    "message": "Current site: unknown"
+  },
+  "popActive": {
+    "message": "Active: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popDisabled": {
+    "message": "Disabled: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popInactive": {
+    "message": "Inactive site: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popRescanning": {
+    "message": "Re-scanning…"
+  },
+  "popNotLoaded": {
+    "message": "Not loaded here — reload the page (Ctrl/Cmd+R)."
+  },
+  "popNotLoadedShort": {
+    "message": "Not loaded here — reload the page."
+  },
+  "popInactiveHere": {
+    "message": "Inactive on this site."
+  },
+  "popRescanReady": {
+    "message": "Re-scanned — template button ready."
+  },
+  "popRescanOpen": {
+    "message": "Re-scanned. Open a work item's description."
+  },
+  "popPermNeeded": {
+    "message": "Permission needed to run on $HOST$.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuBtnLabel": {
+    "message": "Template"
+  },
+  "menuBtnAria": {
+    "message": "Insert title & body template (Alt/⌥+T)"
+  },
+  "menuBtnTitle": {
+    "message": "Insert title & body template  ·  Alt/⌥+T"
+  },
+  "menuFilterPh": {
+    "message": "Filter templates…"
+  },
+  "menuYours": {
+    "message": "Yours"
+  },
+  "menuSynced": {
+    "message": "Synced"
+  },
+  "menuUntitled": {
+    "message": "(untitled)"
+  },
+  "menuTitlePrefix": {
+    "message": "Title: $TITLE$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuNoMatch": {
+    "message": "No matching templates."
+  },
+  "menuManage": {
+    "message": "＋ Manage templates"
+  },
+  "pickHeader": {
+    "message": "Create a rule from a selector  ·  Esc to cancel"
+  },
+  "pickerHint": {
+    "message": "Click an element to create a rule · Esc to cancel"
+  },
+  "pickMatches": {
+    "message": "matches $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "pickNoSelector": {
+    "message": "Couldn't build a selector for that element."
+  },
+  "pickRuleAdded": {
+    "message": "Rule added: $SELECTOR$ — open Settings to set the value.",
+    "placeholders": {
+      "selector": {
+        "content": "$1"
+      }
+    }
+  },
+  "pickRuleFailed": {
+    "message": "Failed to save the rule (storage error)."
   }
 }

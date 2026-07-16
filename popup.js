@@ -3,6 +3,7 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   let state = null;
+  let syncCache = { bySource: {} }; // synced templates (chrome.storage.local)
   let currentHost = "";
   let currentTabId = null;
 
@@ -12,7 +13,7 @@
     const pickBtn = $("pickEl");
     const rescanBtn = $("rescan");
     if (!currentHost) {
-      statusEl.textContent = "Current site: unknown";
+      statusEl.textContent = peMsg("popUnknown");
       statusEl.className = "pop-status";
       addBtn.hidden = true;
       pickBtn.hidden = true;
@@ -24,23 +25,24 @@
     pickBtn.hidden = !active; // picker is only offered on active sites
     rescanBtn.hidden = !active; // re-scan/self-heal is only relevant on active sites
     if (active) {
-      statusEl.textContent = "Active: " + currentHost;
+      statusEl.textContent = peMsg("popActive", [currentHost]);
       statusEl.className = "pop-status on";
       addBtn.hidden = true;
     } else if (!state.enabled) {
-      statusEl.textContent = "Disabled: " + currentHost;
+      statusEl.textContent = peMsg("popDisabled", [currentHost]);
       statusEl.className = "pop-status off";
       addBtn.hidden = true;
     } else {
-      statusEl.textContent = "Inactive site: " + currentHost;
+      statusEl.textContent = peMsg("popInactive", [currentHost]);
       statusEl.className = "pop-status off";
       addBtn.hidden = false;
     }
   }
 
   function init() {
+    peApplyI18n(document);
     $("enabled").checked = !!state.enabled;
-    $("tplCount").textContent = (state.templates || []).length;
+    $("tplCount").textContent = peCountTemplates(peBuildTemplateSections(state, syncCache));
     updateDomainStatus();
 
     $("enabled").addEventListener("change", async () => {
@@ -66,26 +68,26 @@
     $("rescan").addEventListener("click", () => {
       if (currentTabId == null) return;
       const statusEl = $("domainStatus");
-      statusEl.textContent = "Re-scanning…";
+      statusEl.textContent = peMsg("popRescanning");
       statusEl.className = "pop-status";
       try {
         chrome.tabs.sendMessage(currentTabId, { type: "pe-rescan" }, (resp) => {
           if (chrome.runtime.lastError || !resp) {
-            statusEl.textContent = "Not loaded here — reload the page (Ctrl/Cmd+R).";
+            statusEl.textContent = peMsg("popNotLoaded");
             statusEl.className = "pop-status off";
           } else if (!resp.active) {
-            statusEl.textContent = "Inactive on this site.";
+            statusEl.textContent = peMsg("popInactiveHere");
             statusEl.className = "pop-status off";
           } else if (resp.buttons > 0) {
-            statusEl.textContent = "Re-scanned — template button ready.";
+            statusEl.textContent = peMsg("popRescanReady");
             statusEl.className = "pop-status on";
           } else {
-            statusEl.textContent = "Re-scanned. Open a work item's description.";
+            statusEl.textContent = peMsg("popRescanOpen");
             statusEl.className = "pop-status on";
           }
         });
       } catch (_) {
-        statusEl.textContent = "Not loaded here — reload the page.";
+        statusEl.textContent = peMsg("popNotLoadedShort");
         statusEl.className = "pop-status off";
       }
     });
@@ -109,7 +111,7 @@
             state.domains = (state.domains || []).filter((d) => d !== currentHost);
             peSaveSettings(state);
             const statusEl = $("domainStatus");
-            statusEl.textContent = "Permission needed to run on " + currentHost + ".";
+            statusEl.textContent = peMsg("popPermNeeded", [currentHost]);
             statusEl.className = "pop-status off";
             return;
           }
@@ -128,8 +130,9 @@
         if (tab.url) currentHost = new URL(tab.url).hostname;
       }
     } catch (_) {}
-    peGetSettings().then((s) => {
+    Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
       state = s;
+      syncCache = c;
       init();
     });
   });

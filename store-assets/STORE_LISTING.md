@@ -47,7 +47,16 @@ A native "Template" button sits in the description toolbar — and in the "Creat
 One click fills the work-item title AND the description together.
 Bodies are Markdown, rendered into the editor: headings, bullet and numbered lists, checkboxes.
 Variables on insert: {{date}}, {{date+N}} / {{date-N}} (e.g. {{date+7}} for a deadline), {{week}}, {{month}}.
+Define up to 5 of your own, too — {{var.team}} and the like, filled in from your settings.
 Shortcut: Alt/⌥+T.
+
+▸ Team template sync
+Keep your team's templates in one JSON file — on your intranet, a Git host, any URL — and everyone pulls the same set.
+Add the URL once; it refreshes on the schedule you pick (hourly to daily), or on demand with "Sync now".
+Templates arrive grouped under their source, and you can hide any group you don't need without touching the shared file.
+Synced templates are read-only here: they're edited at the source, so no one's local edit gets silently reverted.
+Off by default. It contacts nothing until you add a source, and only ever the URL you entered.
+Inserting a template reads the local cache, so it costs no request and works offline.
 
 ▸ Width & style rules
 Plane truncates long names — modules, cycles, labels, breadcrumbs.
@@ -68,15 +77,16 @@ It runs only on the domains you enable and stays completely inert everywhere els
 Wildcards (*.example.com) are supported.
 
 ▸ Import / Export
-Back up all your domains, rules, and templates to a JSON file, and restore them on another machine.
+Back up your domains, rules, templates, variables, and sync sources to a JSON file, and restore them on another machine.
 
 ▸ Light & dark mode
 The popup and settings follow your system theme and match Plane's monochrome look.
 
 PRIVACY
 
-No accounts, no tracking, no analytics, no external servers.
+No accounts, no tracking, no analytics. The developer runs no server and receives nothing from you.
 Your settings live in Chrome's own storage (synced to your Google account by Chrome if you have sync on) and are never sent anywhere else.
+The one request this extension can make is downloading the team-template file from a URL you added yourself — and it carries none of your data.
 See the privacy policy for details.
 
 HOW TO START
@@ -98,7 +108,10 @@ Enhancer for Plane has one purpose: to let users customize the Plane (makeplane)
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, and templates) so they persist across sessions and sync via Chrome. No other data is stored.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, and team-template source URLs) so they persist across sessions and sync via Chrome. Also caches the team templates downloaded from the user's own source URL in storage.local, so the template picker reads from disk instead of the network. No other data is stored, and nothing is sent to the developer.
+
+alarms
+  Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
 
 activeTab
   When the user clicks the toolbar icon, the popup reads the current tab's hostname to show whether Plane enhancements are active there and to offer "Enable on this site." It also messages the current tab to start the element picker. Access is limited to the tab the user explicitly invoked the extension on.
@@ -108,9 +121,11 @@ scripting
 
 Optional host permissions (requested per site at runtime, NOT at install)
   Plane can be self-hosted on ANY domain, so the target host is not known at build time and cannot be a fixed match list. The extension therefore declares optional host permissions and requests access to a single origin only when the user enables that domain (via the popup's "Enable on this site" or Settings) — Chrome shows a per-site prompt. It requests no host access at install, holds access only for the domains the user granted, and releases it when a domain is removed. This is the least-privilege way to support arbitrary user-provided self-hosted Plane hosts.
+  The same mechanism covers team-template sync: a source URL can be on any host (an intranet server, a Git host), so adding a source prompts for that one origin, and the extension refuses to fetch any origin the user has not granted.
 
 Remote code
-  None. All JavaScript and CSS is bundled in the package. Nothing is fetched or eval'd at runtime.
+  None. All JavaScript and CSS is bundled in the package; nothing is eval'd, injected as markup, or executed from the network at runtime.
+  For clarity, since the extension does make one kind of request: when the user turns on team-template sync and supplies a URL, the service worker downloads that JSON file. It is data, not code — parsed with JSON.parse, capped in size, and rendered into the picker with textContent only. It is never evaluated, never assigned to innerHTML, and never loaded as a script. The extension makes no other request, and none at all until the user configures a source.
 
 ---
 
@@ -169,7 +184,16 @@ Plane 과 제휴하거나 승인받은 제품이 아닙니다. "Plane" 은 해�
 한 번의 클릭으로 작업 항목의 제목과 본문을 함께 채웁니다.
 본문은 마크다운으로 작성되어 에디터에 제목·목록·체크박스로 렌더됩니다.
 삽입 시 변수 치환: {{date}}(오늘), {{date+N}} / {{date-N}}(예: 마감일 {{date+7}}), {{week}}(이번 주 범위), {{month}}.
+{{var.team}}처럼 직접 만든 변수도 최대 5개까지 쓸 수 있고, 값은 설정에서 채웁니다.
 단축키: Alt/⌥+T.
+
+▸ 팀 템플릿 동기화
+팀의 템플릿을 JSON 파일 하나에 두면(사내 서버, Git 호스트, 아무 URL이나) 모두가 같은 템플릿을 씁니다.
+URL을 한 번 등록해두면 선택한 주기(1시간~하루)로 갱신되고, "Sync now"로 즉시 받을 수도 있습니다.
+템플릿은 소스별로 묶여서 표시되며, 필요 없는 그룹은 공유 파일을 건드리지 않고 숨길 수 있습니다.
+동기화된 템플릿은 이곳에서 읽기 전용입니다. 수정은 원본에서 하므로, 누군가의 수정이 조용히 되돌려지지 않습니다.
+기본은 꺼져 있습니다. 소스를 추가하기 전까지 아무 곳에도 접속하지 않고, 이후에도 직접 등록한 URL에만 접속합니다.
+템플릿 삽입은 로컬 캐시를 읽으므로 요청이 발생하지 않고 오프라인에서도 동작합니다.
 
 ▸ 폭·스타일 규칙
 Plane 은 긴 이름(모듈·사이클·라벨·브레드크럼)을 잘라서 보여줍니다.
@@ -190,16 +214,18 @@ DevTools 가 필요 없습니다.
 와일드카드(*.example.com)도 지원합니다.
 
 ▸ 가져오기 / 내보내기
-도메인·규칙·템플릿 전체를 JSON 파일로 백업하고 다른 기기에서 복원할 수 있습니다.
+도메인·규칙·템플릿·변수·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원할 수 있습니다.
 
 ▸ 라이트 & 다크 모드
 팝업과 설정이 시스템 테마를 따르며 Plane 의 모노크롬 톤과 어울립니다.
 
 개인정보
 
-계정·추적·분석·외부 서버가 없습니다.
+계정·추적·분석이 없습니다. 개발자는 서버를 운영하지 않으며 사용자로부터 아무것도 받지 않습니다.
 설정은 브라우저 자체 저장소(chrome.storage)에 보관됩니다(동기화가 켜져 있으면 본인 Google 계정으로 동기화).
-그 외 어디로도 전송되지 않습니다. 자세한 내용은 개인정보 처리방침을 참고하세요.
+그 외 어디로도 전송되지 않습니다.
+익스텐션이 보내는 유일한 요청은 사용자가 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것이며, 그 요청에는 사용자의 데이터가 담기지 않습니다.
+자세한 내용은 개인정보 처리방침을 참고하세요.
 
 시작하기
 

@@ -6,5 +6,532 @@
   "extDesc": {
     "message": "Plane(makeplane/plane.so)용 보조 도구 — 제목·본문 템플릿 원클릭 삽입과 이름 폭 조정 규칙을 추가합니다.",
     "description": "Short description shown in the Chrome Web Store."
+  },
+  "optPageTitle": {
+    "message": "Enhancer for Plane — 설정 (makeplane / plane.so)"
+  },
+  "optTagline": {
+    "message": "오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane / plane.so)을 위한 본문 템플릿과 스타일 규칙."
+  },
+  "optGitHub": {
+    "message": "GitHub"
+  },
+  "optReportIssue": {
+    "message": "문제 신고"
+  },
+  "optEnabled": {
+    "message": "사용"
+  },
+  "optDomainsTitle": {
+    "message": "적용 도메인"
+  },
+  "optDomainsDesc": {
+    "message": "아래 나열한 도메인에서만 동작합니다. 한 줄에 하나씩 입력하세요. <code>*.example.com</code> 같은 와일드카드를 지원합니다. 저장하면 새로 추가한 도메인마다 Chrome이 접근 권한을 요청합니다."
+  },
+  "optDomainsAll": {
+    "message": "모든 사이트에서 실행 (아래 목록 무시)"
+  },
+  "optDomainsTip": {
+    "message": "팁: 현재 탭의 Plane을 켜려면 툴바 팝업을 열고 <b>“이 사이트에서 사용”</b>을 누르세요."
+  },
+  "optRulesTitle": {
+    "message": "스타일 규칙 (폭 / 길이)"
+  },
+  "optRulesAdd": {
+    "message": "＋ 규칙 추가"
+  },
+  "optRulesDesc": {
+    "message": "원하는 <b>CSS 선택자</b>에 <b>속성 : 값</b>을 <code>!important</code>로 강제 적용합니다. Plane의 클래스명이 바뀌면 선택자만 고치면 됩니다. 값은 단위까지 함께 입력하세요. 예: <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
+  },
+  "optRulesEmpty": {
+    "message": "규칙이 없습니다. “규칙 추가”를 눌러 시작하세요."
+  },
+  "optQuickAdd": {
+    "message": "빠른 추가:"
+  },
+  "optPresetModuleName": {
+    "message": "모듈 / 항목 이름 폭"
+  },
+  "optPresetCycleName": {
+    "message": "사이클 / 경로 이름 폭"
+  },
+  "optPresetDropdown": {
+    "message": "검색 드롭다운 폭"
+  },
+  "optRuleLabelPh": {
+    "message": "설명 (예: 모듈 이름 폭)"
+  },
+  "optRuleSelectorPh": {
+    "message": "CSS 선택자 (예: .max-w-40)"
+  },
+  "optRulePropPh": {
+    "message": "속성"
+  },
+  "optRuleValuePh": {
+    "message": "값 (예: 320px)"
+  },
+  "optTplTitle": {
+    "message": "본문 템플릿 (제목 + 본문)"
+  },
+  "optTplAdd": {
+    "message": "＋ 템플릿 추가"
+  },
+  "optTplDesc1": {
+    "message": "작업 항목 설명 툴바의 <b>“첨부” 옆 “템플릿” 버튼</b>에서 선택하면 <b>제목</b>과 <b>본문</b>이 함께 채워집니다. 제목은 선택 사항입니다."
+  },
+  "optTplDesc2": {
+    "message": "본문은 <b>마크다운</b>으로 작성하며 에디터에 서식으로 변환되어 들어갑니다: <code>##</code> 제목, <code>-</code> / <code>1.</code> 목록, <code>- [ ]</code> 체크박스, <code>**굵게**</code>, <code>`코드`</code>."
+  },
+  "optTplDesc3": {
+    "message": "변수 (삽입 시 치환): <code>{{date}}</code> 오늘, <code>{{date+N}}</code>/<code>{{date-N}}</code> 오늘부터 N일 (예: <code>{{date+7}}</code>), <code>{{week}}</code> 이번 주 범위 (월–일), <code>{{month}}</code> <code>YYYY-MM</code> 형식. 단축키: 설명 편집 중 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd>로 템플릿을 엽니다."
+  },
+  "optTplEmpty": {
+    "message": "템플릿이 없습니다. “템플릿 추가”를 눌러 시작하세요."
+  },
+  "optTplNamePh": {
+    "message": "템플릿 이름 (예: 🐞 버그 리포트)"
+  },
+  "optTplTitlePh": {
+    "message": "제목 (예: [Bug] — 비우면 제목을 채우지 않음)"
+  },
+  "optTplContentPh": {
+    "message": "본문 내용"
+  },
+  "optVarsTitle": {
+    "message": "템플릿 변수"
+  },
+  "optVarsAdd": {
+    "message": "＋ 변수 추가"
+  },
+  "optVarsDesc": {
+    "message": "내 템플릿과 동기화된 템플릿 어디에나 <code>{{var.name}}</code> 형태로 넣을 수 있는 값입니다. 동기화된 템플릿이 <code>{{var.team}}</code>을 쓰면, 삽입하는 사람마다 각자의 값으로 해석됩니다."
+  },
+  "optVarsUndefined": {
+    "message": "<code>var.</code> 접두어 덕분에 내장 변수 <code>{{date}}</code>·<code>{{week}}</code>·<code>{{month}}</code>와 이름이 겹칠 수 없습니다. 정의하지 않은 변수는 빈 문자열이 되지 않고 <code>{{var.name}}</code> 그대로 남아 눈에 보입니다."
+  },
+  "optVarsEmpty": {
+    "message": "변수가 없습니다. “변수 추가”를 눌러 시작하세요."
+  },
+  "optVarNamePh": {
+    "message": "이름 (예: team)"
+  },
+  "optVarValuePh": {
+    "message": "대신 삽입될 값"
+  },
+  "msgVarBadName": {
+    "message": "영문·숫자·하이픈·밑줄만 쓸 수 있습니다."
+  },
+  "msgVarDupe": {
+    "message": "같은 이름의 변수가 이미 있습니다."
+  },
+  "msgVarLimit": {
+    "message": "변수는 최대 $MAX$개입니다. 추가하려면 하나를 지우세요.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcLimit": {
+    "message": "동기화 소스는 최대 $MAX$개입니다. 추가하려면 하나를 지우세요.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "optSyncTitle": {
+    "message": "템플릿 동기화"
+  },
+  "optSyncDesc": {
+    "message": "하나 이상의 URL에서 공유 템플릿을 받아옵니다. 브라우저 시작 시, 설정한 주기마다, 그리고 이 페이지를 열 때 확인합니다. 동기화된 템플릿은 <b>읽기 전용</b>입니다. 수정은 소스에서 하세요. 별도 접근 권한 요청을 피하려면 <b>Plane과 같은 도메인</b>에 파일을 두세요."
+  },
+  "optSyncFormat": {
+    "message": "파일 형식"
+  },
+  "optSyncFormatDesc": {
+    "message": "중첩이 없는 단순한 목록입니다. 항목마다 <code>group</code> 문자열을 하나씩 넣습니다. 최상위 <code>name</code>은 이 묶음 전체의 이름이며, 소스 이름을 비워두면 이 값이 쓰입니다."
+  },
+  "optSyncEmpty": {
+    "message": "소스가 없습니다. “소스 추가”를 누르세요."
+  },
+  "optSyncAddSource": {
+    "message": "＋ 소스 추가"
+  },
+  "optSyncNow": {
+    "message": "↻ 지금 동기화"
+  },
+  "optSrcEnableTitle": {
+    "message": "이 소스 사용"
+  },
+  "optSrcNamePh": {
+    "message": "이름 (예: QA 표준)"
+  },
+  "optSrcUrlPh": {
+    "message": "https://plane.example.com/templates.json"
+  },
+  "optSrcInterval": {
+    "message": "동기화 주기"
+  },
+  "optInterval1h": {
+    "message": "1시간마다"
+  },
+  "optInterval6h": {
+    "message": "6시간마다"
+  },
+  "optInterval12h": {
+    "message": "12시간마다"
+  },
+  "optIntervalDaily": {
+    "message": "하루마다"
+  },
+  "optBackupTitle": {
+    "message": "백업"
+  },
+  "optBackupDesc1": {
+    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
+  },
+  "optBackupDesc2": {
+    "message": "파일에는 도메인·소스 URL·변수 값이 평문으로 들어갑니다. 변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요. 동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
+  },
+  "optBackupExport": {
+    "message": "↓ JSON 내보내기"
+  },
+  "optBackupImport": {
+    "message": "↑ JSON 가져오기…"
+  },
+  "optStorageNote": {
+    "message": "설정은 Chrome을 통해 기기 간 동기화되며, 항목당 약 8 KB 제한이 있습니다. 한도에 걸리면 템플릿을 줄이거나 삭제하고 JSON 백업을 보관하세요."
+  },
+  "optDelete": {
+    "message": "삭제"
+  },
+  "optRestoreDefaults": {
+    "message": "기본값 복원"
+  },
+  "optSave": {
+    "message": "저장"
+  },
+  "msgInvalidSelector": {
+    "message": "올바르지 않은 CSS 선택자"
+  },
+  "msgInvalidSrcUrl": {
+    "message": "소스 주소는 http:// 또는 https:// 로 시작해야 합니다"
+  },
+  "msgUngrouped": {
+    "message": "그룹 없음"
+  },
+  "msgSrcEnterUrl": {
+    "message": "URL을 입력한 뒤 저장하면 동기화됩니다."
+  },
+  "msgSrcNotSynced": {
+    "message": "아직 동기화되지 않았습니다 — 저장 후 “지금 동기화”를 누르세요."
+  },
+  "msgSrcSynced": {
+    "message": "$TIME$ 동기화됨 · 템플릿 $COUNT$개",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSrcSkipped": {
+    "message": " (한도 초과로 $COUNT$개 생략)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcFailed": {
+    "message": "동기화 실패: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcLastGood": {
+    "message": " — 마지막 정상본 사용 ($TIME$)",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcSummaryOne": {
+    "message": "템플릿 $COUNT$개 · 그룹 1개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSrcSummaryMany": {
+    "message": "템플릿 $COUNT$개 · 그룹 $GROUPS$개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "groups": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSrcHidden": {
+    "message": " ($COUNT$개 숨김)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgChangedElsewhere": {
+    "message": "다른 곳(예: 요소 선택기)에서 설정이 변경되었습니다. 적용하려면 이 페이지를 새로고침하세요 — 저장하지 않은 편집 내용은 사라집니다."
+  },
+  "msgLoadedPicked": {
+    "message": "요소 선택기로 추가한 규칙을 불러왔습니다."
+  },
+  "msgExported": {
+    "message": "설정 JSON을 내보냈습니다."
+  },
+  "msgImported": {
+    "message": "가져왔습니다 — 확인한 뒤 저장을 누르면 적용됩니다."
+  },
+  "msgImportInvalid": {
+    "message": "가져오기 실패: 올바른 설정 JSON이 아닙니다."
+  },
+  "msgImportNotOurs": {
+    "message": "가져오기 실패: 이 확장에서 내보낸 파일이 아닙니다."
+  },
+  "msgImportIsSyncFile": {
+    "message": "설정 백업이 아니라 템플릿 동기화 피드로 보입니다. 대신 “템플릿 동기화”에 URL을 추가하세요."
+  },
+  "msgImportNewer": {
+    "message": "가져오기 실패: 더 새로운 버전의 백업입니다 (파일 schema $FILE$, 현재 빌드는 $HERE$). 확장을 먼저 업데이트하세요.",
+    "placeholders": {
+      "file": {
+        "content": "$1"
+      },
+      "here": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgImportUnreadable": {
+    "message": "가져오기 실패: 파일을 읽을 수 없습니다."
+  },
+  "msgSaveFirst": {
+    "message": "먼저 저장하세요 — “지금 동기화”는 저장된 소스를 받아옵니다."
+  },
+  "msgSyncing": {
+    "message": "동기화 중…"
+  },
+  "msgSyncFailed": {
+    "message": "동기화 실패: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSyncDone": {
+    "message": "소스 $COUNT$개를 동기화했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSyncDoneErrors": {
+    "message": "소스 $COUNT$개를 동기화했고 $FAILED$개는 실패했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "msgSyncFinished": {
+    "message": "동기화를 마쳤습니다."
+  },
+  "msgResetConfirm": {
+    "message": "모든 설정을 기본값으로 되돌립니다. 계속할까요?"
+  },
+  "msgResetDone": {
+    "message": "기본값을 복원했습니다. “저장”을 눌러 적용하세요."
+  },
+  "msgSaved": {
+    "message": "저장했습니다."
+  },
+  "msgSavedNoPerm": {
+    "message": "저장했습니다 — 다만 사이트 접근이 거부되어, 권한을 허용할 때까지 등록한 도메인은 동작하지 않습니다."
+  },
+  "msgSaveQuota": {
+    "message": "저장 실패: 설정이 Chrome 동기화의 약 8 KB 한도를 초과했습니다. 템플릿을 줄이거나 삭제하세요 (또는 JSON 백업을 보관하세요)."
+  },
+  "msgSaveFailed": {
+    "message": "저장 실패: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgStorageUsed": {
+    "message": "8 KB 중 $SIZE$ 사용",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgStorageOver": {
+    "message": " — 동기화 한도 초과. 저장이 실패할 수 있습니다"
+  },
+  "msgStorageNear": {
+    "message": " — 한도에 근접했습니다"
+  },
+  "popEnabled": {
+    "message": "사용"
+  },
+  "popTemplates": {
+    "message": "템플릿"
+  },
+  "popPick": {
+    "message": "🎯 요소 선택 → 규칙 추가"
+  },
+  "popRescan": {
+    "message": "↻ 이 페이지 다시 검사"
+  },
+  "popSettings": {
+    "message": "설정 · 템플릿 관리"
+  },
+  "popEnableSite": {
+    "message": "이 사이트에서 사용"
+  },
+  "popChecking": {
+    "message": "현재 사이트: 확인 중…"
+  },
+  "popUnknown": {
+    "message": "현재 사이트: 알 수 없음"
+  },
+  "popActive": {
+    "message": "동작 중: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popDisabled": {
+    "message": "사용 안 함: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popInactive": {
+    "message": "적용되지 않은 사이트: $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "popRescanning": {
+    "message": "다시 검사 중…"
+  },
+  "popNotLoaded": {
+    "message": "여기에 로드되지 않았습니다 — 페이지를 새로고침하세요 (Ctrl/Cmd+R)."
+  },
+  "popNotLoadedShort": {
+    "message": "여기에 로드되지 않았습니다 — 페이지를 새로고침하세요."
+  },
+  "popInactiveHere": {
+    "message": "이 사이트에서는 동작하지 않습니다."
+  },
+  "popRescanReady": {
+    "message": "다시 검사했습니다 — 템플릿 버튼이 준비됐습니다."
+  },
+  "popRescanOpen": {
+    "message": "다시 검사했습니다. 작업 항목의 설명을 여세요."
+  },
+  "popPermNeeded": {
+    "message": "$HOST$에서 실행하려면 권한이 필요합니다.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuBtnLabel": {
+    "message": "템플릿"
+  },
+  "menuBtnAria": {
+    "message": "제목·본문 템플릿 삽입 (Alt/⌥+T)"
+  },
+  "menuBtnTitle": {
+    "message": "제목·본문 템플릿 삽입  ·  Alt/⌥+T"
+  },
+  "menuFilterPh": {
+    "message": "템플릿 검색…"
+  },
+  "menuYours": {
+    "message": "내 템플릿"
+  },
+  "menuSynced": {
+    "message": "동기화됨"
+  },
+  "menuUntitled": {
+    "message": "(이름 없음)"
+  },
+  "menuTitlePrefix": {
+    "message": "제목: $TITLE$",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuNoMatch": {
+    "message": "일치하는 템플릿이 없습니다."
+  },
+  "menuManage": {
+    "message": "＋ 템플릿 관리"
+  },
+  "pickHeader": {
+    "message": "선택자로 규칙 만들기  ·  Esc로 취소"
+  },
+  "pickerHint": {
+    "message": "요소를 클릭하면 규칙이 만들어집니다 · Esc로 취소"
+  },
+  "pickMatches": {
+    "message": "$COUNT$개 일치",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "pickNoSelector": {
+    "message": "이 요소의 선택자를 만들지 못했습니다."
+  },
+  "pickRuleAdded": {
+    "message": "규칙 추가됨: $SELECTOR$ — 설정에서 값을 지정하세요.",
+    "placeholders": {
+      "selector": {
+        "content": "$1"
+      }
+    }
+  },
+  "pickRuleFailed": {
+    "message": "규칙 저장 실패 (스토리지 오류)."
   }
 }
