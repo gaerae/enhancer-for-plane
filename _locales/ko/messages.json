@@ -400,6 +400,14 @@
       }
     }
   },
+  "msgSaveQuotaItem": {
+    "message": "저장 실패: 도메인과 스타일 규칙을 합친 크기가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 일부를 지우거나 JSON 백업을 보관하세요.",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
   "msgSaveTplTooLarge": {
     "message": "저장 실패: 템플릿 “$NAME$” 하나가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 내용을 줄이거나, 이 템플릿은 JSON 백업으로만 보관하세요.",
     "placeholders": {

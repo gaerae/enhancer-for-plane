@@ -1335,6 +1335,32 @@ test("storage: the meter measures the items the save actually writes", async () 
   eq(predicted, actual, "predicted bytes");
 });
 
+test("storage: the meter watches both ceilings, not just the total", async () => {
+  // When everything lived in one item, "is the total too big" and "is this item too big"
+  // were the same question. They are not any more: templates shard, but domains and rules
+  // still share the core item, so that item can bust the 8 KB per-item cap while the
+  // total sits comfortably inside 100 KB. Watching only the total shows green and then
+  // fails on save.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.domains = Array.from({ length: 100 }, (_, i) => "sub" + i + ".plane.example.com".padEnd(120, "x"));
+  const u = ctx.peSettingsUsage(s);
+  ok(u.total < ctx.__SYNC_QUOTA, "the total is nowhere near the overall quota");
+  ok(u.overItem, "yet one item is over the per-item cap");
+  eq(u.worstKey, ctx.__STORAGE_KEY, "and it is the core item, not a template shard");
+
+  // …and the save it predicts really does fail, so the warning is not theatre.
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save fails");
+  match(caught.message, /QUOTA_BYTES_PER_ITEM/, "with the per-item error the UI keys off");
+  eq(Object.keys(storage.store), [], "and wrote nothing");
+});
+
 test("storage: the budget is bytes, so a Korean template is not counted as ASCII", () => {
   // The cap that shipped wrong last time counted UTF-16 units against a byte limit, and
   // a Korean feed sailed past it at 3x. Same arithmetic, same trap, different place.

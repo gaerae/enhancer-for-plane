@@ -400,6 +400,14 @@
       }
     }
   },
+  "msgSaveQuotaItem": {
+    "message": "Save failed: your domains and style rules together exceed the ~$LIMIT$ KB Chrome sync allows for one block. Remove some, or keep a JSON backup.",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
   "msgSaveTplTooLarge": {
     "message": "Save failed: the template “$NAME$” is on its own larger than the ~$LIMIT$ KB Chrome sync allows for one block. Shorten it, or keep it in a JSON backup instead.",
     "placeholders": {

@@ -727,6 +727,11 @@
           peMsg("msgSaveTplTooLarge", [e.templateName || peMsg("menuUntitled"), String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]),
           true
         );
+      } else if (/QUOTA_BYTES_PER_ITEM/i.test(msg)) {
+        // The templates are already split across items, so this can only be the core
+        // one: domains and style rules. Saying "settings are too large" would point at
+        // the templates, which are not the problem and cannot help.
+        flash(peMsg("msgSaveQuotaItem", [String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]), true);
       } else if (/quota/i.test(msg)) {
         flash(peMsg("msgSaveQuota", [String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]), true);
       } else {
@@ -806,11 +811,14 @@
     const bar = $("storageBarFill");
     const txt = $("storageText");
     if (!bar || !txt || !state) return;
-    let bytes = 0;
+    let usage = { total: 0, overTotal: false, overItem: false };
     try {
-      bytes = peSettingsBytes(state);
+      usage = peSettingsUsage(state);
     } catch (_) {}
-    const over = bytes > PE_SYNC_QUOTA_BYTES;
+    const bytes = usage.total;
+    // Either ceiling refuses the save, so either one has to light the bar up. The bar
+    // itself tracks the total, which is the number the user can act on.
+    const over = usage.overTotal || usage.overItem;
     const near = !over && bytes > PE_SYNC_QUOTA_BYTES * 0.8;
     bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_QUOTA_BYTES) * 100)) + "%";
     bar.className = over ? "over" : near ? "near" : "";

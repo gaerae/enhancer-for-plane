@@ -396,12 +396,36 @@ function peSettingsWriteSet(settings) {
   return items;
 }
 
+// What a save would occupy: the total against PE_SYNC_QUOTA_BYTES, and the largest
+// single item against PE_SYNC_ITEM_BYTES. Both are real ceilings and either one can
+// refuse the write, so the meter has to watch both — when everything lived in one item
+// the two questions were the same question, and a meter that only tracks the total now
+// shows green while a core item bloated by domains and rules fails on save.
+function peSettingsUsage(settings) {
+  const items = peSettingsWriteSet(settings);
+  let total = 0;
+  let worst = 0;
+  let worstKey = "";
+  for (const k of Object.keys(items)) {
+    const n = peItemBytes(k, items[k]);
+    total += n;
+    if (n > worst) {
+      worst = n;
+      worstKey = k;
+    }
+  }
+  return {
+    total,
+    worst,
+    worstKey,
+    overTotal: total > PE_SYNC_QUOTA_BYTES,
+    overItem: worst > PE_SYNC_ITEM_BYTES
+  };
+}
+
 // Total bytes one save would occupy, against PE_SYNC_QUOTA_BYTES.
 function peSettingsBytes(settings) {
-  const items = peSettingsWriteSet(settings);
-  let n = 0;
-  for (const k of Object.keys(items)) n += peItemBytes(k, items[k]);
-  return n;
+  return peSettingsUsage(settings).total;
 }
 
 // Reassemble settings from a raw chrome.storage.sync dump. Split out so the assembly
