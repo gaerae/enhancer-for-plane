@@ -112,6 +112,14 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 Host a JSON file anywhere your team can reach over `http(s)` — an intranet path, a
 Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Team template sync.
 
+You do not have to write it by hand. **Settings ▸ Team template sync ▸ "Export my
+templates as a feed"** writes this exact format from the templates you already
+have: build them in the UI, export, upload, share the URL. The export asks for the
+collection's `name` and stamps today's date as `version`. It is a *publication*,
+not a backup — it carries your templates and nothing else, no domains, no rules, no
+variable values, no source URLs. Templates you received *from* a source are left
+out too; they belong to whoever publishes them.
+
 ```json
 {
   "schema": 1,
@@ -300,14 +308,16 @@ carries none of your data. See [PRIVACY.md](PRIVACY.md).
 - **Chrome / Chromium, Manifest V3** — not built for Firefox or Safari.
 - **Self-hosted Plane, inactive by default** — no domain ships enabled; add yours
   in the popup or Settings. It never touches non-Plane sites.
-- **Sync storage cap (~8 KB).** All settings (domains + rules + templates +
-  variables + sync sources) live in a single `chrome.storage.sync` item, which
-  Chrome caps at ~8 KB — roughly a couple dozen typical templates. The Settings
-  page shows a live storage meter and warns before you hit it; if a save fails,
-  shorten/remove templates or keep a JSON backup (Export). Settings sync across
-  your signed-in Chrome devices. **Team templates don't count against it** — they
-  live in `chrome.storage.local` (5 MB, this device only), which is why sync is the
-  way to carry a large shared library.
+- **Sync storage cap (~100 KB).** Settings live in `chrome.storage.sync`, which
+  allows ~100 KB in total and ~8 KB per item. Templates are packed into their own
+  items (`peTpl.0`, `peTpl.1`, …), so the ceiling is the 100 KB — several hundred
+  typical templates — rather than the 8 KB a single item would have imposed. Two
+  consequences: **one template still has to fit one ~8 KB item**, and a save that
+  breaks that rule is refused up front naming the template; and sizes are counted
+  in **bytes**, so a Korean or emoji-heavy template costs about three times what
+  its character count suggests. The Settings page shows a live meter against the
+  100 KB. **Team templates don't count against it** — they live in
+  `chrome.storage.local` (10 MB, 5 MB on Chrome ≤ 113; this device only).
 - **Synced templates are read-only.** They're edited at the source file, not in
   Settings. An edit here would be silently reverted by the next sync, so the UI
   doesn't offer one; hiding a group is local and does survive.

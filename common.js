@@ -610,6 +610,43 @@ function peNormalizeRemoteTemplates(json, sourceId) {
   return { templates: out, dropped, name };
 }
 
+// The version of the sync feed format — what a published file stamps as `schema`, and
+// what examples/team-templates.json carries. Independent of PE_SCHEMA, which versions the
+// user's own settings: one is a wire format between people, the other is storage.
+const PE_FEED_SCHEMA = 1;
+
+// Turn the user's own templates into a file another install can subscribe to.
+//
+// Sync could always read a feed; nothing could write one, so the only way to publish for
+// a team was to author the JSON by hand. That put the feature out of reach of everyone
+// who was not going to do that, which is most of the people it was built for.
+//
+// The output goes back through peNormalizeRemoteTemplates on the subscriber's side, so
+// this is one half of a round trip and tools/test.js checks it as one. `version` is a
+// stamp for whoever reads the file — sync deliberately does not use it for change
+// detection (a source edited without bumping it once kept serving the old templates), so
+// nothing breaks if two exports on one day share a value.
+function peBuildTeamFeed(settings, feedName, today) {
+  const L = PE_SYNC_LIMITS;
+  const templates = (settings && settings.templates ? settings.templates : [])
+    .filter(peTemplateHasContent)
+    .slice(0, L.maxTemplatesPerSource)
+    .map((t) => ({
+      id: peClampStr(t.id || "", L.maxFieldLen),
+      name: peClampStr(t.name || "", L.maxFieldLen),
+      title: peClampStr(t.title || "", L.maxFieldLen),
+      content: peClampStr(t.content || "", L.maxContentLen)
+    }));
+  const feed = { schema: PE_FEED_SCHEMA };
+  const label = peClampStr(typeof feedName === "string" ? feedName : "", L.maxFieldLen).trim();
+  // Omitted rather than blank when unnamed: a subscriber falls back to the source's host,
+  // and an empty string would only look like a name that failed to load.
+  if (label) feed.name = label;
+  if (today) feed.version = today;
+  feed.templates = templates;
+  return feed;
+}
+
 // What the picker/settings call a source: the user's own name wins, then the name the
 // file declares, then the host. (Two sources can share a host, so a name matters.)
 function peSourceDisplayName(src, entry) {

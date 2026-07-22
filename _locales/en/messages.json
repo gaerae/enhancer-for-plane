@@ -161,6 +161,12 @@
   "optSyncNow": {
     "message": "↻ Sync now"
   },
+  "optSyncExportFeed": {
+    "message": "↓ Export my templates as a feed"
+  },
+  "optSyncExportFeedDesc": {
+    "message": "Publishing for a team? Export writes your own templates in the format above. Put the file somewhere your teammates can reach over <code>https</code> and give them the URL — they add it as a source. Your <b>synced</b> templates are not included; they already belong to whoever publishes them."
+  },
   "optSrcEnableTitle": {
     "message": "Enable this source"
   },
@@ -297,6 +303,20 @@
   },
   "msgExported": {
     "message": "Exported settings JSON."
+  },
+  "msgFeedNamePrompt": {
+    "message": "Name this collection — a subscriber sees it when they leave the source's name blank. Leave it empty to skip."
+  },
+  "msgFeedEmpty": {
+    "message": "Nothing to publish: add a template of your own first. Synced templates belong to their own source."
+  },
+  "msgFeedExported": {
+    "message": "Exported $COUNT$ templates as a feed. Host it over https, then share the URL.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "msgImported": {
     "message": "Imported — review, then click Save to apply."

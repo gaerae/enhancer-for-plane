@@ -40,7 +40,8 @@
     status: $("status"),
     exportBtn: $("exportBtn"),
     importBtn: $("importBtn"),
-    importFile: $("importFile")
+    importFile: $("importFile"),
+    exportFeedBtn: $("exportFeedBtn")
   };
 
   // labelKey feeds the rule's label field on click, so it must follow the UI language.
@@ -220,6 +221,17 @@
     }
     if (!Array.isArray(state.templateSync.sources)) state.templateSync.sources = [];
     return state.templateSync;
+  }
+
+  // Local date, YYYY-MM-DD. Stamped on an exported feed as its `version`.
+  function fmtDay(ms) {
+    try {
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, "0");
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    } catch (_) {
+      return "";
+    }
   }
 
   function fmtTime(ms) {
@@ -480,6 +492,7 @@
     } catch (_) {}
 
     el.exportBtn.addEventListener("click", exportSettings);
+    el.exportFeedBtn.addEventListener("click", exportTeamFeed);
     el.importBtn.addEventListener("click", () => el.importFile.click());
     el.importFile.addEventListener("change", () => {
       const f = el.importFile.files && el.importFile.files[0];
@@ -488,20 +501,42 @@
     });
   }
 
-  function exportSettings() {
-    // `settings.schema` already states which version this is; a second copy alongside
-    // it would only be one more thing that can disagree.
-    const payload = { _app: PE_APP_ID, settings: state };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "enhancer-for-plane-settings.json";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSettings() {
+    // `settings.schema` already states which version this is; a second copy alongside
+    // it would only be one more thing that can disagree.
+    downloadJson({ _app: PE_APP_ID, settings: state }, "enhancer-for-plane-settings.json");
     flash(peMsg("msgExported"));
+  }
+
+  // Publish the user's own templates as a sync feed — the file a teammate subscribes to.
+  // Deliberately not a backup: no domains, no rules, no variable values, no source URLs.
+  // This one is meant to be handed to other people, and a backup is not.
+  function exportTeamFeed() {
+    const templates = (state.templates || []).filter(peTemplateHasContent);
+    if (!templates.length) {
+      flash(peMsg("msgFeedEmpty"), true);
+      return;
+    }
+    // Asked, not stored: naming the collection is a decision about this file, and a
+    // remembered name would go stale the moment it was published under another one.
+    // Cancel means cancel — an empty answer still exports, just without a name.
+    const name = prompt(peMsg("msgFeedNamePrompt"), "");
+    if (name === null) return;
+    const feed = peBuildTeamFeed(state, name, fmtDay(Date.now()));
+    downloadJson(feed, "enhancer-for-plane-team-templates.json");
+    flash(peMsg("msgFeedExported", [String(feed.templates.length)]));
   }
 
   function importSettings(file) {

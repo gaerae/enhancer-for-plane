@@ -1359,6 +1359,145 @@ test("storage: a change to a shard alone still counts as a settings change", () 
   ok(!ctx.peSettingsChanged({ peSettings: {} }, "local"), "wrong area");
 });
 
+/* ================================================================== */
+/* team feed export — the other half of the round trip                */
+/* ================================================================== */
+
+test("feed: what export writes, sync reads back — every field, unchanged", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "bug", name: "🐞 버그", title: "[Bug] ", content: "## 재현\n1. \n2. " },
+    { id: "task", name: "Task", title: "", content: "## Goal\n- [ ] " }
+  ];
+  const feed = ctx.peBuildTeamFeed(s, "QA standards", "2026-07-22");
+  // Publishing is only useful if a subscriber's normalizer accepts the result. Asserting
+  // the shape of the file would pass while the two halves quietly disagreed.
+  const got = ctx.peNormalizeRemoteTemplates(JSON.parse(JSON.stringify(feed)), "src1");
+  eq(got.dropped, 0, "nothing dropped");
+  eq(got.name, "QA standards", "the collection name survives");
+  eq(got.templates.map((t) => t.name), ["🐞 버그", "Task"], "names survive");
+  eq(got.templates.map((t) => t.title), ["[Bug] ", ""], "titles survive");
+  eq(got.templates.map((t) => t.content), s.templates.map((t) => t.content), "bodies survive");
+  eq(got.templates.map((t) => t.id), ["sync:src1:bug", "sync:src1:task"], "ids are namespaced by the reader");
+});
+
+test("feed: it is a publication, not a backup — nothing private rides along", () => {
+  // This file is meant to be handed to other people. A backup is not: it carries the
+  // user's domains, their source URLs and their variable values in plain text.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.domains = ["plane.internal.example.com"];
+  s.variables = [{ name: "team", value: "Someone's real name" }];
+  s.templateSync = { enabled: true, sources: [{ id: "s1", url: "https://private.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] };
+  const wire = JSON.stringify(ctx.peBuildTeamFeed(s, "Team", "2026-07-22"));
+  for (const secret of ["plane.internal.example.com", "Someone's real name", "private.example.com", "variables", "domains", "rules"]) {
+    ok(wire.indexOf(secret) === -1, `"${secret}" must not appear in a published feed`);
+  }
+  eq(Object.keys(JSON.parse(wire)).sort(), ["name", "schema", "templates", "version"], "keys");
+});
+
+test("feed: synced templates are not re-published as your own", () => {
+  // They belong to whoever publishes them. Re-exporting them would let a second feed
+  // fork someone else's collection silently, and the ids would collide on the way back.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "mine", name: "Mine", title: "", content: "c" }];
+  const cache = { bySource: { s1: { templates: [{ id: "sync:s1:theirs", group: "G", name: "Theirs", title: "", content: "c" }] } } };
+  // The picker shows both; the feed must carry only the first.
+  eq(ctx.peCountTemplates(ctx.peBuildTemplateSections(Object.assign({}, s, { templateSync: { enabled: true, sources: [{ id: "s1", url: "https://x.test/f.json", enabled: true }] } }), cache)), 2, "the picker shows both");
+  eq(ctx.peBuildTeamFeed(s, "", "2026-07-22").templates.map((t) => t.id), ["mine"], "the feed carries only your own");
+});
+
+test("feed: an unnamed collection omits the key rather than publishing an empty one", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const feed = ctx.peBuildTeamFeed(s, "   ", "2026-07-22");
+  ok(!("name" in feed), "no blank name — a subscriber falls back to the host");
+  // …and the reader must agree that there is no name to show.
+  eq(ctx.peNormalizeRemoteTemplates(feed, "s").name, "", "reader sees no name");
+  eq(ctx.peSourceDisplayName({ url: "https://team.example.com/f.json" }, { remoteName: "" }), "team.example.com", "falls back to the host");
+});
+
+test("feed: empty and unusable templates never reach the file", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "blank", name: "", title: "", content: "" },
+    { id: "spaces", name: "   ", title: "  ", content: "\n\t " },
+    { id: "real", name: "Real", title: "", content: "c" }
+  ];
+  eq(ctx.peBuildTeamFeed(s, "", "2026-07-22").templates.map((t) => t.id), ["real"], "only the usable one");
+});
+
+test("feed: the publisher's own caps apply, so a subscriber never has to drop anything", () => {
+  const ctx = loadCommon();
+  const L = ctx.__LIMITS;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: L.maxTemplatesPerSource + 25 }, (_, i) => ({
+    id: "t" + i,
+    name: "x".repeat(400),
+    title: "y".repeat(400),
+    content: "z".repeat(L.maxContentLen + 500)
+  }));
+  const feed = ctx.peBuildTeamFeed(s, "z".repeat(400), "2026-07-22");
+  eq(feed.templates.length, L.maxTemplatesPerSource, "count capped at what a source may hold");
+  eq(feed.name.length, L.maxFieldLen, "collection name capped");
+  eq(feed.templates[0].name.length, L.maxFieldLen, "name capped");
+  eq(feed.templates[0].content.length, L.maxContentLen, "content capped");
+  eq(ctx.peNormalizeRemoteTemplates(feed, "s").dropped, 0, "so the reader drops none of it");
+});
+
+test("feed: one publisher's export lands in another install's picker, end to end", async () => {
+  // The whole point of the feature, exercised through the real worker rather than
+  // asserted piecewise: the publisher's file goes over the wire, the subscriber fetches
+  // it, and what they can insert is what was published.
+  const author = loadCommon();
+  const s = author.peDeepMerge(author.__DEFAULTS, {});
+  s.templates = [
+    { id: "bug", name: "🐞 버그 리포트", title: "[Bug] ", content: "## 재현 절차\n1. " },
+    { id: "spec", name: "Spec", title: "[Spec] ", content: "## Problem\n" },
+    { id: "blank", name: "", title: "", content: "" } // must not travel
+  ];
+  const published = JSON.stringify(author.peBuildTeamFeed(s, "QA & Delivery standards", "2026-07-22"));
+
+  const { ctx, state } = loadWorker({
+    settings: {
+      templates: [{ id: "own", name: "My own", title: "", content: "c" }],
+      templateSync: {
+        enabled: true,
+        sources: [{ id: "src1", url: "https://team.example.com/templates.json", intervalMinutes: 360, enabled: true }]
+      }
+    },
+    respond: () => jsonResponse(published)
+  });
+  await ctx.syncSources(true);
+
+  const entry = state.cache.bySource.src1;
+  eq(entry.status, "ok", "the subscriber's sync succeeded");
+  eq(entry.dropped, 0, "and had nothing to drop");
+  eq(entry.remoteName, "QA & Delivery standards", "the collection name travelled");
+  eq(entry.templates.map((t) => t.name), ["🐞 버그 리포트", "Spec"], "exactly what was published, blank one excluded");
+
+  // …and the picker composes it with the subscriber's own templates.
+  const settings = await ctx.peGetSettings();
+  const sections = ctx.peBuildTemplateSections(settings, state.cache);
+  eq(sections.map((x) => x.kind), ["personal", "synced"], "their own block, then the source");
+  eq(sections[1].source, "QA & Delivery standards", "headed by the published name");
+  eq(ctx.peCountTemplates(sections), 3, "1 of their own + 2 published");
+  eq(sections[1].groups[0].items.map((t) => t.content), ["## 재현 절차\n1. ", "## Problem\n"], "bodies arrive intact");
+});
+
+test("feed: a published feed is not mistaken for a settings backup", () => {
+  // Both are JSON with a "templates" key. Importing one as the other used to be an
+  // unhelpful "not ours"; options.js tells them apart by this shape, so pin it.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const feed = ctx.peBuildTeamFeed(s, "Team", "2026-07-22");
+  ok(feed._app === undefined, "a feed carries no app stamp, so import refuses it");
+  ok(Array.isArray(feed.templates) && !feed.rules && !feed.domains, "…and looks like a feed, not a backup");
+});
+
 /* ---------- run ---------- */
 
 // A test that awaits something which never settles does not fail — node runs out of work

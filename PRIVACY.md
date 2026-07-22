@@ -99,7 +99,12 @@ source's cached templates.
 
 You can view, edit, export, or delete all stored settings at any time from the
 extension's Settings page ("Restore defaults" clears them, including sync sources
-and their cached templates). Template sync can be switched off, or individual
+and their cached templates). There are two exports, and they carry different
+things. "Export JSON" is a backup: it includes your domains, source URLs and
+variable values in plain text, so keep it to yourself. "Export my templates as a
+feed" is meant to be handed to teammates, and carries your templates and nothing
+else — no domains, no rules, no variable values, no source URLs. Both write a file
+to your device; neither uploads anything. Template sync can be switched off, or individual
 sources disabled or removed, at any time. Uninstalling the extension removes its
 stored data.
 
