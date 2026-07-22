@@ -88,6 +88,12 @@
   "optTplEmpty": {
     "message": "No templates yet. Click “Add template” to start."
   },
+  "optTplShare": {
+    "message": "↓ Share with your team…"
+  },
+  "optTplShareDesc": {
+    "message": "<b>Share with your team</b> saves the templates above as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Only your own templates are included, not ones you received from a source."
+  },
   "optTplNamePh": {
     "message": "Template name (e.g. 🐞 Bug report)"
   },
@@ -160,12 +166,6 @@
   },
   "optSyncNow": {
     "message": "↻ Sync now"
-  },
-  "optSyncExportFeed": {
-    "message": "↓ Export my templates as a feed"
-  },
-  "optSyncExportFeedDesc": {
-    "message": "Publishing for a team? Export writes your own templates in the format above. Put the file somewhere your teammates can reach over <code>https</code> and give them the URL — they add it as a source. Your <b>synced</b> templates are not included; they already belong to whoever publishes them."
   },
   "optSrcEnableTitle": {
     "message": "Enable this source"
@@ -305,13 +305,13 @@
     "message": "Exported settings JSON."
   },
   "msgFeedNamePrompt": {
-    "message": "Name this collection — a subscriber sees it when they leave the source's name blank. Leave it empty to skip."
+    "message": "Name this set of templates. A teammate sees it as the source's name unless they rename it. Leave empty to skip."
   },
   "msgFeedEmpty": {
-    "message": "Nothing to publish: add a template of your own first. Synced templates belong to their own source."
+    "message": "Nothing to share yet — add a template of your own first. Templates you received from a source are not included."
   },
   "msgFeedExported": {
-    "message": "Exported $COUNT$ templates as a feed. Host it over https, then share the URL.",
+    "message": "Saved $COUNT$ templates to a file. Host it over https, then share the URL.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -328,7 +328,7 @@
     "message": "Import failed: that file was not exported by this extension."
   },
   "msgImportIsSyncFile": {
-    "message": "That looks like a template sync feed, not a settings backup. Add its URL under Template sync instead."
+    "message": "That looks like a template sync file, not a settings backup. Add its URL under Template sync instead."
   },
   "msgImportNewer": {
     "message": "Import failed: that backup is from a newer version (schema $FILE$, this build reads $HERE$). Update the extension first.",

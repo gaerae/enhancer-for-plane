@@ -103,6 +103,14 @@ body {
   align-items: center;
   justify-content: space-between;
 }
+/* Header buttons: "Share…" sits beside "Add template". Wraps under the heading on a
+   narrow window rather than overflowing the card. */
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
 .desc {
   margin: 4px 0 12px;
   font-size: 12.5px;

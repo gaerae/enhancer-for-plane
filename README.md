@@ -112,13 +112,13 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 Host a JSON file anywhere your team can reach over `http(s)` — an intranet path, a
 Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Team template sync.
 
-You do not have to write it by hand. **Settings ▸ Team template sync ▸ "Export my
-templates as a feed"** writes this exact format from the templates you already
-have: build them in the UI, export, upload, share the URL. The export asks for the
-collection's `name` and stamps today's date as `version`. It is a *publication*,
-not a backup — it carries your templates and nothing else, no domains, no rules, no
-variable values, no source URLs. Templates you received *from* a source are left
-out too; they belong to whoever publishes them.
+You do not have to write it by hand. **Settings ▸ Body templates ▸ "Share with your
+team"** writes this exact format from the templates you already have: build them in
+the UI, export, upload, share the URL. It asks for the collection's `name` and
+stamps today's date as `version`. It is a *publication*, not a backup — it carries
+your templates and nothing else, no domains, no rules, no variable values, no source
+URLs. Templates you received *from* a source are left out too; they belong to
+whoever publishes them.
 
 ```json
 {

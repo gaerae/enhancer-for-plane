@@ -68,13 +68,17 @@
       <section class="card">
         <div class="card-head">
           <h2 data-i18n="optTplTitle">Body templates (title + body)</h2>
-          <button class="primary sm" id="addTemplate" data-i18n="optTplAdd">＋ Add template</button>
+          <div class="head-actions">
+            <button class="ghost sm" id="exportFeedBtn" data-i18n="optTplShare">↓ Share with your team…</button>
+            <button class="primary sm" id="addTemplate" data-i18n="optTplAdd">＋ Add template</button>
+          </div>
         </div>
         <p class="desc" data-i18n-html="optTplDesc1">Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional.</p>
         <p class="desc" data-i18n-html="optTplDesc2">The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>.</p>
         <p class="desc" data-i18n-html="optTplDesc3">Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description.</p>
         <div id="templateList" class="tpl-list"></div>
         <div id="templateEmpty" class="tpl-empty" hidden data-i18n="optTplEmpty">No templates yet. Click “Add template” to start.</div>
+        <p class="desc" style="margin:10px 0 0" data-i18n-html="optTplShareDesc"><b>Share with your team</b> saves the templates above as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Only your own templates are included, not ones you received from a source.</p>
       </section>
 
       <!-- Template variables -->
@@ -123,9 +127,7 @@
         <div class="preset-bar" style="border:0;padding:0;margin-top:10px">
           <button class="ghost sm" id="addSource" data-i18n="optSyncAddSource">＋ Add source</button>
           <button class="ghost sm" id="syncNow" data-i18n="optSyncNow">↻ Sync now</button>
-          <button class="ghost sm" id="exportFeedBtn" data-i18n="optSyncExportFeed">↓ Export my templates as a feed</button>
         </div>
-        <p class="desc" style="margin:8px 0 0" data-i18n-html="optSyncExportFeedDesc">Publishing for a team? Export writes your own templates in the format above. Put the file somewhere your teammates can reach over <code>https</code> and give them the URL — they add it as a source. Your <b>synced</b> templates are not included; they already belong to whoever publishes them.</p>
       </section>
 
       <!-- Backup -->
