@@ -441,6 +441,14 @@
   "msgStorageOver": {
     "message": " — 동기화 한도 초과. 저장이 실패할 수 있습니다"
   },
+  "msgStorageOverItem": {
+    "message": " — 블록 하나가 약 $LIMIT$ KB 한도를 넘었습니다. 저장이 실패합니다",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
   "msgStorageNear": {
     "message": " — 한도에 근접했습니다"
   },

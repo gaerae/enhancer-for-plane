@@ -441,6 +441,14 @@
   "msgStorageOver": {
     "message": " — over the sync limit; saving may fail"
   },
+  "msgStorageOverItem": {
+    "message": " — one block is over its ~$LIMIT$ KB limit; saving will fail",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
   "msgStorageNear": {
     "message": " — approaching the limit"
   },

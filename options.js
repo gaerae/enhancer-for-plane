@@ -822,9 +822,18 @@
     const near = !over && bytes > PE_SYNC_QUOTA_BYTES * 0.8;
     bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_QUOTA_BYTES) * 100)) + "%";
     bar.className = over ? "over" : near ? "near" : "";
+    // Two ceilings, two explanations. "12.7 / 100 KB used — over the sync limit" is a
+    // sentence that argues with itself; when the total is fine and a single item is not,
+    // say which one is not.
+    const why = usage.overTotal
+      ? peMsg("msgStorageOver")
+      : usage.overItem
+        ? peMsg("msgStorageOverItem", [String(Math.round(PE_SYNC_ITEM_BYTES / 1024))])
+        : near
+          ? peMsg("msgStorageNear")
+          : "";
     txt.textContent =
-      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1), String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]) +
-      (over ? peMsg("msgStorageOver") : near ? peMsg("msgStorageNear") : "");
+      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1), String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]) + why;
     txt.className = "storage-text" + (over ? " over" : near ? " near" : "");
   }
   let meterTimer = null;
