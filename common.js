@@ -380,9 +380,14 @@ function peItemBytes(key, value) {
   return peByteLen(key) + peJsonBytes(value);
 }
 
-// Greedily fill one item at a time. A template that does not fit an item on its own is
-// still emitted (as a shard of one) rather than dropped — losing a user's work to stay
-// under a limit is never the right trade. peSaveSettings refuses that save by name.
+// Greedily fill one item at a time. Templates are never split across two items, so a
+// shard ends wherever the next one would not fit — one holding a single 5 KB template is
+// correct, not under-filled. Packing tighter means splitting them, which buys a little
+// quota and makes one lost shard damage several templates instead of one.
+//
+// A template that does not fit an item on its own is still emitted (as a shard of one)
+// rather than dropped — losing a user's work to stay under a limit is never the right
+// trade. peSaveSettings refuses that save by name.
 function pePackTemplates(templates) {
   const shards = [];
   let cur = [];
