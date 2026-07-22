@@ -65,7 +65,10 @@ function loadCommon() {
 function loadCommonWithSyncStorage(seed = {}) {
   const store = clone(seed);
   const ctx = { console, URL, Date, TextEncoder };
-  const bytes = (k, v) => k.length + Buffer.byteLength(JSON.stringify(v), "utf8");
+  // Measured the way Chrome measures, independently of common.js — including Chromium's
+  // "<" → "<" escape. A stub that just called JSON.stringify would agree with any
+  // accounting bug in the code under test, which is the opposite of what it is for.
+  const bytes = (k, v) => chromeItemBytes(k, v);
   const totalWith = (pending) => {
     const merged = Object.assign({}, store, pending);
     return Object.keys(merged).reduce((n, k) => n + bytes(k, merged[k]), 0);
@@ -135,6 +138,19 @@ function gate() {
 
 // Let the worker reach its first await (the fetch) before the test acts.
 const tick = () => new Promise((r) => setImmediate(r));
+
+// How chrome.storage.sync sizes an item, written from Chromium's own rules rather than
+// from ours: key bytes + the byte length of Chromium's JSON serialization, in which "<"
+// becomes the six-byte "<". Kept deliberately independent of common.js so the two
+// can disagree and a test can say so.
+//   extensions/browser/api/storage/settings_storage_quota_enforcer.cc
+//     std::string value_as_json = base::WriteJson(value).value_or("");
+//     size_t new_size = key.size() + value_as_json.size();
+//   base/json/string_escape.cc — case '<': dest->append("\\u003C");
+function chromeItemBytes(key, value) {
+  const json = JSON.stringify(value).split("<").join("\\u003C");
+  return Buffer.byteLength(key, "utf8") + Buffer.byteLength(json, "utf8");
+}
 
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
@@ -1163,7 +1179,7 @@ test("storage: a set too big for one item is split across shards, in order", asy
   await ctx.peSaveSettings(s);
   ok(shardKeys(storage.store).length >= 3, `expected several shards, got ${shardKeys(storage.store).length}`);
   for (const k of shardKeys(storage.store)) {
-    ok(Buffer.byteLength(JSON.stringify(storage.store[k])) + k.length <= ctx.__ITEM_BYTES, `${k} within the item cap`);
+    ok(chromeItemBytes(k, storage.store[k]) <= ctx.__ITEM_BYTES, `${k} within the item cap`);
   }
   const back = await ctx.peGetSettings();
   eq(back.templates.map((t) => t.id), s.templates.map((t) => t.id), "order preserved across shards");
@@ -1180,14 +1196,64 @@ test("storage: the ceiling moved — a settings object far past one item now sav
   eq(back.templates.length, 60, "all 60 survive");
 });
 
-test("storage: PE_IMPORT_LIMITS.maxTemplates is a number that actually fits", () => {
+test("storage: the capacity the docs quote is the capacity you get", () => {
+  // The READMEs give a range rather than one number, because the answer depends on the
+  // alphabet: the quota is bytes and a Korean character costs three of them. These are
+  // the figures they quote. If the packing changes, this is where it shows up — a doc
+  // that overstates capacity is worse than one that says nothing.
   const ctx = loadCommon();
-  // The comment on PE_IMPORT_LIMITS claims 500 is now reachable rather than fiction.
-  // 187 bytes is what the sample feed averages; if either number drifts, say so here.
-  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
-  s.templates = Array.from({ length: ctx.__IMPORT_LIMITS.maxTemplates }, (_, i) => tplOfBytes("t" + i, 187));
-  const used = ctx.peSettingsBytes(s);
-  ok(used <= ctx.__SYNC_QUOTA, `${ctx.__IMPORT_LIMITS.maxTemplates} templates need ${used} B of ${ctx.__SYNC_QUOTA} B`);
+  const fits = (n, content) => {
+    const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+    s.templates = Array.from({ length: n }, (_, i) => ({
+      id: "tpl-abc123",
+      name: "🐞 Bug report",
+      title: "[Bug] ",
+      content
+    })).map((t, i) => Object.assign({}, t, { id: "t" + i }));
+    const u = ctx.peSettingsUsage(s);
+    return !u.overTotal && !u.overItem;
+  };
+  const en = "## Summary\n\n".padEnd(400, "x");
+  const ko = "## 요약\n\n" + "가".repeat(390);
+
+  ok(fits(200, en), "200 English templates of ~400 characters fit");
+  ok(!fits(260, en), "…and it does run out; 260 must not fit");
+  ok(fits(80, ko), "80 Korean templates of ~400 characters fit");
+  ok(!fits(100, ko), "…and 100 do not — three bytes a character is the whole difference");
+
+  // PE_IMPORT_LIMITS.maxTemplates is an anti-abuse bound on parsing a hostile file, not a
+  // promise of capacity: it is only reachable at the small end (the sample feed averages
+  // 187 bytes a template).
+  ok(fits(ctx.__IMPORT_LIMITS.maxTemplates, "x".repeat(120)), "500 tiny templates fit");
+  ok(!fits(ctx.__IMPORT_LIMITS.maxTemplates, en), "500 realistic ones do not — bytes bind first");
+});
+
+test("storage: how big one template may be, per alphabet", () => {
+  // One template must fit one 8 KB item and nothing can split it further, so this is a
+  // real user-facing ceiling. PE_SYNC_LIMITS.maxContentLen (20 000) is far above all of
+  // these and always has been: it bounds work on a hostile remote file, where the cache
+  // lives in storage.local, and says nothing about what a personal template may hold.
+  const ctx = loadCommon();
+  const maxChars = (ch) => {
+    let lo = 0;
+    let hi = 20000;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      const t = { id: "tpl-abc123", name: "🐞 Bug report", title: "[Bug] ", content: ch.repeat(mid) };
+      if (ctx.peItemBytes("peTpl.0", [t]) <= ctx.__ITEM_BYTES) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const ascii = maxChars("x");
+  const korean = maxChars("가");
+  const emoji = maxChars("🐞");
+  const lt = maxChars("<");
+  ok(ascii > 8000 && ascii < 8192, `ASCII ~8100, got ${ascii}`);
+  ok(korean > 2600 && korean < 2800, `Korean ~2700 (3 bytes each), got ${korean}`);
+  ok(emoji > 1950 && emoji < 2100, `emoji ~2030 (4 bytes each), got ${emoji}`);
+  ok(lt > 1300 && lt < 1400, `"<" ~1350 (6 bytes each in storage), got ${lt}`);
+  ok(korean < ctx.__LIMITS.maxContentLen, "and every one of them is under maxContentLen, which is not the binding limit");
 });
 
 test("storage: one template too big for an item is refused by name, not dropped", async () => {
@@ -1284,7 +1350,7 @@ test("storage: the core item mirrors templates while they fit, and drops them wh
   await ctx.peSaveSettings(s);
   eq(storage.store.peSettings.templates, [], "dropped once it stops fitting");
   ok(
-    Buffer.byteLength(JSON.stringify(storage.store.peSettings)) + "peSettings".length <= ctx.__ITEM_BYTES,
+    chromeItemBytes("peSettings", storage.store.peSettings) <= ctx.__ITEM_BYTES,
     "so the core item itself always fits"
   );
   eq((await ctx.peGetSettings()).templates.length, 30, "the shards remain the source of truth");
@@ -1329,10 +1395,55 @@ test("storage: the meter measures the items the save actually writes", async () 
   const predicted = ctx.peSettingsBytes(s);
   await ctx.peSaveSettings(s);
   const actual = Object.keys(storage.store).reduce(
-    (n, k) => n + k.length + Buffer.byteLength(JSON.stringify(storage.store[k]), "utf8"),
+    (n, k) => n + chromeItemBytes(k, storage.store[k]),
     0
   );
   eq(predicted, actual, "predicted bytes");
+});
+
+test("storage: our byte count is Chrome's byte count, character for character", () => {
+  // The budget is only as good as the measurement. Chrome sizes an item with its own
+  // serializer, so this compares peItemBytes against Chromium's documented rules over
+  // every kind of content that serializes differently — rather than against
+  // JSON.stringify, which is the thing that was wrong.
+  const ctx = loadCommon();
+  const cases = {
+    ascii: "plain text",
+    korean: "한글 본문입니다",
+    emoji: "🐞✅🗺️",
+    quotes: 'he said "hi" \\ backslash',
+    controls: "line\nbreak\ttab\r\u0001",
+    // The one that used to be wrong: Chromium writes "<" as the six-byte "<".
+    lessThan: "<details><summary>x</summary></details>",
+    greaterAndAmp: "a > b && c",
+    unicodeSeparators: "\u2028 and \u2029",
+    markdownWithHtml: "## Steps\n<br>\n- [ ] <kbd>Alt</kbd>+<kbd>T</kbd>\n"
+  };
+  for (const [what, content] of Object.entries(cases)) {
+    const value = [{ id: "t", name: "n", title: "", content }];
+    eq(ctx.peItemBytes("peTpl.0", value), chromeItemBytes("peTpl.0", value), `bytes for ${what}`);
+  }
+});
+
+test("storage: a template full of < is packed against its real size, not its raw one", async () => {
+  // "<" costs six bytes in storage and one in JSON.stringify. Counted the cheap way, a
+  // shard packed to "just under 8 KB" is really ~6x over, the meter says green, and the
+  // save dies on a per-item quota error naming the wrong part of the settings.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 12 }, (_, i) => ({
+    id: "t" + i,
+    name: "html " + i,
+    title: "",
+    content: "<div>".repeat(200) // 1000 chars, 6000 bytes as Chrome stores it
+  }));
+  // Every shard the packer produces has to fit by Chrome's arithmetic, not ours.
+  for (const shard of ctx.pePackTemplates(s.templates)) {
+    ok(chromeItemBytes("peTpl.0", shard) <= ctx.__ITEM_BYTES, "shard fits Chrome's per-item cap");
+  }
+  await ctx.peSaveSettings(s); // the stub enforces the cap the same way; a bad pack throws
+  eq((await ctx.peGetSettings()).templates.length, 12, "all of them stored and read back");
+  ok(Object.keys(storage.store).length > 2, "and it genuinely needed several shards");
 });
 
 test("storage: the meter watches both ceilings, not just the total", async () => {

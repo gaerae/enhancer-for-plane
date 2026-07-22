@@ -75,11 +75,12 @@ const PE_LOCAL_QUOTA_BYTES = 10485760;
 // Without them, sanitizing was asymmetric — the two newest fields (variables, sources)
 // were count-capped and the three older ones were not.
 //
-// maxTemplates used to be a fiction: 500 against a ceiling of roughly 39. Sharding lifts
-// the ceiling to the 100 KB sync quota, which at the sample feed's ~187 bytes a template
-// is a little over 500 — so the number now describes something real. It is still the
-// looser of the two limits, and the honest one remains the byte budget: tools/test.js
-// asserts that 500 templates of a realistic size fit.
+// maxTemplates is not a capacity figure and must not be read as one. The real ceiling is
+// the byte budget, and it depends on the alphabet: measured, 100 KB holds about 218
+// templates of 400 English characters but only about 81 of 400 Korean ones. 500 is
+// reachable only at the small end (roughly 120 characters each). Quoting it to a user
+// would promise six times what a Korean team actually gets — the READMEs give the
+// measured range instead, and tools/test.js holds both to it.
 const PE_IMPORT_LIMITS = {
   maxTemplates: 500,
   maxRules: 500,
@@ -355,8 +356,28 @@ const PE_ENCODER = new TextEncoder();
 function peByteLen(s) {
   return PE_ENCODER.encode(String(s == null ? "" : s)).length;
 }
+
+// Chrome sizes an item with its OWN serializer, not ours, and the two disagree on one
+// character. Chromium's JSON writer escapes "<" as "<" — six bytes — to stop a
+// serialized value from closing a script tag; JSON.stringify emits it raw as one. Every
+// other rule matches: the same escapes for quotes, backslashes and control characters,
+// and raw UTF-8 for everything non-ASCII (a Korean character is three bytes in both, an
+// emoji four). So the whole correction is five bytes per "<".
+//
+// Left out, a template of Markdown with HTML in it measured up to six times small: the
+// meter showed green, the packer filled a shard past the cap, and Chrome refused the save
+// with a per-item quota error that pointed at the wrong part of the settings.
+// (Verified against extensions/browser/api/storage/settings_storage_quota_enforcer.cc and
+// base/json/string_escape.cc, not inferred from the API docs.)
+function peJsonBytes(value) {
+  const json = JSON.stringify(value);
+  let lt = 0;
+  for (let i = 0; i < json.length; i++) if (json.charCodeAt(i) === 60) lt++;
+  return peByteLen(json) + lt * 5;
+}
+
 function peItemBytes(key, value) {
-  return key.length + peByteLen(JSON.stringify(value));
+  return peByteLen(key) + peJsonBytes(value);
 }
 
 // Greedily fill one item at a time. A template that does not fit an item on its own is

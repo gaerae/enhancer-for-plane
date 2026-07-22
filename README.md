@@ -308,16 +308,27 @@ carries none of your data. See [PRIVACY.md](PRIVACY.md).
 - **Chrome / Chromium, Manifest V3** — not built for Firefox or Safari.
 - **Self-hosted Plane, inactive by default** — no domain ships enabled; add yours
   in the popup or Settings. It never touches non-Plane sites.
-- **Sync storage cap (~100 KB).** Settings live in `chrome.storage.sync`, which
-  allows ~100 KB in total and ~8 KB per item. Templates are packed into their own
-  items (`peTpl.0`, `peTpl.1`, …), so the ceiling is the 100 KB — several hundred
-  typical templates — rather than the 8 KB a single item would have imposed. Two
-  consequences: **one template still has to fit one ~8 KB item**, and a save that
-  breaks that rule is refused up front naming the template; and sizes are counted
-  in **bytes**, so a Korean or emoji-heavy template costs about three times what
-  its character count suggests. The Settings page shows a live meter against the
-  100 KB. **Team templates don't count against it** — they live in
-  `chrome.storage.local` (10 MB, 5 MB on Chrome ≤ 113; this device only).
+- **Sync storage cap (~100 KB total, ~8 KB per item).** Both numbers are Chrome's
+  and neither can be raised. Settings used to occupy a single item, so the 8 KB was
+  the ceiling for everything; templates are now packed into their own items
+  (`peTpl.0`, `peTpl.1`, …) and the ceiling is the 100 KB.
+
+  Capacity is measured in **bytes**, not characters — a Korean character costs 3,
+  an emoji 4, and `<` costs 6 because Chrome stores it escaped. So the honest answer
+  is a range, measured rather than estimated:
+
+  | | fits in 100 KB | longest single template |
+  |---|---|---|
+  | English, ~400 chars each | ~218 | ~8,100 chars |
+  | Korean, ~400 chars each | ~81 | ~2,700 chars |
+  | Markdown with inline HTML | ~160 | ~1,350 chars |
+
+  **One template must still fit one 8 KB item** — nothing can split it further — and
+  a save that breaks either ceiling is refused up front, naming the template or the
+  setting responsible. The Settings page meters both. **Team templates don't count
+  against any of this**: they live in `chrome.storage.local` (10 MB, 5 MB on
+  Chrome ≤ 113; this device only), which is why sync is the way to carry a large
+  shared library.
 - **Synced templates are read-only.** They're edited at the source file, not in
   Settings. An edit here would be silently reverted by the next sync, so the UI
   doesn't offer one; hiding a group is local and does survive.
