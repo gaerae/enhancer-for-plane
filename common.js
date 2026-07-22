@@ -7,7 +7,19 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 3;
+const PE_SCHEMA = 4;
+
+// Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
+// peSettingsWriteSet for why, and how many.
+const PE_TPL_KEY_PREFIX = "peTpl.";
+
+// chrome.storage.sync's documented quotas. QUOTA_BYTES_PER_ITEM is the one that used to
+// bind: the whole settings object was a single item, so ~8 KB was the ceiling for
+// everything a user could keep — about 39 templates of the size the sample feed ships,
+// while PE_IMPORT_LIMITS said 500. QUOTA_BYTES is 100 KB, so the other 92% was there all
+// along; splitting templates across items is what reaches it.
+const PE_SYNC_QUOTA_BYTES = 102400;
+const PE_SYNC_ITEM_BYTES = 8192;
 
 // Stamped on exported backups and required on import, so a file that is not ours is
 // refused by name instead of being merged into the user's settings.
@@ -58,11 +70,16 @@ const PE_SYNC_LIMITS = {
 // Chrome <= 113). Not a cap we enforce — a fact we have to design against.
 const PE_LOCAL_QUOTA_BYTES = 10485760;
 
-// Count caps for an imported settings file. The real ceiling is the ~8 KB sync quota, so
-// these are far above anything that can actually be saved — they are here to bound the
-// work done on a file that is hostile or simply corrupt, not to tell a user how many
-// templates they may keep. Without them, sanitizing was asymmetric: the two newest
-// fields (variables, sources) were count-capped and the three older ones were not.
+// Count caps for an imported settings file: a bound on the work done for a file that is
+// hostile or simply corrupt, not a statement of how many templates a user may keep.
+// Without them, sanitizing was asymmetric — the two newest fields (variables, sources)
+// were count-capped and the three older ones were not.
+//
+// maxTemplates used to be a fiction: 500 against a ceiling of roughly 39. Sharding lifts
+// the ceiling to the 100 KB sync quota, which at the sample feed's ~187 bytes a template
+// is a little over 500 — so the number now describes something real. It is still the
+// looser of the two limits, and the honest one remains the byte budget: tools/test.js
+// asserts that 500 templates of a realistic size fit.
 const PE_IMPORT_LIMITS = {
   maxTemplates: 500,
   maxRules: 500,
@@ -201,6 +218,10 @@ function peDeepMerge(def, cur) {
 // Bring a stored settings object up to PE_SCHEMA.
 //   v1 → v2: the old widths.{moduleName,dropdown} shape becomes rules
 //   v2 → v3: templateSync is additive, so peDeepMerge backfills it — only the stamp moves
+//   v3 → v4: templates moved into their own storage items. Nothing to rewrite here — a
+//            v3 object still carries them inline and peAssembleSettings reads them from
+//            there whenever no shard count is stamped, so the conversion happens on the
+//            next save. Only the stamp moves.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -322,36 +343,162 @@ function peSanitizeSettings(raw) {
   return out;
 }
 
+/* ------------------------------------------------------------------ */
+/* Settings storage — one core item plus a template shard per 8 KB     */
+/* ------------------------------------------------------------------ */
+
+// Chrome sizes an item as "the JSON stringification of its value plus its key length",
+// and that is bytes, not characters — a Korean template costs three times what its
+// length suggests. Measure it the same way, or the meter lies in exactly the locale
+// least able to afford it.
+const PE_ENCODER = new TextEncoder();
+function peByteLen(s) {
+  return PE_ENCODER.encode(String(s == null ? "" : s)).length;
+}
+function peItemBytes(key, value) {
+  return key.length + peByteLen(JSON.stringify(value));
+}
+
+// Greedily fill one item at a time. A template that does not fit an item on its own is
+// still emitted (as a shard of one) rather than dropped — losing a user's work to stay
+// under a limit is never the right trade. peSaveSettings refuses that save by name.
+function pePackTemplates(templates) {
+  const shards = [];
+  let cur = [];
+  for (const t of templates || []) {
+    if (cur.length && peItemBytes(PE_TPL_KEY_PREFIX + shards.length, cur.concat([t])) > PE_SYNC_ITEM_BYTES) {
+      shards.push(cur);
+      cur = [];
+    }
+    cur.push(t);
+  }
+  if (cur.length) shards.push(cur);
+  return shards;
+}
+
+// The exact set of items a save writes. The storage meter uses this too, so what it
+// measures is what actually goes to storage rather than a second guess at the layout.
+function peSettingsWriteSet(settings) {
+  const templates = Array.isArray(settings.templates) ? settings.templates : [];
+  const shards = pePackTemplates(templates);
+  const core = {};
+  for (const k of Object.keys(settings)) core[k] = settings[k];
+  core.tplShards = shards.length;
+  // A build older than sharding reads templates from the core item and knows nothing
+  // about the shards, so it would show an empty list on any device that had not updated
+  // yet. Keeping a copy here while it still fits costs quota we have and spares that
+  // user the fright. It is dropped the moment it stops fitting — which is precisely the
+  // case an older build could never have stored anyway.
+  core.templates = templates;
+  if (peItemBytes(PE_STORAGE_KEY, core) > PE_SYNC_ITEM_BYTES) core.templates = [];
+  const items = { [PE_STORAGE_KEY]: core };
+  shards.forEach((s, i) => (items[PE_TPL_KEY_PREFIX + i] = s));
+  return items;
+}
+
+// Total bytes one save would occupy, against PE_SYNC_QUOTA_BYTES.
+function peSettingsBytes(settings) {
+  const items = peSettingsWriteSet(settings);
+  let n = 0;
+  for (const k of Object.keys(items)) n += peItemBytes(k, items[k]);
+  return n;
+}
+
+// Reassemble settings from a raw chrome.storage.sync dump. Split out so the assembly
+// rules are testable without a storage stub — they are where a wrong guess costs a user
+// their templates.
+//
+// `tplShards` is the switch: stamped, templates come from the shards and whatever sits
+// inline is a mirror to ignore; absent, they come from inline, which covers both a v3
+// object and a write from a build that predates sharding.
+function peAssembleSettings(all) {
+  const raw = peMigrate((all && all[PE_STORAGE_KEY]) || {});
+  const n = raw.tplShards;
+  if (typeof n === "number" && n >= 0) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const part = all[PE_TPL_KEY_PREFIX + i];
+      if (Array.isArray(part)) out.push(...part);
+    }
+    raw.templates = out;
+  }
+  // Never let it reach the form: it is storage bookkeeping, and peDeepMerge carries
+  // unknown keys through, so it would ride into exports and back out of imports.
+  delete raw.tplShards;
+  const merged = peDeepMerge(PE_DEFAULTS, raw);
+  // Backfill the template title field (compat with older templates)
+  (merged.templates || []).forEach((t) => {
+    if (typeof t.title !== "string") t.title = "";
+  });
+  return merged;
+}
+
 function peGetSettings() {
   return new Promise((resolve) => {
     try {
-      chrome.storage.sync.get(PE_STORAGE_KEY, (res) => {
-        const raw = peMigrate((res && res[PE_STORAGE_KEY]) || {});
-        const merged = peDeepMerge(PE_DEFAULTS, raw);
-        // Backfill the template title field (compat with older templates)
-        (merged.templates || []).forEach((t) => {
-          if (typeof t.title !== "string") t.title = "";
-        });
-        resolve(merged);
-      });
+      // Everything, not one key: the shards have to come back in the same read, and a
+      // second read could land either side of another device's write.
+      chrome.storage.sync.get(null, (res) => resolve(peAssembleSettings(res || {})));
     } catch (e) {
       resolve(peDeepMerge(PE_DEFAULTS, {}));
     }
   });
 }
 
+// Raised when one template is too big for an item of its own. Nothing can split it
+// further, and chrome's own answer is a generic quota error that never says which
+// template — so it is caught here, by name, before the write.
+const PE_ERR_TEMPLATE_TOO_LARGE = "PE_TEMPLATE_TOO_LARGE";
+
 function peSaveSettings(settings) {
   return new Promise((resolve, reject) => {
     try {
-      chrome.storage.sync.set({ [PE_STORAGE_KEY]: settings }, () => {
+      const templates = Array.isArray(settings.templates) ? settings.templates : [];
+      const big = templates.find((t) => peItemBytes(PE_TPL_KEY_PREFIX + "0", [t]) > PE_SYNC_ITEM_BYTES);
+      if (big) {
+        reject(
+          Object.assign(new Error("template too large for one sync item"), {
+            code: PE_ERR_TEMPLATE_TOO_LARGE,
+            templateName: ((big && big.name) || "").trim()
+          })
+        );
+        return;
+      }
+      const items = peSettingsWriteSet(settings);
+      const live = Object.keys(items);
+      chrome.storage.sync.set(items, () => {
         const err = chrome.runtime && chrome.runtime.lastError;
-        if (err) reject(err);
-        else resolve();
+        if (err) {
+          reject(err);
+          return;
+        }
+        // Write first, prune second. A stale shard left behind is inert — the core item
+        // says how many to read — whereas pruning first would leave a failed save with
+        // its tail of templates already gone.
+        chrome.storage.sync.get(null, (all) => {
+          const stale = Object.keys(all || {}).filter(
+            (k) => k.indexOf(PE_TPL_KEY_PREFIX) === 0 && live.indexOf(k) === -1
+          );
+          if (!stale.length) {
+            resolve();
+            return;
+          }
+          chrome.storage.sync.remove(stale, () => resolve());
+        });
       });
     } catch (e) {
       reject(e);
     }
   });
+}
+
+// Did a storage change touch the settings? Every listener used to ask
+// `changes[PE_STORAGE_KEY]`, which stopped seeing template edits the moment templates
+// moved into items of their own — the picker would keep showing the old list until the
+// page was reloaded.
+function peSettingsChanged(changes, area) {
+  if (area !== "sync" || !changes) return false;
+  return Object.keys(changes).some((k) => k === PE_STORAGE_KEY || k.indexOf(PE_TPL_KEY_PREFIX) === 0);
 }
 
 function peDomainMatches(domains, host) {

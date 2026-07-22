@@ -38,11 +38,88 @@ function match(actual, re, what) {
 
 // common.js alone (no chrome). peMsg falls back to "" so seed labels keep their
 // English literals — exercising the fallback path at the same time.
+const EXPORT_GLOBALS =
+  "\n;globalThis.__DEFAULTS = PE_DEFAULTS;" +
+  "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
+  "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
+  "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
+  "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
+  "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
+  "\n;globalThis.__SYNC_QUOTA = PE_SYNC_QUOTA_BYTES;" +
+  "\n;globalThis.__ITEM_BYTES = PE_SYNC_ITEM_BYTES;" +
+  "\n;globalThis.__STORAGE_KEY = PE_STORAGE_KEY;" +
+  "\n;globalThis.__TPL_PREFIX = PE_TPL_KEY_PREFIX;" +
+  "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;";
+
 function loadCommon() {
-  const ctx = { console, URL, Date };
+  const ctx = { console, URL, Date, TextEncoder };
   vm.createContext(ctx);
-  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;", ctx);
+  vm.runInContext(COMMON + EXPORT_GLOBALS, ctx);
   return ctx;
+}
+
+// common.js against a chrome.storage.sync that behaves like the real one: several keys,
+// a per-item cap, a total cap, and errors reported through runtime.lastError rather than
+// thrown. Settings live across many items now, so a stub that stores a single blob would
+// agree with any packing whatsoever — including one that loses templates.
+function loadCommonWithSyncStorage(seed = {}) {
+  const store = clone(seed);
+  const ctx = { console, URL, Date, TextEncoder };
+  const bytes = (k, v) => k.length + Buffer.byteLength(JSON.stringify(v), "utf8");
+  const totalWith = (pending) => {
+    const merged = Object.assign({}, store, pending);
+    return Object.keys(merged).reduce((n, k) => n + bytes(k, merged[k]), 0);
+  };
+  const api = {
+    calls: { set: 0, remove: 0 },
+    store,
+    // Set true to make every write fail the way a full quota does.
+    full: false
+  };
+  ctx.chrome = {
+    runtime: { lastError: null },
+    storage: {
+      sync: {
+        get: (keys, cb) => {
+          if (keys === null || keys === undefined) return cb(clone(store));
+          const list = Array.isArray(keys) ? keys : [keys];
+          const out = {};
+          for (const k of list) if (k in store) out[k] = clone(store[k]);
+          cb(out);
+        },
+        set: (obj, cb) => {
+          api.calls.set++;
+          const over = Object.keys(obj).find((k) => bytes(k, obj[k]) > 8192);
+          if (api.full || over || totalWith(obj) > 102400) {
+            ctx.chrome.runtime.lastError = {
+              message: over ? "QUOTA_BYTES_PER_ITEM quota exceeded" : "QUOTA_BYTES quota exceeded"
+            };
+            cb();
+            ctx.chrome.runtime.lastError = null;
+            return;
+          }
+          for (const k of Object.keys(obj)) store[k] = clone(obj[k]);
+          cb();
+        },
+        remove: (keys, cb) => {
+          api.calls.remove++;
+          for (const k of Array.isArray(keys) ? keys : [keys]) delete store[k];
+          cb();
+        }
+      }
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(COMMON + EXPORT_GLOBALS, ctx);
+  return { ctx, storage: api };
+}
+
+// A template of a known JSON size, so a test can say "fill three shards" and mean it.
+function tplOfBytes(id, n) {
+  const t = { id, name: "n" + id, title: "", content: "" };
+  const pad = n - Buffer.byteLength(JSON.stringify(t), "utf8");
+  t.content = "x".repeat(Math.max(0, pad));
+  return t;
 }
 
 // background.js as a service worker: stubbed storage, permissions, alarms and fetch.
@@ -1054,6 +1131,232 @@ test("import: sanitizing keeps every key the form renders", () => {
   const ctx = loadCommon();
   const out = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peSanitizeSettings({}));
   for (const k of Object.keys(ctx.__DEFAULTS)) ok(k in out, `"${k}" must survive an empty import`);
+});
+
+/* ================================================================== */
+/* settings storage — the core item plus one template shard per 8 KB  */
+/* ================================================================== */
+
+const shardKeys = (store) => Object.keys(store).filter((k) => k.startsWith("peTpl.")).sort();
+
+test("storage: templates come back from a save exactly as they went in", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "a", name: "🐞 Bug", title: "[Bug] ", content: "## 요약\n\n## 재현 절차\n1. " },
+    { id: "b", name: "Task", title: "", content: "body" }
+  ];
+  await ctx.peSaveSettings(s);
+  const back = await ctx.peGetSettings();
+  eq(back.templates, s.templates, "templates round-trip");
+  eq(back.rules.length, s.rules.length, "rules round-trip");
+  ok(!("tplShards" in back), "tplShards is storage bookkeeping and must not reach the form");
+  ok(!("tplShards" in JSON.parse(JSON.stringify(back))), "…nor survive an export");
+  eq(shardKeys(storage.store), ["peTpl.0"], "one shard for a small set");
+});
+
+test("storage: a set too big for one item is split across shards, in order", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  // 20 x ~1 KB is well past the 8 KB an item holds.
+  s.templates = Array.from({ length: 20 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  ok(shardKeys(storage.store).length >= 3, `expected several shards, got ${shardKeys(storage.store).length}`);
+  for (const k of shardKeys(storage.store)) {
+    ok(Buffer.byteLength(JSON.stringify(storage.store[k])) + k.length <= ctx.__ITEM_BYTES, `${k} within the item cap`);
+  }
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), s.templates.map((t) => t.id), "order preserved across shards");
+});
+
+test("storage: the ceiling moved — a settings object far past one item now saves", async () => {
+  const { ctx } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 60 }, (_, i) => tplOfBytes("t" + i, 1000));
+  // The whole thing is ~60 KB: it could not have been stored at all before sharding.
+  ok(ctx.peSettingsBytes(s) > ctx.__ITEM_BYTES * 4, "the fixture must exceed the old single-item ceiling");
+  await ctx.peSaveSettings(s);
+  const back = await ctx.peGetSettings();
+  eq(back.templates.length, 60, "all 60 survive");
+});
+
+test("storage: PE_IMPORT_LIMITS.maxTemplates is a number that actually fits", () => {
+  const ctx = loadCommon();
+  // The comment on PE_IMPORT_LIMITS claims 500 is now reachable rather than fiction.
+  // 187 bytes is what the sample feed averages; if either number drifts, say so here.
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: ctx.__IMPORT_LIMITS.maxTemplates }, (_, i) => tplOfBytes("t" + i, 187));
+  const used = ctx.peSettingsBytes(s);
+  ok(used <= ctx.__SYNC_QUOTA, `${ctx.__IMPORT_LIMITS.maxTemplates} templates need ${used} B of ${ctx.__SYNC_QUOTA} B`);
+});
+
+test("storage: one template too big for an item is refused by name, not dropped", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "a", name: "Runbook", title: "", content: "x".repeat(9000) }];
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save must fail");
+  eq(caught.code, ctx.__ERR_TPL_BIG, "carries the specific code, not a generic quota error");
+  eq(caught.templateName, "Runbook", "names the offending template");
+  eq(Object.keys(storage.store), [], "nothing was written — the form still holds the user's text");
+});
+
+test("storage: shrinking the list prunes the shards it no longer needs", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 24 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  const before = shardKeys(storage.store).length;
+  ok(before >= 3, "fixture must span several shards");
+  s.templates = s.templates.slice(0, 2);
+  await ctx.peSaveSettings(s);
+  eq(shardKeys(storage.store), ["peTpl.0"], "the tail is gone");
+  const back = await ctx.peGetSettings();
+  eq(back.templates.length, 2, "and the read agrees");
+});
+
+test("storage: a save that prunes is two storage operations, and callers must expect both", async () => {
+  // Each operation is its own onChanged event. The settings page used to absorb exactly
+  // one of them as "my own save", so the prune arrived looking like somebody else's edit
+  // and it announced "Loaded the rule added by the picker" right after "Saved." — about
+  // the user's own deletion. Nothing in node can click that button; what node can do is
+  // hold the count still, so the assumption stays visible to whoever changes this next.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 24 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  eq([storage.calls.set, storage.calls.remove], [1, 0], "a plain save writes once and prunes nothing");
+
+  s.templates = s.templates.slice(0, 2);
+  await ctx.peSaveSettings(s);
+  eq([storage.calls.set, storage.calls.remove], [2, 1], "shrinking adds exactly one prune");
+});
+
+test("storage: a shard left behind by a failed prune is ignored, not read back", async () => {
+  // The prune is a second call and can fail on its own. What must never happen is the
+  // orphan reappearing as templates the user deleted — this codebase has already shipped
+  // one resurrection bug.
+  const { ctx } = loadCommonWithSyncStorage({
+    peSettings: { schema: 4, tplShards: 1, templates: [] },
+    "peTpl.0": [{ id: "keep", name: "keep", title: "", content: "" }],
+    "peTpl.1": [{ id: "deleted", name: "deleted", title: "", content: "" }]
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["keep"], "only the shards the core item counts");
+});
+
+test("storage: v3 settings are read inline, then written sharded", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage({
+    peSettings: { schema: 3, templates: [{ id: "old", name: "Old", title: "", content: "kept" }] }
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["old"], "a pre-sharding user keeps their templates");
+  eq(back.schema, ctx.__SCHEMA, "and is stamped at the current schema");
+  await ctx.peSaveSettings(back);
+  eq(shardKeys(storage.store), ["peTpl.0"], "the next save converts");
+  eq(storage.store.peSettings.tplShards, 1, "and stamps the count");
+});
+
+test("storage: a write from a build that predates sharding is read from inline", async () => {
+  // That build knows nothing of tplShards, so its save drops the stamp while leaving our
+  // shards behind. Inline has to win, or the device shows a list the user did not write.
+  const { ctx } = loadCommonWithSyncStorage({
+    peSettings: { schema: 4, templates: [{ id: "typed-there", name: "Theirs", title: "", content: "" }] },
+    "peTpl.0": [{ id: "stale", name: "Stale", title: "", content: "" }]
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["typed-there"], "inline wins when no count is stamped");
+});
+
+test("storage: the core item mirrors templates while they fit, and drops them when they do not", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "a", name: "Small", title: "", content: "tiny" }];
+  await ctx.peSaveSettings(s);
+  eq(storage.store.peSettings.templates.length, 1, "a pre-sharding build still sees the list");
+
+  s.templates = Array.from({ length: 30 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  eq(storage.store.peSettings.templates, [], "dropped once it stops fitting");
+  ok(
+    Buffer.byteLength(JSON.stringify(storage.store.peSettings)) + "peSettings".length <= ctx.__ITEM_BYTES,
+    "so the core item itself always fits"
+  );
+  eq((await ctx.peGetSettings()).templates.length, 30, "the shards remain the source of truth");
+});
+
+test("storage: deleting every template leaves zero, not the shipped samples", async () => {
+  // peDeepMerge backfills an absent array from the defaults. Read the shard count wrong
+  // and a user who cleared their templates gets the two sample ones back on every load.
+  const { ctx } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  ok(s.templates.length > 0, "the defaults do ship samples");
+  s.templates = [];
+  await ctx.peSaveSettings(s);
+  eq((await ctx.peGetSettings()).templates, [], "cleared stays cleared");
+
+  // …and it must hold on its own, not because the mirror happens to agree. A stamped
+  // count of zero means zero whatever the core item still carries inline; without this
+  // the guard could be written `n > 0` and nothing would notice until someone simplified
+  // the mirror away and the samples came back from the dead.
+  const stale = { peSettings: { schema: 4, tplShards: 0, templates: [{ id: "stale", name: "Stale" }] } };
+  eq(ctx.peAssembleSettings(stale).templates, [], "a stamped zero outranks a stale mirror");
+});
+
+test("storage: a quota failure rejects rather than reporting a partial save", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  storage.full = true;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "must reject");
+  match(caught.message, /quota/i, "and say why");
+});
+
+test("storage: the meter measures the items the save actually writes", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 15 }, (_, i) => tplOfBytes("t" + i, 1000));
+  const predicted = ctx.peSettingsBytes(s);
+  await ctx.peSaveSettings(s);
+  const actual = Object.keys(storage.store).reduce(
+    (n, k) => n + k.length + Buffer.byteLength(JSON.stringify(storage.store[k]), "utf8"),
+    0
+  );
+  eq(predicted, actual, "predicted bytes");
+});
+
+test("storage: the budget is bytes, so a Korean template is not counted as ASCII", () => {
+  // The cap that shipped wrong last time counted UTF-16 units against a byte limit, and
+  // a Korean feed sailed past it at 3x. Same arithmetic, same trap, different place.
+  const ctx = loadCommon();
+  const ko = { id: "a", name: "n", title: "", content: "가".repeat(1000) };
+  const en = { id: "a", name: "n", title: "", content: "a".repeat(1000) };
+  const koBytes = ctx.peItemBytes("peTpl.0", [ko]);
+  ok(koBytes > ctx.peItemBytes("peTpl.0", [en]) * 2.5, `Korean must cost ~3x, got ${koBytes}`);
+  // …and the packer has to act on that, not on length.
+  const shards = ctx.pePackTemplates(Array.from({ length: 6 }, () => ko));
+  ok(shards.length >= 2, `6 x 3 KB cannot share one 8 KB item, got ${shards.length} shard(s)`);
+});
+
+test("storage: a change to a shard alone still counts as a settings change", () => {
+  // Every listener used to test changes[PE_STORAGE_KEY]. Editing a template now writes a
+  // shard and may leave the core item byte-identical, so that test would see nothing and
+  // the picker would keep serving the old list.
+  const ctx = loadCommon();
+  ok(ctx.peSettingsChanged({ "peTpl.2": {} }, "sync"), "a shard-only change");
+  ok(ctx.peSettingsChanged({ peSettings: {} }, "sync"), "the core item");
+  ok(!ctx.peSettingsChanged({ peSyncCache: {} }, "local"), "the template cache is not settings");
+  ok(!ctx.peSettingsChanged({ peSettings: {} }, "local"), "wrong area");
 });
 
 /* ---------- run ---------- */

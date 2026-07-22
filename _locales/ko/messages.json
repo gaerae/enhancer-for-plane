@@ -201,7 +201,7 @@
     "message": "↑ JSON 가져오기…"
   },
   "optStorageNote": {
-    "message": "설정은 Chrome을 통해 기기 간 동기화되며, 항목당 약 8 KB 제한이 있습니다. 한도에 걸리면 템플릿을 줄이거나 삭제하고 JSON 백업을 보관하세요."
+    "message": "설정은 Chrome을 통해 기기 간 동기화되며, 전체 약 100 KB까지 저장됩니다. 템플릿은 약 8 KB 단위 블록에 나뉘어 저장되므로, 템플릿 하나가 블록 하나에 들어가야 합니다."
   },
   "optDelete": {
     "message": "삭제"
@@ -373,7 +373,23 @@
     "message": "저장했습니다 — 다만 사이트 접근이 거부되어, 권한을 허용할 때까지 등록한 도메인은 동작하지 않습니다."
   },
   "msgSaveQuota": {
-    "message": "저장 실패: 설정이 Chrome 동기화의 약 8 KB 한도를 초과했습니다. 템플릿을 줄이거나 삭제하세요 (또는 JSON 백업을 보관하세요)."
+    "message": "저장 실패: 설정이 Chrome 동기화의 전체 한도 약 $LIMIT$ KB를 초과했습니다. 템플릿을 줄이거나 삭제하세요 (또는 JSON 백업을 보관하세요).",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveTplTooLarge": {
+    "message": "저장 실패: 템플릿 “$NAME$” 하나가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 내용을 줄이거나, 이 템플릿은 JSON 백업으로만 보관하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "msgSaveFailed": {
     "message": "저장 실패: $ERROR$",
@@ -384,10 +400,13 @@
     }
   },
   "msgStorageUsed": {
-    "message": "8 KB 중 $SIZE$ 사용",
+    "message": "$TOTAL$ KB 중 $USED$ KB 사용",
     "placeholders": {
-      "size": {
+      "used": {
         "content": "$1"
+      },
+      "total": {
+        "content": "$2"
       }
     }
   },

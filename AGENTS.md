@@ -52,9 +52,16 @@ half is: treat every new remote field as hostile until you have clamped it.
 works in a message body. If the documentation does not say it, do not build on it —
 find the guarantee or pick the documented path.
 
-**Store config and state separately.** `chrome.storage.sync` holds settings (~8 KB,
-follows the user across devices). `chrome.storage.local` holds the fetched templates and
-per-device sync status. Never put fetched content or timestamps in `sync`.
+**Store config and state separately.** `chrome.storage.sync` holds settings (~100 KB
+total, follows the user across devices). `chrome.storage.local` holds the fetched
+templates and per-device sync status. Never put fetched content or timestamps in `sync`.
+
+**Settings span several sync items.** The per-item cap is ~8 KB and the total is ~100 KB,
+so templates are packed into `peTpl.0`, `peTpl.1`, … and the core item stamps how many
+there are. Two consequences bite anything that touches storage: a settings change is not
+`changes[PE_STORAGE_KEY]` any more (ask `peSettingsChanged`), and sizes are **bytes**, not
+string length — a Korean template costs three times what `.length` suggests. Everything
+still reads and writes through `peGetSettings` / `peSaveSettings`; keep it that way.
 
 ## Traps this codebase has already hit
 
@@ -84,6 +91,18 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   and the limit was named `maxResponseBytes`, so a Korean feed passed at ~3x; and
   `resp.text()` had already buffered the whole stream before the check could run, which is
   no cap at all for a chunked response. Count bytes, and count them as they arrive.
+- **One save, two storage events.** Templates live in their own items, so a save that
+  needs fewer of them writes and then prunes — two operations, two `onChanged` events.
+  The settings page absorbed exactly one as "my own save", so the prune read as somebody
+  else's edit and it announced "Loaded the rule added by the picker" straight after
+  "Saved.", about the user's own deletion. Chrome does not promise the event arrives
+  before the `set` callback either, so nothing here may lean on ordering.
+- **A backfilling merge turns "none" into "the defaults".** `peDeepMerge` fills an absent
+  array from `PE_DEFAULTS`, which is right for a new install and wrong for a user who
+  deleted everything. Reading the shard count as `n > 0` instead of `n >= 0` handed those
+  users the two sample templates back on every load — and the test passed anyway, because
+  the compatibility mirror happened to hold the same empty list. Assert the rule against
+  the assembler directly, not through whatever else agrees with it today.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

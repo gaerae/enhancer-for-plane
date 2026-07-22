@@ -418,7 +418,7 @@ chrome.permissions.onAdded.addListener(async (perms) => {
 chrome.permissions.onRemoved.addListener(() => reconcile());
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" && changes[PE_STORAGE_KEY]) {
+  if (peSettingsChanged(changes, area)) {
     reconcile();
     ensureSyncAlarm();
     pruneSyncCacheNow();

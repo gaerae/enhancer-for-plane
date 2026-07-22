@@ -6,7 +6,12 @@
   let state = null;
   let syncCache = { bySource: {} }; // synced-template status/cache (chrome.storage.local)
   let dirty = false; // whether the user has edited the form
-  let savingSelf = false; // ignore the storage change our own save triggers
+  // Ignore the storage changes our own save triggers. It has to span the whole save, not
+  // absorb a single event: one save writes the settings and — when the template shards
+  // shrink — prunes the ones it no longer needs, which is a second storage operation and
+  // therefore a second event. Consuming only the first told the user "Loaded the rule
+  // added by the picker" immediately after "Saved.", about their own deletion.
+  let savingSelf = false;
 
   const el = {
     enabled: $("enabled"),
@@ -455,16 +460,18 @@
           renderSources();
           return;
         }
-        if (area !== "sync" || !changes[PE_STORAGE_KEY]) return;
-        if (savingSelf) {
-          savingSelf = false; // ignore our own save
-          return;
-        }
-        if (dirty) {
-          flash(peMsg("msgChangedElsewhere"), true);
-          return;
-        }
+        if (!peSettingsChanged(changes, area)) return;
+        if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
+          // Read before deciding: a write that leaves the settings identical to what is
+          // already on screen is not news, and announcing it is worse than saying
+          // nothing. (Chrome does not promise onChanged arrives before the set callback,
+          // so an event can outlive the flag above.)
+          if (JSON.stringify(s) === JSON.stringify(state)) return;
+          if (dirty) {
+            flash(peMsg("msgChangedElsewhere"), true);
+            return;
+          }
           state = s;
           render();
           flash(peMsg("msgLoadedPicked"));
@@ -675,13 +682,25 @@
         } catch (_) {}
       }
     } catch (e) {
-      savingSelf = false;
       const msg = e && e.message ? e.message : String(e);
-      if (/quota/i.test(msg)) {
-        flash(peMsg("msgSaveQuota"), true);
+      // One template too big for an item of its own is the one quota failure with a
+      // specific cause and a specific fix, so it gets its own message and names the
+      // template — "settings are too large" would send the user hunting through all of
+      // them for the one that is actually the problem.
+      if (e && e.code === PE_ERR_TEMPLATE_TOO_LARGE) {
+        flash(
+          peMsg("msgSaveTplTooLarge", [e.templateName || peMsg("menuUntitled"), String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]),
+          true
+        );
+      } else if (/quota/i.test(msg)) {
+        flash(peMsg("msgSaveQuota", [String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]), true);
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
       }
+    } finally {
+      // Released a turn later than the save, so every event the save produced has landed
+      // while the flag was still set.
+      setTimeout(() => (savingSelf = false), 0);
     }
   }
 
@@ -744,23 +763,24 @@
     if (av) av.textContent = "v" + chrome.runtime.getManifest().version + " · ";
   } catch (_) {}
 
-  // storage meter: the whole settings object lives in one chrome.storage.sync item,
-  // capped at ~8 KB (QUOTA_BYTES_PER_ITEM). Show how full it is so a save never fails silently.
-  const PE_SYNC_ITEM_LIMIT = 8192;
+  // Storage meter. Settings occupy several chrome.storage.sync items now (the core one
+  // plus a template shard per ~8 KB), so the ceiling that matters is the 100 KB total,
+  // and the figure has to come from the same packing the save uses — measuring
+  // JSON.stringify(state) instead would ignore the shard keys and quietly under-report.
   function updateStorageMeter() {
     const bar = $("storageBarFill");
     const txt = $("storageText");
     if (!bar || !txt || !state) return;
     let bytes = 0;
     try {
-      bytes = new Blob([PE_STORAGE_KEY + JSON.stringify(state)]).size;
+      bytes = peSettingsBytes(state);
     } catch (_) {}
-    const over = bytes > PE_SYNC_ITEM_LIMIT;
-    const near = !over && bytes > PE_SYNC_ITEM_LIMIT * 0.8;
-    bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_ITEM_LIMIT) * 100)) + "%";
+    const over = bytes > PE_SYNC_QUOTA_BYTES;
+    const near = !over && bytes > PE_SYNC_QUOTA_BYTES * 0.8;
+    bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_QUOTA_BYTES) * 100)) + "%";
     bar.className = over ? "over" : near ? "near" : "";
     txt.textContent =
-      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1)]) +
+      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1), String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]) +
       (over ? peMsg("msgStorageOver") : near ? peMsg("msgStorageNear") : "");
     txt.className = "storage-text" + (over ? " over" : near ? " near" : "");
   }

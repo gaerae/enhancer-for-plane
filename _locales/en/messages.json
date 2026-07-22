@@ -201,7 +201,7 @@
     "message": "↑ Import JSON…"
   },
   "optStorageNote": {
-    "message": "Settings sync across your devices via Chrome, which caps each item at ~8 KB. If you hit it, shorten/remove templates or keep a JSON backup."
+    "message": "Settings sync across your devices via Chrome, which allows ~100 KB in total. Templates are stored in blocks of ~8 KB, so any one template has to fit a single block."
   },
   "optDelete": {
     "message": "Delete"
@@ -373,7 +373,23 @@
     "message": "Saved — but site access was denied, so listed domains stay inactive until you grant it."
   },
   "msgSaveQuota": {
-    "message": "Save failed: settings exceed Chrome sync's ~8 KB limit. Shorten or remove templates (or keep a JSON backup)."
+    "message": "Save failed: settings exceed the ~$LIMIT$ KB Chrome sync allows in total. Shorten or remove templates (or keep a JSON backup).",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveTplTooLarge": {
+    "message": "Save failed: the template “$NAME$” is on its own larger than the ~$LIMIT$ KB Chrome sync allows for one block. Shorten it, or keep it in a JSON backup instead.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "msgSaveFailed": {
     "message": "Save failed: $ERROR$",
@@ -384,10 +400,13 @@
     }
   },
   "msgStorageUsed": {
-    "message": "$SIZE$ / 8 KB used",
+    "message": "$USED$ / $TOTAL$ KB used",
     "placeholders": {
-      "size": {
+      "used": {
         "content": "$1"
+      },
+      "total": {
+        "content": "$2"
       }
     }
   },
