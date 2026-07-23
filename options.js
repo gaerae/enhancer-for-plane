@@ -6,7 +6,17 @@
   let state = null;
   let syncCache = { bySource: {} }; // synced-template status/cache (chrome.storage.local)
   let dirty = false; // whether the user has edited the form
-  let savingSelf = false; // ignore the storage change our own save triggers
+  // Ignore the storage changes our own save triggers. It has to span the whole save, not
+  // absorb a single event: one save writes the settings and — when the template shards
+  // shrink — prunes the ones it no longer needs, which is a second storage operation and
+  // therefore a second event. Consuming only the first told the user "Loaded the rule
+  // added by the picker" immediately after "Saved.", about their own deletion.
+  let savingSelf = false;
+  // The settings as they last stood in storage, serialized once at each authoritative
+  // read/write (initial load, our own save, adopting a foreign change). A storage event
+  // is then decided by stringifying only the incoming settings and comparing to this —
+  // rather than stringifying the ~100 KB `state` a second time on every event.
+  let syncedJson = "";
 
   const el = {
     enabled: $("enabled"),
@@ -35,7 +45,8 @@
     status: $("status"),
     exportBtn: $("exportBtn"),
     importBtn: $("importBtn"),
-    importFile: $("importFile")
+    importFile: $("importFile"),
+    exportFeedBtn: $("exportFeedBtn")
   };
 
   // labelKey feeds the rule's label field on click, so it must follow the UI language.
@@ -217,22 +228,25 @@
     return state.templateSync;
   }
 
-  function fmtTime(ms) {
-    if (!ms) return "";
+  // Local date, YYYY-MM-DD. Stamped on an exported feed as its `version`.
+  function fmtDay(ms) {
     try {
       const d = new Date(ms);
       const p = (n) => String(n).padStart(2, "0");
-      return (
-        d.getFullYear() +
-        "-" +
-        p(d.getMonth() + 1) +
-        "-" +
-        p(d.getDate()) +
-        " " +
-        p(d.getHours()) +
-        ":" +
-        p(d.getMinutes())
-      );
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function fmtTime(ms) {
+    if (!ms) return "";
+    const day = fmtDay(ms);
+    if (!day) return "";
+    try {
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, "0");
+      return day + " " + p(d.getHours()) + ":" + p(d.getMinutes());
     } catch (_) {
       return "";
     }
@@ -455,16 +469,21 @@
           renderSources();
           return;
         }
-        if (area !== "sync" || !changes[PE_STORAGE_KEY]) return;
-        if (savingSelf) {
-          savingSelf = false; // ignore our own save
-          return;
-        }
-        if (dirty) {
-          flash(peMsg("msgChangedElsewhere"), true);
-          return;
-        }
+        if (!peSettingsChanged(changes, area)) return;
+        if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
+          // A write that leaves storage identical to what we last synced is not news, and
+          // announcing it is worse than saying nothing — our own save can land a late
+          // event after savingSelf clears, and Chrome can fire the same change twice.
+          // Compare against the stored baseline, so only the incoming settings are
+          // stringified here.
+          const sJson = JSON.stringify(s);
+          if (sJson === syncedJson) return;
+          syncedJson = sJson; // adopt the new storage baseline either way
+          if (dirty) {
+            flash(peMsg("msgChangedElsewhere"), true);
+            return;
+          }
           state = s;
           render();
           flash(peMsg("msgLoadedPicked"));
@@ -473,6 +492,7 @@
     } catch (_) {}
 
     el.exportBtn.addEventListener("click", exportSettings);
+    el.exportFeedBtn.addEventListener("click", exportTeamFeed);
     el.importBtn.addEventListener("click", () => el.importFile.click());
     el.importFile.addEventListener("change", () => {
       const f = el.importFile.files && el.importFile.files[0];
@@ -481,20 +501,50 @@
     });
   }
 
-  function exportSettings() {
-    // `settings.schema` already states which version this is; a second copy alongside
-    // it would only be one more thing that can disagree.
-    const payload = { _app: PE_APP_ID, settings: state };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "enhancer-for-plane-settings.json";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSettings() {
+    // `settings.schema` already states which version this is; a second copy alongside
+    // it would only be one more thing that can disagree.
+    downloadJson({ _app: PE_APP_ID, settings: state }, "enhancer-for-plane-settings.json");
     flash(peMsg("msgExported"));
+  }
+
+  // Publish the user's own templates as a sync feed — the file a teammate subscribes to.
+  // Deliberately not a backup: no domains, no rules, no variable values, no source URLs.
+  // This one is meant to be handed to other people, and a backup is not.
+  function exportTeamFeed() {
+    const templates = (state.templates || []).filter(peTemplateHasContent);
+    if (!templates.length) {
+      flash(peMsg("msgFeedEmpty"), true);
+      return;
+    }
+    // Asked, not stored: naming the collection is a decision about this file, and a
+    // remembered name would go stale the moment it was published under another one.
+    // Cancel means cancel — an empty answer still exports, just without a name.
+    const name = prompt(peMsg("msgFeedNamePrompt"), "");
+    if (name === null) return;
+    const feed = peBuildTeamFeed(state, name, fmtDay(Date.now()));
+    downloadJson(feed, "enhancer-for-plane-team-templates.json");
+    // peBuildTeamFeed caps at what a subscriber will accept from one source, so a large
+    // personal library can lose its tail. Say so — "Saved N" alone would read as "all of
+    // them", and the missing ones would never reach the team.
+    const dropped = templates.length - feed.templates.length;
+    if (dropped > 0) {
+      flash(peMsg("msgFeedExportedCapped", [String(feed.templates.length), String(dropped)]), true);
+    } else {
+      flash(peMsg("msgFeedExported", [String(feed.templates.length)]));
+    }
   }
 
   function importSettings(file) {
@@ -663,6 +713,7 @@
     try {
       savingSelf = true;
       await peSaveSettings(state);
+      syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       render();
       flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
@@ -675,13 +726,30 @@
         } catch (_) {}
       }
     } catch (e) {
-      savingSelf = false;
       const msg = e && e.message ? e.message : String(e);
-      if (/quota/i.test(msg)) {
-        flash(peMsg("msgSaveQuota"), true);
+      // One template too big for an item of its own is the one quota failure with a
+      // specific cause and a specific fix, so it gets its own message and names the
+      // template — "settings are too large" would send the user hunting through all of
+      // them for the one that is actually the problem.
+      if (e && e.code === PE_ERR_TEMPLATE_TOO_LARGE) {
+        flash(
+          peMsg("msgSaveTplTooLarge", [e.templateName || peMsg("menuUntitled"), String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]),
+          true
+        );
+      } else if (/QUOTA_BYTES_PER_ITEM/i.test(msg)) {
+        // The templates are already split across items, so this can only be the core
+        // one: domains and style rules. Saying "settings are too large" would point at
+        // the templates, which are not the problem and cannot help.
+        flash(peMsg("msgSaveQuotaItem", [String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]), true);
+      } else if (/quota/i.test(msg)) {
+        flash(peMsg("msgSaveQuota", [String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]), true);
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
       }
+    } finally {
+      // Released a turn later than the save, so every event the save produced has landed
+      // while the flag was still set.
+      setTimeout(() => (savingSelf = false), 0);
     }
   }
 
@@ -744,24 +812,37 @@
     if (av) av.textContent = "v" + chrome.runtime.getManifest().version + " · ";
   } catch (_) {}
 
-  // storage meter: the whole settings object lives in one chrome.storage.sync item,
-  // capped at ~8 KB (QUOTA_BYTES_PER_ITEM). Show how full it is so a save never fails silently.
-  const PE_SYNC_ITEM_LIMIT = 8192;
+  // Storage meter. Settings occupy several chrome.storage.sync items now (the core one
+  // plus a template shard per ~8 KB), so the ceiling that matters is the 100 KB total,
+  // and the figure has to come from the same packing the save uses — measuring
+  // JSON.stringify(state) instead would ignore the shard keys and quietly under-report.
   function updateStorageMeter() {
     const bar = $("storageBarFill");
     const txt = $("storageText");
     if (!bar || !txt || !state) return;
-    let bytes = 0;
+    let usage = { total: 0, overTotal: false, overItem: false };
     try {
-      bytes = new Blob([PE_STORAGE_KEY + JSON.stringify(state)]).size;
+      usage = peSettingsUsage(state);
     } catch (_) {}
-    const over = bytes > PE_SYNC_ITEM_LIMIT;
-    const near = !over && bytes > PE_SYNC_ITEM_LIMIT * 0.8;
-    bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_ITEM_LIMIT) * 100)) + "%";
+    const bytes = usage.total;
+    // Either ceiling refuses the save, so either one has to light the bar up. The bar
+    // itself tracks the total, which is the number the user can act on.
+    const over = usage.overTotal || usage.overItem;
+    const near = !over && bytes > PE_SYNC_QUOTA_BYTES * 0.8;
+    bar.style.width = Math.min(100, Math.round((bytes / PE_SYNC_QUOTA_BYTES) * 100)) + "%";
     bar.className = over ? "over" : near ? "near" : "";
+    // Two ceilings, two explanations. "12.7 / 100 KB used — over the sync limit" is a
+    // sentence that argues with itself; when the total is fine and a single item is not,
+    // say which one is not.
+    const why = usage.overTotal
+      ? peMsg("msgStorageOver")
+      : usage.overItem
+        ? peMsg("msgStorageOverItem", [String(Math.round(PE_SYNC_ITEM_BYTES / 1024))])
+        : near
+          ? peMsg("msgStorageNear")
+          : "";
     txt.textContent =
-      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1)]) +
-      (over ? peMsg("msgStorageOver") : near ? peMsg("msgStorageNear") : "");
+      peMsg("msgStorageUsed", [(bytes / 1024).toFixed(1), String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]) + why;
     txt.className = "storage-text" + (over ? " over" : near ? " near" : "");
   }
   let meterTimer = null;
@@ -773,6 +854,7 @@
   peApplyI18n(document);
   Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
     state = s;
+    syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     syncCache = c;
     render();
     bind();

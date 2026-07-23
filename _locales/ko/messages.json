@@ -88,6 +88,12 @@
   "optTplEmpty": {
     "message": "템플릿이 없습니다. “템플릿 추가”를 눌러 시작하세요."
   },
+  "optTplShare": {
+    "message": "↓ 팀에 공유…"
+  },
+  "optTplShareDesc": {
+    "message": "<b>팀에 공유</b>를 누르면 내 템플릿을 팀원이 구독할 수 있는 파일로 저장합니다. 팀원이 <code>https</code>로 열 수 있는 곳에 올리고 주소를 알려주면, 팀원은 아래 <b>템플릿 동기화</b>에 소스로 추가합니다. 소스에서 받은 템플릿은 포함되지 않습니다."
+  },
   "optTplNamePh": {
     "message": "템플릿 이름 (예: 🐞 버그 리포트)"
   },
@@ -201,7 +207,7 @@
     "message": "↑ JSON 가져오기…"
   },
   "optStorageNote": {
-    "message": "설정은 Chrome을 통해 기기 간 동기화되며, 항목당 약 8 KB 제한이 있습니다. 한도에 걸리면 템플릿을 줄이거나 삭제하고 JSON 백업을 보관하세요."
+    "message": "설정은 Chrome을 통해 기기 간 동기화되며, 전체 약 100 KB까지 저장됩니다. 템플릿은 약 8 KB 단위 블록에 나뉘어 저장되므로, 템플릿 하나가 블록 하나에 들어가야 합니다."
   },
   "optDelete": {
     "message": "삭제"
@@ -298,6 +304,31 @@
   "msgExported": {
     "message": "설정 JSON을 내보냈습니다."
   },
+  "msgFeedNamePrompt": {
+    "message": "이 템플릿 모음의 이름을 정해주세요. 팀원이 소스 이름을 따로 바꾸지 않으면 이 이름이 소스 이름으로 보입니다. 비워두셔도 됩니다."
+  },
+  "msgFeedEmpty": {
+    "message": "아직 공유할 내용이 없습니다. 내 템플릿을 먼저 추가하세요. 소스에서 받은 템플릿은 포함되지 않습니다."
+  },
+  "msgFeedExported": {
+    "message": "템플릿 $COUNT$개를 파일로 저장했습니다. https로 열리는 곳에 올리고 주소를 공유하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgFeedExportedCapped": {
+    "message": "템플릿 $COUNT$개를 저장했습니다. 소스 하나가 담을 수 있는 최대치라 $DROPPED$개는 제외됐습니다. 파일을 https로 열리는 곳에 올리고 주소를 공유하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "dropped": {
+        "content": "$2"
+      }
+    }
+  },
   "msgImported": {
     "message": "가져왔습니다 — 확인한 뒤 저장을 누르면 적용됩니다."
   },
@@ -308,7 +339,7 @@
     "message": "가져오기 실패: 이 확장에서 내보낸 파일이 아닙니다."
   },
   "msgImportIsSyncFile": {
-    "message": "설정 백업이 아니라 템플릿 동기화 피드로 보입니다. 대신 “템플릿 동기화”에 URL을 추가하세요."
+    "message": "설정 백업이 아니라 템플릿 동기화 소스 파일로 보입니다. 대신 “템플릿 동기화”에 URL을 추가하세요."
   },
   "msgImportNewer": {
     "message": "가져오기 실패: 더 새로운 버전의 백업입니다 (파일 schema $FILE$, 현재 빌드는 $HERE$). 확장을 먼저 업데이트하세요.",
@@ -373,7 +404,31 @@
     "message": "저장했습니다 — 다만 사이트 접근이 거부되어, 권한을 허용할 때까지 등록한 도메인은 동작하지 않습니다."
   },
   "msgSaveQuota": {
-    "message": "저장 실패: 설정이 Chrome 동기화의 약 8 KB 한도를 초과했습니다. 템플릿을 줄이거나 삭제하세요 (또는 JSON 백업을 보관하세요)."
+    "message": "저장 실패: 설정이 Chrome 동기화의 전체 한도 약 $LIMIT$ KB를 초과했습니다. 템플릿을 줄이거나 삭제하세요 (또는 JSON 백업을 보관하세요).",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveQuotaItem": {
+    "message": "저장 실패: 도메인과 스타일 규칙을 합친 크기가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 일부를 지우거나 JSON 백업을 보관하세요.",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveTplTooLarge": {
+    "message": "저장 실패: 템플릿 “$NAME$” 하나가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 내용을 줄이거나, 이 템플릿은 JSON 백업으로만 보관하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "msgSaveFailed": {
     "message": "저장 실패: $ERROR$",
@@ -384,15 +439,26 @@
     }
   },
   "msgStorageUsed": {
-    "message": "8 KB 중 $SIZE$ 사용",
+    "message": "$TOTAL$ KB 중 $USED$ KB 사용",
     "placeholders": {
-      "size": {
+      "used": {
         "content": "$1"
+      },
+      "total": {
+        "content": "$2"
       }
     }
   },
   "msgStorageOver": {
     "message": " — 동기화 한도 초과. 저장이 실패할 수 있습니다"
+  },
+  "msgStorageOverItem": {
+    "message": " — 블록 하나가 약 $LIMIT$ KB 한도를 넘었습니다. 저장이 실패합니다",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
   },
   "msgStorageNear": {
     "message": " — 한도에 근접했습니다"

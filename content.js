@@ -1169,7 +1169,7 @@
 
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === "sync" && changes[PE_STORAGE_KEY]) {
+      if (peSettingsChanged(changes, area)) {
         refresh();
       } else if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
         // Synced templates updated by the service worker → refresh cache, re-render an

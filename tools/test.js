@@ -38,11 +38,91 @@ function match(actual, re, what) {
 
 // common.js alone (no chrome). peMsg falls back to "" so seed labels keep their
 // English literals — exercising the fallback path at the same time.
+const EXPORT_GLOBALS =
+  "\n;globalThis.__DEFAULTS = PE_DEFAULTS;" +
+  "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
+  "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
+  "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
+  "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
+  "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
+  "\n;globalThis.__SYNC_QUOTA = PE_SYNC_QUOTA_BYTES;" +
+  "\n;globalThis.__ITEM_BYTES = PE_SYNC_ITEM_BYTES;" +
+  "\n;globalThis.__STORAGE_KEY = PE_STORAGE_KEY;" +
+  "\n;globalThis.__TPL_PREFIX = PE_TPL_KEY_PREFIX;" +
+  "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;";
+
 function loadCommon() {
-  const ctx = { console, URL, Date };
+  const ctx = { console, URL, Date, TextEncoder };
   vm.createContext(ctx);
-  vm.runInContext(COMMON + "\n;globalThis.__DEFAULTS = PE_DEFAULTS;\n;globalThis.__LIMITS = PE_SYNC_LIMITS;\n;globalThis.__SCHEMA = PE_SCHEMA;\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;", ctx);
+  vm.runInContext(COMMON + EXPORT_GLOBALS, ctx);
   return ctx;
+}
+
+// common.js against a chrome.storage.sync that behaves like the real one: several keys,
+// a per-item cap, a total cap, and errors reported through runtime.lastError rather than
+// thrown. Settings live across many items now, so a stub that stores a single blob would
+// agree with any packing whatsoever — including one that loses templates.
+function loadCommonWithSyncStorage(seed = {}) {
+  const store = clone(seed);
+  const ctx = { console, URL, Date, TextEncoder };
+  // Measured the way Chrome measures, independently of common.js — including Chromium's
+  // "<" → "<" escape. A stub that just called JSON.stringify would agree with any
+  // accounting bug in the code under test, which is the opposite of what it is for.
+  const bytes = (k, v) => chromeItemBytes(k, v);
+  const totalWith = (pending) => {
+    const merged = Object.assign({}, store, pending);
+    return Object.keys(merged).reduce((n, k) => n + bytes(k, merged[k]), 0);
+  };
+  const api = {
+    calls: { set: 0, remove: 0 },
+    store,
+    // Set true to make every write fail the way a full quota does.
+    full: false
+  };
+  ctx.chrome = {
+    runtime: { lastError: null },
+    storage: {
+      sync: {
+        get: (keys, cb) => {
+          if (keys === null || keys === undefined) return cb(clone(store));
+          const list = Array.isArray(keys) ? keys : [keys];
+          const out = {};
+          for (const k of list) if (k in store) out[k] = clone(store[k]);
+          cb(out);
+        },
+        set: (obj, cb) => {
+          api.calls.set++;
+          const over = Object.keys(obj).find((k) => bytes(k, obj[k]) > 8192);
+          if (api.full || over || totalWith(obj) > 102400) {
+            ctx.chrome.runtime.lastError = {
+              message: over ? "QUOTA_BYTES_PER_ITEM quota exceeded" : "QUOTA_BYTES quota exceeded"
+            };
+            cb();
+            ctx.chrome.runtime.lastError = null;
+            return;
+          }
+          for (const k of Object.keys(obj)) store[k] = clone(obj[k]);
+          cb();
+        },
+        remove: (keys, cb) => {
+          api.calls.remove++;
+          for (const k of Array.isArray(keys) ? keys : [keys]) delete store[k];
+          cb();
+        }
+      }
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(COMMON + EXPORT_GLOBALS, ctx);
+  return { ctx, storage: api };
+}
+
+// A template of a known JSON size, so a test can say "fill three shards" and mean it.
+function tplOfBytes(id, n) {
+  const t = { id, name: "n" + id, title: "", content: "" };
+  const pad = n - Buffer.byteLength(JSON.stringify(t), "utf8");
+  t.content = "x".repeat(Math.max(0, pad));
+  return t;
 }
 
 // background.js as a service worker: stubbed storage, permissions, alarms and fetch.
@@ -58,6 +138,19 @@ function gate() {
 
 // Let the worker reach its first await (the fetch) before the test acts.
 const tick = () => new Promise((r) => setImmediate(r));
+
+// How chrome.storage.sync sizes an item, written from Chromium's own rules rather than
+// from ours: key bytes + the byte length of Chromium's JSON serialization, in which "<"
+// becomes the six-byte "<". Kept deliberately independent of common.js so the two
+// can disagree and a test can say so.
+//   extensions/browser/api/storage/settings_storage_quota_enforcer.cc
+//     std::string value_as_json = base::WriteJson(value).value_or("");
+//     size_t new_size = key.size() + value_as_json.size();
+//   base/json/string_escape.cc — case '<': dest->append("\\u003C");
+function chromeItemBytes(key, value) {
+  const json = JSON.stringify(value).split("<").join("\\u003C");
+  return Buffer.byteLength(key, "utf8") + Buffer.byteLength(json, "utf8");
+}
 
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
@@ -1054,6 +1147,557 @@ test("import: sanitizing keeps every key the form renders", () => {
   const ctx = loadCommon();
   const out = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peSanitizeSettings({}));
   for (const k of Object.keys(ctx.__DEFAULTS)) ok(k in out, `"${k}" must survive an empty import`);
+});
+
+/* ================================================================== */
+/* settings storage — the core item plus one template shard per 8 KB  */
+/* ================================================================== */
+
+const shardKeys = (store) => Object.keys(store).filter((k) => k.startsWith("peTpl.")).sort();
+
+test("storage: templates come back from a save exactly as they went in", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "a", name: "🐞 Bug", title: "[Bug] ", content: "## 요약\n\n## 재현 절차\n1. " },
+    { id: "b", name: "Task", title: "", content: "body" }
+  ];
+  await ctx.peSaveSettings(s);
+  const back = await ctx.peGetSettings();
+  eq(back.templates, s.templates, "templates round-trip");
+  eq(back.rules.length, s.rules.length, "rules round-trip");
+  ok(!("tplShards" in back), "tplShards is storage bookkeeping and must not reach the form");
+  ok(!("tplShards" in JSON.parse(JSON.stringify(back))), "…nor survive an export");
+  eq(shardKeys(storage.store), ["peTpl.0"], "one shard for a small set");
+});
+
+test("storage: a set too big for one item is split across shards, in order", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  // 20 x ~1 KB is well past the 8 KB an item holds.
+  s.templates = Array.from({ length: 20 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  ok(shardKeys(storage.store).length >= 3, `expected several shards, got ${shardKeys(storage.store).length}`);
+  for (const k of shardKeys(storage.store)) {
+    ok(chromeItemBytes(k, storage.store[k]) <= ctx.__ITEM_BYTES, `${k} within the item cap`);
+  }
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), s.templates.map((t) => t.id), "order preserved across shards");
+});
+
+test("storage: the ceiling moved — a settings object far past one item now saves", async () => {
+  const { ctx } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 60 }, (_, i) => tplOfBytes("t" + i, 1000));
+  // The whole thing is ~60 KB: it could not have been stored at all before sharding.
+  ok(ctx.peSettingsBytes(s) > ctx.__ITEM_BYTES * 4, "the fixture must exceed the old single-item ceiling");
+  await ctx.peSaveSettings(s);
+  const back = await ctx.peGetSettings();
+  eq(back.templates.length, 60, "all 60 survive");
+});
+
+test("storage: the capacity the docs quote is the capacity you get", () => {
+  // The READMEs give a range rather than one number, because the answer depends on the
+  // alphabet: the quota is bytes and a Korean character costs three of them. These are
+  // the figures they quote. If the packing changes, this is where it shows up — a doc
+  // that overstates capacity is worse than one that says nothing.
+  const ctx = loadCommon();
+  const fits = (n, content) => {
+    const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+    s.templates = Array.from({ length: n }, (_, i) => ({
+      id: "tpl-abc123",
+      name: "🐞 Bug report",
+      title: "[Bug] ",
+      content
+    })).map((t, i) => Object.assign({}, t, { id: "t" + i }));
+    const u = ctx.peSettingsUsage(s);
+    return !u.overTotal && !u.overItem;
+  };
+  const en = "## Summary\n\n".padEnd(400, "x");
+  const ko = "## 요약\n\n" + "가".repeat(390);
+
+  ok(fits(200, en), "200 English templates of ~400 characters fit");
+  ok(!fits(260, en), "…and it does run out; 260 must not fit");
+  ok(fits(80, ko), "80 Korean templates of ~400 characters fit");
+  ok(!fits(100, ko), "…and 100 do not — three bytes a character is the whole difference");
+
+  // PE_IMPORT_LIMITS.maxTemplates is an anti-abuse bound on parsing a hostile file, not a
+  // promise of capacity: it is only reachable at the small end (the sample feed averages
+  // 187 bytes a template).
+  ok(fits(ctx.__IMPORT_LIMITS.maxTemplates, "x".repeat(120)), "500 tiny templates fit");
+  ok(!fits(ctx.__IMPORT_LIMITS.maxTemplates, en), "500 realistic ones do not — bytes bind first");
+});
+
+test("storage: how big one template may be, per alphabet", () => {
+  // One template must fit one 8 KB item and nothing can split it further, so this is a
+  // real user-facing ceiling. PE_SYNC_LIMITS.maxContentLen (20 000) is far above all of
+  // these and always has been: it bounds work on a hostile remote file, where the cache
+  // lives in storage.local, and says nothing about what a personal template may hold.
+  const ctx = loadCommon();
+  const maxChars = (ch) => {
+    let lo = 0;
+    let hi = 20000;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      const t = { id: "tpl-abc123", name: "🐞 Bug report", title: "[Bug] ", content: ch.repeat(mid) };
+      if (ctx.peItemBytes("peTpl.0", [t]) <= ctx.__ITEM_BYTES) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const ascii = maxChars("x");
+  const korean = maxChars("가");
+  const emoji = maxChars("🐞");
+  const lt = maxChars("<");
+  ok(ascii > 8000 && ascii < 8192, `ASCII ~8100, got ${ascii}`);
+  ok(korean > 2600 && korean < 2800, `Korean ~2700 (3 bytes each), got ${korean}`);
+  ok(emoji > 1950 && emoji < 2100, `emoji ~2030 (4 bytes each), got ${emoji}`);
+  ok(lt > 1300 && lt < 1400, `"<" ~1350 (6 bytes each in storage), got ${lt}`);
+  ok(korean < ctx.__LIMITS.maxContentLen, "and every one of them is under maxContentLen, which is not the binding limit");
+});
+
+test("storage: one template too big for an item is refused by name, not dropped", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "a", name: "Runbook", title: "", content: "x".repeat(9000) }];
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save must fail");
+  eq(caught.code, ctx.__ERR_TPL_BIG, "carries the specific code, not a generic quota error");
+  eq(caught.templateName, "Runbook", "names the offending template");
+  eq(Object.keys(storage.store), [], "nothing was written — the form still holds the user's text");
+});
+
+test("storage: a boundary template past ten shards is still refused by name, not mislabelled", async () => {
+  // The refusal check must weigh each template against its REAL shard key. A template
+  // whose one-item size is exactly the cap with a 7-byte "peTpl.0" but one over it with
+  // an 8-byte "peTpl.10" used to slip the old pre-check (which always guessed "peTpl.0")
+  // and be rejected by Chrome as a generic per-item quota error — which the settings page
+  // then blamed on "domains and style rules". Push it past ten shards and it must still
+  // come back as the named too-large error.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  // Size the boundary so [t] serializes to exactly cap-7 bytes: fits "peTpl.0" (7),
+  // busts any key of eight bytes or more.
+  const target = ctx.__ITEM_BYTES - 7; // peItemBytes(key,[t]) = key.length + jsonBytes([t])
+  let n = target;
+  let boundary;
+  for (let i = 0; i < 40; i++) {
+    boundary = { id: "big", name: "Runbook", title: "", content: "x".repeat(n) };
+    const bytes = ctx.peItemBytes("peTpl.0", [boundary]);
+    if (bytes === ctx.__ITEM_BYTES) break;
+    n += ctx.__ITEM_BYTES - bytes; // JSON overhead is constant, so this converges at once
+  }
+  eq(ctx.peItemBytes("peTpl.0", [boundary]), ctx.__ITEM_BYTES, "fits a 7-byte key exactly");
+  ok(ctx.peItemBytes("peTpl.10", [boundary]) > ctx.__ITEM_BYTES, "…and busts an 8-byte one");
+
+  // ~80 small templates ahead of it guarantee it lands at index >= 10 (8-byte key).
+  s.templates = Array.from({ length: 80 }, (_, i) => tplOfBytes("t" + i, 1000)).concat([boundary]);
+  const key = Object.keys(ctx.peSettingsWriteSet(s)).find((k) => k.startsWith("peTpl.") && k.length >= 8);
+  ok(key, "the fixture really does produce a shard key of eight bytes or more");
+
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save must fail");
+  eq(caught.code, ctx.__ERR_TPL_BIG, "named too-large error, not a generic quota rejection");
+  eq(caught.templateName, "Runbook", "and it names the boundary template");
+  eq(Object.keys(storage.store), [], "nothing written");
+});
+
+test("storage: shrinking the list prunes the shards it no longer needs", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 24 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  const before = shardKeys(storage.store).length;
+  ok(before >= 3, "fixture must span several shards");
+  s.templates = s.templates.slice(0, 2);
+  await ctx.peSaveSettings(s);
+  eq(shardKeys(storage.store), ["peTpl.0"], "the tail is gone");
+  const back = await ctx.peGetSettings();
+  eq(back.templates.length, 2, "and the read agrees");
+});
+
+test("storage: a save that prunes is two storage operations, and callers must expect both", async () => {
+  // Each operation is its own onChanged event. The settings page used to absorb exactly
+  // one of them as "my own save", so the prune arrived looking like somebody else's edit
+  // and it announced "Loaded the rule added by the picker" right after "Saved." — about
+  // the user's own deletion. Nothing in node can click that button; what node can do is
+  // hold the count still, so the assumption stays visible to whoever changes this next.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 24 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  eq([storage.calls.set, storage.calls.remove], [1, 0], "a plain save writes once and prunes nothing");
+
+  s.templates = s.templates.slice(0, 2);
+  await ctx.peSaveSettings(s);
+  eq([storage.calls.set, storage.calls.remove], [2, 1], "shrinking adds exactly one prune");
+});
+
+test("storage: a shard left behind by a failed prune is ignored, not read back", async () => {
+  // The prune is a second call and can fail on its own. What must never happen is the
+  // orphan reappearing as templates the user deleted — this codebase has already shipped
+  // one resurrection bug.
+  const { ctx } = loadCommonWithSyncStorage({
+    peSettings: { schema: 4, tplShards: 1, templates: [] },
+    "peTpl.0": [{ id: "keep", name: "keep", title: "", content: "" }],
+    "peTpl.1": [{ id: "deleted", name: "deleted", title: "", content: "" }]
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["keep"], "only the shards the core item counts");
+});
+
+test("storage: v3 settings are read inline, then written sharded", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage({
+    peSettings: { schema: 3, templates: [{ id: "old", name: "Old", title: "", content: "kept" }] }
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["old"], "a pre-sharding user keeps their templates");
+  eq(back.schema, ctx.__SCHEMA, "and is stamped at the current schema");
+  await ctx.peSaveSettings(back);
+  eq(shardKeys(storage.store), ["peTpl.0"], "the next save converts");
+  eq(storage.store.peSettings.tplShards, 1, "and stamps the count");
+});
+
+test("storage: a write from a build that predates sharding is read from inline", async () => {
+  // That build knows nothing of tplShards, so its save drops the stamp while leaving our
+  // shards behind. Inline has to win, or the device shows a list the user did not write.
+  const { ctx } = loadCommonWithSyncStorage({
+    peSettings: { schema: 4, templates: [{ id: "typed-there", name: "Theirs", title: "", content: "" }] },
+    "peTpl.0": [{ id: "stale", name: "Stale", title: "", content: "" }]
+  });
+  const back = await ctx.peGetSettings();
+  eq(back.templates.map((t) => t.id), ["typed-there"], "inline wins when no count is stamped");
+});
+
+test("storage: the core item mirrors templates while they fit, and drops them when they do not", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "a", name: "Small", title: "", content: "tiny" }];
+  await ctx.peSaveSettings(s);
+  eq(storage.store.peSettings.templates.length, 1, "a pre-sharding build still sees the list");
+
+  s.templates = Array.from({ length: 30 }, (_, i) => tplOfBytes("t" + i, 1000));
+  await ctx.peSaveSettings(s);
+  eq(storage.store.peSettings.templates, [], "dropped once it stops fitting");
+  ok(
+    chromeItemBytes("peSettings", storage.store.peSettings) <= ctx.__ITEM_BYTES,
+    "so the core item itself always fits"
+  );
+  eq((await ctx.peGetSettings()).templates.length, 30, "the shards remain the source of truth");
+});
+
+test("storage: deleting every template leaves zero, not the shipped samples", async () => {
+  // peDeepMerge backfills an absent array from the defaults. Read the shard count wrong
+  // and a user who cleared their templates gets the two sample ones back on every load.
+  const { ctx } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  ok(s.templates.length > 0, "the defaults do ship samples");
+  s.templates = [];
+  await ctx.peSaveSettings(s);
+  eq((await ctx.peGetSettings()).templates, [], "cleared stays cleared");
+
+  // …and it must hold on its own, not because the mirror happens to agree. A stamped
+  // count of zero means zero whatever the core item still carries inline; without this
+  // the guard could be written `n > 0` and nothing would notice until someone simplified
+  // the mirror away and the samples came back from the dead.
+  const stale = { peSettings: { schema: 4, tplShards: 0, templates: [{ id: "stale", name: "Stale" }] } };
+  eq(ctx.peAssembleSettings(stale).templates, [], "a stamped zero outranks a stale mirror");
+});
+
+test("storage: a quota failure rejects rather than reporting a partial save", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  storage.full = true;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "must reject");
+  match(caught.message, /quota/i, "and say why");
+});
+
+test("storage: the meter measures the items the save actually writes", async () => {
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 15 }, (_, i) => tplOfBytes("t" + i, 1000));
+  const predicted = ctx.peSettingsBytes(s);
+  await ctx.peSaveSettings(s);
+  const actual = Object.keys(storage.store).reduce(
+    (n, k) => n + chromeItemBytes(k, storage.store[k]),
+    0
+  );
+  eq(predicted, actual, "predicted bytes");
+});
+
+test("storage: our byte count is Chrome's byte count, character for character", () => {
+  // The budget is only as good as the measurement. Chrome sizes an item with its own
+  // serializer, so this compares peItemBytes against Chromium's documented rules over
+  // every kind of content that serializes differently — rather than against
+  // JSON.stringify, which is the thing that was wrong.
+  const ctx = loadCommon();
+  const cases = {
+    ascii: "plain text",
+    korean: "한글 본문입니다",
+    emoji: "🐞✅🗺️",
+    quotes: 'he said "hi" \\ backslash',
+    controls: "line\nbreak\ttab\r\u0001",
+    // The one that used to be wrong: Chromium writes "<" as the six-byte "<".
+    lessThan: "<details><summary>x</summary></details>",
+    greaterAndAmp: "a > b && c",
+    unicodeSeparators: "\u2028 and \u2029",
+    markdownWithHtml: "## Steps\n<br>\n- [ ] <kbd>Alt</kbd>+<kbd>T</kbd>\n"
+  };
+  for (const [what, content] of Object.entries(cases)) {
+    const value = [{ id: "t", name: "n", title: "", content }];
+    eq(ctx.peItemBytes("peTpl.0", value), chromeItemBytes("peTpl.0", value), `bytes for ${what}`);
+  }
+});
+
+test("storage: a template full of < is packed against its real size, not its raw one", async () => {
+  // "<" costs six bytes in storage and one in JSON.stringify. Counted the cheap way, a
+  // shard packed to "just under 8 KB" is really ~6x over, the meter says green, and the
+  // save dies on a per-item quota error naming the wrong part of the settings.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: 12 }, (_, i) => ({
+    id: "t" + i,
+    name: "html " + i,
+    title: "",
+    content: "<div>".repeat(200) // 1000 chars, 6000 bytes as Chrome stores it
+  }));
+  // Every shard the packer produces has to fit by Chrome's arithmetic, not ours.
+  for (const shard of ctx.pePackTemplates(s.templates)) {
+    ok(chromeItemBytes("peTpl.0", shard) <= ctx.__ITEM_BYTES, "shard fits Chrome's per-item cap");
+  }
+  await ctx.peSaveSettings(s); // the stub enforces the cap the same way; a bad pack throws
+  eq((await ctx.peGetSettings()).templates.length, 12, "all of them stored and read back");
+  ok(Object.keys(storage.store).length > 2, "and it genuinely needed several shards");
+});
+
+test("storage: the meter watches both ceilings, not just the total", async () => {
+  // When everything lived in one item, "is the total too big" and "is this item too big"
+  // were the same question. They are not any more: templates shard, but domains and rules
+  // still share the core item, so that item can bust the 8 KB per-item cap while the
+  // total sits comfortably inside 100 KB. Watching only the total shows green and then
+  // fails on save.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.domains = Array.from({ length: 100 }, (_, i) => "sub" + i + ".plane.example.com".padEnd(120, "x"));
+  const u = ctx.peSettingsUsage(s);
+  ok(u.total < ctx.__SYNC_QUOTA, "the total is nowhere near the overall quota");
+  ok(u.overItem, "yet one item is over the per-item cap");
+  eq(u.worstKey, ctx.__STORAGE_KEY, "and it is the core item, not a template shard");
+
+  // …and the save it predicts really does fail, so the warning is not theatre.
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save fails");
+  match(caught.message, /QUOTA_BYTES_PER_ITEM/, "with the per-item error the UI keys off");
+  eq(Object.keys(storage.store), [], "and wrote nothing");
+});
+
+test("storage: the budget is bytes, so a Korean template is not counted as ASCII", () => {
+  // The cap that shipped wrong last time counted UTF-16 units against a byte limit, and
+  // a Korean feed sailed past it at 3x. Same arithmetic, same trap, different place.
+  const ctx = loadCommon();
+  const ko = { id: "a", name: "n", title: "", content: "가".repeat(1000) };
+  const en = { id: "a", name: "n", title: "", content: "a".repeat(1000) };
+  const koBytes = ctx.peItemBytes("peTpl.0", [ko]);
+  ok(koBytes > ctx.peItemBytes("peTpl.0", [en]) * 2.5, `Korean must cost ~3x, got ${koBytes}`);
+  // …and the packer has to act on that, not on length.
+  const shards = ctx.pePackTemplates(Array.from({ length: 6 }, () => ko));
+  ok(shards.length >= 2, `6 x 3 KB cannot share one 8 KB item, got ${shards.length} shard(s)`);
+});
+
+test("storage: a change to a shard alone still counts as a settings change", () => {
+  // Every listener used to test changes[PE_STORAGE_KEY]. Editing a template now writes a
+  // shard and may leave the core item byte-identical, so that test would see nothing and
+  // the picker would keep serving the old list.
+  const ctx = loadCommon();
+  ok(ctx.peSettingsChanged({ "peTpl.2": {} }, "sync"), "a shard-only change");
+  ok(ctx.peSettingsChanged({ peSettings: {} }, "sync"), "the core item");
+  ok(!ctx.peSettingsChanged({ peSyncCache: {} }, "local"), "the template cache is not settings");
+  ok(!ctx.peSettingsChanged({ peSettings: {} }, "local"), "wrong area");
+});
+
+/* ================================================================== */
+/* team feed export — the other half of the round trip                */
+/* ================================================================== */
+
+test("feed: what export writes, sync reads back — every field, unchanged", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "bug", name: "🐞 버그", title: "[Bug] ", content: "## 재현\n1. \n2. " },
+    { id: "task", name: "Task", title: "", content: "## Goal\n- [ ] " }
+  ];
+  const feed = ctx.peBuildTeamFeed(s, "QA standards", "2026-07-22");
+  // Publishing is only useful if a subscriber's normalizer accepts the result. Asserting
+  // the shape of the file would pass while the two halves quietly disagreed.
+  const got = ctx.peNormalizeRemoteTemplates(JSON.parse(JSON.stringify(feed)), "src1");
+  eq(got.dropped, 0, "nothing dropped");
+  eq(got.name, "QA standards", "the collection name survives");
+  eq(got.templates.map((t) => t.name), ["🐞 버그", "Task"], "names survive");
+  eq(got.templates.map((t) => t.title), ["[Bug] ", ""], "titles survive");
+  eq(got.templates.map((t) => t.content), s.templates.map((t) => t.content), "bodies survive");
+  eq(got.templates.map((t) => t.id), ["sync:src1:bug", "sync:src1:task"], "ids are namespaced by the reader");
+});
+
+test("feed: it is a publication, not a backup — nothing private rides along", () => {
+  // This file is meant to be handed to other people. A backup is not: it carries the
+  // user's domains, their source URLs and their variable values in plain text.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.domains = ["plane.internal.example.com"];
+  s.variables = [{ name: "team", value: "Someone's real name" }];
+  s.templateSync = { enabled: true, sources: [{ id: "s1", url: "https://private.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] };
+  const wire = JSON.stringify(ctx.peBuildTeamFeed(s, "Team", "2026-07-22"));
+  for (const secret of ["plane.internal.example.com", "Someone's real name", "private.example.com", "variables", "domains", "rules"]) {
+    ok(wire.indexOf(secret) === -1, `"${secret}" must not appear in a published feed`);
+  }
+  eq(Object.keys(JSON.parse(wire)).sort(), ["name", "schema", "templates", "version"], "keys");
+});
+
+test("feed: synced templates are not re-published as your own", () => {
+  // They belong to whoever publishes them. Re-exporting them would let a second feed
+  // fork someone else's collection silently, and the ids would collide on the way back.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [{ id: "mine", name: "Mine", title: "", content: "c" }];
+  const cache = { bySource: { s1: { templates: [{ id: "sync:s1:theirs", group: "G", name: "Theirs", title: "", content: "c" }] } } };
+  // The picker shows both; the feed must carry only the first.
+  eq(ctx.peCountTemplates(ctx.peBuildTemplateSections(Object.assign({}, s, { templateSync: { enabled: true, sources: [{ id: "s1", url: "https://x.test/f.json", enabled: true }] } }), cache)), 2, "the picker shows both");
+  eq(ctx.peBuildTeamFeed(s, "", "2026-07-22").templates.map((t) => t.id), ["mine"], "the feed carries only your own");
+});
+
+test("feed: an unnamed collection omits the key rather than publishing an empty one", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const feed = ctx.peBuildTeamFeed(s, "   ", "2026-07-22");
+  ok(!("name" in feed), "no blank name — a subscriber falls back to the host");
+  // …and the reader must agree that there is no name to show.
+  eq(ctx.peNormalizeRemoteTemplates(feed, "s").name, "", "reader sees no name");
+  eq(ctx.peSourceDisplayName({ url: "https://team.example.com/f.json" }, { remoteName: "" }), "team.example.com", "falls back to the host");
+});
+
+test("feed: empty and unusable templates never reach the file", () => {
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = [
+    { id: "blank", name: "", title: "", content: "" },
+    { id: "spaces", name: "   ", title: "  ", content: "\n\t " },
+    { id: "real", name: "Real", title: "", content: "c" }
+  ];
+  eq(ctx.peBuildTeamFeed(s, "", "2026-07-22").templates.map((t) => t.id), ["real"], "only the usable one");
+});
+
+test("feed: the publisher's own caps apply, so a subscriber never has to drop anything", () => {
+  const ctx = loadCommon();
+  const L = ctx.__LIMITS;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  s.templates = Array.from({ length: L.maxTemplatesPerSource + 25 }, (_, i) => ({
+    id: "t" + i,
+    name: "x".repeat(400),
+    title: "y".repeat(400),
+    content: "z".repeat(L.maxContentLen + 500)
+  }));
+  const feed = ctx.peBuildTeamFeed(s, "z".repeat(400), "2026-07-22");
+  eq(feed.templates.length, L.maxTemplatesPerSource, "count capped at what a source may hold");
+  eq(feed.name.length, L.maxFieldLen, "collection name capped");
+  eq(feed.templates[0].name.length, L.maxFieldLen, "name capped");
+  eq(feed.templates[0].content.length, L.maxContentLen, "content capped");
+  eq(ctx.peNormalizeRemoteTemplates(feed, "s").dropped, 0, "so the reader drops none of it");
+});
+
+test("feed: what the cap drops is a number the caller can report, not a silent loss", () => {
+  // exportTeamFeed warns when the cap leaves templates out, and it computes the count as
+  // (templates with content) minus (templates in the feed). Pin that arithmetic so the
+  // export can never quietly publish fewer than the user built. Blanks don't count — they
+  // are filtered before the cap, so they are not "dropped" in the sense the message means.
+  const ctx = loadCommon();
+  const L = ctx.__LIMITS;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const extra = 37;
+  s.templates = Array.from({ length: L.maxTemplatesPerSource + extra }, (_, i) => ({
+    id: "t" + i,
+    name: "n" + i,
+    title: "",
+    content: "c"
+  }));
+  s.templates.push({ id: "blank", name: "", title: "", content: "" }); // filtered, not dropped
+
+  const withContent = s.templates.filter(ctx.peTemplateHasContent).length;
+  const feed = ctx.peBuildTeamFeed(s, "Team", "2026-07-22");
+  const dropped = withContent - feed.templates.length;
+  eq(feed.templates.length, L.maxTemplatesPerSource, "feed holds exactly the cap");
+  eq(dropped, extra, "the caller sees the real overflow count");
+  ok(dropped > 0, "so the UI takes the 'capped' branch and warns");
+});
+
+test("feed: one publisher's export lands in another install's picker, end to end", async () => {
+  // The whole point of the feature, exercised through the real worker rather than
+  // asserted piecewise: the publisher's file goes over the wire, the subscriber fetches
+  // it, and what they can insert is what was published.
+  const author = loadCommon();
+  const s = author.peDeepMerge(author.__DEFAULTS, {});
+  s.templates = [
+    { id: "bug", name: "🐞 버그 리포트", title: "[Bug] ", content: "## 재현 절차\n1. " },
+    { id: "spec", name: "Spec", title: "[Spec] ", content: "## Problem\n" },
+    { id: "blank", name: "", title: "", content: "" } // must not travel
+  ];
+  const published = JSON.stringify(author.peBuildTeamFeed(s, "QA & Delivery standards", "2026-07-22"));
+
+  const { ctx, state } = loadWorker({
+    settings: {
+      templates: [{ id: "own", name: "My own", title: "", content: "c" }],
+      templateSync: {
+        enabled: true,
+        sources: [{ id: "src1", url: "https://team.example.com/templates.json", intervalMinutes: 360, enabled: true }]
+      }
+    },
+    respond: () => jsonResponse(published)
+  });
+  await ctx.syncSources(true);
+
+  const entry = state.cache.bySource.src1;
+  eq(entry.status, "ok", "the subscriber's sync succeeded");
+  eq(entry.dropped, 0, "and had nothing to drop");
+  eq(entry.remoteName, "QA & Delivery standards", "the collection name travelled");
+  eq(entry.templates.map((t) => t.name), ["🐞 버그 리포트", "Spec"], "exactly what was published, blank one excluded");
+
+  // …and the picker composes it with the subscriber's own templates.
+  const settings = await ctx.peGetSettings();
+  const sections = ctx.peBuildTemplateSections(settings, state.cache);
+  eq(sections.map((x) => x.kind), ["personal", "synced"], "their own block, then the source");
+  eq(sections[1].source, "QA & Delivery standards", "headed by the published name");
+  eq(ctx.peCountTemplates(sections), 3, "1 of their own + 2 published");
+  eq(sections[1].groups[0].items.map((t) => t.content), ["## 재현 절차\n1. ", "## Problem\n"], "bodies arrive intact");
+});
+
+test("feed: a published feed is not mistaken for a settings backup", () => {
+  // Both are JSON with a "templates" key. Importing one as the other used to be an
+  // unhelpful "not ours"; options.js tells them apart by this shape, so pin it.
+  const ctx = loadCommon();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const feed = ctx.peBuildTeamFeed(s, "Team", "2026-07-22");
+  ok(feed._app === undefined, "a feed carries no app stamp, so import refuses it");
+  ok(Array.isArray(feed.templates) && !feed.rules && !feed.domains, "…and looks like a feed, not a backup");
 });
 
 /* ---------- run ---------- */

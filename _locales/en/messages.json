@@ -88,6 +88,12 @@
   "optTplEmpty": {
     "message": "No templates yet. Click “Add template” to start."
   },
+  "optTplShare": {
+    "message": "↓ Share with your team…"
+  },
+  "optTplShareDesc": {
+    "message": "<b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included."
+  },
   "optTplNamePh": {
     "message": "Template name (e.g. 🐞 Bug report)"
   },
@@ -201,7 +207,7 @@
     "message": "↑ Import JSON…"
   },
   "optStorageNote": {
-    "message": "Settings sync across your devices via Chrome, which caps each item at ~8 KB. If you hit it, shorten/remove templates or keep a JSON backup."
+    "message": "Settings sync across your devices via Chrome, which allows ~100 KB in total. Templates are stored in blocks of ~8 KB, so any one template has to fit a single block."
   },
   "optDelete": {
     "message": "Delete"
@@ -298,6 +304,31 @@
   "msgExported": {
     "message": "Exported settings JSON."
   },
+  "msgFeedNamePrompt": {
+    "message": "Name this set of templates. A teammate sees it as the source's name unless they rename it. Leave empty to skip."
+  },
+  "msgFeedEmpty": {
+    "message": "Nothing to share yet — add a template of your own first. Templates you received from a source are not included."
+  },
+  "msgFeedExported": {
+    "message": "Saved $COUNT$ templates to a file. Host it over https, then share the URL.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgFeedExportedCapped": {
+    "message": "Saved $COUNT$ templates — the most a synced source can hold — so $DROPPED$ were left out. Host the file over https and share the URL.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "dropped": {
+        "content": "$2"
+      }
+    }
+  },
   "msgImported": {
     "message": "Imported — review, then click Save to apply."
   },
@@ -308,7 +339,7 @@
     "message": "Import failed: that file was not exported by this extension."
   },
   "msgImportIsSyncFile": {
-    "message": "That looks like a template sync feed, not a settings backup. Add its URL under Template sync instead."
+    "message": "That looks like a template sync file, not a settings backup. Add its URL under Template sync instead."
   },
   "msgImportNewer": {
     "message": "Import failed: that backup is from a newer version (schema $FILE$, this build reads $HERE$). Update the extension first.",
@@ -373,7 +404,31 @@
     "message": "Saved — but site access was denied, so listed domains stay inactive until you grant it."
   },
   "msgSaveQuota": {
-    "message": "Save failed: settings exceed Chrome sync's ~8 KB limit. Shorten or remove templates (or keep a JSON backup)."
+    "message": "Save failed: settings exceed the ~$LIMIT$ KB Chrome sync allows in total. Shorten or remove templates (or keep a JSON backup).",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveQuotaItem": {
+    "message": "Save failed: your domains and style rules together exceed the ~$LIMIT$ KB Chrome sync allows for one block. Remove some, or keep a JSON backup.",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSaveTplTooLarge": {
+    "message": "Save failed: the template “$NAME$” is on its own larger than the ~$LIMIT$ KB Chrome sync allows for one block. Shorten it, or keep it in a JSON backup instead.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
   },
   "msgSaveFailed": {
     "message": "Save failed: $ERROR$",
@@ -384,15 +439,26 @@
     }
   },
   "msgStorageUsed": {
-    "message": "$SIZE$ / 8 KB used",
+    "message": "$USED$ / $TOTAL$ KB used",
     "placeholders": {
-      "size": {
+      "used": {
         "content": "$1"
+      },
+      "total": {
+        "content": "$2"
       }
     }
   },
   "msgStorageOver": {
     "message": " — over the sync limit; saving may fail"
+  },
+  "msgStorageOverItem": {
+    "message": " — one block is over its ~$LIMIT$ KB limit; saving will fail",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
   },
   "msgStorageNear": {
     "message": " — approaching the limit"
