@@ -318,6 +318,17 @@
       }
     }
   },
+  "msgFeedExportedCapped": {
+    "message": "템플릿 $COUNT$개를 저장했습니다. 소스 하나가 담을 수 있는 최대치라 $DROPPED$개는 제외됐습니다. 파일을 https로 열리는 곳에 올리고 주소를 공유하세요.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "dropped": {
+        "content": "$2"
+      }
+    }
+  },
   "msgImported": {
     "message": "가져왔습니다 — 확인한 뒤 저장을 누르면 적용됩니다."
   },

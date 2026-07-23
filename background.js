@@ -418,7 +418,14 @@ chrome.permissions.onAdded.addListener(async (perms) => {
 chrome.permissions.onRemoved.addListener(() => reconcile());
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (peSettingsChanged(changes, area)) {
+  // The core item only — NOT peSettingsChanged. The worker reconciles content-script
+  // registration (domains), the sync alarm (sources) and the cache (sources); none of
+  // those live in a template shard. Reacting to shard writes would just repeat this work,
+  // and the prune step of a shrinking save (a remove of peTpl.* keys) would run it a
+  // second time for one save. Domains/rules/sources are always in the core item, so its
+  // change is the only signal this worker needs. (The picker and the settings page do
+  // need template edits, and they use peSettingsChanged.)
+  if (area === "sync" && changes[PE_STORAGE_KEY]) {
     reconcile();
     ensureSyncAlarm();
     pruneSyncCacheNow();

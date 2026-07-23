@@ -1272,6 +1272,46 @@ test("storage: one template too big for an item is refused by name, not dropped"
   eq(Object.keys(storage.store), [], "nothing was written — the form still holds the user's text");
 });
 
+test("storage: a boundary template past ten shards is still refused by name, not mislabelled", async () => {
+  // The refusal check must weigh each template against its REAL shard key. A template
+  // whose one-item size is exactly the cap with a 7-byte "peTpl.0" but one over it with
+  // an 8-byte "peTpl.10" used to slip the old pre-check (which always guessed "peTpl.0")
+  // and be rejected by Chrome as a generic per-item quota error — which the settings page
+  // then blamed on "domains and style rules". Push it past ten shards and it must still
+  // come back as the named too-large error.
+  const { ctx, storage } = loadCommonWithSyncStorage();
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  // Size the boundary so [t] serializes to exactly cap-7 bytes: fits "peTpl.0" (7),
+  // busts any key of eight bytes or more.
+  const target = ctx.__ITEM_BYTES - 7; // peItemBytes(key,[t]) = key.length + jsonBytes([t])
+  let n = target;
+  let boundary;
+  for (let i = 0; i < 40; i++) {
+    boundary = { id: "big", name: "Runbook", title: "", content: "x".repeat(n) };
+    const bytes = ctx.peItemBytes("peTpl.0", [boundary]);
+    if (bytes === ctx.__ITEM_BYTES) break;
+    n += ctx.__ITEM_BYTES - bytes; // JSON overhead is constant, so this converges at once
+  }
+  eq(ctx.peItemBytes("peTpl.0", [boundary]), ctx.__ITEM_BYTES, "fits a 7-byte key exactly");
+  ok(ctx.peItemBytes("peTpl.10", [boundary]) > ctx.__ITEM_BYTES, "…and busts an 8-byte one");
+
+  // ~80 small templates ahead of it guarantee it lands at index >= 10 (8-byte key).
+  s.templates = Array.from({ length: 80 }, (_, i) => tplOfBytes("t" + i, 1000)).concat([boundary]);
+  const key = Object.keys(ctx.peSettingsWriteSet(s)).find((k) => k.startsWith("peTpl.") && k.length >= 8);
+  ok(key, "the fixture really does produce a shard key of eight bytes or more");
+
+  let caught = null;
+  try {
+    await ctx.peSaveSettings(s);
+  } catch (e) {
+    caught = e;
+  }
+  ok(caught, "the save must fail");
+  eq(caught.code, ctx.__ERR_TPL_BIG, "named too-large error, not a generic quota rejection");
+  eq(caught.templateName, "Runbook", "and it names the boundary template");
+  eq(Object.keys(storage.store), [], "nothing written");
+});
+
 test("storage: shrinking the list prunes the shards it no longer needs", async () => {
   const { ctx, storage } = loadCommonWithSyncStorage();
   const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
@@ -1583,6 +1623,31 @@ test("feed: the publisher's own caps apply, so a subscriber never has to drop an
   eq(feed.templates[0].name.length, L.maxFieldLen, "name capped");
   eq(feed.templates[0].content.length, L.maxContentLen, "content capped");
   eq(ctx.peNormalizeRemoteTemplates(feed, "s").dropped, 0, "so the reader drops none of it");
+});
+
+test("feed: what the cap drops is a number the caller can report, not a silent loss", () => {
+  // exportTeamFeed warns when the cap leaves templates out, and it computes the count as
+  // (templates with content) minus (templates in the feed). Pin that arithmetic so the
+  // export can never quietly publish fewer than the user built. Blanks don't count — they
+  // are filtered before the cap, so they are not "dropped" in the sense the message means.
+  const ctx = loadCommon();
+  const L = ctx.__LIMITS;
+  const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
+  const extra = 37;
+  s.templates = Array.from({ length: L.maxTemplatesPerSource + extra }, (_, i) => ({
+    id: "t" + i,
+    name: "n" + i,
+    title: "",
+    content: "c"
+  }));
+  s.templates.push({ id: "blank", name: "", title: "", content: "" }); // filtered, not dropped
+
+  const withContent = s.templates.filter(ctx.peTemplateHasContent).length;
+  const feed = ctx.peBuildTeamFeed(s, "Team", "2026-07-22");
+  const dropped = withContent - feed.templates.length;
+  eq(feed.templates.length, L.maxTemplatesPerSource, "feed holds exactly the cap");
+  eq(dropped, extra, "the caller sees the real overflow count");
+  ok(dropped > 0, "so the UI takes the 'capped' branch and warns");
 });
 
 test("feed: one publisher's export lands in another install's picker, end to end", async () => {

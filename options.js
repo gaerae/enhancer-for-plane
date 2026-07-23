@@ -12,6 +12,11 @@
   // therefore a second event. Consuming only the first told the user "Loaded the rule
   // added by the picker" immediately after "Saved.", about their own deletion.
   let savingSelf = false;
+  // The settings as they last stood in storage, serialized once at each authoritative
+  // read/write (initial load, our own save, adopting a foreign change). A storage event
+  // is then decided by stringifying only the incoming settings and comparing to this —
+  // rather than stringifying the ~100 KB `state` a second time on every event.
+  let syncedJson = "";
 
   const el = {
     enabled: $("enabled"),
@@ -236,20 +241,12 @@
 
   function fmtTime(ms) {
     if (!ms) return "";
+    const day = fmtDay(ms);
+    if (!day) return "";
     try {
       const d = new Date(ms);
       const p = (n) => String(n).padStart(2, "0");
-      return (
-        d.getFullYear() +
-        "-" +
-        p(d.getMonth() + 1) +
-        "-" +
-        p(d.getDate()) +
-        " " +
-        p(d.getHours()) +
-        ":" +
-        p(d.getMinutes())
-      );
+      return day + " " + p(d.getHours()) + ":" + p(d.getMinutes());
     } catch (_) {
       return "";
     }
@@ -475,11 +472,14 @@
         if (!peSettingsChanged(changes, area)) return;
         if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
-          // Read before deciding: a write that leaves the settings identical to what is
-          // already on screen is not news, and announcing it is worse than saying
-          // nothing. (Chrome does not promise onChanged arrives before the set callback,
-          // so an event can outlive the flag above.)
-          if (JSON.stringify(s) === JSON.stringify(state)) return;
+          // A write that leaves storage identical to what we last synced is not news, and
+          // announcing it is worse than saying nothing — our own save can land a late
+          // event after savingSelf clears, and Chrome can fire the same change twice.
+          // Compare against the stored baseline, so only the incoming settings are
+          // stringified here.
+          const sJson = JSON.stringify(s);
+          if (sJson === syncedJson) return;
+          syncedJson = sJson; // adopt the new storage baseline either way
           if (dirty) {
             flash(peMsg("msgChangedElsewhere"), true);
             return;
@@ -536,7 +536,15 @@
     if (name === null) return;
     const feed = peBuildTeamFeed(state, name, fmtDay(Date.now()));
     downloadJson(feed, "enhancer-for-plane-team-templates.json");
-    flash(peMsg("msgFeedExported", [String(feed.templates.length)]));
+    // peBuildTeamFeed caps at what a subscriber will accept from one source, so a large
+    // personal library can lose its tail. Say so — "Saved N" alone would read as "all of
+    // them", and the missing ones would never reach the team.
+    const dropped = templates.length - feed.templates.length;
+    if (dropped > 0) {
+      flash(peMsg("msgFeedExportedCapped", [String(feed.templates.length), String(dropped)]), true);
+    } else {
+      flash(peMsg("msgFeedExported", [String(feed.templates.length)]));
+    }
   }
 
   function importSettings(file) {
@@ -705,6 +713,7 @@
     try {
       savingSelf = true;
       await peSaveSettings(state);
+      syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       render();
       flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
@@ -845,6 +854,7 @@
   peApplyI18n(document);
   Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
     state = s;
+    syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     syncCache = c;
     render();
     bind();

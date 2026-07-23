@@ -318,6 +318,17 @@
       }
     }
   },
+  "msgFeedExportedCapped": {
+    "message": "Saved $COUNT$ templates — the most a synced source can hold — so $DROPPED$ were left out. Host the file over https and share the URL.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "dropped": {
+        "content": "$2"
+      }
+    }
+  },
   "msgImported": {
     "message": "Imported — review, then click Save to apply."
   },

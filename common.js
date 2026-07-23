@@ -407,8 +407,10 @@ function pePackTemplates(templates) {
 function peSettingsWriteSet(settings) {
   const templates = Array.isArray(settings.templates) ? settings.templates : [];
   const shards = pePackTemplates(templates);
+  // Copy every key except templates, then set the mirror from the normalized array — so a
+  // non-array `templates` on the way in cannot land in the core item as-is.
   const core = {};
-  for (const k of Object.keys(settings)) core[k] = settings[k];
+  for (const k of Object.keys(settings)) if (k !== "templates") core[k] = settings[k];
   core.tplShards = shards.length;
   // A build older than sharding reads templates from the core item and knows nothing
   // about the shards, so it would show an empty list on any device that had not updated
@@ -503,19 +505,28 @@ const PE_ERR_TEMPLATE_TOO_LARGE = "PE_TEMPLATE_TOO_LARGE";
 function peSaveSettings(settings) {
   return new Promise((resolve, reject) => {
     try {
-      const templates = Array.isArray(settings.templates) ? settings.templates : [];
-      const big = templates.find((t) => peItemBytes(PE_TPL_KEY_PREFIX + "0", [t]) > PE_SYNC_ITEM_BYTES);
-      if (big) {
-        reject(
-          Object.assign(new Error("template too large for one sync item"), {
-            code: PE_ERR_TEMPLATE_TOO_LARGE,
-            templateName: ((big && big.name) || "").trim()
-          })
-        );
-        return;
-      }
       const items = peSettingsWriteSet(settings);
       const live = Object.keys(items);
+      // A shard of one that is still over the per-item cap is a single template nothing
+      // can split — refuse it by name before the write, since Chrome's own quota error
+      // never says which one. Checked on the ACTUAL items (real keys): the shard's stored
+      // key can be longer than "peTpl.0" once there are ten shards, and guessing the
+      // short key would let a byte-boundary template pass here only to be rejected by
+      // Chrome and mislabelled as a core-item (domains/rules) failure. (Multi-template
+      // shards are never over — pePackTemplates starts a new one before it would be.)
+      for (const key of live) {
+        if (key.indexOf(PE_TPL_KEY_PREFIX) !== 0) continue;
+        const shard = items[key];
+        if (shard.length === 1 && peItemBytes(key, shard) > PE_SYNC_ITEM_BYTES) {
+          reject(
+            Object.assign(new Error("template too large for one sync item"), {
+              code: PE_ERR_TEMPLATE_TOO_LARGE,
+              templateName: ((shard[0] && shard[0].name) || "").trim()
+            })
+          );
+          return;
+        }
+      }
       chrome.storage.sync.set(items, () => {
         const err = chrome.runtime && chrome.runtime.lastError;
         if (err) {
