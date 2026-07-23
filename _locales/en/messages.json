@@ -92,7 +92,7 @@
     "message": "↓ Share with your team…"
   },
   "optTplShareDesc": {
-    "message": "<b>Share with your team</b> saves the templates above as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Only your own templates are included, not ones you received from a source."
+    "message": "<b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included."
   },
   "optTplNamePh": {
     "message": "Template name (e.g. 🐞 Bug report)"
