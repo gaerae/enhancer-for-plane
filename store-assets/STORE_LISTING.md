@@ -269,11 +269,26 @@ DevTools 가 필요 없습니다.
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-2-width.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-3-picker.png ✓
   (Upload in this order so the store carousel opens on templates, with the two
-  everyday actions — insert a template, copy a reference — first.)
-  Screenshot 4 is rendered from store-assets/screenshot-4-copy.html:
-  chrome --headless --window-size=1280,800 --screenshot=out.png file://…/screenshot-4-copy.html
+  everyday actions — insert a template, copy a reference — first. The file numbers
+  are the order they were made in, not the upload order.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
+
+Every screenshot is generated, not hand-composited. Each `screenshot-N-*.html` is a
+1280×800 page sharing `shot.css` and `shot.js` (the brand mark there is the real path
+from `icons/icon.svg`), so a caption or a menu label can be corrected by editing HTML
+instead of rebuilding a layout in an image editor:
+
+    sh store-assets/render.sh        # all four
+    sh store-assets/render.sh 4      # just screenshot-4-*
+
+Keep the mocks honest — they must show what the extension currently draws. Capture 1's
+menu once still showed a "TEMPLATES (TITLE + BODY)" header that the picker had long
+stopped rendering, and no "＋ Manage templates" footer, which the picker had gained.
+When the UI moves, re-render.
+
+None of this ships: release.yml lists the packaged files explicitly and store-assets is
+not among them.
 
 ## Packaging
 

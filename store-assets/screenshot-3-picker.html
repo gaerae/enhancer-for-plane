@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store capture 3 — visual element picker</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  .left { top: 208px; }
+  .win { top: 198px; }
+  .page { padding: 26px 26px 96px; }
+
+  .url .picking { color: #dc2626; font-weight: 700; }
+
+  /* the outline the picker draws over the element under the cursor */
+  .hit {
+    display: inline-block; padding: 10px 15px; border-radius: 8px;
+    border: 2px solid #121212; font-size: 15px; font-weight: 650; letter-spacing: -0.01em;
+  }
+
+  .panel.chooser { left: 611px; top: 353px; width: 337px; }
+  .panel.chooser .row { display: flex; align-items: center; gap: 12px; padding: 10px 15px; }
+  .panel.chooser .row + .row { border-top: 0; }
+  .sel {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+    color: #121212; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cnt {
+    margin-left: auto; flex: 0 0 auto; background: #f1f2f4; color: #79818c;
+    border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 600;
+  }
+</style>
+
+<div class="left">
+  <div class="brand"></div>
+  <h1>Point-and-click<br />rules.<br />No DevTools.</h1>
+  <p class="lede">
+    Click <b>Pick element</b>, hover any part of Plane, and choose a selector by its
+    <b>match count</b>. The rule lands in Settings, ready to tune.
+  </p>
+  <div class="pill">Pick → choose selector → set value</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <span class="url">plane.example.com <span class="sep">·</span> <span class="picking">🎯 picking…</span></span>
+  </div>
+  <div class="page">
+    <span class="hit">Q3 Billing &amp; Invoicing Revamp</span>
+  </div>
+</div>
+
+<div class="panel chooser">
+  <div class="head">Create a rule from a selector&nbsp;&nbsp;·&nbsp;&nbsp;Esc to cancel</div>
+  <div class="row on"><span class="sel">.max-w-[150px]</span><span class="cnt">matches 1</span></div>
+  <div class="row"><span class="sel">.truncate</span><span class="cnt">matches 12</span></div>
+  <div class="row"><span class="sel">.line-clamp-1</span><span class="cnt">matches 3</span></div>
+  <div class="row"><span class="sel">.flex</span><span class="cnt">matches 6</span></div>
+  <div class="row"><span class="sel">.relative</span><span class="cnt">matches 148</span></div>
+</div>
+
+<div class="caption">Width classes ranked first · bracket classes like <b>max-w-[150px]</b> escaped for you</div>
+<script src="shot.js"></script>

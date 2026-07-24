@@ -1,0 +1,79 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store capture 1 — title + body templates</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  .left { top: 208px; }
+  .win { top: 240px; }
+  .doc-title { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+  .doc h3 { font-size: 14px; font-weight: 650; margin-top: 17px; }
+  .doc .ol { margin-top: 9px; font-size: 13px; color: #9aa1aa; letter-spacing: 0.06em; }
+
+  /* description toolbar: the row our Template button is cloned into, right of Attach */
+  .toolbar {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 22px; padding: 11px 13px;
+    border: 1px solid #eceef1; border-radius: 9px;
+  }
+  .marks { display: flex; align-items: center; gap: 13px; color: #79818c; font-size: 13.5px; }
+  .marks .i { font-style: italic; }
+  .marks .s { text-decoration: line-through; }
+  .marks .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 600;
+    border: 1px solid #e6e8ec; color: #4b525c; background: #fff;
+  }
+  .btn.primary { background: #121212; border-color: #121212; color: #fff; }
+
+  .panel.menu { left: 862px; top: 505px; width: 322px; }
+  .emoji { font-size: 13px; }
+</style>
+
+<div class="left">
+  <div class="brand"></div>
+  <h1>Title + body<br />templates,<br />one click.</h1>
+  <p class="lede">
+    A native <b>Template</b> button sits next to <b>Attach</b> — and in the create dialog.
+    Pick one; it fills the <b>title and description together</b>.
+  </p>
+  <div class="pill">{{date}}<span class="dot">·</span>{{date+7}}<span class="dot">·</span>{{week}}</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <span class="url">plane.example.com <span class="sep">/</span> <span class="path">work item</span></span>
+  </div>
+  <div class="page doc">
+    <div class="doc-title">[Bug] Checkout fails on Safari</div>
+    <h3>Summary</h3>
+    <h3>Steps to reproduce</h3>
+    <div class="ol">1.&nbsp;&nbsp;&nbsp;2.</div>
+    <div class="toolbar">
+      <span class="marks">
+        <b>B</b><span class="i">I</span><span class="s">S</span><span>•</span><span>1.</span>
+        <span class="mono">&lt;/&gt;</span>
+      </span>
+      <span class="tools">
+        <span class="btn">📎 Attach</span>
+        <span class="btn primary">📄 Template</span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="panel menu">
+  <div class="row">
+    <div class="rname"><span class="emoji">🐞</span> Bug report</div>
+    <div class="rprev">Title: [Bug] · Summary Steps to reproduce Expected result…</div>
+  </div>
+  <div class="row on">
+    <div class="rname"><span class="emoji">✅</span> Task</div>
+    <div class="rprev">Background Goal Definition of Done References</div>
+  </div>
+  <div class="foot">＋ Manage templates</div>
+</div>
+
+<div class="caption">Open with the button or press <b>Alt/⌥+T</b></div>
+<script src="shot.js"></script>
