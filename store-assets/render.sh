@@ -1,8 +1,9 @@
 #!/bin/sh
-# Render every store capture to a 1280x800 PNG beside its source.
+# Render every store capture to a 1280x800 PNG beside its source, in both listing
+# languages: screenshot-N-name.png (English) and screenshot-N-name.ko.png (Korean).
 #
-#   sh store-assets/render.sh            # all of them
-#   sh store-assets/render.sh 4          # just screenshot-4-*.html
+#   sh store-assets/render.sh            # all of them, both languages
+#   sh store-assets/render.sh 4          # just screenshot-4-*
 #
 # Chrome is used headless rather than a screenshot tool so the result is identical on any
 # machine: same viewport, same device scale, no window chrome, no retina doubling.
@@ -14,9 +15,15 @@ CHROME=${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}
 
 WHICH=${1:-}
 for src in "$DIR"/screenshot-${WHICH:-[0-9]}*.html; do
-  out=${src%.html}.png
-  "$CHROME" --headless --disable-gpu --hide-scrollbars \
-    --force-device-scale-factor=1 --window-size=1280,800 \
-    --screenshot="$out" "file://$src" >/dev/null 2>&1
-  echo "$(basename "$out")"
+  base=${src%.html}
+  for lang in en ko; do
+    case $lang in
+      en) out=$base.png ;;                     # the default listing keeps the plain name
+      *)  out=$base.$lang.png ;;
+    esac
+    "$CHROME" --headless --disable-gpu --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=1280,800 \
+      --screenshot="$out" "file://$src?lang=$lang" >/dev/null 2>&1
+    echo "$(basename "$out")"
+  done
 done

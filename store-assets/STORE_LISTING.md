@@ -13,8 +13,10 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 > own name/description are localized (Korean users see "Enhancer for Plane —
 > 프로젝트·위키·이슈"). In the dashboard, set the default listing to English and
 > add a Korean listing (Store listing ▸ language selector) using the Korean
-> summary + description below. Full in-extension UI i18n (options/popup strings)
-> is still intentionally out of scope for now.
+> summary + description below, and its own screenshots — the `*.ko.png` set in
+> store-assets (screenshots are stored per language, so the Korean tab does not
+> inherit the English ones). The extension's own UI is fully translated too;
+> the Korean captures quote those strings rather than inventing new ones.
 
 ---
 
@@ -268,19 +270,32 @@ DevTools 가 필요 없습니다.
 • Screenshot 2 (1280×800) ....... store-assets/screenshot-4-copy.png ✓  ← copy reference (v1.4)
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-2-width.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-3-picker.png ✓
+• The same four, Korean listing .. store-assets/screenshot-*.ko.png ✓
   (Upload in this order so the store carousel opens on templates, with the two
   everyday actions — insert a template, copy a reference — first. The file numbers
   are the order they were made in, not the upload order.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
 
+The Korean listing gets its own set: `screenshot-N-*.ko.png`. The store keeps screenshots
+per language, so a Korean visitor sees Korean captures — which is the point of shipping
+`_locales/ko` at all. Upload them in the same order under Store listing ▸ 한국어.
+
 Every screenshot is generated, not hand-composited. Each `screenshot-N-*.html` is a
 1280×800 page sharing `shot.css` and `shot.js` (the brand mark there is the real path
-from `icons/icon.svg`), so a caption or a menu label can be corrected by editing HTML
-instead of rebuilding a layout in an image editor:
+from `icons/icon.svg`), and carries its own copy for both languages in a `window.T`
+block, applied by `?lang=`. One layout serves both listings, so a fix to a mock cannot
+land in one language and not the other:
 
-    sh store-assets/render.sh        # all four
+    sh store-assets/render.sh        # all four, both languages
     sh store-assets/render.sh 4      # just screenshot-4-*
+
+What is translated and what is quoted differ. Headlines, ledes and captions are ours to
+write in each language. The strings inside a mocked menu are not: "＋ 템플릿 관리",
+"1개 일치", "선택자로 규칙 만들기" are copied from `_locales/ko/messages.json`, because a
+poster showing a Korean UI the extension does not render is a promise it cannot keep.
+Sample templates and item titles are user content, so those are written in the reader's
+language.
 
 Keep the mocks honest — they must show what the extension currently draws. Capture 1's
 menu once still showed a "TEMPLATES (TITLE + BODY)" header that the picker had long

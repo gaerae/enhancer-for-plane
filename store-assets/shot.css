@@ -73,10 +73,14 @@ h1 {
 .panel .row + .row { border-top: 1px solid #f3f4f6; }
 .panel .row.on { background: #f7f8fa; }
 .rname { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+/* Sans by default, matching the template picker's own preview line. `.mono` is for
+   previews that show a literal string — a copy format, a URL — where the real UI is
+   monospace too. Mocking the wrong one makes the poster subtly untrue. */
 .rprev {
-  margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px; color: #98a0aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 4px; font-size: 11.5px; color: #98a0aa;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.rprev.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .panel .head {
   padding: 10px 15px; border-bottom: 1px solid #f3f4f6;
   font-size: 11.5px; color: #9aa1aa; letter-spacing: 0.01em;
@@ -85,6 +89,18 @@ h1 {
   padding: 10px 15px; border-top: 1px solid #f3f4f6; background: #fcfcfd;
   font-size: 12px; font-weight: 600; color: #6b7280;
 }
+
+/* ---- Korean ----
+ * Hangul has no spaces inside a word the way Latin does, so a browser will happily break
+ * a term in half at the line end; keep-all stops that. The tight tracking that suits a
+ * Latin display face also crowds Hangul, and the taller glyphs need more leading. */
+.lang-ko h1 {
+  font-size: 47px; line-height: 1.22; letter-spacing: -0.025em;
+  word-break: keep-all;
+}
+.lang-ko .lede { font-size: 16.5px; line-height: 1.72; word-break: keep-all; }
+.lang-ko .caption { font-size: 14px; word-break: keep-all; }
+.lang-ko .rname { font-weight: 700; }
 
 /* ---- caption ---- */
 .caption {

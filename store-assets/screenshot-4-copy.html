@@ -20,17 +20,14 @@
 
 <div class="left">
   <div class="brand"></div>
-  <h1>Take the item<br />with you.</h1>
-  <p class="lede">
-    One click beside a work item's ID copies it in <b>the format you wrote</b> —
-    for a chat message, a pull request, or a branch name.
-  </p>
+  <h1 data-t="head"></h1>
+  <p class="lede" data-t="lede"></p>
   <div class="pill">[{{item.key}}]({{item.url}})<span class="dot">·</span>Alt/⌥+C</div>
 </div>
 
 <div class="win">
   <div class="bar">
-    <span class="url">plane.example.com <span class="sep">/</span> <span class="path">work item</span></span>
+    <span class="url">plane.example.com <span class="sep">/</span> <span class="path" data-t="crumb"></span></span>
   </div>
   <div class="page">
     <div class="keyline">
@@ -43,25 +40,63 @@
         </svg>
       </span>
     </div>
-    <div class="doc-title">Checkout fails on Safari</div>
+    <div class="doc-title" data-t="itemTitle"></div>
   </div>
 </div>
 
 <div class="panel formats">
   <div class="row">
-    <div class="rname">Plain text</div>
-    <div class="rprev">PROJ-142 Checkout fails on Safari https://plane.example.com/acme/browse/PROJ-142</div>
+    <div class="rname" data-t="f1"></div>
+    <div class="rprev mono" data-t="p1"></div>
   </div>
   <div class="row on">
-    <div class="rname">Markdown link</div>
-    <div class="rprev">[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Checkout fails on Safari</div>
+    <div class="rname" data-t="f2"></div>
+    <div class="rprev mono" data-t="p2"></div>
   </div>
   <div class="row">
-    <div class="rname">Branch name</div>
-    <div class="rprev">feature/PROJ-142</div>
+    <div class="rname" data-t="f3"></div>
+    <div class="rprev mono">feature/PROJ-142</div>
   </div>
-  <div class="foot">＋ Manage copy formats</div>
+  <div class="foot" data-t="manage"></div>
 </div>
 
-<div class="caption">Every format is yours to edit — and the preview <b>is</b> what lands on the clipboard</div>
+<div class="caption" data-t="caption"></div>
+
+<script>
+  // The three format names are the shipped presets for that locale (PE_DEFAULTS →
+  // optCopyPreset*), and "manage" is menuManageCopy. The previews are what the expander
+  // actually produces from those formats, title and all.
+  window.T = {
+    en: {
+      head: "Take the item<br />with you.",
+      lede:
+        "One click beside a work item's ID copies it in <b>the format you wrote</b> — " +
+        "for a chat message, a pull request, or a branch name.",
+      crumb: "work item",
+      itemTitle: "Checkout fails on Safari",
+      f1: "Plain text",
+      p1: "PROJ-142 Checkout fails on Safari https://plane.example.com/acme/browse/PROJ-142",
+      f2: "Markdown link",
+      p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Checkout fails on Safari",
+      f3: "Branch name",
+      manage: "＋ Manage copy formats",
+      caption: "Every format is yours to edit — and the preview <b>is</b> what lands on the clipboard"
+    },
+    ko: {
+      head: "항목을 그대로<br />가져가기.",
+      lede:
+        "작업 항목 번호 옆 버튼을 한 번 누르면 <b>직접 정한 형식</b>으로 복사됩니다 — " +
+        "메신저로, 풀 리퀘스트 본문으로, 브랜치명으로.",
+      crumb: "작업 항목",
+      itemTitle: "Safari에서 결제가 실패합니다",
+      f1: "일반 텍스트",
+      p1: "PROJ-142 Safari에서 결제가 실패합니다 https://plane.example.com/acme/browse/PROJ-142",
+      f2: "마크다운 링크",
+      p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Safari에서 결제가 실패합니다",
+      f3: "브랜치명",
+      manage: "＋ 참조 복사 형식 관리",
+      caption: "형식은 마음대로 고칠 수 있고, 미리보기가 <b>곧</b> 클립보드에 담길 내용입니다"
+    }
+  };
+</script>
 <script src="shot.js"></script>
