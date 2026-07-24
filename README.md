@@ -92,6 +92,8 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      thing here that would break silently against a future Plane, and it is commented as
      such in the source.
 
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
+
 5. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.

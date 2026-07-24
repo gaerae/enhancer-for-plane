@@ -22,7 +22,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 Enhancer for Plane — Projects, Wiki & Issues
 
 ## Summary / short description  (max 132)
-One-click title + body templates and width rules for Plane (makeplane) — the open-source project management, issues & wiki tool.
+Title + body templates, one-click work item references, and width rules for Plane (makeplane) — the open-source Jira alternative.
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -49,6 +49,14 @@ Bodies are Markdown, rendered into the editor: headings, bullet and numbered lis
 Variables on insert: {{date}}, {{date+N}} / {{date-N}} (e.g. {{date+7}} for a deadline), {{week}}, {{month}}.
 Define up to 5 of your own, too — {{var.team}} and the like, filled in from your settings.
 Shortcut: Alt/⌥+T.
+
+▸ Copy a work item's reference
+A work item leaves Plane all day — into a chat message, a pull request, a branch name — and each trip meant selecting the title, copying the URL separately, and typing the rest.
+One click on the button beside a work item's ID copies the whole reference.
+The formats are yours to write: plain text, a markdown link, and a branch name ship as a starting point, and every one of them is an editable row.
+Three values are filled in — {{item.key}}, {{item.title}}, {{item.url}} — and everything else is copied exactly as you typed it, so what you edit is what lands on the clipboard. Settings previews each row.
+Works on a work item's own page and in the panel a list opens, so you can grab a reference without leaving the list.
+Shortcut: Alt/⌥+C.
 
 ▸ Team template sync
 Keep your team's templates in one JSON file — on your intranet, a Git host, any URL — and everyone pulls the same set.
@@ -77,7 +85,7 @@ It runs only on the domains you enable and stays completely inert everywhere els
 Wildcards (*.example.com) are supported.
 
 ▸ Import / Export
-Back up your domains, rules, templates, variables, and sync sources to a JSON file, and restore them on another machine.
+Back up your domains, rules, templates, variables, copy formats, and sync sources to a JSON file, and restore them on another machine.
 
 ▸ Light & dark mode
 The popup and settings follow your system theme and match Plane's monochrome look.
@@ -93,7 +101,7 @@ HOW TO START
 
 1. Open your self-hosted Plane instance.
 2. Click the toolbar icon and "Enable on this site" (grant access when Chrome prompts).
-3. Open Settings to manage templates and width rules.
+3. Open Settings to manage templates, copy formats, and width rules.
 
 Open source. Feedback and issues welcome.
 
@@ -101,14 +109,14 @@ Open source. Feedback and issues welcome.
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items and adjusting element widths via CSS rules — on the Plane instances the user chooses.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, and adjusting element widths via CSS rules — on the Plane instances the user chooses.
 
 ---
 
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, and team-template source URLs) so they persist across sessions and sync via Chrome. Also caches the team templates downloaded from the user's own source URL in storage.local, so the template picker reads from disk instead of the network. No other data is stored, and nothing is sent to the developer.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, and team-template source URLs) so they persist across sessions and sync via Chrome. Also caches the team templates downloaded from the user's own source URL in storage.local, so the template picker reads from disk instead of the network. No other data is stored, and nothing is sent to the developer.
 
 alarms
   Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
@@ -122,6 +130,9 @@ scripting
 Optional host permissions (requested per site at runtime, NOT at install)
   Plane can be self-hosted on ANY domain, so the target host is not known at build time and cannot be a fixed match list. The extension therefore declares optional host permissions and requests access to a single origin only when the user enables that domain (via the popup's "Enable on this site" or Settings) — Chrome shows a per-site prompt. It requests no host access at install, holds access only for the domains the user granted, and releases it when a domain is removed. This is the least-privilege way to support arbitrary user-provided self-hosted Plane hosts.
   The same mechanism covers team-template sync: a source URL can be on any host (an intranet server, a Git host), so adding a source prompts for that one origin, and the extension refuses to fetch any origin the user has not granted.
+
+Clipboard
+  No clipboard permission is requested or needed. "Copy reference" writes one string during the user's own click, using the standard page API; the extension never reads the clipboard.
 
 Remote code
   None. All JavaScript and CSS is bundled in the package; nothing is eval'd, injected as markup, or executed from the network at runtime.
@@ -164,7 +175,7 @@ Enhancer for Plane — 프로젝트·위키·이슈
 > 권장합니다. 위 한글 병기는 선택 사항입니다.
 
 ### 요약 / 짧은 설명 (max 132)
-제목·본문 템플릿 원클릭 삽입과 이름 폭 조정 규칙을 오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane)에 추가합니다.
+제목·본문 템플릿 삽입, 작업 항목 참조 원클릭 복사, 이름 폭 조정을 오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane)에 추가합니다.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)
@@ -186,6 +197,14 @@ Plane 과 제휴하거나 승인받은 제품이 아닙니다. "Plane" 은 해�
 삽입 시 변수 치환: {{date}}(오늘), {{date+N}} / {{date-N}}(예: 마감일 {{date+7}}), {{week}}(이번 주 범위), {{month}}.
 {{var.team}}처럼 직접 만든 변수도 최대 5개까지 쓸 수 있고, 값은 설정에서 채웁니다.
 단축키: Alt/⌥+T.
+
+▸ 작업 항목 참조 복사
+작업 항목은 하루에도 여러 번 Plane 밖으로 나갑니다 — 메신저, 풀 리퀘스트 본문, 브랜치명. 그때마다 제목을 드래그하고 URL을 따로 복사하고 나머지는 손으로 적어야 했습니다.
+번호 옆 버튼을 한 번 누르면 참조 전체가 복사됩니다.
+형식은 직접 씁니다. 일반 텍스트·마크다운 링크·브랜치명이 기본으로 들어 있고, 전부 편집 가능한 줄입니다.
+치환되는 값은 {{item.key}}, {{item.title}}, {{item.url}} 세 가지이며 나머지는 적은 그대로 복사됩니다. 편집한 것이 그대로 클립보드에 들어가고, 설정 화면이 줄마다 결과를 미리 보여 줍니다.
+항목 화면은 물론 목록에서 열리는 패널에서도 동작하므로, 목록을 벗어나지 않고 참조를 집을 수 있습니다.
+단축키: Alt/⌥+C.
 
 ▸ 팀 템플릿 동기화
 팀의 템플릿을 JSON 파일 하나에 두면(사내 서버, Git 호스트, 아무 URL이나) 모두가 같은 템플릿을 씁니다.
@@ -214,7 +233,7 @@ DevTools 가 필요 없습니다.
 와일드카드(*.example.com)도 지원합니다.
 
 ▸ 가져오기 / 내보내기
-도메인·규칙·템플릿·변수·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원할 수 있습니다.
+도메인·규칙·템플릿·변수·복사 형식·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원할 수 있습니다.
 
 ▸ 라이트 & 다크 모드
 팝업과 설정이 시스템 테마를 따르며 Plane 의 모노크롬 톤과 어울립니다.
@@ -231,7 +250,7 @@ DevTools 가 필요 없습니다.
 
 1. 자체 호스팅 Plane 인스턴스를 엽니다.
 2. 툴바 아이콘을 눌러 "Enable on this site" 를 클릭합니다(Chrome 프롬프트에서 접근 허용).
-3. 설정에서 템플릿과 폭 규칙을 관리합니다.
+3. 설정에서 템플릿·복사 형식·폭 규칙을 관리합니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
 
@@ -246,9 +265,13 @@ DevTools 가 필요 없습니다.
 
 • Store icon 128×128 ............ icons/icon128.png ✓
 • Screenshot 1 (1280×800) ....... store-assets/screenshot-1-templates.png ✓  ← lead with templates (the biggest gain over stock Plane)
-• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-width.png ✓
-• Screenshot 3 (1280×800) ....... store-assets/screenshot-3-picker.png ✓
-  (Upload in this order so the store carousel opens on templates.)
+• Screenshot 2 (1280×800) ....... store-assets/screenshot-4-copy.png ✓  ← copy reference (v1.4)
+• Screenshot 3 (1280×800) ....... store-assets/screenshot-2-width.png ✓
+• Screenshot 4 (1280×800) ....... store-assets/screenshot-3-picker.png ✓
+  (Upload in this order so the store carousel opens on templates, with the two
+  everyday actions — insert a template, copy a reference — first.)
+  Screenshot 4 is rendered from store-assets/screenshot-4-copy.html:
+  chrome --headless --window-size=1280,800 --screenshot=out.png file://…/screenshot-4-copy.html
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
 

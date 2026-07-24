@@ -1,0 +1,149 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>screenshot 4 — copy reference</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 800px; }
+  body {
+    background: linear-gradient(155deg, #eef0f3 0%, #f4f5f7 45%, #fafbfc 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    color: #121212;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ---- left column ---- */
+  .left { position: absolute; left: 72px; top: 232px; width: 452px; }
+  .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 8px; background: #121212;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand .name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  h1 {
+    font-size: 52px; line-height: 1.06; font-weight: 800; letter-spacing: -0.035em;
+    margin-bottom: 26px;
+  }
+  .lede { font-size: 17.5px; line-height: 1.62; color: #3f4650; }
+  .lede b { font-weight: 700; color: #121212; }
+  .pill {
+    margin-top: 30px; display: inline-block; background: #121212; color: #f4f4f5;
+    border-radius: 10px; padding: 13px 20px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+  .pill .dot { color: #7d848e; padding: 0 9px; }
+
+  /* ---- mock browser ---- */
+  .win {
+    position: absolute; left: 583px; top: 218px; width: 625px;
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 26px 60px rgba(20, 26, 38, 0.14), 0 3px 10px rgba(20, 26, 38, 0.06);
+  }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #fbfbfc; }
+  .lights { display: flex; gap: 6px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .url {
+    flex: 1; background: #fff; border-radius: 7px; padding: 8px 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #5b6470;
+    box-shadow: inset 0 0 0 1px #eceef1;
+  }
+  .url .sep { color: #b6bcc4; }
+  .url .path { color: #9aa1aa; }
+  .page { padding: 22px 26px 72px; }
+
+  .keyline { display: flex; align-items: center; gap: 8px; }
+  .key { font-size: 13px; font-weight: 500; color: #79818c; }
+  .copybtn {
+    width: 22px; height: 22px; border-radius: 6px; background: #eceef1;
+    display: flex; align-items: center; justify-content: center; color: #121212;
+  }
+  .title { margin-top: 9px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+
+  /* a hint of the description below, so the window reads as a work item page */
+  /* ---- the copy menu ---- */
+  /* Positioned over the window and allowed to hang past its bottom edge — the same
+     depth the other store shots use for an open menu. */
+  .menu {
+    position: absolute; left: 610px; top: 376px; width: 396px;
+    background: #fff; border-radius: 11px;
+    box-shadow: 0 18px 40px rgba(20, 26, 38, 0.18), 0 0 0 1px #eceef1;
+    overflow: hidden;
+  }
+  .menu .row { padding: 11px 15px; }
+  .menu .row + .row { border-top: 1px solid #f3f4f6; }
+  .menu .row.on { background: #f7f8fa; }
+  .rname { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+  .rprev {
+    margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px; color: #98a0aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .foot {
+    padding: 10px 15px; border-top: 1px solid #f3f4f6; background: #fcfcfd;
+    font-size: 12px; font-weight: 600; color: #6b7280;
+  }
+
+  .caption {
+    position: absolute; left: 0; right: 0; bottom: 30px; text-align: center;
+    font-size: 14.5px; color: #8b929b;
+  }
+  .caption b { color: #4b525c; font-weight: 650; }
+</style>
+
+<div class="left">
+  <div class="brand">
+    <span class="mark">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="#fff">
+        <path d="M14.2779 12.465L14.2045 12.5365L14.1028 12.6109C13.999 12.6752 13.8985 12.7093 13.8745 12.7186L8.09646 14.9677C7.9026 15.0431 7.68376 15.0174 7.51292 14.8987C7.34209 14.7799 7.24168 14.5838 7.24485 14.3758L7.28054 12.0898L5.14952 12.9194C4.95564 12.9949 4.73602 12.9685 4.56518 12.8498C4.39458 12.731 4.29394 12.5348 4.29711 12.3269L4.33279 10.0409L2.20178 10.8705C2.0079 10.946 1.78908 10.9202 1.61824 10.8015C1.44742 10.6828 1.347 10.4866 1.35017 10.2786L1.44444 4.07898C1.44497 4.04466 1.43911 3.86844 1.50017 3.70622C1.54848 3.57794 1.62751 3.46423 1.73091 3.37424C1.86169 3.26043 2.02889 3.20455 2.06088 3.1921L7.83894 0.943026C8.03281 0.867554 8.25164 0.893325 8.42248 1.01205C8.59332 1.13079 8.69372 1.32691 8.69055 1.53494L8.65623 3.82068L10.7859 2.99132C10.9796 2.9159 11.1986 2.94183 11.3694 3.06034C11.5403 3.17909 11.6415 3.37576 11.6383 3.58379L11.604 5.86953L13.7336 5.04017C13.9275 4.96469 14.1463 4.99045 14.3172 5.10919C14.488 5.22794 14.5884 5.42408 14.5852 5.63208L14.491 11.8317C14.4904 11.866 14.4963 12.0422 14.4352 12.2045L14.3939 12.2982C14.3622 12.3584 14.3233 12.4144 14.2779 12.465ZM4.39219 6.12784C4.39271 6.09351 4.38601 5.91676 4.44711 5.75452C4.4954 5.62627 4.57449 5.51251 4.67785 5.42253C4.80863 5.30872 4.97664 5.2534 5.00862 5.24095L7.39924 4.30992L7.42784 2.44478L2.69167 4.28821L2.61504 9.36909L4.35327 8.69224L4.39219 6.12784ZM7.33913 8.17613C7.33965 8.14181 7.3338 7.96558 7.39485 7.80337C7.44316 7.67508 7.52219 7.56138 7.6256 7.47139C7.75637 7.35758 7.92358 7.30169 7.95557 7.28924L10.3456 6.35901L10.3742 4.49387L5.63942 6.33706L5.56254 11.4166L7.30077 10.7397L7.33913 8.17613ZM13.3217 6.54137L8.58636 8.38535L8.50892 13.4657L13.2445 11.623L13.3217 6.54137Z"/>
+      </svg>
+    </span>
+    <span class="name">Enhancer for Plane</span>
+  </div>
+
+  <h1>Take the item<br />with you.</h1>
+
+  <p class="lede">
+    One click beside a work item's ID copies it in <b>the format you wrote</b> —
+    for a chat message, a pull request, or a branch name.
+  </p>
+
+  <div class="pill">[{{item.key}}]({{item.url}})<span class="dot">·</span>Alt/⌥+C</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <span class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>
+    <span class="url">plane.example.com <span class="sep">/</span> <span class="path">work item</span></span>
+  </div>
+  <div class="page">
+    <div class="keyline">
+      <span class="key">PROJ-142</span>
+      <span class="copybtn">
+        <svg viewBox="0 0 16 16" width="12" height="12">
+          <rect x="5.75" y="5.75" width="7.5" height="8.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M10.5 3.75H3.9a1.15 1.15 0 0 0-1.15 1.15v6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </span>
+    </div>
+    <div class="title">Checkout fails on Safari</div>
+  </div>
+</div>
+
+<div class="menu">
+  <div class="row">
+    <div class="rname">Plain text</div>
+    <div class="rprev">PROJ-142 Checkout fails on Safari https://plane.example.com/acme/browse/PROJ-142</div>
+  </div>
+  <div class="row on">
+    <div class="rname">Markdown link</div>
+    <div class="rprev">[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Checkout fails on Safari</div>
+  </div>
+  <div class="row">
+    <div class="rname">Branch name</div>
+    <div class="rprev">feature/PROJ-142</div>
+  </div>
+  <div class="foot">＋ Manage copy formats</div>
+</div>
+
+<div class="caption">Every format is yours to edit — and the preview <b>is</b> what lands on the clipboard</div>
