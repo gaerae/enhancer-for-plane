@@ -60,14 +60,6 @@ Three values are filled in — {{item.key}}, {{item.title}}, {{item.url}} — an
 Works on a work item's own page and in the panel a list opens, so you can grab a reference without leaving the list.
 Shortcut: Alt/⌥+C.
 
-▸ Team template sync
-Keep your team's templates in one JSON file — on your intranet, a Git host, any URL — and everyone pulls the same set.
-Add the URL once; it refreshes on the schedule you pick (hourly to daily), or on demand with "Sync now".
-Templates arrive grouped under their source, and you can hide any group you don't need without touching the shared file.
-Synced templates are read-only here: they're edited at the source, so no one's local edit gets silently reverted.
-Off by default. It contacts nothing until you add a source, and only ever the URL you entered.
-Inserting a template reads the local cache, so it costs no request and works offline.
-
 ▸ Width & style rules
 Plane truncates long names — modules, cycles, labels, breadcrumbs.
 In lists and search dropdowns that makes items impossible to tell apart.
@@ -79,6 +71,14 @@ No DevTools needed.
 Click "Pick element" in the popup, then click any part of Plane.
 You get a candidate selector list with match counts (width classes first).
 The rule lands in Settings, ready for you to set a value.
+
+▸ Team template sync
+Keep your team's templates in one JSON file — on your intranet, a Git host, any URL — and everyone pulls the same set.
+Add the URL once; it refreshes on the schedule you pick (hourly to daily), or on demand with "Sync now".
+Templates arrive grouped under their source, and you can hide any group you don't need without touching the shared file.
+Synced templates are read-only here: they're edited at the source, so no one's local edit gets silently reverted.
+Off by default. It contacts nothing until you add a source, and only ever the URL you entered.
+Inserting a template reads the local cache, so it costs no request and works offline.
 
 ▸ Built for self-hosted Plane
 Add your Plane instance's domain (e.g. plane.your-company.com) in the popup or Settings.
@@ -208,14 +208,6 @@ Plane 과 제휴하거나 승인받은 제품이 아닙니다. "Plane" 은 해�
 항목 화면은 물론 목록에서 열리는 패널에서도 동작하므로, 목록을 벗어나지 않고 참조를 집을 수 있습니다.
 단축키: Alt/⌥+C.
 
-▸ 팀 템플릿 동기화
-팀의 템플릿을 JSON 파일 하나에 두면(사내 서버, Git 호스트, 아무 URL이나) 모두가 같은 템플릿을 씁니다.
-URL을 한 번 등록해두면 선택한 주기(1시간~하루)로 갱신되고, "Sync now"로 즉시 받을 수도 있습니다.
-템플릿은 소스별로 묶여서 표시되며, 필요 없는 그룹은 공유 파일을 건드리지 않고 숨길 수 있습니다.
-동기화된 템플릿은 이곳에서 읽기 전용입니다. 수정은 원본에서 하므로, 누군가의 수정이 조용히 되돌려지지 않습니다.
-기본은 꺼져 있습니다. 소스를 추가하기 전까지 아무 곳에도 접속하지 않고, 이후에도 직접 등록한 URL에만 접속합니다.
-템플릿 삽입은 로컬 캐시를 읽으므로 요청이 발생하지 않고 오프라인에서도 동작합니다.
-
 ▸ 폭·스타일 규칙
 Plane 은 긴 이름(모듈·사이클·라벨·브레드크럼)을 잘라서 보여줍니다.
 그래서 목록이나 검색 드롭다운에서 어느 항목인지 구분하기 어렵습니다.
@@ -227,6 +219,14 @@ DevTools 가 필요 없습니다.
 팝업에서 "Pick element" 를 누르고 Plane 화면의 요소를 클릭하세요.
 각 선택자의 매칭 개수와 함께 후보 목록이 뜹니다(폭 관련 클래스 우선).
 고른 규칙은 설정에 추가되고, 값만 입력하면 됩니다.
+
+▸ 팀 템플릿 동기화
+팀의 템플릿을 JSON 파일 하나에 두면(사내 서버, Git 호스트, 아무 URL이나) 모두가 같은 템플릿을 씁니다.
+URL을 한 번 등록해두면 선택한 주기(1시간~하루)로 갱신되고, "Sync now"로 즉시 받을 수도 있습니다.
+템플릿은 소스별로 묶여서 표시되며, 필요 없는 그룹은 공유 파일을 건드리지 않고 숨길 수 있습니다.
+동기화된 템플릿은 이곳에서 읽기 전용입니다. 수정은 원본에서 하므로, 누군가의 수정이 조용히 되돌려지지 않습니다.
+기본은 꺼져 있습니다. 소스를 추가하기 전까지 아무 곳에도 접속하지 않고, 이후에도 직접 등록한 URL에만 접속합니다.
+템플릿 삽입은 로컬 캐시를 읽으므로 요청이 발생하지 않고 오프라인에서도 동작합니다.
 
 ▸ 자체 호스팅 Plane 전용
 팝업이나 설정에서 자신의 Plane 인스턴스 도메인(예: plane.your-company.com)을 추가하세요.
@@ -266,14 +266,15 @@ DevTools 가 필요 없습니다.
 ## Assets checklist
 
 • Store icon 128×128 ............ icons/icon128.png ✓
-• Screenshot 1 (1280×800) ....... store-assets/screenshot-1-templates.png ✓  ← lead with templates (the biggest gain over stock Plane)
-• Screenshot 2 (1280×800) ....... store-assets/screenshot-4-copy.png ✓  ← copy reference (v1.4)
-• Screenshot 3 (1280×800) ....... store-assets/screenshot-2-width.png ✓
-• Screenshot 4 (1280×800) ....... store-assets/screenshot-3-picker.png ✓
+• Screenshot 1 (1280×800) ....... store-assets/screenshot-1-templates.png ✓
+• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-copy.png ✓
+• Screenshot 3 (1280×800) ....... store-assets/screenshot-3-width.png ✓
+• Screenshot 4 (1280×800) ....... store-assets/screenshot-4-picker.png ✓
 • The same four, Korean listing .. store-assets/screenshot-*.ko.png ✓
-  (Upload in this order so the store carousel opens on templates, with the two
-  everyday actions — insert a template, copy a reference — first. The file numbers
-  are the order they were made in, not the upload order.)
+  (Upload in file order. The carousel opens on templates, then the two everyday
+  actions — insert a template, copy a reference — before the two that shape the
+  page. The listing description lists the features in this same order; keep the
+  three in step when one of them moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
 

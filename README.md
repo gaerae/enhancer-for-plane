@@ -56,22 +56,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-3. **Team template sync** — point the extension at a JSON file (your intranet, a
-   Git host, any URL) and everyone pulls the same templates. Off by default.
-   - Add a source in Settings → Chrome asks for access to that one origin →
-     templates appear in the picker under a header for that source.
-   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
-     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
-     independently with its own interval and on/off switch.
-   - **Synced templates are read-only** — they're edited at the source, not here.
-     What is local is the *view*: hide any group you don't need (per source), and
-     it stays hidden across syncs without touching the file.
-   - **The picker reads the cache, never the network.** Inserting a template costs
-     no request and works offline. A failed sync keeps the last good copy.
-   - **Remote data is treated as untrusted**: size-capped, rendered as text only
-     (never markup), ids namespaced per source so they can't collide with your own.
-   - See [the file format](#team-template-file-format) and `examples/`.
-4. **Copy reference** — on a work item's own page, the button beside its ID (or
+3. **Copy reference** — on a work item's own page, the button beside its ID (or
    `Alt/⌥+C`) copies that item to your clipboard, so handing it to a chat message, a
    pull request body, or a branch name is one click instead of three selections.
    - **The formats are yours to write.** Three ship as a starting point — plain text,
@@ -92,9 +77,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      thing here that would break silently against a future Plane, and it is commented as
      such in the source.
 
-![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-2-copy.png)
 
-5. **Style rules (width / length) — a generic engine**
+4. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -109,7 +94,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-6. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+5. **Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -120,6 +105,21 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
+6. **Team template sync** — point the extension at a JSON file (your intranet, a
+   Git host, any URL) and everyone pulls the same templates. Off by default.
+   - Add a source in Settings → Chrome asks for access to that one origin →
+     templates appear in the picker under a header for that source.
+   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
+     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
+     independently with its own interval and on/off switch.
+   - **Synced templates are read-only** — they're edited at the source, not here.
+     What is local is the *view*: hide any group you don't need (per source), and
+     it stays hidden across syncs without touching the file.
+   - **The picker reads the cache, never the network.** Inserting a template costs
+     no request and works offline. A failed sync keeps the last good copy.
+   - **Remote data is treated as untrusted**: size-capped, rendered as text only
+     (never markup), ids namespaced per source so they can't collide with your own.
+   - See [the file format](#team-template-file-format) and `examples/`.
 7. **Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
 8. **Backup (Import / Export)** — export your settings to a JSON file from the
