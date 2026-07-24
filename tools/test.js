@@ -52,7 +52,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;" +
   "\n;globalThis.__MAX_COPY = PE_MAX_COPY_FORMATS;" +
   "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
-  "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;";
+  "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;" +
+  "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;";
 
 function loadCommon() {
   const ctx = { console, URL, Date, TextEncoder };
@@ -1222,6 +1223,23 @@ test("copy: no title field on the page means the token stays, not an empty strin
   eq(ref.title, "");
   eq(ctx.peExpandCopyFormat("{{item.key}} {{item.title}}", ref), "K-9 {{item.title}}");
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
+});
+
+test("example feed: the button's URL points at the file that actually ships", () => {
+  const ctx = loadCommon();
+  const url = ctx.__EXAMPLE_FEED_URL;
+  // A dead example is worse than none — it teaches a first-time user that sync is broken.
+  // The URL must be a real https address Save will accept, and its path must be the file
+  // present in the repo, so renaming or removing that file breaks this test loudly.
+  ok(/^https:\/\//.test(url), "https");
+  ok(ctx.peOriginPatternForUrl(url), "Save can turn it into a host permission");
+  const path = new URL(url).pathname;
+  ok(path.endsWith("/examples/team-templates.json"), "path is the example file");
+  const shipped = read("examples/team-templates.json");
+  const feed = JSON.parse(shipped);
+  // And it has to be a feed the normalizer accepts, or the example would sync to nothing.
+  const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
+  ok(out.templates.length > 0, "the shipped file parses into templates");
 });
 
 // The form used to let you add sources past the cap and then drop the extras during

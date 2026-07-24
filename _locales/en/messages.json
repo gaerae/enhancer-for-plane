@@ -674,5 +674,14 @@
   },
   "menuManageCopy": {
     "message": "＋ Manage copy formats"
+  },
+  "optSyncTryExample": {
+    "message": "✨ Try our example"
+  },
+  "msgExampleAdded": {
+    "message": "Added our example feed. Press Save to fetch it — Chrome will ask for access to raw.githubusercontent.com once."
+  },
+  "msgExampleExists": {
+    "message": "Our example feed is already in your sources."
   }
 }

@@ -674,5 +674,14 @@
   },
   "menuManageCopy": {
     "message": "＋ 참조 복사 형식 관리"
+  },
+  "optSyncTryExample": {
+    "message": "✨ 예시 사용해 보기"
+  },
+  "msgExampleAdded": {
+    "message": "예시 피드를 추가했습니다. 저장을 누르면 가져옵니다 — Chrome이 raw.githubusercontent.com 접근을 한 번 묻습니다."
+  },
+  "msgExampleExists": {
+    "message": "예시 피드는 이미 소스에 있습니다."
   }
 }

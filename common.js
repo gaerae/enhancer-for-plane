@@ -96,6 +96,15 @@ const PE_SYNC_LIMITS = {
 // Chrome <= 113). Not a cap we enforce — a fact we have to design against.
 const PE_LOCAL_QUOTA_BYTES = 10485760;
 
+// A ready-to-try team feed: this repo's own examples/team-templates.json, served raw from
+// GitHub. The "Try the example" button in Settings fills a source with it, so a first-time
+// user can watch sync work without writing or hosting a feed — one Save (which grants
+// raw.githubusercontent.com, a different origin than Plane, so Chrome prompts once) and the
+// picker fills with the sample collection. The URL lives here so the button and the tests
+// share one string; tools/test.js checks it points at the file that actually ships.
+const PE_EXAMPLE_FEED_URL =
+  "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates.json";
+
 // Count caps for an imported settings file: a bound on the work done for a file that is
 // hostile or simply corrupt, not a statement of how many templates a user may keep.
 // Without them, sanitizing was asymmetric — the two newest fields (variables, sources)

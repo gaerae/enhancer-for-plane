@@ -38,6 +38,7 @@
     sourceList: $("sourceList"),
     sourceEmpty: $("sourceEmpty"),
     addSource: $("addSource"),
+    addExample: $("addExample"),
     syncNow: $("syncNow"),
     srcRow: $("srcRow"),
     copyList: $("copyList"),
@@ -500,6 +501,35 @@
       });
       renderSources();
       focusLast(".src-name");
+    });
+
+    el.addExample.addEventListener("click", () => {
+      const sync = ensureSync();
+      if (sync.sources.length >= PE_SYNC_LIMITS.maxSources) {
+        flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
+        return;
+      }
+      // Adding it twice would fetch one file under two headers and show it twice.
+      if ((sync.sources || []).some((s) => (s.url || "").trim() === PE_EXAMPLE_FEED_URL)) {
+        flash(peMsg("msgExampleExists"), true);
+        return;
+      }
+      // Clicking "try the example" is asking for sync to run, so turn it on — otherwise the
+      // source sits there and nothing fetches, which reads as the button not working. Name
+      // left blank so it behaves like any source: the feed's own name fills in on first sync.
+      sync.enabled = true;
+      sync.sources.push({
+        id: uid("src"),
+        url: PE_EXAMPLE_FEED_URL,
+        name: "",
+        intervalMinutes: 360,
+        enabled: true,
+        hiddenGroups: []
+      });
+      renderSources();
+      dirty = true; // pushed programmatically, so no input event fired to mark it
+      scheduleMeter();
+      flash(peMsg("msgExampleAdded"));
     });
 
     el.syncNow.addEventListener("click", syncNow);

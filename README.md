@@ -108,7 +108,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 6. **Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
-     templates appear in the picker under a header for that source.
+     templates appear in the picker under a header for that source. **Not sure what
+     a source looks like? Click "Try our example"** — it fills in this repo's own
+     `examples/team-templates.json`, so one Save shows the whole flow working.
    - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
      `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
      independently with its own interval and on/off switch.
