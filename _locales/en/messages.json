@@ -607,7 +607,7 @@
     "message": "＋ Add format"
   },
   "optCopyDesc": {
-    "message": "On a work item page, the button beside its ID — or <code>Alt/⌥+C</code> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
+    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <code>Alt/⌥+C</code>) copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
   },
   "optCopyTokens": {
     "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
@@ -654,7 +654,7 @@
     "message": "Could not reach the clipboard. Copy it by hand from the preview in Settings."
   },
   "msgCopyNoItem": {
-    "message": "Open a work item's own page first — a list or a preview panel has no single item to copy."
+    "message": "No work item on this page — open one, or click a row to open its panel."
   },
   "msgCopyLimit": {
     "message": "Up to $MAX$ formats. Remove one to add another.",

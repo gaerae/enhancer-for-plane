@@ -103,6 +103,13 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **The peek panel keeps the list's URL.** Clicking a row opens a panel with the same
+  header as the item's own page — same `#title-input`, same key button — but the address
+  bar still says `/projects/{uuid}/issues/`, with no query, no hash, and no link to the
+  item anywhere inside the panel. So anything derived from the URL has to be composed
+  there (`/{workspace}/browse/{KEY}`, which is what Plane redirects to). Composition is
+  the only part of the copy feature that could go wrong silently rather than visibly;
+  `peItemUrl` says so and is where to look first against a new Plane version.
 - **A work item key is not `ABC-123`.** A project identifier can be all digits — a
   Plane project can have one, so a key can read `42-7`. Any regex anchored
   on letters silently matches nothing there. The same measurement killed the branch-name

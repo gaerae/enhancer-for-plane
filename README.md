@@ -84,9 +84,13 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - A value the page does not give us **stays visible as its token** rather than
      turning into an empty string, and the toast names it — you find out before you
      paste, not after.
-   - Offered **only on the item's own page** (`/browse/{KEY}`), never over a list or a
-     preview panel: the URL there belongs to the list, and a link assembled from a
-     guess is a wrong link in someone else's chat window.
+   - Works both on a work item's own page and in the **panel a list opens**, which has
+     the same header. On its own page the link is simply the address bar. The panel
+     keeps the *list's* URL and holds no link to the item at all, so there the link is
+     composed as `/{workspace}/browse/{KEY}` — Plane's own canonical short link, which
+     the `/projects/{uuid}/issues/{uuid}` form redirects to. That composition is the one
+     thing here that would break silently against a future Plane, and it is commented as
+     such in the source.
 
 5. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is

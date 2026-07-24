@@ -51,7 +51,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__TPL_PREFIX = PE_TPL_KEY_PREFIX;" +
   "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;" +
   "\n;globalThis.__MAX_COPY = PE_MAX_COPY_FORMATS;" +
-  "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;";
+  "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
+  "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;";
 
 function loadCommon() {
   const ctx = { console, URL, Date, TextEncoder };
@@ -1053,17 +1054,24 @@ test("vars: a value is never re-scanned for markup or dates", () => {
 
 /* ---------- copy reference ---------- */
 
-// readItemRef reads the page; here the page is a stub. Only two things are supplied
-// because only two are read: the address bar, and the title field.
-function loadReadItemRef(href, titleValue) {
+// readItemRef reads the page; here the page is a stub. The key element is passed in (the
+// DOM search that finds it is exercised in a browser, not here), so only the address bar
+// and the title field need standing in.
+function loadReadItemRef(href, titleValue, peItemUrl) {
   const src = read("content.js");
-  const body = src.slice(src.indexOf("function readItemRef()"), src.indexOf("// The key as printed above the title"));
+  const body = src.slice(src.indexOf("function readItemRef(keyEl)"), src.indexOf("function makeCopyButton()"));
   const u = new URL(href);
   const location = { pathname: u.pathname, origin: u.origin, href };
   const document = {
     querySelector: (s) => (s === "#title-input" && titleValue !== null ? { value: titleValue } : null)
   };
-  return new Function("location", "document", body + "\nreturn readItemRef;")(location, document);
+  const fn = new Function(
+    "location",
+    "document",
+    "peItemUrl",
+    body + "\nreturn readItemRef;"
+  )(location, document, peItemUrl);
+  return (keyText) => fn(keyText === null ? null : { textContent: keyText });
 }
 
 test("copy: a format is copied exactly as written", () => {
@@ -1151,31 +1159,66 @@ test("copy: formats survive a save/read round trip", async () => {
   eq(back.copyFormats[0].format, "{{item.key}} {{item.url}}");
 });
 
-test("copy: an item is read only from its own page", () => {
-  // A peek panel over a list keeps the list's URL. We could still find a key in the DOM
-  // there and assemble a /browse/ link from it — but an assembled link is a guess, and a
-  // guess here ends up in someone else's chat window.
-  eq(loadReadItemRef("https://p.test/acme/projects/abc/issues", "T")(), null, "a list has no single item");
-  eq(loadReadItemRef("https://p.test/acme/browse/", "T")(), null, "browse with no key");
-  eq(loadReadItemRef("https://p.test/acme/browse/K-1/activity", "T")(), null, "a sub-page is not the item page");
-  const ref = loadReadItemRef("https://p.test/acme/browse/K-1?tab=comments", "  Fix login  ")();
-  eq(ref.key, "K-1");
-  eq(ref.title, "Fix login", "trimmed");
-  eq(ref.url, "https://p.test/acme/browse/K-1", "the query carries view state, not the item");
+test("copy: on the item's own page the link is the address bar, not a composition", () => {
+  const { peItemUrl } = loadCommon();
+  eq(
+    peItemUrl("https://p.test", "/acme/browse/K-1", "K-1"),
+    "https://p.test/acme/browse/K-1",
+    "observed: the page already is the item"
+  );
+  // The key in the path decides it. A stale panel showing a different item must not make
+  // us hand back this page's URL for that item.
+  eq(
+    peItemUrl("https://p.test", "/acme/browse/K-1", "K-2"),
+    "https://p.test/acme/browse/K-2",
+    "a different key is composed, not borrowed"
+  );
+  eq(peItemUrl("https://p.test", "/acme/browse/K%2D1", "K-1"), "https://p.test/acme/browse/K%2D1", "percent-decoded");
+});
+
+test("copy: a peek panel over a list composes the link from the workspace slug", () => {
+  const { peItemUrl } = loadCommon();
+  // Measured: the panel keeps the list's URL and contains no link to the item, so the
+  // slug (always the first path segment) plus the key is all there is to work with.
+  eq(
+    peItemUrl("https://p.test", "/data/projects/86965b22/issues/", "DATA-5"),
+    "https://p.test/data/browse/DATA-5"
+  );
+  eq(peItemUrl("https://p.test", "/acme/browse/K-1/activity", "K-1"), "https://p.test/acme/browse/K-1", "a sub-page");
+  eq(peItemUrl("https://p.test", "/", "K-1"), "", "no slug to build on → no link at all");
+  eq(peItemUrl("", "/acme/x", "K-1"), "", "no origin");
+  eq(peItemUrl("https://p.test", "/acme/x", ""), "", "no key");
+});
+
+test("copy: the item is whatever key the header shows", () => {
+  const { peItemUrl } = loadCommon();
+  const onList = loadReadItemRef("https://p.test/data/projects/abc/issues/", "  Visualize your work  ", peItemUrl);
+  eq(onList(null), null, "no key on screen → nothing to copy");
+  const ref = onList("DATA-5");
+  eq(ref.key, "DATA-5");
+  eq(ref.title, "Visualize your work", "trimmed");
+  eq(ref.url, "https://p.test/data/browse/DATA-5");
+  const own = loadReadItemRef("https://p.test/acme/browse/K-1?tab=comments", "Fix login", peItemUrl)("K-1");
+  eq(own.url, "https://p.test/acme/browse/K-1", "the query carries view state, not the item");
 });
 
 test("copy: a numeric project identifier is a key like any other", () => {
+  const ctx = loadCommon();
   // A project's identifier can be numeric ("42-7"). A key pattern anchored on
-  // letters would have failed here, and a title slug would have been the empty string
-  // for its Korean titles — which is why neither exists.
-  const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시")();
+  // letters would have matched nothing here, and a title slug would have been the empty
+  // string for its Korean titles — which is why neither exists.
+  ok(ctx.__ITEM_KEY_RE.test("42-7"), "numeric identifier");
+  ok(ctx.__ITEM_KEY_RE.test("DATA-5"), "and the ordinary kind");
+  ok(!ctx.__ITEM_KEY_RE.test("2026-07-24"), "a date in the same block is not a key");
+  ok(!ctx.__ITEM_KEY_RE.test("Fix login"), "nor is prose");
+  const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시", ctx.peItemUrl)("42-7");
   eq(ref.key, "42-7");
   eq(ref.title, "한국어 제목 예시");
 });
 
 test("copy: no title field on the page means the token stays, not an empty string", () => {
   const ctx = loadCommon();
-  const ref = loadReadItemRef("https://p.test/acme/browse/K-9", null)();
+  const ref = loadReadItemRef("https://p.test/acme/browse/K-9", null, ctx.peItemUrl)("K-9");
   eq(ref.title, "");
   eq(ctx.peExpandCopyFormat("{{item.key}} {{item.title}}", ref), "K-9 {{item.title}}");
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");

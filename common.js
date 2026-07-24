@@ -66,6 +66,10 @@ const peItemTokenRe = () => /\{\{\s*item\.([a-zA-Z0-9_-]+)\s*\}\}/gi;
 // and no title in it. Half-support is worse than none.
 const PE_ITEM_FIELDS = ["key", "title", "url"];
 const PE_MAX_COPY_FORMATS = 5;
+// A work item key as Plane prints it: project identifier + "-" + number. The identifier
+// is not always letters — a project's can be all digits, e.g. "42", so a key can read "42-7". Anchoring
+// on [A-Z] would have matched nothing there.
+const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-\d+$/;
 
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it
@@ -805,6 +809,45 @@ function peSaveSyncCache(cache) {
 }
 
 // A template is "meaningful" if it has at least one filled field.
+// Where a work item lives, as a link someone else can open. Returns "" when the page
+// cannot tell us — the caller then leaves {{item.url}} standing as its own token.
+//
+// Two cases, and the difference is worth keeping in view:
+//
+//   observed  — the address bar already IS the item's page, /{workspace}/browse/{KEY}.
+//               Nothing to work out; the query string is dropped because it carries view
+//               state, not the item.
+//   assembled — a peek panel opened over a list keeps the *list's* URL, and the panel
+//               contains no link to the item at all (checked: its only anchor points at
+//               Plane's docs). So the link is composed from two things the page does
+//               give us: the workspace slug, which is the first path segment on every
+//               Plane page, and the key.
+//
+// Assembly rests on Plane's canonical short link being /{workspace}/browse/{KEY} —
+// verified by opening the /projects/{uuid}/issues/{uuid} form and watching Plane
+// redirect to exactly that. It is the one place here that would still "work" if Plane
+// changed its URL scheme, and quietly copy a dead link, so it is the line to re-check
+// against a new Plane version.
+function peItemUrl(origin, pathname, key) {
+  if (!origin || !key) return "";
+  const seg = String(pathname || "")
+    .split("/")
+    .filter(Boolean);
+  const i = seg.indexOf("browse");
+  if (i !== -1 && seg.length === i + 2) {
+    let seen = seg[i + 1];
+    try {
+      seen = decodeURIComponent(seen);
+    } catch (_) {
+      /* keep it raw */
+    }
+    // Same page, same item → hand back what the user is looking at.
+    if (seen === key) return origin + pathname;
+  }
+  if (!seg.length) return "";
+  return origin + "/" + seg[0] + "/browse/" + key;
+}
+
 // Expand a copy format against the fields read off the work item page.
 //
 // One pass, no recursion, and the same law the template variables already follow: a

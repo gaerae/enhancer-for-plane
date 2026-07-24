@@ -289,54 +289,41 @@
 
   const hasCopyFormats = () => !!(settings && (settings.copyFormats || []).length);
 
-  // The work item this page is about, or null. Read, never constructed.
+  // The key as printed above the title, or null. This element is both the value we copy
+  // and the spot we hang the button on, so everything starts here.
   //
-  // Plane's canonical detail URL is /{workspace}/browse/{KEY} — opening the
-  // /projects/{uuid}/issues/{uuid} form redirects there — so the key is a path segment
-  // and the link to share is the address bar itself. The query string is dropped: it
-  // carries view state, not the item.
+  // Found by shape, not by class name — Plane's Tailwind classes move between versions.
+  // The search starts at #title-input and widens one ancestor at a time, so the first
+  // block holding both the title and a key is the item header; the breadcrumb prints the
+  // same key higher up the page and is never reached. Restricting the match to <button>
+  // keeps a date badge ("2026-07") in the same block from being mistaken for a key.
   //
-  // Strict on purpose. We offer a copy only when the URL *is* this item's page. A peek
-  // panel opened over a list keeps the list's URL, and there we could still read a key
-  // out of the DOM and assemble a plausible /browse/ link from it — but assembling is
-  // guessing, and a guess here is a wrong link in someone else's chat window.
-  function readItemRef() {
-    const seg = location.pathname.split("/").filter(Boolean);
-    const i = seg.indexOf("browse");
-    if (i === -1 || seg.length !== i + 2) return null;
-    let key = "";
-    try {
-      key = decodeURIComponent(seg[i + 1]);
-    } catch (_) {
-      key = seg[i + 1];
+  // The peek panel a list opens has this identical structure — same title field, same key
+  // button, same wrapper — which is why one function serves both.
+  function findKeyEl() {
+    const title = document.querySelector("#title-input");
+    if (!title) return null;
+    let scope = title.parentElement;
+    for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
+      const hit = [...scope.querySelectorAll("button")].find(
+        (e) => e.children.length === 0 && PE_ITEM_KEY_RE.test((e.textContent || "").trim())
+      );
+      if (hit) return hit;
     }
+    return null;
+  }
+
+  // The work item that key belongs to: its key, title and link.
+  function readItemRef(keyEl) {
+    if (!keyEl) return null;
+    const key = (keyEl.textContent || "").trim();
     if (!key) return null;
     const t = document.querySelector("#title-input");
     return {
       key,
       title: t && typeof t.value === "string" ? t.value.trim() : "",
-      url: location.origin + location.pathname
+      url: peItemUrl(location.origin, location.pathname, key)
     };
-  }
-
-  // The key as printed above the title. Found by its text rather than by class name —
-  // Plane's Tailwind classes move between versions, but the header always prints the key
-  // we already read from the URL, and identifiers vary too much to pattern-match (some are numeric, e.g. "42-7").
-  //
-  // The breadcrumb prints the same key higher up the page, so the search starts at
-  // #title-input and widens one ancestor at a time: the first block holding both the
-  // title and the key is the item header, never the breadcrumb bar above it.
-  function findKeyEl(key) {
-    const title = document.querySelector("#title-input");
-    if (!title) return null;
-    let scope = title.parentElement;
-    for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
-      const hit = [...scope.querySelectorAll("*")].find(
-        (e) => e.children.length === 0 && (e.textContent || "").trim() === key
-      );
-      if (hit) return hit;
-    }
-    return null;
   }
 
   function makeCopyButton() {
@@ -361,15 +348,10 @@
   }
 
   function ensureCopyButton() {
-    const ref = readItemRef();
-    if (!ref) {
-      removeCopyButtons();
-      return;
-    }
-    const keyEl = findKeyEl(ref.key);
+    const keyEl = findKeyEl();
     if (!keyEl) {
-      // No anchor, no button. Nothing floats in from the side: a copy affordance that is
-      // not beside the key it copies is a mystery button.
+      // No key on screen, no button. Nothing floats in from the side: a copy affordance
+      // that is not beside the key it copies is a mystery button.
       removeCopyButtons();
       return;
     }
@@ -410,7 +392,7 @@
 
   function copyReference(fmt) {
     hideMenu();
-    const ref = readItemRef();
+    const ref = readItemRef(findKeyEl());
     if (!ref) {
       toast(peMsg("msgCopyNoItem"));
       return;
@@ -651,7 +633,7 @@
   // clipboard — the format is the output, so showing the output is showing the format.
   function renderCopyMenu() {
     menu.innerHTML = "";
-    const ref = readItemRef();
+    const ref = readItemRef(findKeyEl());
     const formats = (settings && settings.copyFormats) || [];
     const wrap = document.createElement("div");
     wrap.className = "pe-menu-group";
