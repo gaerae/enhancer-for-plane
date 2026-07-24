@@ -19,6 +19,9 @@
   let menu = null;
   let menuOpen = false;
   let menuOwnerBtn = null;
+  // Which list the shared menu is currently showing: "templates" or "copy". One element,
+  // one position/outside-click/scroll path, two contents.
+  let menuMode = "templates";
 
   // DOM watching (re-insert the toolbar button)
   let injectScheduled = false;
@@ -203,8 +206,17 @@
     row.appendChild(btn); // end of the toolbar row (= right of Attach), keeps the gap
   }
 
-  function removeButtons() {
+  function removeTemplateButtons() {
     [...document.querySelectorAll(".pe-body-tmpl-btn")].forEach((b) => b.remove());
+  }
+
+  function removeCopyButtons() {
+    [...document.querySelectorAll(".pe-copy-ref-btn")].forEach((b) => b.remove());
+  }
+
+  function removeButtons() {
+    removeTemplateButtons();
+    removeCopyButtons();
     hideMenu();
   }
 
@@ -273,21 +285,171 @@
     host.appendChild(b);
   }
 
+  /* ---- copy reference ---- */
+
+  const hasCopyFormats = () => !!(settings && (settings.copyFormats || []).length);
+
+  // The work item this page is about, or null. Read, never constructed.
+  //
+  // Plane's canonical detail URL is /{workspace}/browse/{KEY} — opening the
+  // /projects/{uuid}/issues/{uuid} form redirects there — so the key is a path segment
+  // and the link to share is the address bar itself. The query string is dropped: it
+  // carries view state, not the item.
+  //
+  // Strict on purpose. We offer a copy only when the URL *is* this item's page. A peek
+  // panel opened over a list keeps the list's URL, and there we could still read a key
+  // out of the DOM and assemble a plausible /browse/ link from it — but assembling is
+  // guessing, and a guess here is a wrong link in someone else's chat window.
+  function readItemRef() {
+    const seg = location.pathname.split("/").filter(Boolean);
+    const i = seg.indexOf("browse");
+    if (i === -1 || seg.length !== i + 2) return null;
+    let key = "";
+    try {
+      key = decodeURIComponent(seg[i + 1]);
+    } catch (_) {
+      key = seg[i + 1];
+    }
+    if (!key) return null;
+    const t = document.querySelector("#title-input");
+    return {
+      key,
+      title: t && typeof t.value === "string" ? t.value.trim() : "",
+      url: location.origin + location.pathname
+    };
+  }
+
+  // The key as printed above the title. Found by its text rather than by class name —
+  // Plane's Tailwind classes move between versions, but the header always prints the key
+  // we already read from the URL, and identifiers vary too much to pattern-match (some are numeric, e.g. "42-7").
+  //
+  // The breadcrumb prints the same key higher up the page, so the search starts at
+  // #title-input and widens one ancestor at a time: the first block holding both the
+  // title and the key is the item header, never the breadcrumb bar above it.
+  function findKeyEl(key) {
+    const title = document.querySelector("#title-input");
+    if (!title) return null;
+    let scope = title.parentElement;
+    for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
+      const hit = [...scope.querySelectorAll("*")].find(
+        (e) => e.children.length === 0 && (e.textContent || "").trim() === key
+      );
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function makeCopyButton() {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pe-copy-ref-btn";
+    b.setAttribute("aria-label", peMsg("copyBtnAria"));
+    b.setAttribute("title", peMsg("copyBtnTitle"));
+    // Two offset sheets — the copy glyph every UI uses for this, so the button needs no
+    // label next to a key that is already short.
+    b.innerHTML =
+      '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+      '<rect x="5.75" y="5.75" width="7.5" height="8.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M10.5 3.75H3.9a1.15 1.15 0 0 0-1.15 1.15v6.6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMenu(b, "copy");
+    });
+    return b;
+  }
+
+  function ensureCopyButton() {
+    const ref = readItemRef();
+    if (!ref) {
+      removeCopyButtons();
+      return;
+    }
+    const keyEl = findKeyEl(ref.key);
+    if (!keyEl) {
+      // No anchor, no button. Nothing floats in from the side: a copy affordance that is
+      // not beside the key it copies is a mystery button.
+      removeCopyButtons();
+      return;
+    }
+    const row = keyEl.parentElement;
+    if (!row || row.querySelector(":scope > .pe-copy-ref-btn")) return;
+    keyEl.insertAdjacentElement("afterend", makeCopyButton());
+  }
+
+  // Put text on the clipboard. The async API is the one to use, but it rejects when the
+  // document is not focused, so the deprecated execCommand path stays as the fallback
+  // rather than leaving the user with a silent no-op.
+  function writeClipboard(text) {
+    const fallback = () => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(
+          () => true,
+          () => fallback()
+        );
+      }
+    } catch (_) {}
+    return Promise.resolve(fallback());
+  }
+
+  function copyReference(fmt) {
+    hideMenu();
+    const ref = readItemRef();
+    if (!ref) {
+      toast(peMsg("msgCopyNoItem"));
+      return;
+    }
+    const text = peExpandCopyFormat(fmt.format, ref);
+    const missing = peMissingItemFields(fmt.format, ref);
+    writeClipboard(text).then((ok) => {
+      if (!ok) toast(peMsg("msgCopyFailed"));
+      // The unresolved token is on the clipboard verbatim, so say which one it was —
+      // otherwise the user finds out when it is already pasted somewhere.
+      else if (missing.length) toast(peMsg("msgCopiedMissing", [missing.join(", ")]));
+      else toast(peMsg("msgCopied"));
+    });
+  }
+
   function injectAll() {
-    if (!isActive() || !hasAnyTemplates()) {
+    if (!isActive()) {
       removeButtons();
       return;
     }
-    // Anchor on the description editor (ProseMirror/tiptap) — language-independent.
-    // Skip comment editors (comment templates are intentionally not supported).
-    [...document.querySelectorAll(".ProseMirror, .tiptap")].forEach((ed) => {
-      if (isCommentArea(ed)) return;
-      const anchor = findToolbarAnchor(ed);
-      if (anchor) ensureButtonNear(anchor);
-      // Toolbar-less editors: only fall back inside a dialog (the "Create work item"
-      // modal). Prevents spurious buttons on secondary editors in the detail view.
-      else if (ed.closest && ed.closest('[role="dialog"]')) ensureFloatingButton(ed);
-    });
+    // The two buttons are gated separately: a user with no templates can still copy a
+    // reference, and a user who deleted every copy format still gets the template menu.
+    if (hasAnyTemplates()) {
+      // Anchor on the description editor (ProseMirror/tiptap) — language-independent.
+      // Skip comment editors (comment templates are intentionally not supported).
+      [...document.querySelectorAll(".ProseMirror, .tiptap")].forEach((ed) => {
+        if (isCommentArea(ed)) return;
+        const anchor = findToolbarAnchor(ed);
+        if (anchor) ensureButtonNear(anchor);
+        // Toolbar-less editors: only fall back inside a dialog (the "Create work item"
+        // modal). Prevents spurious buttons on secondary editors in the detail view.
+        else if (ed.closest && ed.closest('[role="dialog"]')) ensureFloatingButton(ed);
+      });
+    } else {
+      removeTemplateButtons();
+    }
+
+    if (hasCopyFormats()) ensureCopyButton();
+    else removeCopyButtons();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -460,12 +622,19 @@
       });
     }
 
+    menu.appendChild(makeMenuFooter(peMsg("menuManage")));
+  }
+
+  // Shared by both menu modes. The door is the same Settings page, but the label is not:
+  // "Manage templates" under a list of copy formats sends the user looking for the wrong
+  // card.
+  function makeMenuFooter(label) {
     const footer = document.createElement("div");
     footer.className = "pe-menu-footer";
     const cfg = document.createElement("button");
     cfg.type = "button";
     cfg.className = "pe-menu-config";
-    cfg.textContent = peMsg("menuManage");
+    cfg.textContent = label;
     cfg.addEventListener("mousedown", (e) => e.preventDefault());
     cfg.addEventListener("click", (e) => {
       e.preventDefault();
@@ -475,7 +644,38 @@
       hideMenu();
     });
     footer.appendChild(cfg);
-    menu.appendChild(footer);
+    return footer;
+  }
+
+  // The copy list. Every row previews the exact string the click will put on the
+  // clipboard — the format is the output, so showing the output is showing the format.
+  function renderCopyMenu() {
+    menu.innerHTML = "";
+    const ref = readItemRef();
+    const formats = (settings && settings.copyFormats) || [];
+    const wrap = document.createElement("div");
+    wrap.className = "pe-menu-group";
+    formats.forEach((f) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "pe-menu-item";
+      const name = document.createElement("div");
+      name.className = "pe-menu-item-title";
+      name.textContent = f.name || peMsg("menuUntitled");
+      const preview = document.createElement("div");
+      preview.className = "pe-menu-item-preview";
+      preview.textContent = peExpandCopyFormat(f.format, ref).slice(0, 120);
+      item.appendChild(name);
+      item.appendChild(preview);
+      item.addEventListener("mousedown", (e) => e.preventDefault());
+      item.addEventListener("click", (e) => {
+        e.preventDefault();
+        copyReference(f);
+      });
+      wrap.appendChild(item);
+    });
+    menu.appendChild(wrap);
+    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy")));
   }
 
   function positionMenu(btn) {
@@ -494,14 +694,16 @@
     menu.style.width = mw + "px";
   }
 
-  function toggleMenu(btn) {
+  function toggleMenu(btn, mode) {
     if (menuOpen && menuOwnerBtn === btn) {
       hideMenu();
       return;
     }
     menuOwnerBtn = btn;
+    menuMode = mode === "copy" ? "copy" : "templates";
     ensureMenu();
-    renderMenu();
+    if (menuMode === "copy") renderCopyMenu();
+    else renderMenu();
     menu.style.display = "block";
     positionMenu(btn);
     menuOpen = true;
@@ -996,7 +1198,7 @@
     if (!menuOpen) return;
     if (
       (menu && menu.contains(e.target)) ||
-      (e.target.closest && e.target.closest(".pe-body-tmpl-btn"))
+      (e.target.closest && e.target.closest(".pe-body-tmpl-btn, .pe-copy-ref-btn"))
     )
       return;
     hideMenu();
@@ -1028,6 +1230,22 @@
       }
       e.preventDefault();
       toggleMenu(target);
+      return;
+    }
+    // Alt+C (macOS: ⌥ Option+C, which yields "ç" — hence e.code): open the copy list for
+    // the work item being viewed.
+    if (e.altKey && (e.code === "KeyC" || e.key === "c" || e.key === "C")) {
+      let btn = document.querySelector(".pe-copy-ref-btn");
+      if (!btn) {
+        // self-heal: the header may have mounted late — inject now and retry
+        try {
+          injectAll();
+        } catch (_) {}
+        btn = document.querySelector(".pe-copy-ref-btn");
+      }
+      if (!btn) return;
+      e.preventDefault();
+      toggleMenu(btn, "copy");
     }
   }
   function onScrollResize() {

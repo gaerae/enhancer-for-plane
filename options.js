@@ -40,6 +40,10 @@
     addSource: $("addSource"),
     syncNow: $("syncNow"),
     srcRow: $("srcRow"),
+    copyList: $("copyList"),
+    copyEmpty: $("copyEmpty"),
+    addCopyFormat: $("addCopyFormat"),
+    cpyRow: $("cpyRow"),
     save: $("save"),
     reset: $("reset"),
     status: $("status"),
@@ -84,6 +88,7 @@
     renderRules();
     renderTemplates();
     renderVariables();
+    renderCopyFormats();
     renderSources();
     updateStorageMeter();
     dirty = false; // just re-rendered the form from state, so it's clean
@@ -217,6 +222,56 @@
 
       paint();
       el.variableList.appendChild(node);
+    });
+  }
+
+  // A stand-in work item for the preview. Fixed, not read from anywhere: the preview's
+  // job is to show where each piece lands, and a sample that changes with whatever page
+  // happens to be open would make two people's screens disagree about the same format.
+  const PE_COPY_SAMPLE = {
+    key: "PROJ-123",
+    title: peMsg("optCopySampleTitle") || "Fix the login failure",
+    url: "https://plane.example.com/acme/browse/PROJ-123"
+  };
+
+  function renderCopyFormats() {
+    if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+    el.copyList.innerHTML = "";
+    const list = state.copyFormats;
+    el.copyEmpty.hidden = list.length > 0;
+    list.forEach((c, idx) => {
+      const node = el.cpyRow.content.firstElementChild.cloneNode(true);
+      peApplyI18n(node);
+      const name = node.querySelector(".cpy-name");
+      const format = node.querySelector(".cpy-format");
+      const preview = node.querySelector(".cpy-preview");
+      const del = node.querySelector(".cpy-del");
+
+      name.value = c.name || "";
+      format.value = c.format || "";
+
+      // What the clipboard gets, character for character — the same expander the content
+      // script runs, so the preview cannot drift from the real thing.
+      const paint = () => {
+        const f = state.copyFormats[idx].format || "";
+        preview.textContent = peExpandCopyFormat(f, PE_COPY_SAMPLE);
+        const missing = peMissingItemFields(f, PE_COPY_SAMPLE);
+        preview.classList.toggle("has-unknown", missing.length > 0);
+        preview.title = missing.length ? peMsg("msgCopyUnknownToken", [missing.join(", ")]) : "";
+      };
+
+      name.addEventListener("input", () => (state.copyFormats[idx].name = name.value));
+      format.addEventListener("input", () => {
+        state.copyFormats[idx].format = format.value;
+        paint();
+      });
+      del.addEventListener("click", () => {
+        state.copyFormats.splice(idx, 1);
+        renderCopyFormats();
+      });
+
+      paint();
+      el.copyList.appendChild(node);
     });
   }
 
@@ -415,6 +470,17 @@
       state.variables.push({ name: "", value: "" });
       renderVariables();
       focusLast(".var-name");
+    });
+
+    el.addCopyFormat.addEventListener("click", () => {
+      if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+      if (state.copyFormats.length >= PE_MAX_COPY_FORMATS) {
+        flash(peMsg("msgCopyLimit", [String(PE_MAX_COPY_FORMATS)]), true);
+        return;
+      }
+      state.copyFormats.push({ id: uid("cpy"), name: "", format: "" });
+      renderCopyFormats();
+      focusLast(".cpy-name");
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
@@ -691,6 +757,12 @@
         return true;
       })
       .slice(0, PE_MAX_VARIABLES);
+
+    // A format with no format string copies nothing — the name is only a label for it.
+    // Kept in sync with peSanitizeSettings, which applies the same rule to an import.
+    state.copyFormats = (state.copyFormats || [])
+      .filter((c) => c && (c.format || "").trim())
+      .slice(0, PE_MAX_COPY_FORMATS);
 
     // drop empty sources; enforce the source cap
     const sync = ensureSync();

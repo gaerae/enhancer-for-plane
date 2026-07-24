@@ -29,6 +29,9 @@ Everything is stored in the browser's own extension storage, on your device.
 - your template variables — name/value pairs you define, which you can use as
   `{{var.name}}` inside a template. You choose what goes in them; if you put your
   own name or handle in one, that value is stored here like any other setting,
+- your copy formats — the name and format string of each entry in "Copy
+  reference". These hold only what you type; the work item values they refer to
+  are read from the page at the moment you copy and are never stored,
 - your template sync settings: source URLs, their labels, sync interval, and
   which groups you have hidden.
 
@@ -50,6 +53,10 @@ you delete the source, and Chrome Sync never carries it to other devices.
   enable a domain, Chrome asks you to grant access to that single site, and the
   extension is registered only there. It has no access to any other website and
   reads nothing on them.
+- **The clipboard, only when you ask for it (write only).** Choosing a format in
+  "Copy reference" writes that one string to your clipboard. The extension never
+  reads the clipboard, and needs no clipboard permission to do this — the write
+  happens in your click.
 - **The current tab's address (activeTab).** When you click the toolbar icon,
   the popup reads the active tab's hostname to tell you whether the extension is
   active there. This value is used only in that moment and is not stored or

@@ -71,7 +71,24 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-4. **Style rules (width / length) — a generic engine**
+4. **Copy reference** — on a work item's own page, the button beside its ID (or
+   `Alt/⌥+C`) copies that item to your clipboard, so handing it to a chat message, a
+   pull request body, or a branch name is one click instead of three selections.
+   - **The formats are yours to write.** Three ship as a starting point — plain text,
+     a markdown link, a branch name — and each is an ordinary editable row. A format is
+     copied out exactly as typed: the markdown one carries its own `[…](…)`, because the
+     thing you edit has to be the thing you get. Settings previews each row.
+   - Three values are filled in: `{{item.key}}`, `{{item.title}}`, `{{item.url}}`. There
+     is deliberately no "title slug" for branch names — a Korean or emoji title would
+     slug to nothing, and half a feature is worse than none.
+   - A value the page does not give us **stays visible as its token** rather than
+     turning into an empty string, and the toast names it — you find out before you
+     paste, not after.
+   - Offered **only on the item's own page** (`/browse/{KEY}`), never over a list or a
+     preview panel: the URL there belongs to the list, and a link assembled from a
+     guess is a wrong link in someone else's chat window.
+
+5. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -86,7 +103,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-5. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+6. **Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -97,11 +114,11 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-6. **Active domains** — runs only on the domains you specify. Wildcards
+7. **Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-7. **Backup (Import / Export)** — export your settings to a JSON file from the
+8. **Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, and sync sources (URLs, intervals, hidden
+   domains, rules, templates, variables, copy formats, and sync sources (URLs, intervals, hidden
    groups). It does **not** carry downloaded templates or sync status — those are a
    per-device cache that the next sync refetches, so a backup stays a backup of
    your settings rather than a snapshot of someone else's file. Imported settings
@@ -277,7 +294,7 @@ live in [AGENTS.md](AGENTS.md).
 
 ## Permissions
 
-- `storage` — persists your own settings (domains, rules, templates, variables,
+- `storage` — persists your own settings (domains, rules, templates, variables, copy formats,
   sync sources) and caches downloaded team templates on this device.
 - `alarms` — wakes the service worker on your chosen interval to refresh team
   templates. An MV3 worker is evicted when idle, so a `setTimeout` would never

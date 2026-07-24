@@ -599,5 +599,80 @@
   },
   "pickRuleFailed": {
     "message": "Failed to save the rule (storage error)."
+  },
+  "optCopyTitle": {
+    "message": "Copy reference"
+  },
+  "optCopyAdd": {
+    "message": "＋ Add format"
+  },
+  "optCopyDesc": {
+    "message": "On a work item page, the button beside its ID — or <code>Alt/⌥+C</code> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
+  },
+  "optCopyTokens": {
+    "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
+  },
+  "optCopyEmpty": {
+    "message": "No formats yet. Click “Add format” to start."
+  },
+  "optCopyNamePh": {
+    "message": "name (e.g. Chat)"
+  },
+  "optCopyFormatPh": {
+    "message": "{{item.key}} {{item.title}}"
+  },
+  "optCopySampleTitle": {
+    "message": "Fix the login failure"
+  },
+  "optCopyPresetPlain": {
+    "message": "Plain text"
+  },
+  "optCopyPresetMarkdown": {
+    "message": "Markdown link"
+  },
+  "optCopyPresetBranch": {
+    "message": "Branch name"
+  },
+  "copyBtnAria": {
+    "message": "Copy this work item's reference (Alt/⌥+C)"
+  },
+  "copyBtnTitle": {
+    "message": "Copy reference  ·  Alt/⌥+C"
+  },
+  "msgCopied": {
+    "message": "Copied."
+  },
+  "msgCopiedMissing": {
+    "message": "Copied, but $FIELDS$ could not be read — it stayed in the text as written.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyFailed": {
+    "message": "Could not reach the clipboard. Copy it by hand from the preview in Settings."
+  },
+  "msgCopyNoItem": {
+    "message": "Open a work item's own page first — a list or a preview panel has no single item to copy."
+  },
+  "msgCopyLimit": {
+    "message": "Up to $MAX$ formats. Remove one to add another.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyUnknownToken": {
+    "message": "Not a value that can be filled in: $FIELDS$. It is copied as written.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuManageCopy": {
+    "message": "＋ Manage copy formats"
   }
 }

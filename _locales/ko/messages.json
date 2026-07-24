@@ -599,5 +599,80 @@
   },
   "pickRuleFailed": {
     "message": "규칙 저장 실패 (스토리지 오류)."
+  },
+  "optCopyTitle": {
+    "message": "참조 복사"
+  },
+  "optCopyAdd": {
+    "message": "＋ 형식 추가"
+  },
+  "optCopyDesc": {
+    "message": "작업 항목 화면에서 번호 옆 버튼 또는 <code>Alt/⌥+C</code>를 누르면 아래 형식 중 하나로 클립보드에 복사합니다. 메신저, 풀 리퀘스트 본문, 브랜치명으로 넘길 때 씁니다."
+  },
+  "optCopyTokens": {
+    "message": "치환되는 값은 세 가지입니다: <code>{{item.key}}</code>, <code>{{item.title}}</code>, <code>{{item.url}}</code>. 나머지는 적은 그대로 복사되므로, 각 줄 아래 미리보기가 곧 클립보드에 들어갈 내용입니다."
+  },
+  "optCopyEmpty": {
+    "message": "형식이 없습니다. “형식 추가”를 눌러 시작하세요."
+  },
+  "optCopyNamePh": {
+    "message": "이름 (예: 메신저)"
+  },
+  "optCopyFormatPh": {
+    "message": "{{item.key}} {{item.title}}"
+  },
+  "optCopySampleTitle": {
+    "message": "로그인 실패 수정"
+  },
+  "optCopyPresetPlain": {
+    "message": "일반 텍스트"
+  },
+  "optCopyPresetMarkdown": {
+    "message": "마크다운 링크"
+  },
+  "optCopyPresetBranch": {
+    "message": "브랜치명"
+  },
+  "copyBtnAria": {
+    "message": "이 작업 항목의 참조 복사 (Alt/⌥+C)"
+  },
+  "copyBtnTitle": {
+    "message": "참조 복사  ·  Alt/⌥+C"
+  },
+  "msgCopied": {
+    "message": "복사했습니다."
+  },
+  "msgCopiedMissing": {
+    "message": "복사했지만 $FIELDS$ 값을 읽지 못해 적은 그대로 남았습니다.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyFailed": {
+    "message": "클립보드에 쓰지 못했습니다. 설정의 미리보기에서 직접 복사해 주세요."
+  },
+  "msgCopyNoItem": {
+    "message": "작업 항목 화면을 먼저 열어 주세요. 목록이나 미리보기 패널에는 복사할 항목이 하나로 정해지지 않습니다."
+  },
+  "msgCopyLimit": {
+    "message": "형식은 최대 $MAX$개까지입니다. 하나를 지우고 추가하세요.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyUnknownToken": {
+    "message": "치환되는 값이 아닙니다: $FIELDS$. 적은 그대로 복사됩니다.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuManageCopy": {
+    "message": "＋ 참조 복사 형식 관리"
   }
 }

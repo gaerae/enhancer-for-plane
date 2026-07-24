@@ -49,7 +49,9 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__ITEM_BYTES = PE_SYNC_ITEM_BYTES;" +
   "\n;globalThis.__STORAGE_KEY = PE_STORAGE_KEY;" +
   "\n;globalThis.__TPL_PREFIX = PE_TPL_KEY_PREFIX;" +
-  "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;";
+  "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;" +
+  "\n;globalThis.__MAX_COPY = PE_MAX_COPY_FORMATS;" +
+  "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;";
 
 function loadCommon() {
   const ctx = { console, URL, Date, TextEncoder };
@@ -1047,6 +1049,136 @@ test("vars: names match case-insensitively, like the built-ins", () => {
 test("vars: a value is never re-scanned for markup or dates", () => {
   const expand = loadExpandVars();
   eq(expand("{{var.x}}", [{ name: "x", value: "{{date}}" }]), "{{date}}", "no second pass");
+});
+
+/* ---------- copy reference ---------- */
+
+// readItemRef reads the page; here the page is a stub. Only two things are supplied
+// because only two are read: the address bar, and the title field.
+function loadReadItemRef(href, titleValue) {
+  const src = read("content.js");
+  const body = src.slice(src.indexOf("function readItemRef()"), src.indexOf("// The key as printed above the title"));
+  const u = new URL(href);
+  const location = { pathname: u.pathname, origin: u.origin, href };
+  const document = {
+    querySelector: (s) => (s === "#title-input" && titleValue !== null ? { value: titleValue } : null)
+  };
+  return new Function("location", "document", body + "\nreturn readItemRef;")(location, document);
+}
+
+test("copy: a format is copied exactly as written", () => {
+  const ctx = loadCommon();
+  const item = { key: "PROJ-123", title: "Fix login", url: "https://p.test/w/browse/PROJ-123" };
+  // The markdown preset carries its own link syntax. Nothing in the code appends a URL
+  // or wraps anything — if that ever changes, what the user edits stops being what they
+  // get, which is the whole contract of this feature.
+  eq(
+    ctx.peExpandCopyFormat("[{{item.key}}]({{item.url}}) {{item.title}}", item),
+    "[PROJ-123](https://p.test/w/browse/PROJ-123) Fix login"
+  );
+  eq(ctx.peExpandCopyFormat("feature/{{item.key}}", item), "feature/PROJ-123");
+  eq(ctx.peExpandCopyFormat("{{ITEM.Key}}", item), "PROJ-123", "token names are case-insensitive");
+});
+
+test("copy: a value the page could not give us stays visible as its token", () => {
+  const ctx = loadCommon();
+  const item = { key: "PROJ-1", title: "", url: "https://p.test/w/browse/PROJ-1" };
+  // Blanking it would paste "PROJ-1  https://…" into a colleague's chat and read as an
+  // item with no title, instead of as a failure to read one.
+  eq(ctx.peExpandCopyFormat("{{item.key}} {{item.title}}", item), "PROJ-1 {{item.title}}");
+  eq(ctx.peExpandCopyFormat("{{item.state}}", item), "{{item.state}}", "an unknown field, likewise");
+  eq(ctx.peExpandCopyFormat("{{item.key}}", null), "{{item.key}}", "no item at all");
+});
+
+test("copy: the missing fields are the ones the caller can name in a toast", () => {
+  const ctx = loadCommon();
+  const item = { key: "PROJ-1", title: "", url: "" };
+  const missing = ctx.peMissingItemFields("{{item.key}} {{item.title}} {{item.url}} {{item.title}}", item);
+  eq(missing.join(","), "title,url", "empty and unknown alike, each named once");
+  eq(ctx.peMissingItemFields("{{item.key}}", item).length, 0, "nothing to report when it all resolved");
+});
+
+test("copy: substitution is single-pass, so a title cannot inject a token", () => {
+  const ctx = loadCommon();
+  const item = { key: "K-1", title: "{{item.url}}", url: "https://p.test/x" };
+  eq(ctx.peExpandCopyFormat("{{item.title}}", item), "{{item.url}}", "the value is inserted as written");
+});
+
+test("copy: the presets are three ordinary rows", () => {
+  const ctx = loadCommon();
+  const list = ctx.__DEFAULTS.copyFormats;
+  eq(list.length, 3);
+  ok(
+    list.every((c) => c.id && c.format.trim()),
+    "each has an id and a format"
+  );
+  // Every token the presets use must be a field we can actually read, or the shipped
+  // defaults would hand a new user an unexpanded token on their first copy.
+  const item = { key: "K-1", title: "T", url: "U" };
+  for (const c of list) eq(ctx.peMissingItemFields(c.format, item).length, 0, c.id + " resolves");
+});
+
+test("copy: an import is clamped the same way the form is", () => {
+  const ctx = loadCommon();
+  const over = Array.from({ length: 12 }, (_, i) => ({ id: "c" + i, name: "n", format: "{{item.key}}" }));
+  eq(ctx.peSanitizeSettings({ copyFormats: over }).copyFormats.length, ctx.__MAX_COPY, "count cap");
+  const out = ctx.peSanitizeSettings({
+    copyFormats: [{ name: "named but empty", format: "   " }, { format: "{{item.key}}" }, "junk", null]
+  });
+  eq(out.copyFormats.length, 1, "a row with no format copies nothing, so it is dropped");
+  ok(out.copyFormats[0].id, "an id is generated for a row that arrived without one");
+});
+
+test("copy: deleting every format is not the same as never having had one", () => {
+  const ctx = loadCommon();
+  // peDeepMerge backfills an absent array from the defaults — right for a new install,
+  // wrong for someone who cleared the list on purpose.
+  eq(ctx.peDeepMerge(ctx.__DEFAULTS, { copyFormats: [] }).copyFormats.length, 0, "an empty list is kept empty");
+  eq(
+    ctx.peDeepMerge(ctx.__DEFAULTS, {}).copyFormats.length,
+    ctx.__DEFAULTS.copyFormats.length,
+    "an absent list is filled with the presets"
+  );
+});
+
+test("copy: formats survive a save/read round trip", async () => {
+  const { ctx } = loadCommonWithSyncStorage();
+  const settings = clone(ctx.__DEFAULTS);
+  settings.copyFormats = [{ id: "cpy-1", name: "Chat", format: "{{item.key}} {{item.url}}" }];
+  await ctx.peSaveSettings(settings);
+  const back = await ctx.peGetSettings();
+  eq(back.copyFormats.length, 1);
+  eq(back.copyFormats[0].format, "{{item.key}} {{item.url}}");
+});
+
+test("copy: an item is read only from its own page", () => {
+  // A peek panel over a list keeps the list's URL. We could still find a key in the DOM
+  // there and assemble a /browse/ link from it — but an assembled link is a guess, and a
+  // guess here ends up in someone else's chat window.
+  eq(loadReadItemRef("https://p.test/acme/projects/abc/issues", "T")(), null, "a list has no single item");
+  eq(loadReadItemRef("https://p.test/acme/browse/", "T")(), null, "browse with no key");
+  eq(loadReadItemRef("https://p.test/acme/browse/K-1/activity", "T")(), null, "a sub-page is not the item page");
+  const ref = loadReadItemRef("https://p.test/acme/browse/K-1?tab=comments", "  Fix login  ")();
+  eq(ref.key, "K-1");
+  eq(ref.title, "Fix login", "trimmed");
+  eq(ref.url, "https://p.test/acme/browse/K-1", "the query carries view state, not the item");
+});
+
+test("copy: a numeric project identifier is a key like any other", () => {
+  // A project's identifier can be numeric ("42-7"). A key pattern anchored on
+  // letters would have failed here, and a title slug would have been the empty string
+  // for its Korean titles — which is why neither exists.
+  const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시")();
+  eq(ref.key, "42-7");
+  eq(ref.title, "한국어 제목 예시");
+});
+
+test("copy: no title field on the page means the token stays, not an empty string", () => {
+  const ctx = loadCommon();
+  const ref = loadReadItemRef("https://p.test/acme/browse/K-9", null)();
+  eq(ref.title, "");
+  eq(ctx.peExpandCopyFormat("{{item.key}} {{item.title}}", ref), "K-9 {{item.title}}");
+  eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
 });
 
 // The form used to let you add sources past the cap and then drop the extras during

@@ -103,6 +103,12 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **A work item key is not `ABC-123`.** A project identifier can be all digits — a
+  Plane project can have one, so a key can read `42-7`. Any regex anchored
+  on letters silently matches nothing there. The same measurement killed the branch-name
+  "title slug": Korean and emoji titles slug to the empty string, so the feature would
+  have worked for English titles and quietly produced `feature/proj-123-` for everyone
+  else. Read the key from the URL, which Plane already guarantees.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 4;
+const PE_SCHEMA = 5;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -44,6 +44,28 @@ const PE_SYNC_CACHE_KEY = "peSyncCache";
 const PE_VAR_PREFIX = "var.";
 const PE_VAR_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const PE_MAX_VARIABLES = 5;
+
+// Copy formats — what the "copy reference" button puts on the clipboard, written as a
+// plain string with {{item.…}} tokens. The `item.` prefix is the same idea as `var.`:
+// a namespace, so "url" can later be joined by item.state or item.assignee without
+// taking a top-level name, and so a token always says whose field it is. That matters
+// here more than in a template body — a copy can be triggered from a list one day, and
+// a bare {{url}} would be genuinely ambiguous between the page and the work item.
+//
+// A format is copied out exactly as written. There is no per-format special-casing and
+// no post-processing: the markdown preset carries its own "[…](…)" because the user
+// must be able to see, and edit, the thing that lands on their clipboard.
+const PE_ITEM_PREFIX = "item.";
+// Built fresh on every call. A /g regex carries lastIndex between uses, so one shared
+// constant would make the expander and the missing-token scan depend on which ran last.
+const peItemTokenRe = () => /\{\{\s*item\.([a-zA-Z0-9_-]+)\s*\}\}/gi;
+// The fields we can actually read off a work item page. Deliberately three: key, title,
+// url. A "slug" field (title lowercased into `a-b-c` for a branch name) was cut — a
+// Korean or emoji title slugs to the empty string, and some projects' identifiers are
+// numeric ("42-7"), so half the team would get a branch name with a dangling separator
+// and no title in it. Half-support is worse than none.
+const PE_ITEM_FIELDS = ["key", "title", "url"];
+const PE_MAX_COPY_FORMATS = 5;
 
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it
@@ -143,6 +165,28 @@ const PE_DEFAULTS = {
   // browser. Each: { name, value }.
   variables: [],
 
+  // Copy formats — see PE_ITEM_PREFIX. Each: { id, name, format }. The three presets are
+  // the three places a work item reference actually goes: a chat message, a pull request
+  // body, and a branch name. They are ordinary rows, editable and deletable like any
+  // other — nothing in the code treats them as special.
+  copyFormats: [
+    {
+      id: "cpy-plain",
+      name: peMsg("optCopyPresetPlain") || "Plain text",
+      format: "{{item.key}} {{item.title}} {{item.url}}"
+    },
+    {
+      id: "cpy-markdown",
+      name: peMsg("optCopyPresetMarkdown") || "Markdown link",
+      format: "[{{item.key}}]({{item.url}}) {{item.title}}"
+    },
+    {
+      id: "cpy-branch",
+      name: peMsg("optCopyPresetBranch") || "Branch name",
+      format: "feature/{{item.key}}"
+    }
+  ],
+
   // Template sync — pull shared templates from one or more URLs. Config only
   // (the fetched templates + per-device status live in PE_SYNC_CACHE_KEY, not here,
   // so status never syncs across devices or bloats the ~8 KB settings item).
@@ -223,6 +267,9 @@ function peDeepMerge(def, cur) {
 //            v3 object still carries them inline and peAssembleSettings reads them from
 //            there whenever no shard count is stamped, so the conversion happens on the
 //            next save. Only the stamp moves.
+//   v4 → v5: copyFormats is additive, so peDeepMerge backfills it — only the stamp
+//            moves. Note it backfills an *absent* array only: a user who deleted every
+//            format keeps an empty one and does not get the presets back.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -320,6 +367,17 @@ function peSanitizeSettings(raw) {
       return true;
     })
     .slice(0, PE_MAX_VARIABLES);
+
+  out.copyFormats = arr(raw.copyFormats)
+    .filter((c) => c && typeof c === "object")
+    .map((c) => ({
+      id: str(c.id, L.maxFieldLen) || "cpy-" + peHash([c.name, c.format].map((x) => str(x, L.maxFieldLen)).join(SEP)),
+      name: str(c.name, L.maxFieldLen),
+      format: str(c.format, L.maxFieldLen)
+    }))
+    // A format with nothing in it copies nothing; the name alone is not the thing.
+    .filter((c) => c.format.trim())
+    .slice(0, PE_MAX_COPY_FORMATS);
 
   const sync = raw.templateSync && typeof raw.templateSync === "object" ? raw.templateSync : {};
   out.templateSync = {
@@ -747,6 +805,38 @@ function peSaveSyncCache(cache) {
 }
 
 // A template is "meaningful" if it has at least one filled field.
+// Expand a copy format against the fields read off the work item page.
+//
+// One pass, no recursion, and the same law the template variables already follow: a
+// token we cannot resolve is returned untouched instead of blanked. A format that asks
+// for a field the page did not give us then says so on the clipboard — visible before
+// the paste — rather than copying a hole that reads as if the title were empty.
+// peMissingItemFields names those tokens so the caller can say which one failed.
+function peExpandCopyFormat(format, item) {
+  if (!format) return "";
+  const fields = item || {};
+  return String(format).replace(peItemTokenRe(), (token, name) => {
+    const v = fields[String(name).toLowerCase()];
+    return typeof v === "string" && v !== "" ? v : token;
+  });
+}
+
+// The item fields a format references but the page could not supply — unknown names
+// ({{item.state}}) and known ones that came back empty alike, because from the user's
+// side both leave the same unexpanded token on the clipboard.
+function peMissingItemFields(format, item) {
+  const fields = item || {};
+  const out = [];
+  const re = peItemTokenRe();
+  let m;
+  while ((m = re.exec(String(format || "")))) {
+    const name = String(m[1]).toLowerCase();
+    const v = fields[name];
+    if (!(typeof v === "string" && v !== "") && out.indexOf(name) === -1) out.push(name);
+  }
+  return out;
+}
+
 function peTemplateHasContent(t) {
   return !!(t && ((t.name && t.name.trim()) || (t.title && t.title.trim()) || (t.content && t.content.trim())));
 }
