@@ -103,6 +103,16 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **The peek panel closes the moment you mousedown outside it.** Our copy menu is
+  appended to `<body>`, outside the panel, so clicking a format fires a mousedown Plane
+  reads as an outside click — it tears the panel down, `#title-input` and all, before the
+  click handler runs. `copyReference` used to re-read the item at click time and got
+  `null`, so a copy from a peek panel always failed with "no item here". The fix is to
+  snapshot the item when the menu opens (panel still up) and copy from that, never from a
+  fresh read. `stopPropagation` on the menu-item mousedown keeps the panel from flickering
+  shut, but that is polish layered on Plane's event wiring; the snapshot is what makes the
+  copy correct regardless. Verified against real Plane: an outside mousedown removes
+  `#title-input` within one frame.
 - **The peek panel keeps the list's URL.** Clicking a row opens a panel with the same
   header as the item's own page — same `#title-input`, same key button — but the address
   bar still says `/projects/{uuid}/issues/`, with no query, no hash, and no link to the

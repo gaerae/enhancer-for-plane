@@ -22,6 +22,12 @@
   // Which list the shared menu is currently showing: "templates" or "copy". One element,
   // one position/outside-click/scroll path, two contents.
   let menuMode = "templates";
+  // The work item the copy menu was opened for, read once while the menu opens. A peek
+  // panel over a list closes as soon as you mousedown outside it, and the menu is appended
+  // to <body> — outside the panel — so by the time a format is clicked the panel, and its
+  // #title-input, can already be gone. Reading the item up front is what lets the copy
+  // survive the panel closing under it.
+  let copyRef = null;
 
   // DOM watching (re-insert the toolbar button)
   let injectScheduled = false;
@@ -391,8 +397,10 @@
   }
 
   function copyReference(fmt) {
+    // The snapshot taken when the menu opened — NOT a fresh read, which would fail once
+    // the peek panel has closed under the menu.
+    const ref = copyRef;
     hideMenu();
-    const ref = readItemRef(findKeyEl());
     if (!ref) {
       toast(peMsg("msgCopyNoItem"));
       return;
@@ -633,7 +641,10 @@
   // clipboard — the format is the output, so showing the output is showing the format.
   function renderCopyMenu() {
     menu.innerHTML = "";
-    const ref = readItemRef(findKeyEl());
+    // Snapshot the item now, while whatever opened the menu (button or Alt+C) guarantees
+    // the panel is still up. copyReference uses this, not a fresh read at click time.
+    copyRef = readItemRef(findKeyEl());
+    const ref = copyRef;
     const formats = (settings && settings.copyFormats) || [];
     const wrap = document.createElement("div");
     wrap.className = "pe-menu-group";
@@ -649,7 +660,14 @@
       preview.textContent = peExpandCopyFormat(f.format, ref).slice(0, 120);
       item.appendChild(name);
       item.appendChild(preview);
-      item.addEventListener("mousedown", (e) => e.preventDefault());
+      // stopPropagation as well as preventDefault: the mousedown is on <body>-level menu,
+      // outside the peek panel, and without stopping it Plane's own outside-click handler
+      // closes the panel under the menu. The copy would still work (we use copyRef), but
+      // the panel snapping shut mid-copy is jarring.
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       item.addEventListener("click", (e) => {
         e.preventDefault();
         copyReference(f);
