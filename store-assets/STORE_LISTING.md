@@ -24,7 +24,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 Enhancer for Plane — Projects, Wiki & Issues
 
 ## Summary / short description  (max 132)
-Title + body templates, one-click work item references, and width rules for Plane (makeplane) — the open-source Jira alternative.
+Fill a work item in one click, copy it in one click, read every name — for Plane (makeplane), the open-source Jira alternative.
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -36,74 +36,48 @@ English
 
 ## Detailed description  (max 16,000)
 
-Enhancer for Plane is a lightweight companion for Plane (makeplane / plane.so) — the open-source project management, issues, and wiki tool, and a self-hosted alternative to Jira.
-It fixes small day-to-day annoyances right in the Plane UI, with no changes to your Plane server.
+Stop retyping the same work items. Enhancer for Plane brings reusable templates, one-click copying, and readable names right into the Plane UI — with no changes to your Plane server.
 
-Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner; this is an independent, unofficial add-on. (And no — nothing to do with airplanes.)
+Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira. This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
 
-WHAT IT DOES
+WHAT YOU GET
 
-▸ Title + body templates
-Register reusable templates and insert them in one click.
-A native "Template" button sits in the description toolbar — and in the "Create work item" dialog, next to the project selector, so new items start fast.
-One click fills the work-item title AND the description together.
-Bodies are Markdown, rendered into the editor: headings, bullet and numbered lists, checkboxes.
-Variables on insert: {{date}}, {{date+N}} / {{date-N}} (e.g. {{date+7}} for a deadline), {{week}}, {{month}}.
-Define up to 5 of your own, too — {{var.team}} and the like, filled in from your settings.
+▸ Fill a work item in one click — title + body templates
+Register a template once, drop it into any work item with one click — title and description together. A native "Template" button sits in the description toolbar and in the "Create work item" dialog, so new items start fast.
+Bodies are Markdown: headings, lists, checkboxes. Variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}} — plus up to 5 of your own like {{var.team}}.
 Shortcut: Alt/⌥+T.
 
-▸ Copy a work item's reference
-A work item leaves Plane all day — into a chat message, a pull request, a branch name — and each trip meant selecting the title, copying the URL separately, and typing the rest.
-One click on the button beside a work item's ID copies the whole reference.
-The formats are yours to write: plain text, a markdown link, and a branch name ship as a starting point, and every one of them is an editable row.
-Three values are filled in — {{item.key}}, {{item.title}}, {{item.url}} — and everything else is copied exactly as you typed it, so what you edit is what lands on the clipboard. Settings previews each row.
-Works on a work item's own page and in the panel a list opens, so you can grab a reference without leaving the list.
-Shortcut: Alt/⌥+C.
+▸ Hand off a work item in one click — copy reference
+Send a work item to a chat message, a pull request, or a branch name without retyping it. The button beside its ID (or Alt/⌥+C) copies it in the format you pick — plain text, a Markdown link, a branch name — and every format is a row you can edit into your own. The preview in Settings is exactly what lands on the clipboard.
+Works from the item's own page and from the preview panel a list opens, so you never leave the list.
 
-▸ Width & style rules
-Plane truncates long names — modules, cycles, labels, breadcrumbs.
-In lists and search dropdowns that makes items impossible to tell apart.
-Add a simple "selector → property → value" rule to force any width (e.g. 320px, 30rem), and names show in full.
-It's a generic CSS engine: target any element, and if Plane's class names change between versions, just edit the selector.
+▸ Read every name in full — width & style rules
+Plane cuts long names off in lists and dropdowns until you can't tell items apart. One "selector → property → value" rule forces any width (320px, 30rem) and names show completely.
+It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
 
-▸ Visual element picker
-No DevTools needed.
-Click "Pick element" in the popup, then click any part of Plane.
-You get a candidate selector list with match counts (width classes first).
-The rule lands in Settings, ready for you to set a value.
+▸ Build rules without DevTools — visual element picker
+Click "Pick element" in the popup, then click anything on the Plane page. You get candidate selectors with match counts (width classes first); the rule lands in Settings ready for a value.
 
-▸ Team template sync
-Keep your team's templates in one JSON file — on your intranet, a Git host, any URL — and everyone pulls the same set.
-Add the URL once; it refreshes on the schedule you pick (hourly to daily), or on demand with "Sync now".
-Templates arrive grouped under their source, and you can hide any group you don't need without touching the shared file.
-Synced templates are read-only here: they're edited at the source, so no one's local edit gets silently reverted.
-Off by default. It contacts nothing until you add a source, and only ever the URL you entered.
-Inserting a template reads the local cache, so it costs no request and works offline.
+▸ One set of templates for the whole team — template sync
+Point everyone at one JSON file — your intranet, a Git host, any URL — and the whole team pulls the same templates. It refreshes on the schedule you choose or on demand.
+Off by default: it fetches only the URL you add, reads from a local cache so inserting works offline, and synced templates stay read-only so no one's edits get overwritten. New to it? "Try our example" fills in a live feed so you can watch it work.
 
 ▸ Built for self-hosted Plane
-Add your Plane instance's domain (e.g. plane.your-company.com) in the popup or Settings.
-It ships with no host access; enabling a domain asks Chrome for one-time access to just that site.
-It runs only on the domains you enable and stays completely inert everywhere else.
-Wildcards (*.example.com) are supported.
+Add your instance's domain (e.g. plane.your-company.com). It ships with no site access — enabling a domain asks Chrome for that one site — runs only where you allow it, and stays completely inert everywhere else. Wildcards (*.example.com) supported.
 
-▸ Import / Export
+▸ Yours to keep — import / export
 Back up your domains, rules, templates, variables, copy formats, and sync sources to a JSON file, and restore them on another machine.
 
-▸ Light & dark mode
-The popup and settings follow your system theme and match Plane's monochrome look.
+▸ Light & dark
+The popup and Settings follow your system theme and match Plane's monochrome look.
 
-PRIVACY
+PRIVACY — nothing leaves your browser
+No accounts, no tracking, no analytics, no server. Your settings live in Chrome's own storage (synced to your Google account only if you use Chrome Sync). The one request this extension can make is downloading the team-template file from a URL you added yourself — and it carries none of your data. See the privacy policy for details.
 
-No accounts, no tracking, no analytics. The developer runs no server and receives nothing from you.
-Your settings live in Chrome's own storage (synced to your Google account by Chrome if you have sync on) and are never sent anywhere else.
-The one request this extension can make is downloading the team-template file from a URL you added yourself — and it carries none of your data.
-See the privacy policy for details.
-
-HOW TO START
-
+GET STARTED
 1. Open your self-hosted Plane instance.
 2. Click the toolbar icon and "Enable on this site" (grant access when Chrome prompts).
-3. Open Settings to manage templates, copy formats, and width rules.
+3. Open Settings to add templates, copy formats, and width rules.
 
 Open source. Feedback and issues welcome.
 
@@ -177,85 +151,57 @@ Enhancer for Plane — 프로젝트·위키·이슈
 > 권장합니다. 위 한글 병기는 선택 사항입니다.
 
 ### 요약 / 짧은 설명 (max 132)
-제목·본문 템플릿 삽입, 작업 항목 참조 원클릭 복사, 이름 폭 조정을 오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane)에 추가합니다.
+작업 항목을 한 번에 채우고, 한 번에 복사하고, 이름을 온전히 — 오픈소스 Jira 대안 Plane(makeplane)을 위한 확장.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)
 
 ### 상세 설명 (max 16,000)
 
-Enhancer for Plane 는 오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane / plane.so) — Jira 의 자체 호스팅 대안 — 을 위한 가벼운 보조 익스텐션입니다.
-Plane 서버를 전혀 수정하지 않고, 브라우저에서 매일의 사소한 불편을 바로잡아 줍니다.
+같은 작업 항목을 매번 다시 타이핑하지 마세요. Enhancer for Plane 은 재사용 템플릿, 원클릭 복사, 읽기 좋은 이름을 Plane UI 안으로 바로 가져옵니다 — Plane 서버는 전혀 건드리지 않습니다.
 
-Plane 과 제휴하거나 승인받은 제품이 아닙니다. "Plane" 은 해당 소유자의 상표이며, 본 익스텐션은 독립적인 비공식 애드온입니다. (비행기와는 무관합니다.)
+Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira 의 자체 호스팅 대안입니다. 본 익스텐션은 독립적인 비공식 애드온으로, Plane 과 제휴하거나 승인받지 않았으며 "Plane" 은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
 
-주요 기능
+무엇을 제공하나
 
-▸ 제목 + 본문 템플릿
-자주 쓰는 템플릿을 등록해 한 번의 클릭으로 삽입합니다.
-설명 툴바의 네이티브 "Template" 버튼, 그리고 "신규 작업항목 생성" 창의 프로젝트 선택기 옆에서도 동작해 새 항목을 빠르게 시작합니다.
-한 번의 클릭으로 작업 항목의 제목과 본문을 함께 채웁니다.
-본문은 마크다운으로 작성되어 에디터에 제목·목록·체크박스로 렌더됩니다.
-삽입 시 변수 치환: {{date}}(오늘), {{date+N}} / {{date-N}}(예: 마감일 {{date+7}}), {{week}}(이번 주 범위), {{month}}.
-{{var.team}}처럼 직접 만든 변수도 최대 5개까지 쓸 수 있고, 값은 설정에서 채웁니다.
+▸ 작업 항목을 한 번에 채우기 — 제목 + 본문 템플릿
+템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께. 설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
+본문은 마크다운입니다: 제목·목록·체크박스. 삽입 시 변수가 알아서 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}} — 그리고 {{var.team}}처럼 직접 만든 변수 최대 5개.
 단축키: Alt/⌥+T.
 
-▸ 작업 항목 참조 복사
-작업 항목은 하루에도 여러 번 Plane 밖으로 나갑니다 — 메신저, 풀 리퀘스트 본문, 브랜치명. 그때마다 제목을 드래그하고 URL을 따로 복사하고 나머지는 손으로 적어야 했습니다.
-번호 옆 버튼을 한 번 누르면 참조 전체가 복사됩니다.
-형식은 직접 씁니다. 일반 텍스트·마크다운 링크·브랜치명이 기본으로 들어 있고, 전부 편집 가능한 줄입니다.
-치환되는 값은 {{item.key}}, {{item.title}}, {{item.url}} 세 가지이며 나머지는 적은 그대로 복사됩니다. 편집한 것이 그대로 클립보드에 들어가고, 설정 화면이 줄마다 결과를 미리 보여 줍니다.
-항목 화면은 물론 목록에서 열리는 패널에서도 동작하므로, 목록을 벗어나지 않고 참조를 집을 수 있습니다.
-단축키: Alt/⌥+C.
+▸ 작업 항목을 한 번에 넘기기 — 참조 복사
+작업 항목을 메신저, 풀 리퀘스트, 브랜치명으로 다시 타이핑 없이 넘기세요. 번호 옆 버튼(또는 Alt/⌥+C)이 원하는 형식으로 복사합니다 — 일반 텍스트, 마크다운 링크, 브랜치명 — 그리고 모든 형식은 직접 고쳐 쓸 수 있는 줄입니다. 설정의 미리보기가 곧 클립보드에 담길 내용입니다.
+항목 자신의 화면에서도, 목록에서 열리는 미리보기 패널에서도 동작하므로 목록을 벗어날 필요가 없습니다.
 
-▸ 폭·스타일 규칙
-Plane 은 긴 이름(모듈·사이클·라벨·브레드크럼)을 잘라서 보여줍니다.
-그래서 목록이나 검색 드롭다운에서 어느 항목인지 구분하기 어렵습니다.
-"선택자 → 속성 → 값" 규칙으로 원하는 폭(예: 320px, 30rem)을 지정하면 이름이 온전히 표시됩니다.
+▸ 이름을 온전히 보기 — 폭·스타일 규칙
+Plane 은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 구분하기 어렵게 만듭니다. "선택자 → 속성 → 값" 규칙 하나로 원하는 폭(320px, 30rem)을 지정하면 이름이 온전히 보입니다.
 범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
 
-▸ 비주얼 요소 피커
-DevTools 가 필요 없습니다.
-팝업에서 "Pick element" 를 누르고 Plane 화면의 요소를 클릭하세요.
-각 선택자의 매칭 개수와 함께 후보 목록이 뜹니다(폭 관련 클래스 우선).
-고른 규칙은 설정에 추가되고, 값만 입력하면 됩니다.
+▸ DevTools 없이 규칙 만들기 — 비주얼 요소 피커
+팝업에서 "Pick element" 를 누르고 Plane 화면의 요소를 클릭하세요. 매칭 개수와 함께 후보 선택자가 뜨고(폭 관련 클래스 우선), 규칙은 값만 넣으면 되는 상태로 설정에 담깁니다.
 
-▸ 팀 템플릿 동기화
-팀의 템플릿을 JSON 파일 하나에 두면(사내 서버, Git 호스트, 아무 URL이나) 모두가 같은 템플릿을 씁니다.
-URL을 한 번 등록해두면 선택한 주기(1시간~하루)로 갱신되고, "Sync now"로 즉시 받을 수도 있습니다.
-템플릿은 소스별로 묶여서 표시되며, 필요 없는 그룹은 공유 파일을 건드리지 않고 숨길 수 있습니다.
-동기화된 템플릿은 이곳에서 읽기 전용입니다. 수정은 원본에서 하므로, 누군가의 수정이 조용히 되돌려지지 않습니다.
-기본은 꺼져 있습니다. 소스를 추가하기 전까지 아무 곳에도 접속하지 않고, 이후에도 직접 등록한 URL에만 접속합니다.
-템플릿 삽입은 로컬 캐시를 읽으므로 요청이 발생하지 않고 오프라인에서도 동작합니다.
+▸ 팀 전체가 한 벌의 템플릿을 — 팀 템플릿 동기화
+JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀 전체가 같은 템플릿을 씁니다. 선택한 주기로, 또는 즉시 갱신됩니다.
+기본은 꺼져 있습니다: 직접 등록한 URL만 받아 오고, 로컬 캐시에서 읽어 오프라인에서도 삽입되며, 동기화된 템플릿은 읽기 전용이라 누구의 편집도 덮이지 않습니다. 처음이라면 "예시 사용해 보기" 가 살아 있는 피드를 채워 넣어 바로 확인할 수 있습니다.
 
 ▸ 자체 호스팅 Plane 전용
-팝업이나 설정에서 자신의 Plane 인스턴스 도메인(예: plane.your-company.com)을 추가하세요.
-설치 시 호스트 접근 권한이 없고, 도메인을 활성화하면 Chrome 이 그 사이트 하나에 대한 1회성 접근을 묻습니다.
-활성화한 도메인에서만 동작하고, 그 외 모든 사이트에서는 완전히 비활성 상태로 남습니다.
-와일드카드(*.example.com)도 지원합니다.
+자신의 인스턴스 도메인(예: plane.your-company.com)을 추가하세요. 설치 시 사이트 접근 권한이 없고 — 도메인을 켜면 Chrome 이 그 사이트 하나를 묻습니다 — 허용한 곳에서만 동작하며 그 외에는 완전히 비활성입니다. 와일드카드(*.example.com)도 지원합니다.
 
-▸ 가져오기 / 내보내기
-도메인·규칙·템플릿·변수·복사 형식·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원할 수 있습니다.
+▸ 내 것으로 보관 — 가져오기 / 내보내기
+도메인·규칙·템플릿·변수·복사 형식·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원합니다.
 
-▸ 라이트 & 다크 모드
+▸ 라이트 & 다크
 팝업과 설정이 시스템 테마를 따르며 Plane 의 모노크롬 톤과 어울립니다.
 
-개인정보
-
-계정·추적·분석이 없습니다. 개발자는 서버를 운영하지 않으며 사용자로부터 아무것도 받지 않습니다.
-설정은 브라우저 자체 저장소(chrome.storage)에 보관됩니다(동기화가 켜져 있으면 본인 Google 계정으로 동기화).
-그 외 어디로도 전송되지 않습니다.
-익스텐션이 보내는 유일한 요청은 사용자가 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것이며, 그 요청에는 사용자의 데이터가 담기지 않습니다.
-자세한 내용은 개인정보 처리방침을 참고하세요.
+개인정보 — 브라우저 밖으로 나가지 않습니다
+계정·추적·분석·서버가 없습니다. 설정은 브라우저 자체 저장소(chrome.storage)에 보관되고, Chrome 동기화를 쓰는 경우에만 본인 Google 계정으로 동기화됩니다. 익스텐션이 보내는 유일한 요청은 사용자가 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것이며, 그 요청에는 사용자의 데이터가 담기지 않습니다. 자세한 내용은 개인정보 처리방침을 참고하세요.
 
 시작하기
-
 1. 자체 호스팅 Plane 인스턴스를 엽니다.
 2. 툴바 아이콘을 눌러 "Enable on this site" 를 클릭합니다(Chrome 프롬프트에서 접근 허용).
-3. 설정에서 템플릿·복사 형식·폭 규칙을 관리합니다.
+3. 설정에서 템플릿·복사 형식·폭 규칙을 추가합니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
-
 ### 단일 목적 / 권한 정당화 (심사 폼)
 심사 폼(단일 목적, 권한 정당화, 데이터 사용)은 Google 리뷰어를 위해 **영문 그대로
 제출**하세요. 위 영문 섹션을 사용하면 됩니다. 한국어 번역이 반드시 필요한 칸은
