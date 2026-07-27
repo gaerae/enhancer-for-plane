@@ -56,9 +56,10 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-3. **Copy reference** — on a work item's own page, the button beside its ID (or
-   `Alt/⌥+C`) copies that item to your clipboard, so handing it to a chat message, a
-   pull request body, or a branch name is one click instead of three selections.
+3. **Copy reference** — on a work item — its own page, or the panel a list opens — the
+   button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
+   to a chat message, a pull request body, or a branch name is one click instead of three
+   selections.
    - **The formats are yours to write.** Three ship as a starting point — plain text,
      a markdown link, a branch name — and each is an ordinary editable row. A format is
      copied out exactly as typed: the markdown one carries its own `[…](…)`, because the

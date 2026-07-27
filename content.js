@@ -302,9 +302,8 @@
   //
   // Found by shape, not by class name — Plane's Tailwind classes move between versions.
   // The search starts at #title-input and widens one ancestor at a time, so the first
-  // block holding both the title and a key is the item header; the breadcrumb prints the
-  // same key higher up the page and is never reached. Restricting the match to <button>
-  // keeps a date badge ("2026-07") in the same block from being mistaken for a key.
+  // block holding both the title and a key (see isKeyButton) is the item header; the
+  // breadcrumb prints the same key higher up the page and is never reached.
   //
   // The peek panel a list opens has this identical structure — same title field, same key
   // button, same wrapper — which is why one function serves both.

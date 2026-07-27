@@ -22,6 +22,11 @@ changed anything a user sees, drive it:
   (see "Driving the UI" below). Node cannot render CSS.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
+- **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
+  leaf `<button>` whose text is a key — and, for the peek-panel path, a second harness
+  page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
+  value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
+  `tools/test.js`; the DOM timing is only provable in a browser.
 - **The real extension**: load unpacked, then **reload the extension AND the tab**.
   A reloaded extension does not replace content scripts already running in open tabs,
   and `window.__peLoaded` blocks re-injection — so you will be testing old code and
@@ -103,6 +108,13 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **An Alt-letter shortcut in a capture-phase handler eats that letter.** `onKeyDown` is
+  registered with capture `true` and calls `preventDefault`, so a shortcut keyed on
+  `e.code` fires before the page — and on macOS `Option`+a letter IS a character (`⌥C` =
+  "ç", `⌥N` = "ñ", `⌥E` = an accent). Alt+C shipped hijacking "ç" out of a title or body.
+  Gate any such shortcut on `isEditingText()` unless typing over it is the actual intent:
+  Alt+T is exempt because you open the template menu *while* editing the description;
+  Alt+C is not, because you never copy a reference mid-word.
 - **The peek panel closes the moment you mousedown outside it.** Our copy menu is
   appended to `<body>`, outside the panel, so clicking a format fires a mousedown Plane
   reads as an outside click — it tears the panel down, `#title-input` and all, before the
