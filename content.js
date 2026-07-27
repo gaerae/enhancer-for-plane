@@ -19,9 +19,6 @@
   let menu = null;
   let menuOpen = false;
   let menuOwnerBtn = null;
-  // Which list the shared menu is currently showing: "templates" or "copy". One element,
-  // one position/outside-click/scroll path, two contents.
-  let menuMode = "templates";
   // The work item the copy menu was opened for, read once while the menu opens. A peek
   // panel over a list closes as soon as you mousedown outside it, and the menu is appended
   // to <body> — outside the panel — so by the time a format is clicked the panel, and its
@@ -295,6 +292,11 @@
 
   const hasCopyFormats = () => !!(settings && (settings.copyFormats || []).length);
 
+  // Is this element a leaf <button> whose text is a work item key? Restricting to <button>
+  // keeps a date badge ("2026-07") in the same header from being taken for a key.
+  const isKeyButton = (e) =>
+    !!e && e.tagName === "BUTTON" && e.children.length === 0 && PE_ITEM_KEY_RE.test((e.textContent || "").trim());
+
   // The key as printed above the title, or null. This element is both the value we copy
   // and the spot we hang the button on, so everything starts here.
   //
@@ -311,9 +313,7 @@
     if (!title) return null;
     let scope = title.parentElement;
     for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
-      const hit = [...scope.querySelectorAll("button")].find(
-        (e) => e.children.length === 0 && PE_ITEM_KEY_RE.test((e.textContent || "").trim())
-      );
+      const hit = [...scope.querySelectorAll("button")].find(isKeyButton);
       if (hit) return hit;
     }
     return null;
@@ -354,6 +354,16 @@
   }
 
   function ensureCopyButton() {
+    // Fast path: if our button is already sitting right after a key button, it is correctly
+    // placed — leave it and skip findKeyEl. This spares the whole-page button scan on every
+    // mutation-driven inject in the steady state, and reading the key's CURRENT text at copy
+    // time means an in-place key change (a peek panel switching items) still copies the right
+    // one. A stale button (its key gone) fails this check and is rebuilt below.
+    const existing = document.querySelector(".pe-copy-ref-btn");
+    if (existing) {
+      if (isKeyButton(existing.previousElementSibling)) return;
+      removeCopyButtons();
+    }
     const keyEl = findKeyEl();
     if (!keyEl) {
       // No key on screen, no button. Nothing floats in from the side: a copy affordance
@@ -366,34 +376,41 @@
     keyEl.insertAdjacentElement("afterend", makeCopyButton());
   }
 
-  // Put text on the clipboard. The async API is the one to use, but it rejects when the
-  // document is not focused, so the deprecated execCommand path stays as the fallback
-  // rather than leaving the user with a silent no-op.
+  // The synchronous copy: select a throwaway textarea and execCommand. Deprecated, but it
+  // is the only path that works without the async Clipboard API — and it MUST be called
+  // straight from the click, inside the user-activation window, or the browser refuses it.
+  function execCommandCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Put text on the clipboard. Prefer the async Clipboard API. If it REJECTS (e.g. the
+  // document is not focused), there is no sound recovery: an execCommand run from the
+  // rejection handler fires a microtask after the click returned, outside the user
+  // activation, so it would only fail too — reporting failure honestly beats pretending.
+  // The execCommand path is kept for browsers with no async API at all, where it still
+  // runs synchronously inside the click.
   function writeClipboard(text) {
-    const fallback = () => {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.setAttribute("readonly", "");
-        ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand("copy");
-        ta.remove();
-        return ok;
-      } catch (_) {
-        return false;
-      }
-    };
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         return navigator.clipboard.writeText(text).then(
           () => true,
-          () => fallback()
+          () => false
         );
       }
     } catch (_) {}
-    return Promise.resolve(fallback());
+    return Promise.resolve(execCommandCopy(text));
   }
 
   function copyReference(fmt) {
@@ -700,9 +717,8 @@
       return;
     }
     menuOwnerBtn = btn;
-    menuMode = mode === "copy" ? "copy" : "templates";
     ensureMenu();
-    if (menuMode === "copy") renderCopyMenu();
+    if (mode === "copy") renderCopyMenu();
     else renderMenu();
     menu.style.display = "block";
     positionMenu(btn);
@@ -1203,6 +1219,17 @@
       return;
     hideMenu();
   }
+  // Is the user typing into an editable field? (a real input/textarea, or a
+  // contenteditable surface like Plane's ProseMirror/tiptap body). Used to keep Alt+C
+  // from stealing a keystroke that is actually text.
+  function isEditingText() {
+    const a = document.activeElement;
+    if (!a) return false;
+    const tag = a.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return true;
+    return !!a.isContentEditable;
+  }
+
   function onKeyDown(e) {
     if (e.key === "Escape" && menuOpen) {
       hideMenu();
@@ -1234,7 +1261,13 @@
     }
     // Alt+C (macOS: ⌥ Option+C, which yields "ç" — hence e.code): open the copy list for
     // the work item being viewed.
-    if (e.altKey && (e.code === "KeyC" || e.key === "c" || e.key === "C")) {
+    //
+    // Bail while the user is typing. Unlike Alt+T — where you WANT the menu over the
+    // description you are editing — copying a reference is never something you do mid-word,
+    // and on macOS Option+C is the character "ç". Hijacking it (with preventDefault, in a
+    // capture-phase handler) would eat that letter out of a French/Portuguese/Turkish title
+    // or body. So only act when focus is not in an editable field.
+    if (e.altKey && (e.code === "KeyC" || e.key === "c" || e.key === "C") && !isEditingText()) {
       let btn = document.querySelector(".pe-copy-ref-btn");
       if (!btn) {
         // self-heal: the header may have mounted late — inject now and retry

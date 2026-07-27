@@ -1203,6 +1203,28 @@ test("copy: the item is whatever key the header shows", () => {
   eq(own.url, "https://p.test/acme/browse/K-1", "the query carries view state, not the item");
 });
 
+test("copy: a peek-panel ref is a detached snapshot, usable after the DOM is gone", () => {
+  // The bug this guards: copying from the panel a list opens fired an "no item here" error,
+  // because clicking a format closes the peek panel (an outside mousedown) and the old code
+  // re-read the item from a DOM that no longer had #title-input. The fix reads the item once
+  // when the menu opens and copies from that. The load-bearing property is that readItemRef
+  // returns a COMPLETE VALUE — key, title, and an assembled url — that carries no live DOM
+  // reference, so peExpandCopyFormat can render it with the page already torn down.
+  const ctx = loadCommon();
+  // Read the ref while the "panel" is up (list route, so the url is assembled from the slug).
+  const read = loadReadItemRef("https://p.test/data/projects/abc/issues/", "Visualize your work", ctx.peItemUrl);
+  const snapshot = read("DATA-5");
+  // Now the panel is gone. peExpandCopyFormat is pure — it never touches the document — so a
+  // copy that runs off `snapshot` still produces the full reference. If a future change makes
+  // copyReference re-derive fields from the DOM at click time, the ref stops being self-
+  // contained and this line is where it shows.
+  eq(
+    ctx.peExpandCopyFormat("[{{item.key}}]({{item.url}}) {{item.title}}", snapshot),
+    "[DATA-5](https://p.test/data/browse/DATA-5) Visualize your work"
+  );
+  eq(ctx.peMissingItemFields("{{item.key}} {{item.title}} {{item.url}}", snapshot).length, 0, "every field resolved from the snapshot");
+});
+
 test("copy: a numeric project identifier is a key like any other", () => {
   const ctx = loadCommon();
   // A project's identifier can be numeric ("42-7"). A key pattern anchored on
