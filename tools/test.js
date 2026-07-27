@@ -1264,6 +1264,33 @@ test("example feed: the button's URL points at the file that actually ships", ()
   ok(out.templates.length > 0, "the shipped file parses into templates");
 });
 
+test("permissions: desired origins are the domains plus every enabled source", () => {
+  const ctx = loadCommon();
+  // This is what a synced-in profile needs granted on a new device; the badge and the
+  // options banner diff it against what permissions.contains reports. A source that is
+  // disabled, url-less, or belongs to a disabled sync block must not appear — asking to
+  // grant an origin nothing will fetch is noise.
+  const settings = {
+    enabled: true,
+    domains: ["plane.example.com", "*.corp.example"],
+    templateSync: {
+      enabled: true,
+      sources: [
+        { url: "https://raw.example.com/a.json", enabled: true },
+        { url: "https://off.example.com/b.json", enabled: false },
+        { url: "", enabled: true }
+      ]
+    }
+  };
+  const out = ctx.peDesiredOrigins(settings).sort();
+  eq(out.join("|"), ["*://*.corp.example/*", "*://plane.example.com/*", "https://raw.example.com/*"].sort().join("|"));
+  // Sources are dropped entirely when the sync block is off, even if a source is enabled.
+  const off = ctx.peDesiredOrigins({ enabled: true, domains: ["p.example"], templateSync: { enabled: false, sources: [{ url: "https://s.example/x.json", enabled: true }] } });
+  eq(off.join("|"), "*://p.example/*", "a disabled sync block contributes no source origins");
+  // allDomains collapses to the single all-urls pattern.
+  eq(ctx.peDesiredOrigins({ enabled: true, allDomains: true }).join("|"), "*://*/*");
+});
+
 // The form used to let you add sources past the cap and then drop the extras during
 // save, without a word. The Add button now refuses at the cap, so this slice is only
 // ever reached by settings that came from elsewhere.

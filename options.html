@@ -24,6 +24,15 @@
         </label>
       </header>
 
+      <!-- This-device permission gap (settings sync across devices, host permissions do not) -->
+      <div id="permBanner" class="perm-banner" hidden>
+        <div class="perm-text">
+          <strong data-i18n="optPermTitle">This device needs to approve access</strong>
+          <span id="permDesc"></span>
+        </div>
+        <button class="primary sm" id="permGrant" data-i18n="optPermGrant">Approve access</button>
+      </div>
+
       <!-- Active domains -->
       <section class="card">
         <h2 data-i18n="optDomainsTitle">Active domains</h2>

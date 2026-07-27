@@ -683,5 +683,28 @@
   },
   "msgExampleExists": {
     "message": "예시 피드는 이미 소스에 있습니다."
+  },
+  "optPermTitle": {
+    "message": "이 기기에서 접근 승인이 필요합니다"
+  },
+  "optPermDesc": {
+    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트·소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 확장이 동작하지 않습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optPermGrant": {
+    "message": "접근 승인"
+  },
+  "msgPermGranted": {
+    "message": "이 기기에서 접근을 승인했습니다."
+  },
+  "badgeNeedsAccess": {
+    "message": "Enhancer for Plane — 이 기기에서 접근 승인 필요"
+  },
+  "popPermGap": {
+    "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."
   }
 }

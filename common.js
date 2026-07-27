@@ -969,3 +969,25 @@ function peOriginPatterns(settings) {
   }
   return [...new Set(out)];
 }
+
+// Every host pattern the current settings imply a need for: the active domains, plus the
+// origin of each enabled sync source. This is what must be granted for the extension to
+// actually run.
+//
+// It matters because Chrome does NOT sync host permissions across devices — only settings
+// sync. So a settings object that arrived from another device can list domains and source
+// URLs this device has never granted, and reconcile() then registers nothing for them: the
+// extension looks installed and configured but sits inert. Callers diff this against what
+// permissions.contains reports to find that gap and offer a one-click re-grant.
+function peDesiredOrigins(settings) {
+  const out = peOriginPatterns(settings);
+  const sync = settings && settings.templateSync;
+  if (sync && sync.enabled) {
+    for (const src of sync.sources || []) {
+      if (!src || src.enabled === false || !src.url) continue;
+      const p = peOriginPatternForUrl(src.url);
+      if (p) out.push(p);
+    }
+  }
+  return [...new Set(out)];
+}

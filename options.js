@@ -51,7 +51,10 @@
     exportBtn: $("exportBtn"),
     importBtn: $("importBtn"),
     importFile: $("importFile"),
-    exportFeedBtn: $("exportFeedBtn")
+    exportFeedBtn: $("exportFeedBtn"),
+    permBanner: $("permBanner"),
+    permDesc: $("permDesc"),
+    permGrant: $("permGrant")
   };
 
   // labelKey feeds the rule's label field on click, so it must follow the UI language.
@@ -92,6 +95,7 @@
     renderCopyFormats();
     renderSources();
     updateStorageMeter();
+    refreshPermGap(); // async; the banner updates when it resolves
     dirty = false; // just re-rendered the form from state, so it's clean
   }
 
@@ -537,6 +541,26 @@
     el.save.addEventListener("click", saveAll);
     el.reset.addEventListener("click", resetAll);
 
+    if (el.permGrant) {
+      el.permGrant.addEventListener("click", () => {
+        // Must run inside the click gesture, so no await before request(); permMissing was
+        // computed by the last refreshPermGap. Requesting all missing origins at once yields
+        // a single Chrome prompt. On grant, the worker's permissions.onAdded reconciles and
+        // starts a sync; here we just re-check and hide the banner.
+        if (!permMissing.length) {
+          refreshPermGap();
+          return;
+        }
+        try {
+          chrome.permissions.request({ origins: permMissing }, (granted) => {
+            if (chrome.runtime.lastError) return;
+            if (granted) flash(peMsg("msgPermGranted"));
+            refreshPermGap();
+          });
+        } catch (_) {}
+      });
+    }
+
     // mark dirty on real user input (programmatic value sets don't fire these events)
     document.addEventListener(
       "input",
@@ -720,17 +744,31 @@
   // Host access needed = active-domain patterns (content script) + template-source
   // origins (background fetch). Requesting already-granted origins is a silent no-op,
   // so the user is only prompted for newly added domains/sources.
-  function desiredOrigins() {
-    const out = peOriginPatterns(state);
-    const sync = state.templateSync || {};
-    if (sync.enabled) {
-      for (const src of sync.sources || []) {
-        if (!src || src.enabled === false || !src.url) continue;
-        const p = peOriginPatternForUrl(src.url);
-        if (p) out.push(p);
-      }
+  const desiredOrigins = () => peDesiredOrigins(state);
+
+  // Host permissions do not sync across devices, only settings do — so a profile synced to
+  // a new device can list domains and sources it has never granted, and nothing runs until
+  // they are re-approved here. Surface that gap as a banner with a one-click grant, instead
+  // of leaving the user to guess they must press Save again.
+  let permMissing = [];
+  async function refreshPermGap() {
+    const desired = desiredOrigins();
+    const missing = [];
+    for (const o of desired) {
+      let has = false;
+      try {
+        has = await chrome.permissions.contains({ origins: [o] });
+      } catch (_) {}
+      if (!has) missing.push(o);
     }
-    return [...new Set(out)];
+    permMissing = missing;
+    if (el.permBanner) {
+      el.permBanner.hidden = missing.length === 0;
+      // Set the whole sentence with the count substituted, rather than embedding a live
+      // <span> inside a translated string — peApplyI18n replaces innerHTML and would strip
+      // any element reference out from under us.
+      if (el.permDesc && missing.length) el.permDesc.textContent = peMsg("optPermDesc", [String(missing.length)]);
+    }
   }
 
   async function syncHostPermissions() {

@@ -683,5 +683,28 @@
   },
   "msgExampleExists": {
     "message": "Our example feed is already in your sources."
+  },
+  "optPermTitle": {
+    "message": "This device needs to approve access"
+  },
+  "optPermDesc": {
+    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ listed site(s)/source(s) are not yet approved on this device. Until you approve, the extension stays inactive here.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optPermGrant": {
+    "message": "Approve access"
+  },
+  "msgPermGranted": {
+    "message": "Access approved on this device."
+  },
+  "badgeNeedsAccess": {
+    "message": "Enhancer for Plane — approve access on this device"
+  },
+  "popPermGap": {
+    "message": "⚠ Some sites need access on this device — open Settings to approve."
   }
 }

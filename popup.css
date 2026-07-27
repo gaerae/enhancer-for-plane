@@ -86,6 +86,33 @@ input:checked + .switch::after {
   color: #d97706;
   font-weight: 600;
 }
+.pop-perm {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 8px 0;
+  padding: 9px 11px;
+  border: 1px solid #f6d78a;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #7a5c12;
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.pop-perm[hidden] {
+  display: none;
+}
+.pop-perm:hover {
+  border-color: #e6bf5c;
+}
+@media (prefers-color-scheme: dark) {
+  .pop-perm {
+    background: #3a2f12;
+    border-color: #5c4a1c;
+    color: #f0d9a0;
+  }
+}
 .pop-row {
   display: flex;
   align-items: center;

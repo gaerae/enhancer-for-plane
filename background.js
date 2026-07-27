@@ -394,15 +394,49 @@ async function ensureSyncAlarm() {
   } catch (_) {}
 }
 
+// The toolbar badge for the "this device has not approved access yet" state. Settings sync
+// across devices but host permissions do not (see peDesiredOrigins), so a profile synced to
+// a new device can leave the extension inert with nothing to show for it. The badge is that
+// something — visible without opening a page — and it clears the moment every listed domain
+// and source is granted here.
+async function refreshBadge() {
+  let missing = 0;
+  try {
+    const settings = await peGetSettings();
+    if (settings.enabled) {
+      for (const o of peDesiredOrigins(settings)) {
+        let has = false;
+        try {
+          has = await chrome.permissions.contains({ origins: [o] });
+        } catch (_) {}
+        if (!has) missing++;
+      }
+    }
+  } catch (_) {}
+  try {
+    if (missing > 0) {
+      chrome.action.setBadgeText({ text: "!" });
+      chrome.action.setBadgeBackgroundColor({ color: "#d97706" });
+      chrome.action.setTitle({ title: peMsg("badgeNeedsAccess") || PE_ACTION_TITLE });
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+      chrome.action.setTitle({ title: PE_ACTION_TITLE });
+    }
+  } catch (_) {}
+}
+const PE_ACTION_TITLE = "Enhancer for Plane";
+
 chrome.runtime.onInstalled.addListener(() => {
   reconcile();
   ensureSyncAlarm();
   syncSources(true);
+  refreshBadge();
 });
 chrome.runtime.onStartup.addListener(() => {
   reconcile();
   ensureSyncAlarm();
   syncSources(false);
+  refreshBadge();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -414,8 +448,12 @@ chrome.permissions.onAdded.addListener(async (perms) => {
   await injectExistingTabs((perms && perms.origins) || []);
   // A freshly granted origin may be a template source — try syncing it now.
   syncSources(true);
+  refreshBadge();
 });
-chrome.permissions.onRemoved.addListener(() => reconcile());
+chrome.permissions.onRemoved.addListener(() => {
+  reconcile();
+  refreshBadge();
+});
 
 chrome.storage.onChanged.addListener((changes, area) => {
   // The core item only — NOT peSettingsChanged. The worker reconciles content-script
@@ -429,6 +467,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     reconcile();
     ensureSyncAlarm();
     pruneSyncCacheNow();
+    // A settings change synced from another device is the exact moment a permission gap
+    // opens on THIS device — new domains/sources it has never granted. Re-evaluate the badge.
+    refreshBadge();
   }
 });
 

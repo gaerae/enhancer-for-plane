@@ -94,6 +94,50 @@ body {
   padding: 18px 20px;
   margin-bottom: 16px;
 }
+
+/* This-device permission gap banner. Amber, not red — it is an action to take, not an
+   error the user caused. Sits above the cards so it is the first thing seen on a synced
+   device where nothing is running yet. */
+.perm-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fef3c7;
+  border: 1px solid #f6d78a;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  color: #7a5c12;
+}
+.perm-banner[hidden] {
+  display: none;
+}
+.perm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.perm-text strong {
+  font-size: 13.5px;
+  color: #6b4e0a;
+}
+.perm-banner #permGrant {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+@media (prefers-color-scheme: dark) {
+  .perm-banner {
+    background: #3a2f12;
+    border-color: #5c4a1c;
+    color: #f0d9a0;
+  }
+  .perm-text strong {
+    color: #fbe6b0;
+  }
+}
 .card h2 {
   margin: 0 0 4px;
   font-size: 14px;
