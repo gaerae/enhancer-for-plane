@@ -292,10 +292,13 @@
 
   const hasCopyFormats = () => !!(settings && (settings.copyFormats || []).length);
 
-  // Is this element a leaf <button> whose text is a work item key? Restricting to <button>
-  // keeps a date badge ("2026-07") in the same header from being taken for a key.
-  const isKeyButton = (e) =>
-    !!e && e.tagName === "BUTTON" && e.children.length === 0 && PE_ITEM_KEY_RE.test((e.textContent || "").trim());
+  // Is this element a <button> whose visible text IS a work item key (see PE_ITEM_KEY_RE,
+  // which also rules out a "2026-07" date chip)? The match is on the trimmed textContent
+  // anchored end to end, so a button carrying extra text ("PROJ-1 · edit") is rejected — but
+  // a button that wraps the key with an icon (<svg>, which contributes no text) still matches.
+  // Not requiring a childless leaf is deliberate: a future Plane that puts an icon inside the
+  // key button should not make the copy affordance silently vanish.
+  const isKeyButton = (e) => !!e && e.tagName === "BUTTON" && PE_ITEM_KEY_RE.test((e.textContent || "").trim());
 
   // The key as printed above the title, or null. This element is both the value we copy
   // and the spot we hang the button on, so everything starts here.

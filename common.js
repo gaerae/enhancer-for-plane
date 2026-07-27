@@ -66,10 +66,18 @@ const peItemTokenRe = () => /\{\{\s*item\.([a-zA-Z0-9_-]+)\s*\}\}/gi;
 // and no title in it. Half-support is worse than none.
 const PE_ITEM_FIELDS = ["key", "title", "url"];
 const PE_MAX_COPY_FORMATS = 5;
-// A work item key as Plane prints it: project identifier + "-" + number. The identifier
-// is not always letters — a project's can be all digits, e.g. "42", so a key can read "42-7". Anchoring
-// on [A-Z] would have matched nothing there.
-const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-\d+$/;
+// A work item key as Plane prints it: project identifier + "-" + sequence number. The
+// identifier is not always letters — a project's can be all digits, e.g. "42", so a key can
+// read "42-7"; anchoring on [A-Z] would have matched nothing there.
+//
+// The sequence number starts at 1 and is never zero-padded ("DATA-5", not "DATA-05"), so it
+// is required to be [1-9]\d* — no leading zero. That is also what keeps a calendar year-month
+// out: a due-date chip reading "2026-07" (which Plane can render as a bare leaf <button> in
+// the same header) has a zero-padded month and cannot be a key. It is a real constraint on
+// keys, not a hack. (A residual: an unpadded month like "2026-10" on a project whose
+// identifier is literally the year "2026" would still match — but a 4-digit-year identifier
+// is not something Plane hands out.)
+const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-[1-9]\d*$/;
 
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it

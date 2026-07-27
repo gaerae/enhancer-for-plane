@@ -1232,7 +1232,12 @@ test("copy: a numeric project identifier is a key like any other", () => {
   // string for its Korean titles — which is why neither exists.
   ok(ctx.__ITEM_KEY_RE.test("42-7"), "numeric identifier");
   ok(ctx.__ITEM_KEY_RE.test("DATA-5"), "and the ordinary kind");
-  ok(!ctx.__ITEM_KEY_RE.test("2026-07-24"), "a date in the same block is not a key");
+  ok(ctx.__ITEM_KEY_RE.test("DATA-10"), "a two-digit sequence");
+  ok(!ctx.__ITEM_KEY_RE.test("2026-07-24"), "a full date is not a key");
+  // A due-date chip Plane can render as a bare <button>. The sequence number is never
+  // zero-padded, so the zero-padded month keeps a year-month from passing as a key.
+  ok(!ctx.__ITEM_KEY_RE.test("2026-07"), "a zero-padded year-month is not a key");
+  ok(!ctx.__ITEM_KEY_RE.test("DATA-05"), "a work item sequence never has a leading zero");
   ok(!ctx.__ITEM_KEY_RE.test("Fix login"), "nor is prose");
   const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시", ctx.peItemUrl)("42-7");
   eq(ref.key, "42-7");

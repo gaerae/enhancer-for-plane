@@ -424,7 +424,17 @@ async function refreshBadge() {
     }
   } catch (_) {}
 }
-const PE_ACTION_TITLE = "Enhancer for Plane";
+// The plain toolbar tooltip to restore when the badge clears. Read from the manifest so
+// there is one source of truth — if action.default_title ever becomes a localized
+// __MSG_…__ reference, chrome.i18n resolves it here too, rather than a second hardcoded copy.
+const PE_ACTION_TITLE = (() => {
+  try {
+    const a = chrome.runtime.getManifest().action;
+    return (a && a.default_title) || "Enhancer for Plane";
+  } catch (_) {
+    return "Enhancer for Plane";
+  }
+})();
 
 chrome.runtime.onInstalled.addListener(() => {
   reconcile();
