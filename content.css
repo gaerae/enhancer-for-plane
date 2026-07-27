@@ -84,6 +84,40 @@
   }
 }
 
+/* copy-reference button — sits beside the work item key, above the title. Icon only and
+   borderless: the key next to it is small, quiet text, and a bordered button there would
+   read as the louder of the two. It gains contrast on hover instead. */
+.pe-copy-ref-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  opacity: 0.75;
+  vertical-align: middle;
+}
+.pe-copy-ref-btn:hover {
+  opacity: 1;
+  background: rgba(18, 18, 18, 0.06);
+  color: #121212;
+}
+@media (prefers-color-scheme: dark) {
+  .pe-copy-ref-btn {
+    color: #9aa4b2;
+  }
+  .pe-copy-ref-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f4f4f5;
+  }
+}
+
 /* selector chooser menu */
 #pe-pick-menu {
   position: fixed;

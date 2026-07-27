@@ -8,9 +8,6 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Local tooling / assistant session data
-.claude/
-
 # Node (future-proofing; none committed today)
 node_modules/
 npm-debug.log*

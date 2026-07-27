@@ -22,6 +22,11 @@ changed anything a user sees, drive it:
   (see "Driving the UI" below). Node cannot render CSS.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
+- **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
+  leaf `<button>` whose text is a key — and, for the peek-panel path, a second harness
+  page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
+  value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
+  `tools/test.js`; the DOM timing is only provable in a browser.
 - **The real extension**: load unpacked, then **reload the extension AND the tab**.
   A reloaded extension does not replace content scripts already running in open tabs,
   and `window.__peLoaded` blocks re-injection — so you will be testing old code and
@@ -103,6 +108,36 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **An Alt-letter shortcut in a capture-phase handler eats that letter.** `onKeyDown` is
+  registered with capture `true` and calls `preventDefault`, so a shortcut keyed on
+  `e.code` fires before the page — and on macOS `Option`+a letter IS a character (`⌥C` =
+  "ç", `⌥N` = "ñ", `⌥E` = an accent). Alt+C shipped hijacking "ç" out of a title or body.
+  Gate any such shortcut on `isEditingText()` unless typing over it is the actual intent:
+  Alt+T is exempt because you open the template menu *while* editing the description;
+  Alt+C is not, because you never copy a reference mid-word.
+- **The peek panel closes the moment you mousedown outside it.** Our copy menu is
+  appended to `<body>`, outside the panel, so clicking a format fires a mousedown Plane
+  reads as an outside click — it tears the panel down, `#title-input` and all, before the
+  click handler runs. `copyReference` used to re-read the item at click time and got
+  `null`, so a copy from a peek panel always failed with "no item here". The fix is to
+  snapshot the item when the menu opens (panel still up) and copy from that, never from a
+  fresh read. `stopPropagation` on the menu-item mousedown keeps the panel from flickering
+  shut, but that is polish layered on Plane's event wiring; the snapshot is what makes the
+  copy correct regardless. Verified against real Plane: an outside mousedown removes
+  `#title-input` within one frame.
+- **The peek panel keeps the list's URL.** Clicking a row opens a panel with the same
+  header as the item's own page — same `#title-input`, same key button — but the address
+  bar still says `/projects/{uuid}/issues/`, with no query, no hash, and no link to the
+  item anywhere inside the panel. So anything derived from the URL has to be composed
+  there (`/{workspace}/browse/{KEY}`, which is what Plane redirects to). Composition is
+  the only part of the copy feature that could go wrong silently rather than visibly;
+  `peItemUrl` says so and is where to look first against a new Plane version.
+- **A work item key is not `ABC-123`.** A project identifier can be all digits — a
+  Plane project can have one, so a key can read `42-7`. Any regex anchored
+  on letters silently matches nothing there. The same measurement killed the branch-name
+  "title slug": Korean and emoji titles slug to the empty string, so the feature would
+  have worked for English titles and quietly produced `feature/proj-123-` for everyone
+  else. Read the key from the URL, which Plane already guarantees.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

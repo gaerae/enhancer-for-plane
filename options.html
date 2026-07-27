@@ -24,6 +24,15 @@
         </label>
       </header>
 
+      <!-- This-device permission gap (settings sync across devices, host permissions do not) -->
+      <div id="permBanner" class="perm-banner" hidden>
+        <div class="perm-text">
+          <strong data-i18n="optPermTitle">This device needs to approve access</strong>
+          <span id="permDesc"></span>
+        </div>
+        <button class="primary sm" id="permGrant" data-i18n="optPermGrant">Approve access</button>
+      </div>
+
       <!-- Active domains -->
       <section class="card">
         <h2 data-i18n="optDomainsTitle">Active domains</h2>
@@ -126,8 +135,21 @@
         <div id="sourceEmpty" class="tpl-empty" hidden data-i18n="optSyncEmpty">No sources yet. Click “Add source”.</div>
         <div class="preset-bar" style="border:0;padding:0;margin-top:10px">
           <button class="ghost sm" id="addSource" data-i18n="optSyncAddSource">＋ Add source</button>
+          <button class="ghost sm" id="addExample" data-i18n="optSyncTryExample">✨ Try our example</button>
           <button class="ghost sm" id="syncNow" data-i18n="optSyncNow">↻ Sync now</button>
         </div>
+      </section>
+
+      <!-- Copy reference -->
+      <section class="card">
+        <div class="card-head">
+          <h2 data-i18n="optCopyTitle">Copy reference</h2>
+          <button class="primary sm" id="addCopyFormat" data-i18n="optCopyAdd">＋ Add format</button>
+        </div>
+        <p class="desc" data-i18n-html="optCopyDesc">On a work item page, the button beside its ID — or <code>Alt/⌥+C</code> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name.</p>
+        <p class="desc" data-i18n-html="optCopyTokens">Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard.</p>
+        <div id="copyList" class="copy-list"></div>
+        <div id="copyEmpty" class="tpl-empty" hidden data-i18n="optCopyEmpty">No formats yet. Click “Add format” to start.</div>
       </section>
 
       <!-- Backup -->
@@ -194,6 +216,18 @@
         <input class="var-name" type="text" data-i18n-placeholder="optVarNamePh" placeholder="name (e.g. team)" />
         <input class="var-value" type="text" data-i18n-placeholder="optVarValuePh" placeholder="value inserted in its place" />
         <button class="icon-btn var-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
+      </div>
+    </template>
+
+    <!-- Copy format row template -->
+    <template id="cpyRow">
+      <div class="cpy-item">
+        <div class="cpy-fields">
+          <input class="cpy-name" type="text" data-i18n-placeholder="optCopyNamePh" placeholder="name (e.g. Chat)" />
+          <input class="cpy-format" type="text" spellcheck="false" data-i18n-placeholder="optCopyFormatPh" placeholder="{{item.key}} {{item.title}}" />
+          <button class="icon-btn cpy-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
+        </div>
+        <div class="cpy-preview"></div>
       </div>
     </template>
 

@@ -56,6 +56,30 @@
       window.close();
     });
 
+    // Route the toolbar badge here: if this device is missing access for any listed domain
+    // or source (settings sync, host permissions do not), point at Settings — which has the
+    // one-click grant. Async; the notice appears when the check resolves.
+    (async () => {
+      let missing = 0;
+      if (state.enabled) {
+        for (const o of peDesiredOrigins(state)) {
+          let has = false;
+          try {
+            has = await chrome.permissions.contains({ origins: [o] });
+          } catch (_) {}
+          if (!has) missing++;
+        }
+      }
+      const notice = $("permNotice");
+      if (notice && missing > 0) {
+        notice.hidden = false;
+        notice.addEventListener("click", () => {
+          chrome.runtime.openOptionsPage();
+          window.close();
+        });
+      }
+    })();
+
     $("pickEl").addEventListener("click", () => {
       if (currentTabId == null) return;
       try {

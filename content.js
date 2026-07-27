@@ -19,6 +19,12 @@
   let menu = null;
   let menuOpen = false;
   let menuOwnerBtn = null;
+  // The work item the copy menu was opened for, read once while the menu opens. A peek
+  // panel over a list closes as soon as you mousedown outside it, and the menu is appended
+  // to <body> — outside the panel — so by the time a format is clicked the panel, and its
+  // #title-input, can already be gone. Reading the item up front is what lets the copy
+  // survive the panel closing under it.
+  let copyRef = null;
 
   // DOM watching (re-insert the toolbar button)
   let injectScheduled = false;
@@ -203,8 +209,17 @@
     row.appendChild(btn); // end of the toolbar row (= right of Attach), keeps the gap
   }
 
-  function removeButtons() {
+  function removeTemplateButtons() {
     [...document.querySelectorAll(".pe-body-tmpl-btn")].forEach((b) => b.remove());
+  }
+
+  function removeCopyButtons() {
+    [...document.querySelectorAll(".pe-copy-ref-btn")].forEach((b) => b.remove());
+  }
+
+  function removeButtons() {
+    removeTemplateButtons();
+    removeCopyButtons();
     hideMenu();
   }
 
@@ -273,21 +288,177 @@
     host.appendChild(b);
   }
 
+  /* ---- copy reference ---- */
+
+  const hasCopyFormats = () => !!(settings && (settings.copyFormats || []).length);
+
+  // Is this element a <button> whose visible text IS a work item key (see PE_ITEM_KEY_RE,
+  // which also rules out a "2026-07" date chip)? The match is on the trimmed textContent
+  // anchored end to end, so a button carrying extra text ("PROJ-1 · edit") is rejected — but
+  // a button that wraps the key with an icon (<svg>, which contributes no text) still matches.
+  // Not requiring a childless leaf is deliberate: a future Plane that puts an icon inside the
+  // key button should not make the copy affordance silently vanish.
+  const isKeyButton = (e) => !!e && e.tagName === "BUTTON" && PE_ITEM_KEY_RE.test((e.textContent || "").trim());
+
+  // The key as printed above the title, or null. This element is both the value we copy
+  // and the spot we hang the button on, so everything starts here.
+  //
+  // Found by shape, not by class name — Plane's Tailwind classes move between versions.
+  // The search starts at #title-input and widens one ancestor at a time, so the first
+  // block holding both the title and a key (see isKeyButton) is the item header; the
+  // breadcrumb prints the same key higher up the page and is never reached.
+  //
+  // The peek panel a list opens has this identical structure — same title field, same key
+  // button, same wrapper — which is why one function serves both.
+  function findKeyEl() {
+    const title = document.querySelector("#title-input");
+    if (!title) return null;
+    let scope = title.parentElement;
+    for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
+      const hit = [...scope.querySelectorAll("button")].find(isKeyButton);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  // The work item that key belongs to: its key, title and link.
+  function readItemRef(keyEl) {
+    if (!keyEl) return null;
+    const key = (keyEl.textContent || "").trim();
+    if (!key) return null;
+    const t = document.querySelector("#title-input");
+    return {
+      key,
+      title: t && typeof t.value === "string" ? t.value.trim() : "",
+      url: peItemUrl(location.origin, location.pathname, key)
+    };
+  }
+
+  function makeCopyButton() {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pe-copy-ref-btn";
+    b.setAttribute("aria-label", peMsg("copyBtnAria"));
+    b.setAttribute("title", peMsg("copyBtnTitle"));
+    // Two offset sheets — the copy glyph every UI uses for this, so the button needs no
+    // label next to a key that is already short.
+    b.innerHTML =
+      '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+      '<rect x="5.75" y="5.75" width="7.5" height="8.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M10.5 3.75H3.9a1.15 1.15 0 0 0-1.15 1.15v6.6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMenu(b, "copy");
+    });
+    return b;
+  }
+
+  function ensureCopyButton() {
+    // Fast path: if our button is already sitting right after a key button, it is correctly
+    // placed — leave it and skip findKeyEl. This spares the whole-page button scan on every
+    // mutation-driven inject in the steady state, and reading the key's CURRENT text at copy
+    // time means an in-place key change (a peek panel switching items) still copies the right
+    // one. A stale button (its key gone) fails this check and is rebuilt below.
+    const existing = document.querySelector(".pe-copy-ref-btn");
+    if (existing) {
+      if (isKeyButton(existing.previousElementSibling)) return;
+      removeCopyButtons();
+    }
+    const keyEl = findKeyEl();
+    if (!keyEl) {
+      // No key on screen, no button. Nothing floats in from the side: a copy affordance
+      // that is not beside the key it copies is a mystery button.
+      removeCopyButtons();
+      return;
+    }
+    const row = keyEl.parentElement;
+    if (!row || row.querySelector(":scope > .pe-copy-ref-btn")) return;
+    keyEl.insertAdjacentElement("afterend", makeCopyButton());
+  }
+
+  // The synchronous copy: select a throwaway textarea and execCommand. Deprecated, but it
+  // is the only path that works without the async Clipboard API — and it MUST be called
+  // straight from the click, inside the user-activation window, or the browser refuses it.
+  function execCommandCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Put text on the clipboard. Prefer the async Clipboard API. If it REJECTS (e.g. the
+  // document is not focused), there is no sound recovery: an execCommand run from the
+  // rejection handler fires a microtask after the click returned, outside the user
+  // activation, so it would only fail too — reporting failure honestly beats pretending.
+  // The execCommand path is kept for browsers with no async API at all, where it still
+  // runs synchronously inside the click.
+  function writeClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(
+          () => true,
+          () => false
+        );
+      }
+    } catch (_) {}
+    return Promise.resolve(execCommandCopy(text));
+  }
+
+  function copyReference(fmt) {
+    // The snapshot taken when the menu opened — NOT a fresh read, which would fail once
+    // the peek panel has closed under the menu.
+    const ref = copyRef;
+    hideMenu();
+    if (!ref) {
+      toast(peMsg("msgCopyNoItem"));
+      return;
+    }
+    const text = peExpandCopyFormat(fmt.format, ref);
+    const missing = peMissingItemFields(fmt.format, ref);
+    writeClipboard(text).then((ok) => {
+      if (!ok) toast(peMsg("msgCopyFailed"));
+      // The unresolved token is on the clipboard verbatim, so say which one it was —
+      // otherwise the user finds out when it is already pasted somewhere.
+      else if (missing.length) toast(peMsg("msgCopiedMissing", [missing.join(", ")]));
+      else toast(peMsg("msgCopied"));
+    });
+  }
+
   function injectAll() {
-    if (!isActive() || !hasAnyTemplates()) {
+    if (!isActive()) {
       removeButtons();
       return;
     }
-    // Anchor on the description editor (ProseMirror/tiptap) — language-independent.
-    // Skip comment editors (comment templates are intentionally not supported).
-    [...document.querySelectorAll(".ProseMirror, .tiptap")].forEach((ed) => {
-      if (isCommentArea(ed)) return;
-      const anchor = findToolbarAnchor(ed);
-      if (anchor) ensureButtonNear(anchor);
-      // Toolbar-less editors: only fall back inside a dialog (the "Create work item"
-      // modal). Prevents spurious buttons on secondary editors in the detail view.
-      else if (ed.closest && ed.closest('[role="dialog"]')) ensureFloatingButton(ed);
-    });
+    // The two buttons are gated separately: a user with no templates can still copy a
+    // reference, and a user who deleted every copy format still gets the template menu.
+    if (hasAnyTemplates()) {
+      // Anchor on the description editor (ProseMirror/tiptap) — language-independent.
+      // Skip comment editors (comment templates are intentionally not supported).
+      [...document.querySelectorAll(".ProseMirror, .tiptap")].forEach((ed) => {
+        if (isCommentArea(ed)) return;
+        const anchor = findToolbarAnchor(ed);
+        if (anchor) ensureButtonNear(anchor);
+        // Toolbar-less editors: only fall back inside a dialog (the "Create work item"
+        // modal). Prevents spurious buttons on secondary editors in the detail view.
+        else if (ed.closest && ed.closest('[role="dialog"]')) ensureFloatingButton(ed);
+      });
+    } else {
+      removeTemplateButtons();
+    }
+
+    if (hasCopyFormats()) ensureCopyButton();
+    else removeCopyButtons();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -460,12 +631,19 @@
       });
     }
 
+    menu.appendChild(makeMenuFooter(peMsg("menuManage")));
+  }
+
+  // Shared by both menu modes. The door is the same Settings page, but the label is not:
+  // "Manage templates" under a list of copy formats sends the user looking for the wrong
+  // card.
+  function makeMenuFooter(label) {
     const footer = document.createElement("div");
     footer.className = "pe-menu-footer";
     const cfg = document.createElement("button");
     cfg.type = "button";
     cfg.className = "pe-menu-config";
-    cfg.textContent = peMsg("menuManage");
+    cfg.textContent = label;
     cfg.addEventListener("mousedown", (e) => e.preventDefault());
     cfg.addEventListener("click", (e) => {
       e.preventDefault();
@@ -475,7 +653,48 @@
       hideMenu();
     });
     footer.appendChild(cfg);
-    menu.appendChild(footer);
+    return footer;
+  }
+
+  // The copy list. Every row previews the exact string the click will put on the
+  // clipboard — the format is the output, so showing the output is showing the format.
+  function renderCopyMenu() {
+    menu.innerHTML = "";
+    // Snapshot the item now, while whatever opened the menu (button or Alt+C) guarantees
+    // the panel is still up. copyReference uses this, not a fresh read at click time.
+    copyRef = readItemRef(findKeyEl());
+    const ref = copyRef;
+    const formats = (settings && settings.copyFormats) || [];
+    const wrap = document.createElement("div");
+    wrap.className = "pe-menu-group";
+    formats.forEach((f) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "pe-menu-item";
+      const name = document.createElement("div");
+      name.className = "pe-menu-item-title";
+      name.textContent = f.name || peMsg("menuUntitled");
+      const preview = document.createElement("div");
+      preview.className = "pe-menu-item-preview";
+      preview.textContent = peExpandCopyFormat(f.format, ref).slice(0, 120);
+      item.appendChild(name);
+      item.appendChild(preview);
+      // stopPropagation as well as preventDefault: the mousedown is on <body>-level menu,
+      // outside the peek panel, and without stopping it Plane's own outside-click handler
+      // closes the panel under the menu. The copy would still work (we use copyRef), but
+      // the panel snapping shut mid-copy is jarring.
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      item.addEventListener("click", (e) => {
+        e.preventDefault();
+        copyReference(f);
+      });
+      wrap.appendChild(item);
+    });
+    menu.appendChild(wrap);
+    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy")));
   }
 
   function positionMenu(btn) {
@@ -494,14 +713,15 @@
     menu.style.width = mw + "px";
   }
 
-  function toggleMenu(btn) {
+  function toggleMenu(btn, mode) {
     if (menuOpen && menuOwnerBtn === btn) {
       hideMenu();
       return;
     }
     menuOwnerBtn = btn;
     ensureMenu();
-    renderMenu();
+    if (mode === "copy") renderCopyMenu();
+    else renderMenu();
     menu.style.display = "block";
     positionMenu(btn);
     menuOpen = true;
@@ -996,11 +1216,22 @@
     if (!menuOpen) return;
     if (
       (menu && menu.contains(e.target)) ||
-      (e.target.closest && e.target.closest(".pe-body-tmpl-btn"))
+      (e.target.closest && e.target.closest(".pe-body-tmpl-btn, .pe-copy-ref-btn"))
     )
       return;
     hideMenu();
   }
+  // Is the user typing into an editable field? (a real input/textarea, or a
+  // contenteditable surface like Plane's ProseMirror/tiptap body). Used to keep Alt+C
+  // from stealing a keystroke that is actually text.
+  function isEditingText() {
+    const a = document.activeElement;
+    if (!a) return false;
+    const tag = a.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return true;
+    return !!a.isContentEditable;
+  }
+
   function onKeyDown(e) {
     if (e.key === "Escape" && menuOpen) {
       hideMenu();
@@ -1028,6 +1259,28 @@
       }
       e.preventDefault();
       toggleMenu(target);
+      return;
+    }
+    // Alt+C (macOS: ⌥ Option+C, which yields "ç" — hence e.code): open the copy list for
+    // the work item being viewed.
+    //
+    // Bail while the user is typing. Unlike Alt+T — where you WANT the menu over the
+    // description you are editing — copying a reference is never something you do mid-word,
+    // and on macOS Option+C is the character "ç". Hijacking it (with preventDefault, in a
+    // capture-phase handler) would eat that letter out of a French/Portuguese/Turkish title
+    // or body. So only act when focus is not in an editable field.
+    if (e.altKey && (e.code === "KeyC" || e.key === "c" || e.key === "C") && !isEditingText()) {
+      let btn = document.querySelector(".pe-copy-ref-btn");
+      if (!btn) {
+        // self-heal: the header may have mounted late — inject now and retry
+        try {
+          injectAll();
+        } catch (_) {}
+        btn = document.querySelector(".pe-copy-ref-btn");
+      }
+      if (!btn) return;
+      e.preventDefault();
+      toggleMenu(btn, "copy");
     }
   }
   function onScrollResize() {

@@ -38,15 +38,23 @@
     sourceList: $("sourceList"),
     sourceEmpty: $("sourceEmpty"),
     addSource: $("addSource"),
+    addExample: $("addExample"),
     syncNow: $("syncNow"),
     srcRow: $("srcRow"),
+    copyList: $("copyList"),
+    copyEmpty: $("copyEmpty"),
+    addCopyFormat: $("addCopyFormat"),
+    cpyRow: $("cpyRow"),
     save: $("save"),
     reset: $("reset"),
     status: $("status"),
     exportBtn: $("exportBtn"),
     importBtn: $("importBtn"),
     importFile: $("importFile"),
-    exportFeedBtn: $("exportFeedBtn")
+    exportFeedBtn: $("exportFeedBtn"),
+    permBanner: $("permBanner"),
+    permDesc: $("permDesc"),
+    permGrant: $("permGrant")
   };
 
   // labelKey feeds the rule's label field on click, so it must follow the UI language.
@@ -84,8 +92,10 @@
     renderRules();
     renderTemplates();
     renderVariables();
+    renderCopyFormats();
     renderSources();
     updateStorageMeter();
+    refreshPermGap(); // async; the banner updates when it resolves
     dirty = false; // just re-rendered the form from state, so it's clean
   }
 
@@ -217,6 +227,56 @@
 
       paint();
       el.variableList.appendChild(node);
+    });
+  }
+
+  // A stand-in work item for the preview. Fixed, not read from anywhere: the preview's
+  // job is to show where each piece lands, and a sample that changes with whatever page
+  // happens to be open would make two people's screens disagree about the same format.
+  const PE_COPY_SAMPLE = {
+    key: "PROJ-123",
+    title: peMsg("optCopySampleTitle") || "Fix the login failure",
+    url: "https://plane.example.com/acme/browse/PROJ-123"
+  };
+
+  function renderCopyFormats() {
+    if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+    el.copyList.innerHTML = "";
+    const list = state.copyFormats;
+    el.copyEmpty.hidden = list.length > 0;
+    list.forEach((c, idx) => {
+      const node = el.cpyRow.content.firstElementChild.cloneNode(true);
+      peApplyI18n(node);
+      const name = node.querySelector(".cpy-name");
+      const format = node.querySelector(".cpy-format");
+      const preview = node.querySelector(".cpy-preview");
+      const del = node.querySelector(".cpy-del");
+
+      name.value = c.name || "";
+      format.value = c.format || "";
+
+      // What the clipboard gets, character for character — the same expander the content
+      // script runs, so the preview cannot drift from the real thing.
+      const paint = () => {
+        const f = state.copyFormats[idx].format || "";
+        preview.textContent = peExpandCopyFormat(f, PE_COPY_SAMPLE);
+        const missing = peMissingItemFields(f, PE_COPY_SAMPLE);
+        preview.classList.toggle("has-unknown", missing.length > 0);
+        preview.title = missing.length ? peMsg("msgCopyUnknownToken", [missing.join(", ")]) : "";
+      };
+
+      name.addEventListener("input", () => (state.copyFormats[idx].name = name.value));
+      format.addEventListener("input", () => {
+        state.copyFormats[idx].format = format.value;
+        paint();
+      });
+      del.addEventListener("click", () => {
+        state.copyFormats.splice(idx, 1);
+        renderCopyFormats();
+      });
+
+      paint();
+      el.copyList.appendChild(node);
     });
   }
 
@@ -417,6 +477,17 @@
       focusLast(".var-name");
     });
 
+    el.addCopyFormat.addEventListener("click", () => {
+      if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+      if (state.copyFormats.length >= PE_MAX_COPY_FORMATS) {
+        flash(peMsg("msgCopyLimit", [String(PE_MAX_COPY_FORMATS)]), true);
+        return;
+      }
+      state.copyFormats.push({ id: uid("cpy"), name: "", format: "" });
+      renderCopyFormats();
+      focusLast(".cpy-name");
+    });
+
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
 
     el.addSource.addEventListener("click", () => {
@@ -436,10 +507,59 @@
       focusLast(".src-name");
     });
 
+    el.addExample.addEventListener("click", () => {
+      const sync = ensureSync();
+      if (sync.sources.length >= PE_SYNC_LIMITS.maxSources) {
+        flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
+        return;
+      }
+      // Adding it twice would fetch one file under two headers and show it twice.
+      if ((sync.sources || []).some((s) => (s.url || "").trim() === PE_EXAMPLE_FEED_URL)) {
+        flash(peMsg("msgExampleExists"), true);
+        return;
+      }
+      // Clicking "try the example" is asking for sync to run, so turn it on — otherwise the
+      // source sits there and nothing fetches, which reads as the button not working. Name
+      // left blank so it behaves like any source: the feed's own name fills in on first sync.
+      sync.enabled = true;
+      sync.sources.push({
+        id: uid("src"),
+        url: PE_EXAMPLE_FEED_URL,
+        name: "",
+        intervalMinutes: 360,
+        enabled: true,
+        hiddenGroups: []
+      });
+      renderSources();
+      dirty = true; // pushed programmatically, so no input event fired to mark it
+      scheduleMeter();
+      flash(peMsg("msgExampleAdded"));
+    });
+
     el.syncNow.addEventListener("click", syncNow);
 
     el.save.addEventListener("click", saveAll);
     el.reset.addEventListener("click", resetAll);
+
+    if (el.permGrant) {
+      el.permGrant.addEventListener("click", () => {
+        // Must run inside the click gesture, so no await before request(); permMissing was
+        // computed by the last refreshPermGap. Requesting all missing origins at once yields
+        // a single Chrome prompt. On grant, the worker's permissions.onAdded reconciles and
+        // starts a sync; here we just re-check and hide the banner.
+        if (!permMissing.length) {
+          refreshPermGap();
+          return;
+        }
+        try {
+          chrome.permissions.request({ origins: permMissing }, (granted) => {
+            if (chrome.runtime.lastError) return;
+            if (granted) flash(peMsg("msgPermGranted"));
+            refreshPermGap();
+          });
+        } catch (_) {}
+      });
+    }
 
     // mark dirty on real user input (programmatic value sets don't fire these events)
     document.addEventListener(
@@ -624,17 +744,31 @@
   // Host access needed = active-domain patterns (content script) + template-source
   // origins (background fetch). Requesting already-granted origins is a silent no-op,
   // so the user is only prompted for newly added domains/sources.
-  function desiredOrigins() {
-    const out = peOriginPatterns(state);
-    const sync = state.templateSync || {};
-    if (sync.enabled) {
-      for (const src of sync.sources || []) {
-        if (!src || src.enabled === false || !src.url) continue;
-        const p = peOriginPatternForUrl(src.url);
-        if (p) out.push(p);
-      }
+  const desiredOrigins = () => peDesiredOrigins(state);
+
+  // Host permissions do not sync across devices, only settings do — so a profile synced to
+  // a new device can list domains and sources it has never granted, and nothing runs until
+  // they are re-approved here. Surface that gap as a banner with a one-click grant, instead
+  // of leaving the user to guess they must press Save again.
+  let permMissing = [];
+  async function refreshPermGap() {
+    const desired = desiredOrigins();
+    const missing = [];
+    for (const o of desired) {
+      let has = false;
+      try {
+        has = await chrome.permissions.contains({ origins: [o] });
+      } catch (_) {}
+      if (!has) missing.push(o);
     }
-    return [...new Set(out)];
+    permMissing = missing;
+    if (el.permBanner) {
+      el.permBanner.hidden = missing.length === 0;
+      // Set the whole sentence with the count substituted, rather than embedding a live
+      // <span> inside a translated string — peApplyI18n replaces innerHTML and would strip
+      // any element reference out from under us.
+      if (el.permDesc && missing.length) el.permDesc.textContent = peMsg("optPermDesc", [String(missing.length)]);
+    }
   }
 
   async function syncHostPermissions() {
@@ -691,6 +825,12 @@
         return true;
       })
       .slice(0, PE_MAX_VARIABLES);
+
+    // A format with no format string copies nothing — the name is only a label for it.
+    // Kept in sync with peSanitizeSettings, which applies the same rule to an import.
+    state.copyFormats = (state.copyFormats || [])
+      .filter((c) => c && (c.format || "").trim())
+      .slice(0, PE_MAX_COPY_FORMATS);
 
     // drop empty sources; enforce the source cap
     const sync = ensureSync();

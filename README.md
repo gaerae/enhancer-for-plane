@@ -56,21 +56,30 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-3. **Team template sync** — point the extension at a JSON file (your intranet, a
-   Git host, any URL) and everyone pulls the same templates. Off by default.
-   - Add a source in Settings → Chrome asks for access to that one origin →
-     templates appear in the picker under a header for that source.
-   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
-     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
-     independently with its own interval and on/off switch.
-   - **Synced templates are read-only** — they're edited at the source, not here.
-     What is local is the *view*: hide any group you don't need (per source), and
-     it stays hidden across syncs without touching the file.
-   - **The picker reads the cache, never the network.** Inserting a template costs
-     no request and works offline. A failed sync keeps the last good copy.
-   - **Remote data is treated as untrusted**: size-capped, rendered as text only
-     (never markup), ids namespaced per source so they can't collide with your own.
-   - See [the file format](#team-template-file-format) and `examples/`.
+3. **Copy reference** — on a work item — its own page, or the panel a list opens — the
+   button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
+   to a chat message, a pull request body, or a branch name is one click instead of three
+   selections.
+   - **The formats are yours to write.** Three ship as a starting point — plain text,
+     a markdown link, a branch name — and each is an ordinary editable row. A format is
+     copied out exactly as typed: the markdown one carries its own `[…](…)`, because the
+     thing you edit has to be the thing you get. Settings previews each row.
+   - Three values are filled in: `{{item.key}}`, `{{item.title}}`, `{{item.url}}`. There
+     is deliberately no "title slug" for branch names — a Korean or emoji title would
+     slug to nothing, and half a feature is worse than none.
+   - A value the page does not give us **stays visible as its token** rather than
+     turning into an empty string, and the toast names it — you find out before you
+     paste, not after.
+   - Works both on a work item's own page and in the **panel a list opens**, which has
+     the same header. On its own page the link is simply the address bar. The panel
+     keeps the *list's* URL and holds no link to the item at all, so there the link is
+     composed as `/{workspace}/browse/{KEY}` — Plane's own canonical short link, which
+     the `/projects/{uuid}/issues/{uuid}` form redirects to. That composition is the one
+     thing here that would break silently against a future Plane, and it is commented as
+     such in the source.
+
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-2-copy.png)
+
 4. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
@@ -97,11 +106,28 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-6. **Active domains** — runs only on the domains you specify. Wildcards
+6. **Team template sync** — point the extension at a JSON file (your intranet, a
+   Git host, any URL) and everyone pulls the same templates. Off by default.
+   - Add a source in Settings → Chrome asks for access to that one origin →
+     templates appear in the picker under a header for that source. **Not sure what
+     a source looks like? Click "Try our example"** — it fills in this repo's own
+     `examples/team-templates.json`, so one Save shows the whole flow working.
+   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
+     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
+     independently with its own interval and on/off switch.
+   - **Synced templates are read-only** — they're edited at the source, not here.
+     What is local is the *view*: hide any group you don't need (per source), and
+     it stays hidden across syncs without touching the file.
+   - **The picker reads the cache, never the network.** Inserting a template costs
+     no request and works offline. A failed sync keeps the last good copy.
+   - **Remote data is treated as untrusted**: size-capped, rendered as text only
+     (never markup), ids namespaced per source so they can't collide with your own.
+   - See [the file format](#team-template-file-format) and `examples/`.
+7. **Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-7. **Backup (Import / Export)** — export your settings to a JSON file from the
+8. **Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, and sync sources (URLs, intervals, hidden
+   domains, rules, templates, variables, copy formats, and sync sources (URLs, intervals, hidden
    groups). It does **not** carry downloaded templates or sync status — those are a
    per-device cache that the next sync refetches, so a backup stays a backup of
    your settings rather than a snapshot of someone else's file. Imported settings
@@ -277,7 +303,7 @@ live in [AGENTS.md](AGENTS.md).
 
 ## Permissions
 
-- `storage` — persists your own settings (domains, rules, templates, variables,
+- `storage` — persists your own settings (domains, rules, templates, variables, copy formats,
   sync sources) and caches downloaded team templates on this device.
 - `alarms` — wakes the service worker on your chosen interval to refresh team
   templates. An MV3 worker is evicted when idle, so a `setTimeout` would never

@@ -1,0 +1,111 @@
+/* Shared design system for the Chrome Web Store captures.
+ *
+ * Each screenshot-N-*.html is a standalone 1280x800 page that links this file and adds
+ * only what is specific to its own mock. Render one with:
+ *
+ *   chrome --headless --window-size=1280,800 \
+ *     --screenshot=screenshot-1-templates.png file://$PWD/screenshot-1-templates.html
+ *
+ * Layout is absolute on purpose: these are fixed-size posters, not responsive pages, and
+ * a fixed grid is what keeps the four of them looking like a set.
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1280px; height: 800px; }
+body {
+  background: linear-gradient(155deg, #eef0f3 0%, #f4f5f7 45%, #fafbfc 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color: #121212;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- left column: brand, headline, lede, code pill ---- */
+.left { position: absolute; left: 72px; width: 452px; }
+.brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
+.brand .mark {
+  width: 28px; height: 28px; border-radius: 8px; background: #121212;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand .name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+h1 {
+  font-size: 52px; line-height: 1.06; font-weight: 800; letter-spacing: -0.035em;
+  margin-bottom: 26px;
+}
+.lede { font-size: 17.5px; line-height: 1.62; color: #3f4650; }
+.lede b { font-weight: 700; color: #121212; }
+.pill {
+  margin-top: 30px; display: inline-block; background: #121212; color: #f4f4f5;
+  border-radius: 10px; padding: 13px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;
+  letter-spacing: -0.01em;
+}
+.pill .dot { color: #7d848e; padding: 0 9px; }
+
+/* ---- right side: mock browser window ---- */
+.win {
+  position: absolute; left: 583px; width: 625px;
+  background: #fff; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 26px 60px rgba(20, 26, 38, 0.14), 0 3px 10px rgba(20, 26, 38, 0.06);
+}
+.bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #fbfbfc; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+.url {
+  flex: 1; background: #fff; border-radius: 7px; padding: 8px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #5b6470;
+  box-shadow: inset 0 0 0 1px #eceef1;
+}
+.url .sep { color: #b6bcc4; }
+.url .path { color: #9aa1aa; }
+.page { padding: 22px 26px 30px; }
+
+/* ---- a floating panel (template menu, copy list, selector chooser) ---- */
+/* Positioned over the window and allowed to hang past its bottom edge — that overhang
+   is what gives the flat mock its depth. */
+.panel {
+  position: absolute; background: #fff; border-radius: 11px;
+  box-shadow: 0 18px 40px rgba(20, 26, 38, 0.18), 0 0 0 1px #eceef1;
+  overflow: hidden;
+}
+.panel .row { padding: 11px 15px; }
+.panel .row + .row { border-top: 1px solid #f3f4f6; }
+.panel .row.on { background: #f7f8fa; }
+.rname { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+/* Sans by default, matching the template picker's own preview line. `.mono` is for
+   previews that show a literal string — a copy format, a URL — where the real UI is
+   monospace too. Mocking the wrong one makes the poster subtly untrue. */
+.rprev {
+  margin-top: 4px; font-size: 11.5px; color: #98a0aa;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rprev.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.panel .head {
+  padding: 10px 15px; border-bottom: 1px solid #f3f4f6;
+  font-size: 11.5px; color: #9aa1aa; letter-spacing: 0.01em;
+}
+.panel .foot {
+  padding: 10px 15px; border-top: 1px solid #f3f4f6; background: #fcfcfd;
+  font-size: 12px; font-weight: 600; color: #6b7280;
+}
+
+/* ---- Korean ----
+ * Hangul has no spaces inside a word the way Latin does, so a browser will happily break
+ * a term in half at the line end; keep-all stops that. The tight tracking that suits a
+ * Latin display face also crowds Hangul, and the taller glyphs need more leading. */
+.lang-ko h1 {
+  font-size: 47px; line-height: 1.22; letter-spacing: -0.025em;
+  word-break: keep-all;
+}
+.lang-ko .lede { font-size: 16.5px; line-height: 1.72; word-break: keep-all; }
+.lang-ko .caption { font-size: 14px; word-break: keep-all; }
+.lang-ko .rname { font-weight: 700; }
+
+/* ---- caption ---- */
+.caption {
+  position: absolute; left: 0; right: 0; bottom: 30px; text-align: center;
+  font-size: 14.5px; color: #8b929b;
+}
+.caption b { color: #4b525c; font-weight: 650; }
+.caption .em { color: #4b525c; font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 4;
+const PE_SCHEMA = 5;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -45,6 +45,40 @@ const PE_VAR_PREFIX = "var.";
 const PE_VAR_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const PE_MAX_VARIABLES = 5;
 
+// Copy formats — what the "copy reference" button puts on the clipboard, written as a
+// plain string with {{item.…}} tokens. The `item.` prefix is the same idea as `var.`:
+// a namespace, so "url" can later be joined by item.state or item.assignee without
+// taking a top-level name, and so a token always says whose field it is. That matters
+// here more than in a template body — a copy can be triggered from a list one day, and
+// a bare {{url}} would be genuinely ambiguous between the page and the work item.
+//
+// A format is copied out exactly as written. There is no per-format special-casing and
+// no post-processing: the markdown preset carries its own "[…](…)" because the user
+// must be able to see, and edit, the thing that lands on their clipboard.
+const PE_ITEM_PREFIX = "item.";
+// Built fresh on every call. A /g regex carries lastIndex between uses, so one shared
+// constant would make the expander and the missing-token scan depend on which ran last.
+const peItemTokenRe = () => /\{\{\s*item\.([a-zA-Z0-9_-]+)\s*\}\}/gi;
+// The fields we can actually read off a work item page. Deliberately three: key, title,
+// url. A "slug" field (title lowercased into `a-b-c` for a branch name) was cut — a
+// Korean or emoji title slugs to the empty string, and some projects' identifiers are
+// numeric ("42-7"), so half the team would get a branch name with a dangling separator
+// and no title in it. Half-support is worse than none.
+const PE_ITEM_FIELDS = ["key", "title", "url"];
+const PE_MAX_COPY_FORMATS = 5;
+// A work item key as Plane prints it: project identifier + "-" + sequence number. The
+// identifier is not always letters — a project's can be all digits, e.g. "42", so a key can
+// read "42-7"; anchoring on [A-Z] would have matched nothing there.
+//
+// The sequence number starts at 1 and is never zero-padded ("DATA-5", not "DATA-05"), so it
+// is required to be [1-9]\d* — no leading zero. That is also what keeps a calendar year-month
+// out: a due-date chip reading "2026-07" (which Plane can render as a bare leaf <button> in
+// the same header) has a zero-padded month and cannot be a key. It is a real constraint on
+// keys, not a hack. (A residual: an unpadded month like "2026-10" on a project whose
+// identifier is literally the year "2026" would still match — but a 4-digit-year identifier
+// is not something Plane hands out.)
+const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-[1-9]\d*$/;
+
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it
 // to protect quota, memory, and picker render time (and to blunt a bad endpoint).
@@ -69,6 +103,15 @@ const PE_SYNC_LIMITS = {
 // What chrome.storage.local will hold, for the budget check above (10 MB; 5 MB on
 // Chrome <= 113). Not a cap we enforce — a fact we have to design against.
 const PE_LOCAL_QUOTA_BYTES = 10485760;
+
+// A ready-to-try team feed: this repo's own examples/team-templates.json, served raw from
+// GitHub. The "Try the example" button in Settings fills a source with it, so a first-time
+// user can watch sync work without writing or hosting a feed — one Save (which grants
+// raw.githubusercontent.com, a different origin than Plane, so Chrome prompts once) and the
+// picker fills with the sample collection. The URL lives here so the button and the tests
+// share one string; tools/test.js checks it points at the file that actually ships.
+const PE_EXAMPLE_FEED_URL =
+  "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates.json";
 
 // Count caps for an imported settings file: a bound on the work done for a file that is
 // hostile or simply corrupt, not a statement of how many templates a user may keep.
@@ -142,6 +185,28 @@ const PE_DEFAULTS = {
   // differently for each person who inserts it, with no per-user data ever leaving the
   // browser. Each: { name, value }.
   variables: [],
+
+  // Copy formats — see PE_ITEM_PREFIX. Each: { id, name, format }. The three presets are
+  // the three places a work item reference actually goes: a chat message, a pull request
+  // body, and a branch name. They are ordinary rows, editable and deletable like any
+  // other — nothing in the code treats them as special.
+  copyFormats: [
+    {
+      id: "cpy-plain",
+      name: peMsg("optCopyPresetPlain") || "Plain text",
+      format: "{{item.key}} {{item.title}} {{item.url}}"
+    },
+    {
+      id: "cpy-markdown",
+      name: peMsg("optCopyPresetMarkdown") || "Markdown link",
+      format: "[{{item.key}}]({{item.url}}) {{item.title}}"
+    },
+    {
+      id: "cpy-branch",
+      name: peMsg("optCopyPresetBranch") || "Branch name",
+      format: "feature/{{item.key}}"
+    }
+  ],
 
   // Template sync — pull shared templates from one or more URLs. Config only
   // (the fetched templates + per-device status live in PE_SYNC_CACHE_KEY, not here,
@@ -223,6 +288,9 @@ function peDeepMerge(def, cur) {
 //            v3 object still carries them inline and peAssembleSettings reads them from
 //            there whenever no shard count is stamped, so the conversion happens on the
 //            next save. Only the stamp moves.
+//   v4 → v5: copyFormats is additive, so peDeepMerge backfills it — only the stamp
+//            moves. Note it backfills an *absent* array only: a user who deleted every
+//            format keeps an empty one and does not get the presets back.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -320,6 +388,17 @@ function peSanitizeSettings(raw) {
       return true;
     })
     .slice(0, PE_MAX_VARIABLES);
+
+  out.copyFormats = arr(raw.copyFormats)
+    .filter((c) => c && typeof c === "object")
+    .map((c) => ({
+      id: str(c.id, L.maxFieldLen) || "cpy-" + peHash([c.name, c.format].map((x) => str(x, L.maxFieldLen)).join(SEP)),
+      name: str(c.name, L.maxFieldLen),
+      format: str(c.format, L.maxFieldLen)
+    }))
+    // A format with nothing in it copies nothing; the name alone is not the thing.
+    .filter((c) => c.format.trim())
+    .slice(0, PE_MAX_COPY_FORMATS);
 
   const sync = raw.templateSync && typeof raw.templateSync === "object" ? raw.templateSync : {};
   out.templateSync = {
@@ -747,6 +826,77 @@ function peSaveSyncCache(cache) {
 }
 
 // A template is "meaningful" if it has at least one filled field.
+// Where a work item lives, as a link someone else can open. Returns "" when the page
+// cannot tell us — the caller then leaves {{item.url}} standing as its own token.
+//
+// Two cases, and the difference is worth keeping in view:
+//
+//   observed  — the address bar already IS the item's page, /{workspace}/browse/{KEY}.
+//               Nothing to work out; the query string is dropped because it carries view
+//               state, not the item.
+//   assembled — a peek panel opened over a list keeps the *list's* URL, and the panel
+//               contains no link to the item at all (checked: its only anchor points at
+//               Plane's docs). So the link is composed from two things the page does
+//               give us: the workspace slug, which is the first path segment on every
+//               Plane page, and the key.
+//
+// Assembly rests on Plane's canonical short link being /{workspace}/browse/{KEY} —
+// verified by opening the /projects/{uuid}/issues/{uuid} form and watching Plane
+// redirect to exactly that. It is the one place here that would still "work" if Plane
+// changed its URL scheme, and quietly copy a dead link, so it is the line to re-check
+// against a new Plane version.
+function peItemUrl(origin, pathname, key) {
+  if (!origin || !key) return "";
+  const seg = String(pathname || "")
+    .split("/")
+    .filter(Boolean);
+  const i = seg.indexOf("browse");
+  if (i !== -1 && seg.length === i + 2) {
+    let seen = seg[i + 1];
+    try {
+      seen = decodeURIComponent(seen);
+    } catch (_) {
+      /* keep it raw */
+    }
+    // Same page, same item → hand back what the user is looking at.
+    if (seen === key) return origin + pathname;
+  }
+  if (!seg.length) return "";
+  return origin + "/" + seg[0] + "/browse/" + key;
+}
+
+// Expand a copy format against the fields read off the work item page.
+//
+// One pass, no recursion, and the same law the template variables already follow: a
+// token we cannot resolve is returned untouched instead of blanked. A format that asks
+// for a field the page did not give us then says so on the clipboard — visible before
+// the paste — rather than copying a hole that reads as if the title were empty.
+// peMissingItemFields names those tokens so the caller can say which one failed.
+function peExpandCopyFormat(format, item) {
+  if (!format) return "";
+  const fields = item || {};
+  return String(format).replace(peItemTokenRe(), (token, name) => {
+    const v = fields[String(name).toLowerCase()];
+    return typeof v === "string" && v !== "" ? v : token;
+  });
+}
+
+// The item fields a format references but the page could not supply — unknown names
+// ({{item.state}}) and known ones that came back empty alike, because from the user's
+// side both leave the same unexpanded token on the clipboard.
+function peMissingItemFields(format, item) {
+  const fields = item || {};
+  const out = [];
+  const re = peItemTokenRe();
+  let m;
+  while ((m = re.exec(String(format || "")))) {
+    const name = String(m[1]).toLowerCase();
+    const v = fields[name];
+    if (!(typeof v === "string" && v !== "") && out.indexOf(name) === -1) out.push(name);
+  }
+  return out;
+}
+
 function peTemplateHasContent(t) {
   return !!(t && ((t.name && t.name.trim()) || (t.title && t.title.trim()) || (t.content && t.content.trim())));
 }
@@ -824,6 +974,28 @@ function peOriginPatterns(settings) {
     // Allow host chars and a leading "*." wildcard only; skip anything malformed.
     if (!d || /[^a-z0-9.*-]/.test(d)) continue;
     out.push("*://" + d + "/*");
+  }
+  return [...new Set(out)];
+}
+
+// Every host pattern the current settings imply a need for: the active domains, plus the
+// origin of each enabled sync source. This is what must be granted for the extension to
+// actually run.
+//
+// It matters because Chrome does NOT sync host permissions across devices — only settings
+// sync. So a settings object that arrived from another device can list domains and source
+// URLs this device has never granted, and reconcile() then registers nothing for them: the
+// extension looks installed and configured but sits inert. Callers diff this against what
+// permissions.contains reports to find that gap and offer a one-click re-grant.
+function peDesiredOrigins(settings) {
+  const out = peOriginPatterns(settings);
+  const sync = settings && settings.templateSync;
+  if (sync && sync.enabled) {
+    for (const src of sync.sources || []) {
+      if (!src || src.enabled === false || !src.url) continue;
+      const p = peOriginPatternForUrl(src.url);
+      if (p) out.push(p);
+    }
   }
   return [...new Set(out)];
 }

@@ -599,5 +599,112 @@
   },
   "pickRuleFailed": {
     "message": "규칙 저장 실패 (스토리지 오류)."
+  },
+  "optCopyTitle": {
+    "message": "참조 복사"
+  },
+  "optCopyAdd": {
+    "message": "＋ 형식 추가"
+  },
+  "optCopyDesc": {
+    "message": "작업 항목에서 — 항목 화면이든 목록에서 열리는 패널이든 — 번호 옆 버튼 또는 <code>Alt/⌥+C</code>를 누르면 아래 형식 중 하나로 클립보드에 복사합니다. 메신저, 풀 리퀘스트 본문, 브랜치명으로 넘길 때 씁니다."
+  },
+  "optCopyTokens": {
+    "message": "치환되는 값은 세 가지입니다: <code>{{item.key}}</code>, <code>{{item.title}}</code>, <code>{{item.url}}</code>. 나머지는 적은 그대로 복사되므로, 각 줄 아래 미리보기가 곧 클립보드에 들어갈 내용입니다."
+  },
+  "optCopyEmpty": {
+    "message": "형식이 없습니다. “형식 추가”를 눌러 시작하세요."
+  },
+  "optCopyNamePh": {
+    "message": "이름 (예: 메신저)"
+  },
+  "optCopyFormatPh": {
+    "message": "{{item.key}} {{item.title}}"
+  },
+  "optCopySampleTitle": {
+    "message": "로그인 실패 수정"
+  },
+  "optCopyPresetPlain": {
+    "message": "일반 텍스트"
+  },
+  "optCopyPresetMarkdown": {
+    "message": "마크다운 링크"
+  },
+  "optCopyPresetBranch": {
+    "message": "브랜치명"
+  },
+  "copyBtnAria": {
+    "message": "이 작업 항목의 참조 복사 (Alt/⌥+C)"
+  },
+  "copyBtnTitle": {
+    "message": "참조 복사  ·  Alt/⌥+C"
+  },
+  "msgCopied": {
+    "message": "복사했습니다."
+  },
+  "msgCopiedMissing": {
+    "message": "복사했지만 $FIELDS$ 값을 읽지 못해 적은 그대로 남았습니다.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyFailed": {
+    "message": "클립보드에 쓰지 못했습니다. 설정의 미리보기에서 직접 복사해 주세요."
+  },
+  "msgCopyNoItem": {
+    "message": "이 화면에는 작업 항목이 없습니다. 항목을 열거나 목록에서 한 줄을 눌러 패널을 여세요."
+  },
+  "msgCopyLimit": {
+    "message": "형식은 최대 $MAX$개까지입니다. 하나를 지우고 추가하세요.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyUnknownToken": {
+    "message": "치환되는 값이 아닙니다: $FIELDS$. 적은 그대로 복사됩니다.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuManageCopy": {
+    "message": "＋ 참조 복사 형식 관리"
+  },
+  "optSyncTryExample": {
+    "message": "✨ 예시 사용해 보기"
+  },
+  "msgExampleAdded": {
+    "message": "예시 피드를 추가했습니다. 저장을 누르면 가져옵니다 — Chrome이 raw.githubusercontent.com 접근을 한 번 묻습니다."
+  },
+  "msgExampleExists": {
+    "message": "예시 피드는 이미 소스에 있습니다."
+  },
+  "optPermTitle": {
+    "message": "이 기기에서 접근 승인이 필요합니다"
+  },
+  "optPermDesc": {
+    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트·소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 확장이 동작하지 않습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optPermGrant": {
+    "message": "접근 승인"
+  },
+  "msgPermGranted": {
+    "message": "이 기기에서 접근을 승인했습니다."
+  },
+  "badgeNeedsAccess": {
+    "message": "Enhancer for Plane — 이 기기에서 접근 승인 필요"
+  },
+  "popPermGap": {
+    "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."
   }
 }

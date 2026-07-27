@@ -1,0 +1,121 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store capture 1 — title + body templates</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  .left { top: 208px; }
+  .win { top: 240px; }
+  .doc-title { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+  .doc h3 { font-size: 14px; font-weight: 650; margin-top: 17px; }
+  .doc .ol { margin-top: 9px; font-size: 13px; color: #9aa1aa; letter-spacing: 0.06em; }
+
+  /* description toolbar: the row our Template button is cloned into, right of Attach */
+  .toolbar {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 22px; padding: 11px 13px;
+    border: 1px solid #eceef1; border-radius: 9px;
+  }
+  .marks { display: flex; align-items: center; gap: 13px; color: #79818c; font-size: 13.5px; }
+  .marks .i { font-style: italic; }
+  .marks .s { text-decoration: line-through; }
+  .marks .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 600;
+    border: 1px solid #e6e8ec; color: #4b525c; background: #fff;
+  }
+  .btn.primary { background: #121212; border-color: #121212; color: #fff; }
+
+  .panel.menu { left: 862px; top: 505px; width: 322px; }
+  .lang-ko .panel.menu { top: 508px; }
+  .emoji { font-size: 13px; }
+</style>
+
+<div class="left">
+  <div class="brand"></div>
+  <h1 data-t="head">Title + body<br />templates,<br />one click.</h1>
+  <p class="lede" data-t="lede"></p>
+  <div class="pill">{{date}}<span class="dot">·</span>{{date+7}}<span class="dot">·</span>{{week}}</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <span class="url">plane.example.com <span class="sep">/</span> <span class="path" data-t="crumb"></span></span>
+  </div>
+  <div class="page doc">
+    <div class="doc-title" data-t="itemTitle"></div>
+    <h3 data-t="h1"></h3>
+    <h3 data-t="h2"></h3>
+    <div class="ol">1.&nbsp;&nbsp;&nbsp;2.</div>
+    <div class="toolbar">
+      <span class="marks">
+        <b>B</b><span class="i">I</span><span class="s">S</span><span>•</span><span>1.</span>
+        <span class="mono">&lt;/&gt;</span>
+      </span>
+      <span class="tools">
+        <span class="btn" data-t="attach"></span>
+        <span class="btn primary" data-t="tmplBtn"></span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="panel menu">
+  <div class="row">
+    <div class="rname" data-t="t1name"></div>
+    <div class="rprev" data-t="t1prev"></div>
+  </div>
+  <div class="row on">
+    <div class="rname" data-t="t2name"></div>
+    <div class="rprev" data-t="t2prev"></div>
+  </div>
+  <div class="foot" data-t="manage"></div>
+</div>
+
+<div class="caption" data-t="caption"></div>
+
+<script>
+  // The sample templates are user content, so they are written in the reader's language.
+  // The menu's own chrome is not: "manage" is the string the extension actually renders
+  // in that locale (_locales/*/messages.json → menuManage).
+  window.T = {
+    en: {
+      head: "Title + body<br />templates,<br />one click.",
+      lede:
+        "A native <b>Template</b> button sits next to <b>Attach</b> — and in the create dialog. " +
+        "Pick one; it fills the <b>title and description together</b>.",
+      crumb: "work item",
+      itemTitle: "[Bug] Checkout fails on Safari",
+      h1: "Summary",
+      h2: "Steps to reproduce",
+      attach: "📎 Attach",
+      tmplBtn: "📄 Template",
+      t1name: '<span class="emoji">🐞</span> Bug report',
+      t1prev: "Title: [Bug] · Summary Steps to reproduce Expected result…",
+      t2name: '<span class="emoji">✅</span> Task',
+      t2prev: "Background Goal Definition of Done References",
+      manage: "＋ Manage templates",
+      caption: "Open with the button or press <b>Alt/⌥+T</b>"
+    },
+    ko: {
+      head: "제목 + 본문<br />템플릿,<br />한 번에.",
+      lede:
+        "설명 툴바의 <b>첨부</b> 옆에 <b>템플릿</b> 버튼이 생깁니다. 작업 항목 생성 창에서도 마찬가지입니다. " +
+        "하나를 고르면 <b>제목과 본문이 함께</b> 채워집니다.",
+      crumb: "작업 항목",
+      itemTitle: "[Bug] Safari에서 결제가 실패합니다",
+      h1: "요약",
+      h2: "재현 방법",
+      attach: "📎 첨부",
+      tmplBtn: "📄 템플릿",
+      t1name: '<span class="emoji">🐞</span> 버그 리포트',
+      t1prev: "제목: [Bug] · 요약 재현 방법 예상 결과…",
+      t2name: '<span class="emoji">✅</span> 작업',
+      t2prev: "배경 목표 완료 기준 참고 자료",
+      manage: "＋ 템플릿 관리",
+      caption: "버튼을 누르거나 <b>Alt/⌥+T</b>"
+    }
+  };
+</script>
+<script src="shot.js"></script>

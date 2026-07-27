@@ -599,5 +599,112 @@
   },
   "pickRuleFailed": {
     "message": "Failed to save the rule (storage error)."
+  },
+  "optCopyTitle": {
+    "message": "Copy reference"
+  },
+  "optCopyAdd": {
+    "message": "＋ Add format"
+  },
+  "optCopyDesc": {
+    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <code>Alt/⌥+C</code>) copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
+  },
+  "optCopyTokens": {
+    "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
+  },
+  "optCopyEmpty": {
+    "message": "No formats yet. Click “Add format” to start."
+  },
+  "optCopyNamePh": {
+    "message": "name (e.g. Chat)"
+  },
+  "optCopyFormatPh": {
+    "message": "{{item.key}} {{item.title}}"
+  },
+  "optCopySampleTitle": {
+    "message": "Fix the login failure"
+  },
+  "optCopyPresetPlain": {
+    "message": "Plain text"
+  },
+  "optCopyPresetMarkdown": {
+    "message": "Markdown link"
+  },
+  "optCopyPresetBranch": {
+    "message": "Branch name"
+  },
+  "copyBtnAria": {
+    "message": "Copy this work item's reference (Alt/⌥+C)"
+  },
+  "copyBtnTitle": {
+    "message": "Copy reference  ·  Alt/⌥+C"
+  },
+  "msgCopied": {
+    "message": "Copied."
+  },
+  "msgCopiedMissing": {
+    "message": "Copied, but $FIELDS$ could not be read — it stayed in the text as written.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyFailed": {
+    "message": "Could not reach the clipboard. Copy it by hand from the preview in Settings."
+  },
+  "msgCopyNoItem": {
+    "message": "No work item on this page — open one, or click a row to open its panel."
+  },
+  "msgCopyLimit": {
+    "message": "Up to $MAX$ formats. Remove one to add another.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgCopyUnknownToken": {
+    "message": "Not a value that can be filled in: $FIELDS$. It is copied as written.",
+    "placeholders": {
+      "fields": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuManageCopy": {
+    "message": "＋ Manage copy formats"
+  },
+  "optSyncTryExample": {
+    "message": "✨ Try our example"
+  },
+  "msgExampleAdded": {
+    "message": "Added our example feed. Press Save to fetch it — Chrome will ask for access to raw.githubusercontent.com once."
+  },
+  "msgExampleExists": {
+    "message": "Our example feed is already in your sources."
+  },
+  "optPermTitle": {
+    "message": "This device needs to approve access"
+  },
+  "optPermDesc": {
+    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ listed site(s)/source(s) are not yet approved on this device. Until you approve, the extension stays inactive here.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optPermGrant": {
+    "message": "Approve access"
+  },
+  "msgPermGranted": {
+    "message": "Access approved on this device."
+  },
+  "badgeNeedsAccess": {
+    "message": "Enhancer for Plane — approve access on this device"
+  },
+  "popPermGap": {
+    "message": "⚠ Some sites need access on this device — open Settings to approve."
   }
 }
