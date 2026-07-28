@@ -197,6 +197,9 @@ The common case is a Git host: `github.com/<org>/<repo>/raw/main/t.json` redirec
 Group ordering follows first appearance in the file; ungrouped items come first.
 Working examples: [`examples/team-templates.json`](examples/team-templates.json) and
 [`examples/team-templates-design.json`](examples/team-templates-design.json).
+A larger doc-and-issue set is in
+[`examples/team-templates-data.json`](examples/team-templates-data.json) (English) and
+[`examples/team-templates-data-ko.json`](examples/team-templates-data-ko.json) (Korean).
 
 ## Built for self-hosted Plane
 

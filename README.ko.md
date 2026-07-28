@@ -179,6 +179,9 @@ Git 호스트의 raw URL, S3 버킷. 그 URL을 설정 ▸ Team template sync에
 그룹 순서는 파일에 처음 나온 순서를 따르고, 그룹 없는 항목이 먼저 옵니다. 실제 예시는
 [`examples/team-templates.json`](examples/team-templates.json)과
 [`examples/team-templates-design.json`](examples/team-templates-design.json)에 있습니다.
+더 큰 문서·이슈 모음은
+[`examples/team-templates-data.json`](examples/team-templates-data.json)(영문)과
+[`examples/team-templates-data-ko.json`](examples/team-templates-data-ko.json)(한글)에 있습니다.
 
 ## 자체 호스팅 Plane 전용
 
