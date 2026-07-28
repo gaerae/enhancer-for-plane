@@ -4,6 +4,48 @@
   "version": "2026-07-28",
   "templates": [
     {
+      "id": "issue-feature",
+      "group": "Issues",
+      "name": "✨ Feature request",
+      "title": "[Feature] ",
+      "content": "## Request background\n\n## Current approach and pain\n\n## Desired outcome\n(state it in a verifiable way)\n\n## Target date\n{{date+7}}\n"
+    },
+    {
+      "id": "issue-bug",
+      "group": "Issues",
+      "name": "🐞 Bug",
+      "title": "[Bug] ",
+      "content": "## Occurrence\n- First seen: {{date}}\n- Pattern: one-off / intermittent / persistent\n\n## Symptoms\n(observed facts only)\n\n## Reproduction\n1. — actual result: \n2. — actual result: \n\n## Expected\n\n## Impact and SEV\nCheck the matching grade (proposed criteria · when unsure, start high and lower):\n- [ ] SEV-1 — full outage / data loss in progress (unrecoverable)\n- [ ] SEV-2 — core feature broken (no workaround) / data corruption (wrong values exposed to consumers) or core pipeline down\n- [ ] SEV-3 — partial degradation (workaround exists) / load delay past SLA, limited downstream\n- [ ] SEV-4 — no impact / minor, not consumer-facing\n- Basis (workaround? · downstream scope): \n"
+    },
+    {
+      "id": "issue-task",
+      "group": "Issues",
+      "name": "✅ Task",
+      "title": "[Task] ",
+      "content": "## Details\n\n## Done criteria\n- [ ] \n"
+    },
+    {
+      "id": "issue-infra",
+      "group": "Issues",
+      "name": "🧱 Infra request",
+      "title": "[Infra] ",
+      "content": "## Request\nFill these six per firewall rule (duplicate the block for multiple rules):\n- Source system: \n- Source address: \n- Destination system: \n- Destination address: \n- Port: \n- Purpose: \n\n## Reason\n\n## Approval and work\n- Approver: \n- Rollback method: \n- If temporary, expiry date · recall sub-issue: \n"
+    },
+    {
+      "id": "issue-pipeline",
+      "group": "Issues",
+      "name": "🔀 Pipeline request",
+      "title": "[Pipeline] ",
+      "content": "## Spec\n- Source: \n- Destination: \n- Cadence: \n- Latency tolerance: \n- PII: included / not included\n- Schema: (repo link)\n\n## Requester and purpose\n- Requester: \n- Purpose: \n"
+    },
+    {
+      "id": "minutes",
+      "group": "Meetings",
+      "name": "🗒️ Meeting notes",
+      "title": "[Meeting] {{date}} ",
+      "content": "When: {{date}} · Attendees: \n\n## Agenda\n- \n\n## Discussion\n\n## Decisions\n- (extract key decisions as ADR-N references)\n\n## Actions\n- [ ] (owner / Plane link)\n"
+    },
+    {
       "id": "adr",
       "group": "Decisions · Design",
       "name": "🧭 ADR decision record",
@@ -100,48 +142,6 @@
       "name": "📏 Standard (STD)",
       "title": "[STD] ",
       "content": "## Scope\n- In scope: \n- Out of scope: \n\n## Rules\n- MUST: \n- SHOULD: \n\n## Exceptions\n(approval path: who, how)\n\n## Rationale\n- ADR-\n"
-    },
-    {
-      "id": "minutes",
-      "group": "Meetings",
-      "name": "🗒️ Meeting notes",
-      "title": "[Meeting] {{date}} ",
-      "content": "When: {{date}} · Attendees: \n\n## Agenda\n- \n\n## Discussion\n\n## Decisions\n- (extract key decisions as ADR-N references)\n\n## Actions\n- [ ] (owner / Plane link)\n"
-    },
-    {
-      "id": "issue-feature",
-      "group": "Issues",
-      "name": "✨ Feature request",
-      "title": "[Feature] ",
-      "content": "## Request background\n\n## Current approach and pain\n\n## Desired outcome\n(state it in a verifiable way)\n\n## Target date\n{{date+7}}\n"
-    },
-    {
-      "id": "issue-bug",
-      "group": "Issues",
-      "name": "🐞 Bug",
-      "title": "[Bug] ",
-      "content": "## Occurrence\n- First seen: {{date}}\n- Pattern: one-off / intermittent / persistent\n\n## Symptoms\n(observed facts only)\n\n## Reproduction\n1. — actual result: \n2. — actual result: \n\n## Expected\n\n## Impact and SEV\nCheck the matching grade (proposed criteria · when unsure, start high and lower):\n- [ ] SEV-1 — full outage / data loss in progress (unrecoverable)\n- [ ] SEV-2 — core feature broken (no workaround) / data corruption (wrong values exposed to consumers) or core pipeline down\n- [ ] SEV-3 — partial degradation (workaround exists) / load delay past SLA, limited downstream\n- [ ] SEV-4 — no impact / minor, not consumer-facing\n- Basis (workaround? · downstream scope): \n"
-    },
-    {
-      "id": "issue-task",
-      "group": "Issues",
-      "name": "✅ Task",
-      "title": "[Task] ",
-      "content": "## Details\n\n## Done criteria\n- [ ] \n"
-    },
-    {
-      "id": "issue-infra",
-      "group": "Issues",
-      "name": "🧱 Infra request",
-      "title": "[Infra] ",
-      "content": "## Request\n| Source system | Source address | Destination system | Destination address | Port | Purpose |\n| --- | --- | --- | --- | --- | --- |\n|  |  |  |  |  |  |\n\n## Reason\n\n## Approval and work\n- Approver: \n- Rollback method: \n- If temporary, expiry date · recall sub-issue: \n"
-    },
-    {
-      "id": "issue-pipeline",
-      "group": "Issues",
-      "name": "🔀 Pipeline request",
-      "title": "[Pipeline] ",
-      "content": "## Spec\n| Source | Destination | Cadence | Latency tolerance | PII |\n| --- | --- | --- | --- | --- |\n|  |  |  |  |  |\n- Schema: (repo link)\n\n## Requester and purpose\n- Requester: \n- Purpose: \n"
     }
   ]
 }
