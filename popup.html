@@ -12,6 +12,12 @@
         <strong>Enhancer for Plane</strong>
       </header>
 
+      <form class="pop-jump" id="jumpForm" hidden>
+        <input id="jumpKey" class="pop-jump-key" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="popJumpPh" placeholder="Issue key…" />
+        <select id="jumpTarget" class="pop-jump-target" hidden></select>
+        <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
+      </form>
+
       <label class="pop-toggle">
         <span data-i18n="popEnabled">Enabled</span>
         <input type="checkbox" id="enabled" />

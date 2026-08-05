@@ -80,7 +80,20 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-2-copy.png)
 
-4. **Style rules (width / length) — a generic engine**
+4. **Quick jump** — type a work item key and go straight to it. In the address bar type
+   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
+   toolbar popup.
+   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
+     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
+     are its two halves), or the key appended when the link has no token. Plane's is
+     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
+   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
+     target with an empty prefix is the default. The popup shows a target picker once you
+     have more than one, and the address bar suggests the other targets as you type.
+   - It **opens a URL and nothing more** — no host permission, no content script — so it
+     works on any tab, including ones where the rest of the extension never runs. Ships with
+     no targets; add yours in Settings, where each row previews where a sample key lands.
+5. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -95,7 +108,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-5. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+6. **Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -106,7 +119,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-6. **Team template sync** — point the extension at a JSON file (your intranet, a
+7. **Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
@@ -123,12 +136,12 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-7. **Active domains** — runs only on the domains you specify. Wildcards
+8. **Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-8. **Backup (Import / Export)** — export your settings to a JSON file from the
+9. **Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, copy formats, and sync sources (URLs, intervals, hidden
-   groups). It does **not** carry downloaded templates or sync status — those are a
+   domains, rules, templates, variables, copy formats, quick jump links, and sync sources
+   (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
    per-device cache that the next sync refetches, so a backup stays a backup of
    your settings rather than a snapshot of someone else's file. Imported settings
    load into the form — review, then `Save` to apply.

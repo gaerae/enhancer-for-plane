@@ -503,3 +503,109 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // async response
   }
 });
+
+/* ------------------------------------------------------------------ */
+/* Omnibox — "issue <KEY>" in the address bar jumps straight to the    */
+/* item. It only opens a URL: no host permission, no content script,   */
+/* so it works on any tab, including where the enhancer never runs.    */
+/* ------------------------------------------------------------------ */
+
+// Chrome renders a suggestion description as XML, so a raw & or < is dropped or throws.
+function peOmniEscape(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+// Honour the omnibox disposition: Enter → current tab, Alt+Enter → new foreground tab,
+// Meta+Enter → new background tab. Guarded to http(s) so nothing else can be navigated to.
+function peOpenUrl(url, disposition) {
+  if (!peIsHttpUrl(url)) return;
+  if (disposition === "currentTab") {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      const id = tabs && tabs[0] && tabs[0].id;
+      if (id != null) chrome.tabs.update(id, { url });
+      else chrome.tabs.create({ url });
+    });
+  } else {
+    chrome.tabs.create({ url, active: disposition !== "newBackgroundTab" });
+  }
+}
+
+function peEnabledQuickLinks(settings) {
+  return (settings.quickLinks || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
+}
+
+if (chrome.omnibox) {
+  const omniReset = () =>
+    chrome.omnibox.setDefaultSuggestion({
+      description: peOmniEscape(peMsg("omniboxHint") || "Type a work item key to open it")
+    });
+  omniReset();
+
+  chrome.omnibox.onInputChanged.addListener((text, suggest) => {
+    const key = (text || "").trim();
+    peGetSettings().then((settings) => {
+      const links = peEnabledQuickLinks(settings);
+      if (!key || !links.length) {
+        chrome.omnibox.setDefaultSuggestion({
+          description: peOmniEscape(
+            links.length
+              ? peMsg("omniboxHint") || "Type a work item key to open it"
+              : peMsg("omniboxNoTarget") || "No quick link set — Enter opens Settings"
+          )
+        });
+        suggest([]);
+        return;
+      }
+      const chosen = peRouteQuickLink(links, key);
+      const chosenUrl = peExpandQuickLink(chosen, key);
+      // The default row is what plain Enter uses; show where it lands.
+      chrome.omnibox.setDefaultSuggestion({
+        description:
+          peOmniEscape(peMsg("omniboxOpen", [key, (chosen && chosen.name) || ""]) || "Open " + key) +
+          " <url>" +
+          peOmniEscape(chosenUrl) +
+          "</url>"
+      });
+      // The other enabled targets, so a key that auto-routed one way can still be sent
+      // elsewhere. `content` is the resolved URL — onInputEntered opens a URL verbatim.
+      const others = links
+        .filter((l) => l !== chosen)
+        .map((l) => {
+          const u = peExpandQuickLink(l, key);
+          return {
+            content: u,
+            description:
+              peOmniEscape(peMsg("omniboxOpen", [key, l.name || ""]) || "Open " + key) +
+              " <url>" +
+              peOmniEscape(u) +
+              "</url>"
+          };
+        })
+        .filter((s) => peIsHttpUrl(s.content));
+      suggest(others);
+    });
+  });
+
+  chrome.omnibox.onInputEntered.addListener((text, disposition) => {
+    const entered = (text || "").trim();
+    if (!entered) return;
+    // A picked suggestion arrives as its already-resolved URL — open it verbatim.
+    if (peIsHttpUrl(entered)) {
+      peOpenUrl(entered, disposition);
+      omniReset();
+      return;
+    }
+    peGetSettings().then((settings) => {
+      const chosen = peRouteQuickLink(peEnabledQuickLinks(settings), entered);
+      const url = chosen ? peExpandQuickLink(chosen, entered) : "";
+      if (peIsHttpUrl(url)) peOpenUrl(url, disposition);
+      else chrome.runtime.openOptionsPage(); // nothing configured, or a bad url — send them to set one
+      omniReset();
+    });
+  });
+}

@@ -195,7 +195,7 @@
     "message": "백업"
   },
   "optBackupDesc1": {
-    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
+    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>빠른 이동 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
     "message": "파일에는 도메인·소스 URL·변수 값이 평문으로 들어갑니다. 변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요. 동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
@@ -706,5 +706,64 @@
   },
   "popPermGap": {
     "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."
+  },
+  "optQuickTitle": {
+    "message": "빠른 이동"
+  },
+  "optQuickAdd": {
+    "message": "＋ 링크 추가"
+  },
+  "optQuickDesc": {
+    "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다. 키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다. 접두사가 빈 대상이 기본값입니다. 툴바 팝업에서도 됩니다."
+  },
+  "optQuickTokens": {
+    "message": "URL에서 키가 들어갈 자리에 <code>{{key}}</code>를 넣으세요 — <code>{{key.proj}}</code>와 <code>{{key.num}}</code>는 키를 둘로 나눈 조각입니다. <code>{{key}}</code>가 없는 URL은 끝에 키가 덧붙습니다. 각 행 아래 줄은 예시 키가 도착할 위치를 보여 줍니다."
+  },
+  "optQuickEmpty": {
+    "message": "아직 링크가 없습니다. “링크 추가”를 누르세요."
+  },
+  "optQuickNamePh": {
+    "message": "이름 (예: Jira)"
+  },
+  "optQuickPrefixPh": {
+    "message": "접두사"
+  },
+  "optQuickUrlPh": {
+    "message": "https://…/browse/{{key}}"
+  },
+  "optQuickPreview": {
+    "message": "$KEY$ → $URL$",
+    "placeholders": {
+      "key": { "content": "$1" },
+      "url": { "content": "$2" }
+    }
+  },
+  "msgQuickLimit": {
+    "message": "링크는 최대 $COUNT$개까지입니다.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "popJumpPh": {
+    "message": "이슈 키…"
+  },
+  "popJumpGo": {
+    "message": "열기"
+  },
+  "popJumpAuto": {
+    "message": "자동"
+  },
+  "omniboxHint": {
+    "message": "작업 항목 키를 입력하면 바로 엽니다"
+  },
+  "omniboxNoTarget": {
+    "message": "설정된 링크 없음 — Enter로 설정 열기"
+  },
+  "omniboxOpen": {
+    "message": "$NAME$에서 $KEY$ 열기",
+    "placeholders": {
+      "key": { "content": "$1" },
+      "name": { "content": "$2" }
+    }
   }
 }

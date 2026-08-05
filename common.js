@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 5;
+const PE_SCHEMA = 6;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -78,6 +78,18 @@ const PE_MAX_COPY_FORMATS = 5;
 // identifier is literally the year "2026" would still match — but a 4-digit-year identifier
 // is not something Plane hands out.)
 const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-[1-9]\d*$/;
+
+// Quick jump — a key typed in the omnibox (or the popup) opens straight to that item.
+// A quick link is { id, name, prefix, url, enabled }: `url` is a base carrying an optional
+// {{key}} token (its variants {{key.proj}} / {{key.num}} split the key on its last "-"), and
+// `prefix` routes — the typed key picks the link whose prefix it starts with, so one person
+// can point "ENG-" at Linear and leave everything else on Plane. It only opens a URL, so it
+// needs no host permission and works even where the content-script enhancer never runs.
+// Plane, Jira and Linear all expose a key-addressable link (Plane's is /{workspace}/browse/
+// {KEY}, the same short link peItemUrl composes), so one model covers all three.
+const PE_MAX_QUICK_LINKS = 20;
+// Built fresh each call — a /g regex carries lastIndex between uses (see peItemTokenRe).
+const peQuickTokenRe = () => /\{\{\s*key(?:\.(proj|num))?\s*\}\}/gi;
 
 // Hard caps applied to remote data BEFORE it is stored or shown. storage.local is
 // large, but remote content is authored outside our trust boundary, so we bound it
@@ -208,6 +220,12 @@ const PE_DEFAULTS = {
     }
   ],
 
+  // Quick jump targets — see PE_MAX_QUICK_LINKS. Ships empty like `domains`: a target's
+  // url carries the user's own host and workspace ("https://plane.acme.com/team/browse/
+  // {{key}}"), so a shipped preset would only open a broken address. The Settings section
+  // shows the shape and the omnibox keyword. Each: { id, name, prefix, url, enabled }.
+  quickLinks: [],
+
   // Template sync — pull shared templates from one or more URLs. Config only
   // (the fetched templates + per-device status live in PE_SYNC_CACHE_KEY, not here,
   // so status never syncs across devices or bloats the ~8 KB settings item).
@@ -291,6 +309,8 @@ function peDeepMerge(def, cur) {
 //   v4 → v5: copyFormats is additive, so peDeepMerge backfills it — only the stamp
 //            moves. Note it backfills an *absent* array only: a user who deleted every
 //            format keeps an empty one and does not get the presets back.
+//   v5 → v6: quickLinks is additive and ships empty, so there is nothing to backfill —
+//            peDeepMerge carries an absent array through as []. Only the stamp moves.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -399,6 +419,19 @@ function peSanitizeSettings(raw) {
     // A format with nothing in it copies nothing; the name alone is not the thing.
     .filter((c) => c.format.trim())
     .slice(0, PE_MAX_COPY_FORMATS);
+
+  out.quickLinks = arr(raw.quickLinks)
+    .filter((q) => q && typeof q === "object")
+    .map((q) => ({
+      id: str(q.id, L.maxFieldLen) || "qlk-" + peHash([q.name, q.prefix, q.url].map((x) => str(x, L.maxFieldLen)).join(SEP)),
+      name: str(q.name, L.maxFieldLen),
+      prefix: str(q.prefix, L.maxFieldLen),
+      url: str(q.url, L.maxFieldLen).trim(),
+      enabled: bool(q.enabled, true)
+    }))
+    // A quick link with no url opens nothing; a name or prefix on its own is not a target.
+    .filter((q) => q.url)
+    .slice(0, PE_MAX_QUICK_LINKS);
 
   const sync = raw.templateSync && typeof raw.templateSync === "object" ? raw.templateSync : {};
   out.templateSync = {
@@ -895,6 +928,65 @@ function peMissingItemFields(format, item) {
     if (!(typeof v === "string" && v !== "") && out.indexOf(name) === -1) out.push(name);
   }
   return out;
+}
+
+// Split a typed key on its LAST "-" into { proj, num } for the {{key.proj}} / {{key.num}}
+// tokens. A key is "<identifier>-<number>" and the identifier itself can hold a "-", so the
+// last "-" is the true split. A key with no usable "-" has no split — proj/num come back
+// empty and their tokens stay unexpanded, the same as any other unknown token.
+function peSplitKey(key) {
+  const s = String(key == null ? "" : key).trim();
+  const i = s.lastIndexOf("-");
+  if (i <= 0 || i === s.length - 1) return { key: s, proj: "", num: "" };
+  return { key: s, proj: s.slice(0, i), num: s.slice(i + 1) };
+}
+
+// Pick the quick link a typed key routes to: among enabled links that have a url, the one
+// whose non-empty prefix the key starts with — longest prefix wins, so "ENG-INFRA-" beats
+// "ENG-"; failing that, the first with an empty prefix (the default); failing that, the
+// first usable link. The prefix test is a literal string comparison, never a letter-anchored
+// regex — a Plane identifier can be all digits ("42-7"). Returns the link, or null.
+function peRouteQuickLink(links, key) {
+  const k = String(key == null ? "" : key).trim();
+  if (!k) return null;
+  const usable = (links || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
+  if (!usable.length) return null;
+  let best = null;
+  let bestLen = -1;
+  for (const l of usable) {
+    const p = String(l.prefix || "");
+    if (p && k.startsWith(p) && p.length > bestLen) {
+      best = l;
+      bestLen = p.length;
+    }
+  }
+  return best || usable.find((l) => !String(l.prefix || "").trim()) || usable[0];
+}
+
+// Build the destination URL for a key against a quick link. A url with a {{key}} token (or
+// {{key.proj}} / {{key.num}}) has it substituted; a url with no key token gets the key
+// appended — the "base link + what you typed" case. The value is URL-encoded on the way in
+// so a space or "#" cannot break the address; an unknown token stays as written, the same
+// rule the copy formats follow. Returns "" when the link has no url.
+function peExpandQuickLink(link, key) {
+  const url = link && link.url ? String(link.url) : "";
+  if (!url) return "";
+  const parts = peSplitKey(key);
+  const enc = (v) => encodeURIComponent(String(v == null ? "" : v));
+  if (peQuickTokenRe().test(url)) {
+    return url.replace(peQuickTokenRe(), (token, which) => {
+      const v = which ? parts[which] : parts.key;
+      return v ? enc(v) : token;
+    });
+  }
+  return url + enc(parts.key);
+}
+
+// Only ever navigate to an http(s) address from a quick link. A stored url is the user's
+// own, but this keeps a javascript:/data: value (from a hand-edited import) from being
+// opened as if it were a link.
+function peIsHttpUrl(u) {
+  return /^https?:\/\//i.test(String(u == null ? "" : u).trim());
 }
 
 function peTemplateHasContent(t) {
