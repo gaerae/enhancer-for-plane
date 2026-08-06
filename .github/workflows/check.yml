@@ -42,3 +42,10 @@ jobs:
 
       - name: Behaviour tests
         run: node tools/test.js
+
+      # Drives options.html and popup.html in the Chrome that ubuntu-latest already
+      # carries — tabs, labels, and dark-mode contrast are only true of a real layout
+      # engine, and every one of them has shipped broken while the checks above passed.
+      # CI is set, so a missing browser fails here rather than skipping quietly.
+      - name: DOM harness
+        run: node tools/dom-harness.js

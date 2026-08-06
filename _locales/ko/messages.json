@@ -1,26 +1,33 @@
 {
   "extName": {
-    "message": "Enhancer for Plane — 프로젝트·위키·이슈",
+    "message": "Enhancer for Plane — 바로 열기 & 이슈 템플릿",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
+  "extShort": {
+    "message": "Enhancer for Plane",
+    "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
+  },
   "extDesc": {
-    "message": "Plane(makeplane/plane.so)용 보조 도구 — 제목·본문 템플릿 원클릭 삽입과 이름 폭 조정 규칙을 추가합니다.",
+    "message": "오픈소스 Jira 대안, 자체 호스팅 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 참조 복사, 폭 조정 규칙, 팀 동기화.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {
-    "message": "Enhancer for Plane — 설정 (makeplane / plane.so)"
+    "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane / plane.so)을 위한 본문 템플릿과 스타일 규칙."
+    "message": "Plane(makeplane / plane.so)의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
   },
   "optGitHub": {
     "message": "GitHub"
   },
-  "optReportIssue": {
-    "message": "문제 신고"
+  "optFeedback": {
+    "message": "의견 보내기"
+  },
+  "optRate": {
+    "message": "별점 남기기"
   },
   "optEnabled": {
-    "message": "사용"
+    "message": "확장 프로그램 사용"
   },
   "optDomainsTitle": {
     "message": "적용 도메인"
@@ -48,6 +55,9 @@
   },
   "optQuickAdd": {
     "message": "빠른 추가:"
+  },
+  "optQuickAddLink": {
+    "message": "＋ 링크 추가"
   },
   "optPresetModuleName": {
     "message": "모듈 / 항목 이름 폭"
@@ -195,7 +205,7 @@
     "message": "백업"
   },
   "optBackupDesc1": {
-    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>빠른 이동 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
+    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>바로 열기 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
     "message": "파일에는 도메인·소스 URL·변수 값이 평문으로 들어갑니다. 변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요. 동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
@@ -464,7 +474,10 @@
     "message": " — 한도에 근접했습니다"
   },
   "popEnabled": {
-    "message": "사용"
+    "message": "확장 프로그램 사용"
+  },
+  "popSiteLabel": {
+    "message": "이 사이트"
   },
   "popTemplates": {
     "message": "템플릿"
@@ -482,10 +495,10 @@
     "message": "이 사이트에서 사용"
   },
   "popChecking": {
-    "message": "현재 사이트: 확인 중…"
+    "message": "확인 중…"
   },
   "popUnknown": {
-    "message": "현재 사이트: 알 수 없음"
+    "message": "이 탭에는 사이트가 없습니다"
   },
   "popActive": {
     "message": "동작 중: $HOST$",
@@ -496,15 +509,10 @@
     }
   },
   "popDisabled": {
-    "message": "사용 안 함: $HOST$",
-    "placeholders": {
-      "host": {
-        "content": "$1"
-      }
-    }
+    "message": "확장 프로그램이 꺼져 있습니다"
   },
   "popInactive": {
-    "message": "적용되지 않은 사이트: $HOST$",
+    "message": "목록에 없는 사이트: $HOST$",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -707,11 +715,26 @@
   "popPermGap": {
     "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."
   },
-  "optQuickTitle": {
-    "message": "빠른 이동"
+  "optTabsLabel": {
+    "message": "설정 구역"
   },
-  "optQuickAdd": {
-    "message": "＋ 링크 추가"
+  "optTabTemplates": {
+    "message": "템플릿"
+  },
+  "optTabItems": {
+    "message": "작업 항목"
+  },
+  "optTabAppearance": {
+    "message": "화면"
+  },
+  "optTabSites": {
+    "message": "사이트"
+  },
+  "optTabBackup": {
+    "message": "백업"
+  },
+  "optQuickTitle": {
+    "message": "바로 열기"
   },
   "optQuickDesc": {
     "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다. 키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다. 접두사가 빈 대상이 기본값입니다. 툴바 팝업에서도 됩니다."
@@ -734,14 +757,20 @@
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "url": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
     }
   },
   "msgQuickLimit": {
     "message": "링크는 최대 $COUNT$개까지입니다.",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "popJumpLabel": {
@@ -765,8 +794,12 @@
   "omniboxOpen": {
     "message": "$NAME$에서 $KEY$ 열기",
     "placeholders": {
-      "key": { "content": "$1" },
-      "name": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
     }
   }
 }

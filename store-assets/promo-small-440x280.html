@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store promo — small tile 440x280</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  /* 440x280 is the tile shown in store grids and search results, at whatever size the
+     page decides — so it carries the mark, the name, and the two features the name leads
+     with, and nothing that would turn to mush when it is scaled down.
+     Dark, unlike the captures: #121212 is half the brand, the white mark reads best on it,
+     and a dark tile is what separates this from a grid of light ones. */
+  html, body { width: 440px; height: 280px; }
+  body {
+    background: #121212;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  /* A soft off-centre glow so the flat black has some depth at tile size. */
+  body::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    width: 460px;
+    height: 460px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0) 62%);
+    pointer-events: none;
+  }
+  /* The shipped icon itself, not a copy of its path — it cannot drift from the icon the
+     store shows beside this tile. */
+  .mark-lg {
+    width: 88px;
+    height: 88px;
+    position: relative;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
+  }
+  .name {
+    position: relative;
+    margin-top: 22px;
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #fff;
+  }
+  .feat {
+    position: relative;
+    margin-top: 9px;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: #9aa1aa;
+    letter-spacing: -0.005em;
+  }
+  .lang-ko .name { font-size: 24px; }
+  .lang-ko .feat { font-size: 14px; word-break: keep-all; }
+</style>
+
+<img class="mark-lg" src="../icons/icon.svg" alt="" />
+<div class="name">Enhancer for Plane</div>
+<div class="feat" data-t="feat"></div>
+
+<script>
+  // The two features the name leads with, in the same order and joined the same way —
+  // "Quick Open & Issue Templates". The old tile said "Width rules · title + body
+  // templates", which was the positioning two renames ago.
+  window.T = {
+    en: { feat: "Quick open &amp; issue templates" },
+    ko: { feat: "바로 열기 &amp; 이슈 템플릿" }
+  };
+</script>
+<script src="shot.js"></script>

@@ -9,17 +9,34 @@ checkable already lives in `tools/`; this file only covers what a script cannot 
 node tools/test.js            # behaviour: sync engine, normalization, sections
 node tools/check-i18n.js      # translation contract (--strict in CI)
 node tools/check-source.js    # architectural invariants
+node tools/dom-harness.js     # options.html + popup.html in a real browser
 ```
 
-CI runs all three on every push and PR. They are fast and have no dependencies —
+CI runs all four on every push and PR. They are fast and have no dependencies —
 there is no reason to skip them.
+
+`dom-harness.js` needs a Chrome or Chromium on the machine (`PE_CHROME=/path` to
+point it at one). Locally it skips loudly when there is none; in CI, where the
+runner has Chrome, a missing browser is a failure — a check that quietly ran
+nothing is worse than no check. It generates its pages into a temp dir, forces the
+dark blocks on by rewriting the media condition in a copy of the stylesheet, and
+uses `--dump-dom --virtual-time-budget` so timers and transitions settle
+deterministically instead of being slept on. A suite can ask for either locale
+(`lang: "ko"`), which is not about parity: Korean strings are longer and break
+differently, and the header that wrapped in Korean at full width fit perfectly in
+English. Reach for it whenever a layout has to hold text it did not choose.
+
+Do not give it `--user-data-dir` unless you have measured it on your platform: a
+fresh profile directory never finishes initialising on macOS and every launch hangs.
 
 **Passing them is not the same as working.** Every one of them passed while the
 picker was showing stale templates, because the bug was in data, not code. If you
 changed anything a user sees, drive it:
 
-- **Options page / popup**: serve the repo and open the page with a stubbed `chrome`
-  (see "Driving the UI" below). Node cannot render CSS.
+- **Options page / popup**: add the case to `tools/dom-harness.js` — that is what
+  it is for, and it turns a one-off check into one that runs forever. Reach for a
+  hand-served page with a stubbed `chrome` (see "Driving the UI" below) only while
+  exploring. Node cannot render CSS.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
@@ -187,3 +204,26 @@ lies:
   Add new shipped files there too — `check-source.js` walks what the extension actually
   loads (manifest entries, page `<script>`/`<link>`, the worker's injection lists) and
   fails if the zip would miss any of it, so you will hear about it before a release does.
+- **Korean needs `word-break: keep-all`.** CSS breaks CJK at any character, which is right
+  for Chinese and Japanese and wrong for Korean: every description on the settings page was
+  splitting an 어절 down the middle ("폭 조 / 정 규칙"). Both `options.css` and `popup.css` set
+  `keep-all` with `overflow-wrap: break-word` as the escape hatch for a token longer than the
+  line. The harness measures it per tab by reading back where the layout actually broke, so a
+  new surface that sets its own `word-break` fails there rather than shipping.
+- **Tab order lives in three places** — the nav buttons and the panel divs in `options.html`,
+  and `PE_TABS` in `options.js`. Only the buttons are visible; a panel out of step breaks the
+  focus order and a `PE_TABS` out of step breaks the arrow keys and the landing tab, neither
+  of which looks broken. The harness reads all three back against each other.
+- **Store copy quotes real labels.** `store-assets/STORE_LISTING.md`'s Korean section told
+  readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
+  now holds every quoted label in an imperative sentence against that locale's catalogue.
+  The same file's detailed description is one sentence per line on purpose: the store keeps
+  the newlines literally, so that is what makes it scannable.
+- **Template bodies are only as rich as `mdToHtml`.** It handles headings, `-`/`1.` lists,
+  `- [ ]` task lists, `---`, and inline bold/italic/code — nothing else. Everything it does
+  not know becomes a paragraph of literal characters, so a markdown table pastes as rows of
+  pipes and a ` ``` ` fence pastes as backticks. Both shipped once, written by someone
+  reasonably reading the file as generic markdown. `tools/test.js` now rejects tables,
+  fences, blockquotes, images and links in `examples/*.json`; if you teach `mdToHtml` a new
+  construct, take it off that list in the same change. `examples/team-templates.json` and
+  `-ko.json` are one pack in two languages — same ids, same order, enforced by the same test.

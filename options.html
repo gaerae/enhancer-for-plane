@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title data-i18n="optPageTitle">Enhancer for Plane — Settings (makeplane / plane.so)</title>
+    <title data-i18n="optPageTitle">Enhancer for Plane — Settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
@@ -12,9 +12,9 @@
         <div class="brand">
           <img src="icons/icon48.png" alt="" width="28" height="28" />
           <div>
-            <h1>Enhancer for Plane</h1>
-            <p data-i18n="optTagline">Body templates &amp; style rules for Plane — the open-source project management, issues &amp; wiki tool (makeplane / plane.so).</p>
-            <p class="about"><span id="appVersion"></span><a class="about-link" href="https://github.com/gaerae/enhancer-for-plane" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span data-i18n="optGitHub">GitHub</span></a> <span class="about-sep">·</span> <a class="about-link" href="https://github.com/gaerae/enhancer-for-plane/issues" target="_blank" rel="noopener"><span data-i18n="optReportIssue">Report an issue</span><svg class="about-ico about-ico-after" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M6 3H3v10h10v-3M9.5 2.5H13V6M12.5 3 7.5 8"/></svg></a></p>
+            <h1 data-i18n="extShort">Enhancer for Plane</h1>
+            <p data-i18n="optTagline">Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, width rules. Quick open works on Jira and Linear too.</p>
+            <p class="about"><span id="appVersion"></span><a class="about-link" href="https://github.com/gaerae/enhancer-for-plane" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span data-i18n="optGitHub">GitHub</span></a> <span class="about-sep">·</span> <a class="about-link" href="https://github.com/gaerae/enhancer-for-plane/issues" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M14 8.2c0 2.7-2.7 4.9-6 4.9-.6 0-1.2-.07-1.7-.2L3 14.5l.7-2.5C2.6 11 2 9.7 2 8.2 2 5.5 4.7 3.3 8 3.3s6 2.2 6 4.9Z"/></svg><span data-i18n="optFeedback">Send feedback</span></a> <span class="about-sep">·</span> <a class="about-link" href="https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo/reviews" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .74 4.3L8 11.4l-3.84 2 .74-4.3-3.1-3 4.3-.6z"/></svg><span data-i18n="optRate">Rate it</span></a></p>
           </div>
         </div>
         <label class="master">
@@ -33,153 +33,172 @@
         <button class="primary sm" id="permGrant" data-i18n="optPermGrant">Approve access</button>
       </div>
 
-      <!-- Active domains -->
-      <section class="card">
-        <h2 data-i18n="optDomainsTitle">Active domains</h2>
-        <p class="desc" data-i18n-html="optDomainsDesc">Runs only on the domains listed below. One per line. Wildcards like <code>*.example.com</code> are supported. Saving prompts Chrome to grant access to each newly added domain.</p>
-        <label class="inline-check">
-          <input type="checkbox" id="allDomains" />
-          <span data-i18n="optDomainsAll">Run on all sites (ignore the list below)</span>
-        </label>
-        <textarea id="domains" rows="4" placeholder="plane.example.com&#10;plane.your-company.com"></textarea>
-        <p class="desc" style="margin-top:8px" data-i18n-html="optDomainsTip">Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b></p>
-      </section>
+      <nav class="tabs" id="tabs" role="tablist" data-i18n-aria-label="optTabsLabel" aria-label="Settings sections">
+        <button type="button" class="tab" role="tab" id="tab-items" data-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1" data-i18n="optTabItems">Work items</button>
+        <button type="button" class="tab" role="tab" id="tab-templates" data-tab="templates" aria-controls="panel-templates" aria-selected="false" tabindex="-1" data-i18n="optTabTemplates">Templates</button>
+        <button type="button" class="tab" role="tab" id="tab-appearance" data-tab="appearance" aria-controls="panel-appearance" aria-selected="false" tabindex="-1" data-i18n="optTabAppearance">Appearance</button>
+        <button type="button" class="tab" role="tab" id="tab-sites" data-tab="sites" aria-controls="panel-sites" aria-selected="false" tabindex="-1" data-i18n="optTabSites">Sites</button>
+        <button type="button" class="tab" role="tab" id="tab-backup" data-tab="backup" aria-controls="panel-backup" aria-selected="false" tabindex="-1" data-i18n="optTabBackup">Backup</button>
+      </nav>
 
-      <!-- Style rules -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optRulesTitle">Style rules (width / length)</h2>
-          <button class="primary sm" id="addRule" data-i18n="optRulesAdd">＋ Add rule</button>
-        </div>
-        <p class="desc" data-i18n-html="optRulesDesc">
-          Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>).
-          If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>.
-        </p>
-        <div id="ruleList" class="rule-list"></div>
-        <div id="ruleEmpty" class="tpl-empty" hidden data-i18n="optRulesEmpty">No rules yet. Click “Add rule” to start.</div>
-        <div class="preset-bar">
-          <span class="preset-label" data-i18n="optQuickAdd">Quick add:</span>
-          <button class="chip" data-preset="modulename" data-i18n="optPresetModuleName">Module / item name width</button>
-          <button class="chip" data-preset="cyclename" data-i18n="optPresetCycleName">Cycle / breadcrumb name width</button>
-          <button class="chip" data-preset="dropdown" data-i18n="optPresetDropdown">Search dropdown width</button>
-        </div>
-        <datalist id="propList">
-          <option value="max-width"></option>
-          <option value="width"></option>
-          <option value="min-width"></option>
-          <option value="max-height"></option>
-          <option value="font-size"></option>
-          <option value="line-height"></option>
-        </datalist>
-      </section>
-
-      <!-- Body templates -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optTplTitle">Body templates (title + body)</h2>
-          <div class="head-actions">
-            <button class="ghost sm" id="exportFeedBtn" data-i18n="optTplShare">↓ Share with your team…</button>
-            <button class="primary sm" id="addTemplate" data-i18n="optTplAdd">＋ Add template</button>
+      <div class="panel" id="panel-items" data-tab="items" role="tabpanel" aria-labelledby="tab-items" tabindex="0" hidden>
+        <!-- Quick open. First: it is the one feature here that needs no host permission and
+             works on Jira and Linear too, so it is the one a new install can use immediately. -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optQuickTitle">Quick open</h2>
+            <button class="primary sm" id="addQuickLink" data-i18n="optQuickAddLink">＋ Add quick link</button>
           </div>
-        </div>
-        <p class="desc" data-i18n-html="optTplDesc1">Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional.</p>
-        <p class="desc" data-i18n-html="optTplDesc2">The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>.</p>
-        <p class="desc" data-i18n-html="optTplDesc3">Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description.</p>
-        <p class="desc" data-i18n-html="optTplShareDesc"><b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included.</p>
-        <div id="templateList" class="tpl-list"></div>
-        <div id="templateEmpty" class="tpl-empty" hidden data-i18n="optTplEmpty">No templates yet. Click “Add template” to start.</div>
-      </section>
+          <p class="desc" data-i18n-html="optQuickDesc">In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. Also on the toolbar popup.</p>
+          <p class="desc" data-i18n-html="optQuickTokens">Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land.</p>
+          <div id="quickList" class="copy-list"></div>
+          <div id="quickEmpty" class="tpl-empty" hidden data-i18n="optQuickEmpty">No quick links yet. Click “Add quick link”.</div>
+        </section>
 
-      <!-- Template variables -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optVarsTitle">Template variables</h2>
-          <button class="primary sm" id="addVariable" data-i18n="optVarsAdd">＋ Add variable</button>
-        </div>
-        <p class="desc" data-i18n-html="optVarsDesc">Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>. A synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it.</p>
-        <p class="desc" data-i18n-html="optVarsUndefined">The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>. A variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string.</p>
-        <div id="variableList" class="var-list"></div>
-        <div id="variableEmpty" class="tpl-empty" hidden data-i18n="optVarsEmpty">No variables yet. Click “Add variable” to start.</div>
-      </section>
+        <!-- Copy reference -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optCopyTitle">Copy reference</h2>
+            <button class="primary sm" id="addCopyFormat" data-i18n="optCopyAdd">＋ Add format</button>
+          </div>
+          <p class="desc" data-i18n-html="optCopyDesc">On a work item page, the button beside its ID — or <code>Alt/⌥+C</code> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name.</p>
+          <p class="desc" data-i18n-html="optCopyTokens">Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard.</p>
+          <div id="copyList" class="copy-list"></div>
+          <div id="copyEmpty" class="tpl-empty" hidden data-i18n="optCopyEmpty">No formats yet. Click “Add format” to start.</div>
+        </section>
+      </div>
 
-      <!-- Template sync -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optSyncTitle">Template sync</h2>
-          <label class="row-toggle sync-toggle">
-            <input type="checkbox" id="syncEnabled" />
-            <span class="switch"></span>
-            <span class="sync-toggle-label" data-i18n="optEnabled">Enabled</span>
+      <div class="panel" id="panel-templates" data-tab="templates" role="tabpanel" aria-labelledby="tab-templates" tabindex="0" hidden>
+        <!-- Body templates -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optTplTitle">Body templates (title + body)</h2>
+            <div class="head-actions">
+              <button class="ghost sm" id="exportFeedBtn" data-i18n="optTplShare">↓ Share with your team…</button>
+              <button class="primary sm" id="addTemplate" data-i18n="optTplAdd">＋ Add template</button>
+            </div>
+          </div>
+          <p class="desc" data-i18n-html="optTplDesc1">Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional.</p>
+          <p class="desc" data-i18n-html="optTplDesc2">The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>.</p>
+          <p class="desc" data-i18n-html="optTplDesc3">Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description.</p>
+          <p class="desc" data-i18n-html="optTplShareDesc"><b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included.</p>
+          <div id="templateList" class="tpl-list"></div>
+          <div id="templateEmpty" class="tpl-empty" hidden data-i18n="optTplEmpty">No templates yet. Click “Add template” to start.</div>
+        </section>
+
+        <!-- Template variables -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optVarsTitle">Template variables</h2>
+            <button class="primary sm" id="addVariable" data-i18n="optVarsAdd">＋ Add variable</button>
+          </div>
+          <p class="desc" data-i18n-html="optVarsDesc">Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>. A synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it.</p>
+          <p class="desc" data-i18n-html="optVarsUndefined">The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>. A variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string.</p>
+          <div id="variableList" class="var-list"></div>
+          <div id="variableEmpty" class="tpl-empty" hidden data-i18n="optVarsEmpty">No variables yet. Click “Add variable” to start.</div>
+        </section>
+
+        <!-- Template sync -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optSyncTitle">Template sync</h2>
+            <label class="row-toggle sync-toggle">
+              <input type="checkbox" id="syncEnabled" />
+              <span class="switch"></span>
+              <span class="sync-toggle-label" data-i18n="optEnabled">Enabled</span>
+            </label>
+          </div>
+          <p class="desc" data-i18n-html="optSyncDesc">Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page. Synced templates are <b>read-only</b> — edit them at the source. Host the file on the <b>same domain as Plane</b> to avoid a separate access prompt.</p>
+          <details class="fmt">
+            <summary data-i18n="optSyncFormat">File format</summary>
+            <p class="desc" data-i18n-html="optSyncFormatDesc">A flat list; each item carries its own <code>group</code> string. The top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank.</p>
+            <pre class="fmt-pre">{
+    "schema": 1,
+    "name": "QA &amp; Delivery standards",
+    "version": "2026-07-15",
+    "templates": [
+      {
+        "id": "bug",
+        "group": "QA Templates",
+        "name": "🐞 Bug",
+        "title": "[Bug] ",
+        "content": "## Steps\n1. \n"
+      }
+    ]
+  }</pre>
+          </details>
+          <div id="sourceList" class="src-list"></div>
+          <div id="sourceEmpty" class="tpl-empty" hidden data-i18n="optSyncEmpty">No sources yet. Click “Add source”.</div>
+          <div class="preset-bar" style="border:0;padding:0;margin-top:10px">
+            <button class="ghost sm" id="addSource" data-i18n="optSyncAddSource">＋ Add source</button>
+            <button class="ghost sm" id="addExample" data-i18n="optSyncTryExample">✨ Try our example</button>
+            <button class="ghost sm" id="syncNow" data-i18n="optSyncNow">↻ Sync now</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-appearance" data-tab="appearance" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" hidden>
+        <!-- Style rules -->
+        <section class="card">
+          <div class="card-head">
+            <h2 data-i18n="optRulesTitle">Style rules (width / length)</h2>
+            <button class="primary sm" id="addRule" data-i18n="optRulesAdd">＋ Add rule</button>
+          </div>
+          <p class="desc" data-i18n-html="optRulesDesc">
+            Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>).
+            If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>.
+          </p>
+          <div id="ruleList" class="rule-list"></div>
+          <div id="ruleEmpty" class="tpl-empty" hidden data-i18n="optRulesEmpty">No rules yet. Click “Add rule” to start.</div>
+          <div class="preset-bar">
+            <span class="preset-label" data-i18n="optQuickAdd">Quick add:</span>
+            <button class="chip" data-preset="modulename" data-i18n="optPresetModuleName">Module / item name width</button>
+            <button class="chip" data-preset="cyclename" data-i18n="optPresetCycleName">Cycle / breadcrumb name width</button>
+            <button class="chip" data-preset="dropdown" data-i18n="optPresetDropdown">Search dropdown width</button>
+          </div>
+          <datalist id="propList">
+            <option value="max-width"></option>
+            <option value="width"></option>
+            <option value="min-width"></option>
+            <option value="max-height"></option>
+            <option value="font-size"></option>
+            <option value="line-height"></option>
+          </datalist>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-sites" data-tab="sites" role="tabpanel" aria-labelledby="tab-sites" tabindex="0" hidden>
+        <!-- Active domains -->
+        <section class="card">
+          <h2 data-i18n="optDomainsTitle">Active domains</h2>
+          <p class="desc" data-i18n-html="optDomainsDesc">Runs only on the domains listed below. One per line. Wildcards like <code>*.example.com</code> are supported. Saving prompts Chrome to grant access to each newly added domain.</p>
+          <label class="inline-check">
+            <input type="checkbox" id="allDomains" />
+            <span data-i18n="optDomainsAll">Run on all sites (ignore the list below)</span>
           </label>
-        </div>
-        <p class="desc" data-i18n-html="optSyncDesc">Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page. Synced templates are <b>read-only</b> — edit them at the source. Host the file on the <b>same domain as Plane</b> to avoid a separate access prompt.</p>
-        <details class="fmt">
-          <summary data-i18n="optSyncFormat">File format</summary>
-          <p class="desc" data-i18n-html="optSyncFormatDesc">A flat list; each item carries its own <code>group</code> string. The top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank.</p>
-          <pre class="fmt-pre">{
-  "schema": 1,
-  "name": "QA &amp; Delivery standards",
-  "version": "2026-07-15",
-  "templates": [
-    {
-      "id": "bug",
-      "group": "QA Templates",
-      "name": "🐞 Bug",
-      "title": "[Bug] ",
-      "content": "## Steps\n1. \n"
-    }
-  ]
-}</pre>
-        </details>
-        <div id="sourceList" class="src-list"></div>
-        <div id="sourceEmpty" class="tpl-empty" hidden data-i18n="optSyncEmpty">No sources yet. Click “Add source”.</div>
-        <div class="preset-bar" style="border:0;padding:0;margin-top:10px">
-          <button class="ghost sm" id="addSource" data-i18n="optSyncAddSource">＋ Add source</button>
-          <button class="ghost sm" id="addExample" data-i18n="optSyncTryExample">✨ Try our example</button>
-          <button class="ghost sm" id="syncNow" data-i18n="optSyncNow">↻ Sync now</button>
-        </div>
-      </section>
+          <textarea id="domains" rows="4" placeholder="plane.example.com&#10;plane.your-company.com"></textarea>
+          <p class="desc" style="margin-top:8px" data-i18n-html="optDomainsTip">Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b></p>
+        </section>
+      </div>
 
-      <!-- Copy reference -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optCopyTitle">Copy reference</h2>
-          <button class="primary sm" id="addCopyFormat" data-i18n="optCopyAdd">＋ Add format</button>
-        </div>
-        <p class="desc" data-i18n-html="optCopyDesc">On a work item page, the button beside its ID — or <code>Alt/⌥+C</code> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name.</p>
-        <p class="desc" data-i18n-html="optCopyTokens">Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard.</p>
-        <div id="copyList" class="copy-list"></div>
-        <div id="copyEmpty" class="tpl-empty" hidden data-i18n="optCopyEmpty">No formats yet. Click “Add format” to start.</div>
-      </section>
-
-      <!-- Quick jump -->
-      <section class="card">
-        <div class="card-head">
-          <h2 data-i18n="optQuickTitle">Quick jump</h2>
-          <button class="primary sm" id="addQuickLink" data-i18n="optQuickAdd">＋ Add quick link</button>
-        </div>
-        <p class="desc" data-i18n-html="optQuickDesc">In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. Also on the toolbar popup.</p>
-        <p class="desc" data-i18n-html="optQuickTokens">Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land.</p>
-        <div id="quickList" class="copy-list"></div>
-        <div id="quickEmpty" class="tpl-empty" hidden data-i18n="optQuickEmpty">No quick links yet. Click “Add quick link”.</div>
-      </section>
-
-      <!-- Backup -->
-      <section class="card">
-        <h2 data-i18n="optBackupTitle">Backup</h2>
-        <p class="desc" data-i18n-html="optBackupDesc1">Export all settings (domains, style rules, templates, <b>variables</b>, and <b>sync source URLs</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply.</p>
-        <p class="desc" data-i18n-html="optBackupDesc2">The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save.</p>
-        <div class="backup-actions">
-          <button class="ghost" id="exportBtn" data-i18n="optBackupExport">↓ Export JSON</button>
-          <button class="ghost" id="importBtn" data-i18n="optBackupImport">↑ Import JSON…</button>
-          <input type="file" id="importFile" accept="application/json,.json" hidden />
-        </div>
-        <div class="storage-meter">
-          <div class="storage-bar"><span id="storageBarFill"></span></div>
-          <span class="storage-text" id="storageText"></span>
-        </div>
-        <p class="desc" style="margin:6px 0 0" data-i18n="optStorageNote">Settings sync across your devices via Chrome, which caps each item at ~8&nbsp;KB. If you hit it, shorten/remove templates or keep a JSON backup.</p>
-      </section>
+      <div class="panel" id="panel-backup" data-tab="backup" role="tabpanel" aria-labelledby="tab-backup" tabindex="0" hidden>
+        <!-- Backup -->
+        <section class="card">
+          <h2 data-i18n="optBackupTitle">Backup</h2>
+          <p class="desc" data-i18n-html="optBackupDesc1">Export all settings (domains, style rules, templates, <b>variables</b>, and <b>sync source URLs</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply.</p>
+          <p class="desc" data-i18n-html="optBackupDesc2">The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save.</p>
+          <div class="backup-actions">
+            <button class="ghost" id="exportBtn" data-i18n="optBackupExport">↓ Export JSON</button>
+            <button class="ghost" id="importBtn" data-i18n="optBackupImport">↑ Import JSON…</button>
+            <input type="file" id="importFile" accept="application/json,.json" hidden />
+          </div>
+          <div class="storage-meter">
+            <div class="storage-bar"><span id="storageBarFill"></span></div>
+            <span class="storage-text" id="storageText"></span>
+          </div>
+          <p class="desc" style="margin:6px 0 0" data-i18n="optStorageNote">Settings sync across your devices via Chrome, which caps each item at ~8&nbsp;KB. If you hit it, shorten/remove templates or keep a JSON backup.</p>
+        </section>
+      </div>
 
       <footer class="foot">
         <span id="status" class="status"></span>

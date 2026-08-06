@@ -208,6 +208,94 @@ for (const f of SHIPPED) {
   }
 }
 
+/* 8. A light surface colour must have a dark-mode counterpart.
+   Both stylesheets theme themselves with `prefers-color-scheme: dark`, which means every
+   hardcoded light background is a promise to override it — and a missed one does not fail
+   anywhere: it renders a white block on a dark card, which only a human looking at the
+   page in dark mode ever notices. Three row styles shipped that way (.var-item, .cpy-item,
+   and the Quick open row that reuses .cpy-item). So: find the selectors that set a light
+   background outside a dark block, and require each to appear inside one. */
+{
+  // 3-, 4-, 6- and 8-digit hex. The 4th/8th pair is alpha, which says nothing about how
+  // light the colour is, so it is dropped. Getting the length wrong is not a small mistake
+  // here: a shorthand this did not expand produced NaN, `NaN < 0.85` is false, and the
+  // dark-colour skip below therefore failed *open* — `background: #0008`, black at 53%
+  // opacity, was reported as an un-overridden light background and failed the build.
+  const lightness = (hex) => {
+    let h = hex.slice(1);
+    if (h.length === 3 || h.length === 4) h = h.slice(0, 3).split("").map((c) => c + c).join("");
+    h = h.slice(0, 6);
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  };
+
+  for (const file of ["options.css", "popup.css"]) {
+    const css = fs.readFileSync(path.join(ROOT, file), "utf8");
+
+    // Blank out the dark blocks, remembering which selectors they cover.
+    const darkSelectors = new Set();
+    let masked = css;
+    for (const m of [...css.matchAll(/@media \(prefers-color-scheme: dark\)\s*\{/g)].reverse()) {
+      let i = m.index + m[0].length;
+      let depth = 1;
+      while (i < css.length && depth) {
+        if (css[i] === "{") depth++;
+        else if (css[i] === "}") depth--;
+        i++;
+      }
+      // Comments are stripped first: a comment sitting above a rule lands inside the
+      // selector capture and would glue itself to the first selector, so the group's
+      // leading member ("/* … */ .tpl-item") would never match and read as un-overridden.
+      const block = css.slice(m.index + m[0].length, i - 1).replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const rule of block.matchAll(/([^{}]+)\{/g)) {
+        for (const sel of rule[1].split(",")) {
+          const s = sel.trim();
+          if (s && !s.startsWith("@")) darkSelectors.add(s);
+        }
+      }
+      masked = masked.slice(0, m.index) + " ".repeat(i - m.index) + masked.slice(i);
+    }
+
+    for (const rule of masked.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const selectors = rule[1]
+        .replace(/\/\*[\s\S]*?\*\//g, "") // a comment above the rule is not part of it
+        .trim();
+      if (!selectors || selectors.startsWith("@")) continue;
+      // Longest alternative first, so #12345678 is read as 8 digits and not as 6 plus junk.
+      // {3,6} also matched a 5-digit string, which is not a colour at all.
+      const bg = rule[2].match(
+        /background(?:-color)?:\s*(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4}))(?![0-9a-fA-F])/
+      );
+      if (!bg) continue;
+      const light = lightness(bg[1]);
+      // Never let an unreadable colour decide by accident: say so instead of guessing.
+      if (Number.isNaN(light)) {
+        err(file, lineOf(css, rule.index), `cannot read the colour ${bg[1]} — check 8 needs updating`);
+        continue;
+      }
+      if (light < 0.85) continue;
+      // A colour that is deliberately the same in both themes says so in the rule, e.g. a
+      // toggle knob that stays light because its track darkens instead. The marker has to
+      // be inside the braces so it cannot drift away from the declaration it excuses.
+      if (/dark-ok/.test(rule[2])) continue;
+      const parts = selectors.split(",").map((s) => s.trim()).filter(Boolean);
+      // One selector of the group being overridden is enough — they share the declaration.
+      if (parts.some((s) => darkSelectors.has(s))) continue;
+      // rule.index, not indexOf(selectors): masking replaced the dark blocks with the same
+      // number of spaces, so every offset still lines up with the unmasked file — whereas
+      // `selectors` has had its comments stripped, so a rule with a comment between two of
+      // its selectors is not found at all and indexOf(-1) pointed at the end of the file.
+      // Skip the rule's own leading trivia so the line is the selector's, not the comment's.
+      const trivia = rule[1].length - rule[1].replace(/^(?:\s|\/\*[\s\S]*?\*\/)*/, "").length;
+      err(
+        file,
+        lineOf(css, rule.index + trivia),
+        `"${parts.join(", ")}" sets the light background ${bg[1]} with no dark-mode override — it renders as a light block in dark mode`
+      );
+    }
+  }
+}
+
 for (const e of errors) console.log(`  ERROR ${e}`);
 console.log(`\nsource: ${SHIPPED.length} shipped files · ${errors.length} error(s)`);
 process.exit(errors.length ? 1 : 0);

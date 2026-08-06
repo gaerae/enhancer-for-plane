@@ -1,4 +1,4 @@
-# Enhancer for Plane — Projects, Wiki & Issues
+# Enhancer for Plane — Issue Templates & Quick Open
 
 **English** · [한국어](README.ko.md)
 
@@ -9,20 +9,33 @@
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
 open-source **project management, issues & wiki** tool and a self-hosted
-alternative to Jira. It fixes small day-to-day annoyances directly in the Plane
+alternative to Jira. It fills the gaps every issue tracker leaves — reusable
+**issue templates** for the tickets you file over and over, **quick open** to reach
+a ticket from its key, and a one-click **copy reference** — directly in the Plane
 UI, with **no changes to your Plane server**, applied only on the domains you
 enable.
 
 > Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner.
 > (And no — nothing to do with airplanes.)
 
-Brand: follows Plane's monochrome tone (near-black `#121212` + white).
-
-![A native Template button fills a work item's title and body in one click](store-assets/screenshot-1-templates.png)
+![Typing a work item key in the address bar opens it — for Plane, Jira or Linear](store-assets/screenshot-1-open.png)
 
 ## Features
 
-1. **Body templates (title + body)** — register reusable templates and insert
+1. **⚡ Quick open** — type a work item key and go straight to it. In the address bar type
+   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
+   toolbar popup.
+   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
+     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
+     are its two halves), or the key appended when the link has no token. Plane's is
+     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
+   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
+     target with an empty prefix is the default. The popup shows a target picker once you
+     have more than one, and the address bar suggests the other targets as you type.
+   - It **opens a URL and nothing more** — no host permission, no content script — so it
+     works on any tab, including ones where the rest of the extension never runs. Ships with
+     no targets; add yours in Settings, where each row previews where a sample key lands.
+2. **📝 Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
      description toolbar (last item in the row, equal spacing, document icon).
@@ -41,13 +54,12 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
      bootstrap poll) re-inserts the button. The button is cloned from Attach so
      it always looks native. (Comment templates are not provided.)
-2. **Template variables** — substituted on insert: `{{date}}` (today,
-   `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
-   `{{date+7}}` for a deadline), `{{week}}` (this week's range,
-   `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). Open
-   the template menu while editing a description with `Alt/⌥+T`.
-   On macOS, Option+T changes `e.key` to a special
-   character, so the shortcut is detected via `e.code === "KeyT"`.
+   - **🔤 Variables are substituted on insert** — `{{date}}` (today,
+     `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
+     `{{date+7}}` for a deadline), `{{week}}` (this week's range,
+     `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). On
+     macOS, Option+T changes `e.key` to a special character, so `Alt/⌥+T` is
+     detected via `e.code === "KeyT"`.
    - **Your own variables (up to 5)** — define `name` → `value` pairs in Settings
      and use them as `{{var.name}}`, e.g. `{{var.team}}` → `Platform`. The `var.`
      prefix is what keeps them from ever colliding with a built-in: a future
@@ -56,7 +68,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-3. **Copy reference** — on a work item — its own page, or the panel a list opens — the
+![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
+
+3. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
    to a chat message, a pull request body, or a branch name is one click instead of three
    selections.
@@ -78,22 +92,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      thing here that would break silently against a future Plane, and it is commented as
      such in the source.
 
-![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-2-copy.png)
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
 
-4. **Quick jump** — type a work item key and go straight to it. In the address bar type
-   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
-   toolbar popup.
-   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
-     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
-     are its two halves), or the key appended when the link has no token. Plane's is
-     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
-   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
-     target with an empty prefix is the default. The popup shows a target picker once you
-     have more than one, and the address bar suggests the other targets as you type.
-   - It **opens a URL and nothing more** — no host permission, no content script — so it
-     works on any tab, including ones where the rest of the extension never runs. Ships with
-     no targets; add yours in Settings, where each row previews where a sample key lands.
-5. **Style rules (width / length) — a generic engine**
+4. **📐 Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -108,7 +109,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-6. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+5. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -119,7 +120,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-7. **Team template sync** — point the extension at a JSON file (your intranet, a
+6. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
@@ -136,11 +137,11 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-8. **Active domains** — runs only on the domains you specify. Wildcards
+7. **🏠 Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-9. **Backup (Import / Export)** — export your settings to a JSON file from the
+8. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, copy formats, quick jump links, and sync sources
+   domains, rules, templates, variables, copy formats, quick open links, and sync sources
    (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
    per-device cache that the next sync refetches, so a backup stays a backup of
    your settings rather than a snapshot of someone else's file. Imported settings
@@ -149,9 +150,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 ## Team template file format
 
 Host a JSON file anywhere your team can reach over `http(s)` — an intranet path, a
-Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Team template sync.
+Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Templates ▸ Team template sync.
 
-You do not have to write it by hand. **Settings ▸ Body templates ▸ "Share with your
+You do not have to write it by hand. **Settings ▸ Templates ▸ Body templates ▸ "Share with your
 team"** writes this exact format from the templates you already have: build them in
 the UI, export, upload, share the URL. It asks for the collection's `name` and
 stamps today's date as `version`. It is a *publication*, not a backup — it carries
@@ -208,11 +209,10 @@ The common case is a Git host: `github.com/<org>/<repo>/raw/main/t.json` redirec
 `raw.githubusercontent.com`, so enter the `raw.githubusercontent.com` URL directly.
 
 Group ordering follows first appearance in the file; ungrouped items come first.
-Working examples: [`examples/team-templates.json`](examples/team-templates.json) and
-[`examples/team-templates-design.json`](examples/team-templates-design.json).
-A larger doc-and-issue set is in
-[`examples/team-templates-data.json`](examples/team-templates-data.json) (English) and
-[`examples/team-templates-data-ko.json`](examples/team-templates-data-ko.json) (Korean).
+Working example: [`examples/team-templates.json`](examples/team-templates.json) — the
+26-template pack the "Try our example" button subscribes to, also translated in
+[`examples/team-templates-ko.json`](examples/team-templates-ko.json). Fork it, serve it
+from your own URL, and edit the templates to match how your team actually writes an issue.
 
 ## Built for self-hosted Plane
 
@@ -257,7 +257,7 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 | `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
 | `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
 | `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
-| `options.html/js/css` | Full settings page |
+| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Work items · Templates · Appearance · Sites · Backup), still one form with one Save |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
 | `_locales/` | `en` + `ko` message catalogues |
 | `tools/` | Checks (not shipped) — see below |
@@ -271,13 +271,20 @@ No dependencies, no build step — stock node:
 node tools/test.js          # behaviour: sync engine, normalization, sections, counts
 node tools/check-i18n.js    # translation contract (--strict in CI)
 node tools/check-source.js  # architectural invariants
+node tools/dom-harness.js   # the settings page and popup, in a real browser
 ```
 
-CI runs all three on every push and PR. `check-source.js` enforces what a reviewer
+CI runs all four on every push and PR. `check-source.js` enforces what a reviewer
 would otherwise have to remember — network access confined to the worker, no
-`innerHTML` for data that isn't ours, every remote field clamped, and that the
-release zip actually contains every file the extension loads. Contributor rules
-live in [AGENTS.md](AGENTS.md).
+`innerHTML` for data that isn't ours, every remote field clamped, a dark-mode
+counterpart for every light surface, and that the release zip actually contains
+every file the extension loads. `dom-harness.js` covers what is only true of a
+real layout engine — which tab is showing, that an unsaved edit survives one, what
+a label says, what a colour resolves to against the surface behind it — by running
+the pages in headless Chrome with a stubbed `chrome` API. It needs a browser
+(`PE_CHROME=/path` to choose one); locally it skips loudly without one, and in CI
+a missing browser is a failure rather than a quiet pass. Contributor rules live in
+[AGENTS.md](AGENTS.md).
 
 ## How it works (notes)
 
@@ -316,6 +323,9 @@ live in [AGENTS.md](AGENTS.md).
   (or pressing Alt/⌥+T) re-scans, and the popup's **↻ Re-scan this page** forces a
   fresh injection. If the content script never loaded at all (e.g. a tab opened
   before you enabled this domain), Re-scan reports it so you can reload.
+- **Brand.** The popup and Settings follow Plane's monochrome tone (near-black
+  `#121212` + white) and your system light/dark theme, so the extension's own
+  surfaces do not look bolted on.
 
 ## Permissions
 

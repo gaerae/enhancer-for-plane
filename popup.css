@@ -15,6 +15,10 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   color: var(--text);
+  /* Same reason as options.css: keep a Korean 어절 whole, with break-word so a long token
+     still wraps. It matters more here — the popup is 260px wide, so almost everything wraps. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .pop {
   width: 260px;
@@ -63,7 +67,7 @@ body {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: #fff;
+  background: #fff; /* dark-ok: the track darkens in dark mode, so the knob stays light */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s;
 }
@@ -76,13 +80,18 @@ input:checked + .switch::after {
 .pop-jump-block[hidden] {
   display: none;
 }
-.pop-jump-label {
+/* Group heading. Shared by every block in the popup so the groups read as siblings. */
+.pop-label {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 6px;
+}
+/* When the label follows a control rather than a divider it needs its own breathing room. */
+.pop-label-spaced {
+  margin-top: 14px;
 }
 .pop-jump {
   display: flex;
@@ -232,5 +241,14 @@ input:checked + .switch::after {
   }
   .ghost:hover {
     background: #262b31;
+  }
+  /* Same fix as the settings page: the brand inverts on dark, so a checked track is
+     near-white and a white knob on it measured 1.1:1. Dark knob when on, light knob on a
+     dark track when off. */
+  .switch {
+    background: #3f4650;
+  }
+  input:checked + .switch::after {
+    background: var(--accent-contrast);
   }
 }

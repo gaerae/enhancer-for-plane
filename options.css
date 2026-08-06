@@ -24,6 +24,13 @@ body {
     "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  /* Korean breaks at any character by default, because that is right for Chinese and
+     Japanese and wrong for Korean: it split 조정 across two lines as "조 / 정" and 클립보드에
+     복사합니다 as "복 / 사합니다" in every description on this page. keep-all wraps at spaces
+     instead, so an 어절 stays whole. break-word is the safety net keep-all needs — a token
+     longer than the line (a URL, a long selector) can still break rather than overflow. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .wrap {
   max-width: 760px;
@@ -43,6 +50,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* The header is a flex row: without this the brand refuses to give up any of its own
+     width, and the toggle beside it gets squeezed instead. */
+  min-width: 0;
 }
 .brand img {
   border-radius: 7px;
@@ -71,15 +81,14 @@ body {
 .about-link:hover {
   text-decoration-color: currentColor;
 }
+/* Every about-link is icon-then-label, so there is one rule and no side-specific variant.
+   Two of the three used to trail their icon, which made the row read as three different
+   kinds of link when they are all just links. */
 .about-ico {
   width: 12px;
   height: 12px;
   vertical-align: -2px;
   margin-right: 3px;
-}
-.about-ico-after {
-  margin-right: 0;
-  margin-left: 3px;
 }
 .about-sep {
   color: var(--muted);
@@ -87,6 +96,57 @@ body {
 }
 
 /* cards */
+/* Section tabs. Underline rather than pills — it reads as navigation inside one page,
+   which is what this is: every tab edits the same settings object and one Save commits
+   all of them. On a narrow window the row scrolls sideways instead of wrapping, so the
+   tabs never reflow into a block that pushes the content down. */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border: 0;
+  /* Overlaps the container's bottom border so the active underline replaces it. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+.panel[hidden] {
+  display: none;
+}
+/* The panel takes focus when a tab is chosen by keyboard; it is a scroll container, not
+   a control, so it must not draw a focus ring of its own. */
+.panel:focus {
+  outline: none;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -332,6 +392,10 @@ input.invalid {
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  /* A control is not the thing that should shrink. Measured: at the default window width
+     the Korean label ("확장 프로그램 사용") wrapped to two lines — 39px tall where one line
+     is 20 — because the brand block beside it kept all of its width. */
+  flex-shrink: 0;
 }
 .master input,
 .row-toggle input {
@@ -360,7 +424,7 @@ input.invalid {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: #fff; /* dark-ok: the track darkens in dark mode, so the knob stays light */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
@@ -380,6 +444,7 @@ input:checked + .switch.sm::after {
 .master-label {
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .row-toggle {
   cursor: pointer;
@@ -771,10 +836,29 @@ kbd {
     background: #14171b;
     color: var(--text);
   }
+  /* Every row card that sits on .card. Miss one and it keeps its light #fcfcfd, which on
+     a dark card reads as a white block — which is exactly what happened to .var-item and
+     .cpy-item (the latter is also the Quick jump row). check-source.js now fails on a
+     light background with no dark counterpart so the next one cannot ship unnoticed. */
   .tpl-item,
   .rule-item,
-  .src-item {
+  .src-item,
+  .var-item,
+  .cpy-item {
     background: #171b20;
+  }
+  /* Light red wash on a dark card is a flash of near-white; tint the dark surface instead. */
+  .icon-btn:hover {
+    background: #3a1f22;
+  }
+  /* The brand inverts on dark, so a checked track is near-white — and the knob was white
+     on top of it, a measured 1.1:1. Off state keeps a light knob on a dark track; on state
+     flips to a dark knob so the thing that shows the state is visible in both. */
+  .switch {
+    background: #3f4650;
+  }
+  input:checked + .switch::after {
+    background: var(--accent-contrast);
   }
   .src-status.ok {
     color: #4ade80;

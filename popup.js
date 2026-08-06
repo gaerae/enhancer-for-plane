@@ -29,7 +29,9 @@
       statusEl.className = "pop-status on";
       addBtn.hidden = true;
     } else if (!state.enabled) {
-      statusEl.textContent = peMsg("popDisabled", [currentHost]);
+      // The master switch is off everywhere, so this says nothing about the host — naming
+      // it here was what made the switch above read as a per-site one.
+      statusEl.textContent = peMsg("popDisabled");
       statusEl.className = "pop-status off";
       addBtn.hidden = true;
     } else {
@@ -39,7 +41,7 @@
     }
   }
 
-  // Quick jump: type a key, Enter opens it in a new tab. Only shown when at least one
+  // Quick open: type a key, Enter opens it in a new tab. Only shown when at least one
   // quick link is configured; the target picker appears only when there is more than one.
   // It just opens a URL — no host permission, and it works regardless of the current site.
   function setupJump() {

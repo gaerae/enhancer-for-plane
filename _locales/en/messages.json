@@ -1,26 +1,35 @@
 {
   "extName": {
-    "message": "Enhancer for Plane — Projects, Wiki & Issues",
+    "message": "Enhancer for Plane — Quick Open & Issue Templates",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
+  "extShort": {
+    "message": "Enhancer for Plane",
+    "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
+  },
   "extDesc": {
-    "message": "Tweaks for Plane (makeplane/plane.so) — open-source project management, issues & wiki. Title/body templates + width rules.",
+    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, width rules, sync.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {
-    "message": "Enhancer for Plane — Settings (makeplane / plane.so)"
+    "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Body templates & style rules for Plane — the open-source project management, issues & wiki tool (makeplane / plane.so)."
+    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, width rules. Quick open works on Jira and Linear too.",
+    "description": "Sub-line under the settings header. Deliberately does not explain what Plane is — the store listing does that for a stranger, and whoever is reading this already installed the extension. Order matches extName: quick open first."
   },
   "optGitHub": {
     "message": "GitHub"
   },
-  "optReportIssue": {
-    "message": "Report an issue"
+  "optFeedback": {
+    "message": "Send feedback",
+    "description": "Header link to the GitHub issue tracker. Deliberately an invitation, not \"Report an issue\" — most of what arrives is an idea or a question, and the narrower wording turned the tracker into a place you only visit when something is broken."
+  },
+  "optRate": {
+    "message": "Rate it"
   },
   "optEnabled": {
-    "message": "Enabled"
+    "message": "Extension enabled"
   },
   "optDomainsTitle": {
     "message": "Active domains"
@@ -48,6 +57,9 @@
   },
   "optQuickAdd": {
     "message": "Quick add:"
+  },
+  "optQuickAddLink": {
+    "message": "＋ Add quick link"
   },
   "optPresetModuleName": {
     "message": "Module / item name width"
@@ -195,7 +207,7 @@
     "message": "Backup"
   },
   "optBackupDesc1": {
-    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick jump links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
+    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick open links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
   },
   "optBackupDesc2": {
     "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save."
@@ -464,7 +476,10 @@
     "message": " — approaching the limit"
   },
   "popEnabled": {
-    "message": "Enabled"
+    "message": "Extension enabled"
+  },
+  "popSiteLabel": {
+    "message": "This site"
   },
   "popTemplates": {
     "message": "Templates"
@@ -482,10 +497,10 @@
     "message": "Enable on this site"
   },
   "popChecking": {
-    "message": "Current site: checking…"
+    "message": "Checking…"
   },
   "popUnknown": {
-    "message": "Current site: unknown"
+    "message": "No site in this tab"
   },
   "popActive": {
     "message": "Active: $HOST$",
@@ -496,15 +511,10 @@
     }
   },
   "popDisabled": {
-    "message": "Disabled: $HOST$",
-    "placeholders": {
-      "host": {
-        "content": "$1"
-      }
-    }
+    "message": "The extension is off"
   },
   "popInactive": {
-    "message": "Inactive site: $HOST$",
+    "message": "Not in your site list: $HOST$",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -707,11 +717,26 @@
   "popPermGap": {
     "message": "⚠ Some sites need access on this device — open Settings to approve."
   },
-  "optQuickTitle": {
-    "message": "Quick jump"
+  "optTabsLabel": {
+    "message": "Settings sections"
   },
-  "optQuickAdd": {
-    "message": "＋ Add quick link"
+  "optTabTemplates": {
+    "message": "Templates"
+  },
+  "optTabItems": {
+    "message": "Work items"
+  },
+  "optTabAppearance": {
+    "message": "Appearance"
+  },
+  "optTabSites": {
+    "message": "Sites"
+  },
+  "optTabBackup": {
+    "message": "Backup"
+  },
+  "optQuickTitle": {
+    "message": "Quick open"
   },
   "optQuickDesc": {
     "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. It is on the toolbar popup too."
@@ -734,14 +759,20 @@
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "url": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
     }
   },
   "msgQuickLimit": {
     "message": "At most $COUNT$ quick links.",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "popJumpLabel": {
@@ -765,8 +796,12 @@
   "omniboxOpen": {
     "message": "Open $KEY$ in $NAME$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "name": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
     }
   }
 }
