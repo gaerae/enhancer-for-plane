@@ -222,8 +222,13 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   sits in an `<a href>` (you do not link to the page you are on), then whether it is disabled
   (Plane leaves the parent's inert). Ranking rather than filtering matters: any one of those
   signals can change in a Plane release, and the cost should be a worse guess, not no button.
-  Sub-items, relations and the sibling menu put still more keys on the page — anything new that
-  reads "the key" has to say which one it means.
+  Sub-items, relations and the sibling menu put still more keys on the page — measured: every one
+  of them is a `ControlLink` (an `<a href>`) wrapping an inert identifier, so the link signal
+  covers them all, and the harness page carries two sub-items and a relation to keep proving it.
+  Anything new that reads "the key" has to say which one it means. One caveat about that harness
+  page: it also carries a linked key that is *not* inert, which Plane does not render today. Every
+  other key being inert would otherwise make `disabled` sufficient on its own and leave the link
+  signal untested — one release enabling click-to-copy on a chip is all that would take.
 - **A work item key is not `ABC-123`.** A project identifier can be all digits — a
   Plane project can have one, so a key can read `42-7`. Any regex anchored
   on letters silently matches nothing there. The same measurement killed the branch-name

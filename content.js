@@ -433,8 +433,14 @@
   //   * the URL. An item's own page is /{workspace}/browse/{KEY}, so a button whose text is that
   //     key is this item beyond doubt. A list route with a peek panel over it has no key to
   //     compare, which is why the other two signals exist.
-  //   * a link. The parent's key is inside an <a href> to the parent; the sibling menu's keys too.
-  //   * disabled. Plane makes this item's key click-to-copy and leaves the parent's inert.
+  //   * a link. The parent's key is inside an <a href> to the parent, as are the keys of every
+  //     sub-item, relation and sibling-menu entry. You do not link to the page you are on.
+  //   * disabled. Plane makes this item's key click-to-copy and leaves every other one inert.
+  //
+  // Against Plane 1.4 the first two decide every case, and the harness fails if either is taken
+  // away. `disabled` is the spare, and deliberately so: it costs one boolean and it is what would
+  // carry this if a release ever rendered the parent chip as a div with an onClick instead of a
+  // link. It has no case of its own, because Plane has no such DOM to write a case against.
   function rankKeyButton(el, urlKey) {
     let score = 0;
     if (urlKey && (el.textContent || "").trim() === urlKey) score += 4;

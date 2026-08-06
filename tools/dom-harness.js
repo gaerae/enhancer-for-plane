@@ -327,8 +327,27 @@ const PLANE = `
   <div class="mb-5 flex w-min items-center gap-3 rounded-md border">
     <a href="/acme/browse/PROJ-100"><button type="button" disabled>PROJ-100</button></a>
   </div>
+  <!-- Not what Plane renders today, and that is the point: another item's key above this one,
+       in a link, but click-to-copy rather than inert. Plane 1.4 leaves every other key inert, so
+       "not disabled" alone would pick the right button and the link signal could rot untested —
+       one release enabling copy on a chip is all it would take. Here it is that release. -->
+  <div class="mb-5 flex w-min items-center gap-3 rounded-md border">
+    <a href="/acme/browse/PROJ-9"><button type="button">PROJ-9</button></a>
+  </div>
   <button type="button">PROJ-142</button>
   <textarea id="title-input">A work item</textarea>
+  <!-- Sub-items and relations, which put more keys on the page. They sit below the description
+       in Plane, but inside the same block as the title and the two keys above — which is what
+       matters here, because that block is the first scope the walk up from #title-input finds a
+       key in, so every one of these is a candidate. Each is a link to another item with an inert
+       key inside it, exactly as Plane renders them. -->
+  <div class="sub-issues">
+    <a href="/acme/browse/PROJ-201"><button type="button" disabled>PROJ-201</button></a>
+    <a href="/acme/browse/PROJ-202"><button type="button" disabled>PROJ-202</button></a>
+  </div>
+  <div class="relations">
+    <a href="/acme/browse/PROJ-77"><button type="button" disabled>PROJ-77</button></a>
+  </div>
 </div>`;
 
 /* ------------------------------------------------------------------ */
@@ -939,6 +958,23 @@ const suites = [
         const copy = document.querySelector(".pe-copy-ref-btn");
         eq(copy.previousElementSibling.textContent.trim(), "PROJ-142", "the key the copy button follows");
         eq(document.querySelectorAll("a[href] .pe-copy-ref-btn, a[href] .pe-focus-btn").length, 0, "none inside a link");
+      });
+      // Six keys are on this page: the parent's, a copyable chip's, this item's, two sub-items'
+      // and one relation's. One button of each kind, on the one key that is this item's.
+      check("the keys of sub-items and relations are left alone", () => {
+        const keys = [...document.querySelectorAll("#probe-header button")]
+          .filter((b) => /^[A-Za-z0-9]{1,12}-[1-9]\\d*$/.test((b.textContent || "").trim()))
+          .map((b) => b.textContent.trim());
+        eq(keys.join(","), "PROJ-100,PROJ-9,PROJ-142,PROJ-201,PROJ-202,PROJ-77", "the keys on the page");
+        eq(document.querySelectorAll(".pe-copy-ref-btn").length, 1, "one copy button");
+        eq(document.querySelectorAll(".pe-focus-btn").length, 1, "one focus toggle");
+        for (const k of ["PROJ-100", "PROJ-9", "PROJ-201", "PROJ-202", "PROJ-77"]) {
+          const other = [...document.querySelectorAll("#probe-header button")].find(
+            (b) => (b.textContent || "").trim() === k
+          );
+          const next = other.parentElement.nextElementSibling;
+          ok(!next || !/pe-(copy-ref|focus)-btn/.test(next.className || ""), "a button landed beside " + k);
+        }
       });
       check("the toggle sits in the item header, after the copy button", () => {
         const btn = document.querySelector(".pe-focus-btn");
