@@ -9,17 +9,30 @@ checkable already lives in `tools/`; this file only covers what a script cannot 
 node tools/test.js            # behaviour: sync engine, normalization, sections
 node tools/check-i18n.js      # translation contract (--strict in CI)
 node tools/check-source.js    # architectural invariants
+node tools/dom-harness.js     # options.html + popup.html in a real browser
 ```
 
-CI runs all three on every push and PR. They are fast and have no dependencies —
+CI runs all four on every push and PR. They are fast and have no dependencies —
 there is no reason to skip them.
+
+`dom-harness.js` needs a Chrome or Chromium on the machine (`PE_CHROME=/path` to
+point it at one). Locally it skips loudly when there is none; in CI, where the
+runner has Chrome, a missing browser is a failure — a check that quietly ran
+nothing is worse than no check. It generates its pages into a temp dir, forces the
+dark blocks on by rewriting the media condition in a copy of the stylesheet, and
+uses `--dump-dom --virtual-time-budget` so timers and transitions settle
+deterministically instead of being slept on. Do not give it `--user-data-dir`
+unless you have measured it on your platform: a fresh profile directory never
+finishes initialising on macOS and every launch hangs.
 
 **Passing them is not the same as working.** Every one of them passed while the
 picker was showing stale templates, because the bug was in data, not code. If you
 changed anything a user sees, drive it:
 
-- **Options page / popup**: serve the repo and open the page with a stubbed `chrome`
-  (see "Driving the UI" below). Node cannot render CSS.
+- **Options page / popup**: add the case to `tools/dom-harness.js` — that is what
+  it is for, and it turns a one-off check into one that runs forever. Reach for a
+  hand-served page with a stubbed `chrome` (see "Driving the UI" below) only while
+  exploring. Node cannot render CSS.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a

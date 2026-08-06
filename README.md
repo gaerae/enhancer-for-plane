@@ -271,13 +271,20 @@ No dependencies, no build step — stock node:
 node tools/test.js          # behaviour: sync engine, normalization, sections, counts
 node tools/check-i18n.js    # translation contract (--strict in CI)
 node tools/check-source.js  # architectural invariants
+node tools/dom-harness.js   # the settings page and popup, in a real browser
 ```
 
-CI runs all three on every push and PR. `check-source.js` enforces what a reviewer
+CI runs all four on every push and PR. `check-source.js` enforces what a reviewer
 would otherwise have to remember — network access confined to the worker, no
-`innerHTML` for data that isn't ours, every remote field clamped, and that the
-release zip actually contains every file the extension loads. Contributor rules
-live in [AGENTS.md](AGENTS.md).
+`innerHTML` for data that isn't ours, every remote field clamped, a dark-mode
+counterpart for every light surface, and that the release zip actually contains
+every file the extension loads. `dom-harness.js` covers what is only true of a
+real layout engine — which tab is showing, that an unsaved edit survives one, what
+a label says, what a colour resolves to against the surface behind it — by running
+the pages in headless Chrome with a stubbed `chrome` API. It needs a browser
+(`PE_CHROME=/path` to choose one); locally it skips loudly without one, and in CI
+a missing browser is a failure rather than a quiet pass. Contributor rules live in
+[AGENTS.md](AGENTS.md).
 
 ## How it works (notes)
 
