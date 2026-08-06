@@ -83,7 +83,7 @@ One "selector → property → value" rule forces any width (320px, 30rem) and n
 It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
 
 🧘 Just the description — focus mode
-Alt+Shift+F (⌥⇧F on macOS) hides the properties panel and the left navigation so the work item's body is what is left.
+Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation so the work item's body is what is left.
 There is a toggle beside the work item's key too, and a switch in the toolbar popup.
 Plane pins properties to the right of a work item's own page with no way to collapse them; this collapses them.
 Any rule can be marked "Only while focus mode is on", so what disappears is up to you — two are ready to use, and one that centres the body at a reading width is one checkbox away.
@@ -242,7 +242,7 @@ Plane은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 
 범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
 
 🧘 본문만 남기기 — 집중 모드
-Alt+Shift+F(macOS는 ⌥⇧F)로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
+Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
 작업 항목 번호 옆의 토글 버튼과 툴바 팝업의 스위치로도 됩니다.
 Plane은 작업 항목 전용 페이지에서 속성을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
 어떤 규칙이든 "집중 모드에서만 적용"으로 표시할 수 있어 무엇을 숨길지는 직접 정합니다.

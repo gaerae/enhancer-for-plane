@@ -52,7 +52,7 @@
     "message": "규칙에 <b>“집중 모드에서만 적용”</b>을 켜 두면 평소에는 적용되지 않고, 집중 모드를 켤 때만 적용됩니다. 작업 항목의 속성 패널을 숨기는 규칙과 왼쪽 내비게이션을 숨기는 규칙이 바로 쓸 수 있게 들어 있습니다. 본문 읽기 폭을 잡아 주는 규칙도 하나 있고, 이것만 꺼진 채로 시작합니다."
   },
   "optFocusHow": {
-    "message": "켜는 길은 셋입니다 — <b>Alt+Shift+F</b>(macOS <b>⌥⇧F</b>), 작업 항목 번호 옆의 토글 버튼, 그리고 툴바 팝업의 스위치. 단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요."
+    "message": "켜는 길은 셋입니다 — <b>Alt+Shift+F</b>(macOS <b>⌥+⇧+F</b>), 작업 항목 번호 옆의 토글 버튼, 그리고 툴바 팝업의 스위치. 단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요."
   },
   "optFocusScope": {
     "message": "켠 탭에서만 적용되고, 그 탭에서는 새로 고쳐도 유지되며, 탭을 닫으면 사라집니다. 다른 기기로는 동기화되지 않습니다."
@@ -680,11 +680,11 @@
     "message": "참조 복사  ·  Alt/⌥+C"
   },
   "focusBtnTitle": {
-    "message": "집중 모드: 측면 패널 숨기기  ·  Alt+Shift+F (⌥⇧F)",
+    "message": "집중 모드: 측면 패널 숨기기  ·  Alt+Shift+F (⌥+⇧+F)",
     "description": "Title and aria-label of the toggle beside a work item's key, while focus mode is off. Both states name the shortcut, because the button is also where people learn it exists."
   },
   "focusBtnOnTitle": {
-    "message": "집중 모드가 켜져 있습니다 — 측면 패널 보이기  ·  Alt+Shift+F (⌥⇧F)"
+    "message": "집중 모드가 켜져 있습니다 — 측면 패널 보이기  ·  Alt+Shift+F (⌥+⇧+F)"
   },
   "msgCopied": {
     "message": "복사했습니다."

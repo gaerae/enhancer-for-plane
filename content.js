@@ -153,12 +153,13 @@
     const b = document.createElement("button");
     b.type = "button";
     b.className = "pe-focus-btn";
-    // A panel glyph: the frame is the window, the bar is the side panel that goes away.
+    // Three columns: the frame is the window, and both outer columns are what goes away —
+    // the panel on the right and the navigation on the left. A glyph with a bar down one side
+    // only says half of what the button does.
     b.innerHTML =
       '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
-      '<rect x="2.4" y="3.4" width="11.2" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
-      '<path d="M10.2 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
-      '<path d="M11 5.6h1.8M11 7.6h1.8M11 9.6h1.8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>';
+      '<rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
     b.addEventListener("mousedown", (e) => e.preventDefault());
     b.addEventListener("click", (e) => {
       e.preventDefault();

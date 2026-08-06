@@ -1462,6 +1462,34 @@ test("example feed: the button's URL points at the file that actually ships", ()
   ok(out.templates.length > 0, "the shipped file parses into templates");
 });
 
+// Alt+Shift+F was written for macOS as "⌥⇧F" in eleven places while Windows kept its plus
+// signs — the same shortcut spelled two ways, in the one part of the UI whose whole job is to
+// say which keys to press. Nothing was wrong enough to notice line by line, which is why this
+// is a rule rather than a reading: a modifier is followed by "+" or by nothing at all.
+test("shortcuts: a modifier chain reads the same on both platforms", () => {
+  const FILES = [
+    "_locales/en/messages.json",
+    "_locales/ko/messages.json",
+    "options.html",
+    "popup.html",
+    "README.md",
+    "README.ko.md",
+    "store-assets/STORE_LISTING.md"
+  ];
+  // A modifier symbol butting straight into the next key: ⌥⇧, ⌥T, ⌘⇧K. A trailing space, a
+  // "+", a bracket or Hangul after it is prose, not a chain.
+  const GLUED = /[⌥⇧⌘⌃](?=[⌥⇧⌘⌃A-Za-z0-9])/;
+  const bad = [];
+  for (const f of FILES) {
+    read(f)
+      .split("\n")
+      .forEach((line, i) => {
+        if (GLUED.test(line)) bad.push(`${f}:${i + 1}`);
+      });
+  }
+  eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
+});
+
 test("store copy: a quoted UI label is one the matching locale actually shows", () => {
   // The Korean listing told people to click "Pick element" and "Enable on this site" — the
   // English labels. A Korean reader sees "요소 선택 → 규칙 추가" and "이 사이트에서 사용", so the

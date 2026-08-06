@@ -109,7 +109,7 @@ enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥⇧F`) hides the side panels so the description
+5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
    is what is left. There is also a toggle beside the work item's key, next to Copy reference,
    and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
    knew it existed. On a work item's own page Plane pins properties to the right

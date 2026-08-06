@@ -54,7 +54,7 @@
     "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off."
   },
   "optFocusHow": {
-    "message": "Three ways in: <b>Alt+Shift+F</b> (macOS <b>⌥⇧F</b>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
+    "message": "Three ways in: <b>Alt+Shift+F</b> (macOS <b>⌥+⇧+F</b>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
   },
   "optFocusScope": {
     "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices."
@@ -682,11 +682,11 @@
     "message": "Copy reference  ·  Alt/⌥+C"
   },
   "focusBtnTitle": {
-    "message": "Focus mode: hide the side panels  ·  Alt+Shift+F (⌥⇧F)",
+    "message": "Focus mode: hide the side panels  ·  Alt+Shift+F (⌥+⇧+F)",
     "description": "Title and aria-label of the toggle beside a work item's key, while focus mode is off. Both states name the shortcut, because the button is also where people learn it exists."
   },
   "focusBtnOnTitle": {
-    "message": "Focus mode is on — show the side panels  ·  Alt+Shift+F (⌥⇧F)"
+    "message": "Focus mode is on — show the side panels  ·  Alt+Shift+F (⌥+⇧+F)"
   },
   "msgCopied": {
     "message": "Copied."
