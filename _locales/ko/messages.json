@@ -4,7 +4,7 @@
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extDesc": {
-    "message": "Plane(makeplane/plane.so)용 보조 도구 — 제목·본문 템플릿 원클릭 삽입과 이름 폭 조정 규칙을 추가합니다.",
+    "message": "주소창에서 작업 항목 키로 바로 이동. 여기에 Plane용 원클릭 템플릿·참조 복사·폭 조정 규칙까지.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {

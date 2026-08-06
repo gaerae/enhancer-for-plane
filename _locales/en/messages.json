@@ -4,7 +4,7 @@
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extDesc": {
-    "message": "Tweaks for Plane (makeplane/plane.so) — open-source project management, issues & wiki. Title/body templates + width rules.",
+    "message": "Jump to any work item by key from the address bar. Plus one-click templates, copy reference and width rules for Plane.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {

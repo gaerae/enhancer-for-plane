@@ -24,7 +24,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 Enhancer for Plane — Projects, Wiki & Issues
 
 ## Summary / short description  (max 132)
-Fill a work item in one click, copy it in one click, read every name — for Plane (makeplane), the open-source Jira alternative.
+Jump to a work item by key from the address bar. Plus templates, copy reference and full names for Plane (makeplane).
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -41,6 +41,11 @@ Stop retyping the same work items. Enhancer for Plane brings reusable templates,
 Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira. This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
 
 WHAT YOU GET
+
+▸ Go straight to a work item — quick jump
+Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it. The same box is on the toolbar popup.
+Each target is a base link you set, with {{key}} where the key belongs — so it works for Plane, and for Jira and Linear alongside it. The key's prefix picks the target: point ENG- at Linear and leave everything else on Plane.
+It only opens a URL, so it asks for no site access at all and works on any tab.
 
 ▸ Fill a work item in one click — title + body templates
 Register a template once, drop it into any work item with one click — title and description together. A native "Template" button sits in the description toolbar and in the "Create work item" dialog, so new items start fast.
@@ -85,7 +90,7 @@ Open source. Feedback and issues welcome.
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, and adjusting element widths via CSS rules — on the Plane instances the user chooses.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
 
 ---
 
@@ -151,7 +156,7 @@ Enhancer for Plane — 프로젝트·위키·이슈
 > 권장합니다. 위 한글 병기는 선택 사항입니다.
 
 ### 요약 / 짧은 설명 (max 132)
-작업 항목을 한 번에 채우고, 한 번에 복사하고, 이름을 온전히 — 오픈소스 Jira 대안 Plane(makeplane)을 위한 확장.
+주소창에서 작업 항목 키로 바로 이동. 여기에 Plane용 템플릿·참조 복사·이름 폭 조정까지.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)
@@ -163,6 +168,11 @@ Enhancer for Plane — 프로젝트·위키·이슈
 Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira 의 자체 호스팅 대안입니다. 본 익스텐션은 독립적인 비공식 애드온으로, Plane 과 제휴하거나 승인받지 않았으며 "Plane" 은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
 
 무엇을 제공하나
+
+▸ 작업 항목으로 바로 가기 — 빠른 이동
+주소창에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다. 같은 입력칸이 툴바 팝업에도 있습니다.
+대상마다 기본 링크를 하나씩 정하고 키가 들어갈 자리에 {{key}}를 넣습니다. 그래서 Plane은 물론 Jira와 Linear도 함께 씁니다. 키의 접두사가 대상을 고르므로, ENG-는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.
+URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
 
 ▸ 작업 항목을 한 번에 채우기 — 제목 + 본문 템플릿
 템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께. 설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
@@ -216,11 +226,14 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 • Screenshot 2 (1280×800) ....... store-assets/screenshot-2-copy.png ✓
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-3-width.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-4-picker.png ✓
-• The same four, Korean listing .. store-assets/screenshot-*.ko.png ✓
+• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-jump.png ✓
+• The same five, Korean listing .. store-assets/screenshot-*.ko.png ✓
   (Upload in file order. The carousel opens on templates, then the two everyday
   actions — insert a template, copy a reference — before the two that shape the
-  page. The listing description lists the features in this same order; keep the
-  three in step when one of them moves.)
+  page, and closes on quick jump, the one that needs no setup at all. The listing
+  description leads with quick jump because it is the thing a visitor can use a
+  second after installing; the carousel keeps templates first because it is the
+  picture that says what this is. Keep the three in step when one of them moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
 
