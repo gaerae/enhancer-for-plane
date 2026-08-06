@@ -43,13 +43,14 @@
   // quick link is configured; the target picker appears only when there is more than one.
   // It just opens a URL — no host permission, and it works regardless of the current site.
   function setupJump() {
+    const block = $("jumpBlock");
     const form = $("jumpForm");
     const input = $("jumpKey");
     const targetSel = $("jumpTarget");
     const links = (state.quickLinks || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
-    if (!links.length) return; // nothing to jump to → leave the form hidden
+    if (!links.length) return; // nothing to jump to → leave the block (label + divider) hidden
 
-    form.hidden = false;
+    block.hidden = false;
     if (links.length > 1) {
       // "Auto" routes by the key's prefix; the named rows force one target.
       targetSel.innerHTML = "";

@@ -12,11 +12,17 @@
         <strong>Enhancer for Plane</strong>
       </header>
 
-      <form class="pop-jump" id="jumpForm" hidden>
-        <input id="jumpKey" class="pop-jump-key" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="popJumpPh" placeholder="Issue key…" />
-        <select id="jumpTarget" class="pop-jump-target" hidden></select>
-        <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
-      </form>
+      <!-- Quick jump is its own concern: it works on any tab, regardless of the enable /
+           per-site controls below, so it is grouped and divided off from them. -->
+      <div class="pop-jump-block" id="jumpBlock" hidden>
+        <div class="pop-jump-label" data-i18n="popJumpLabel">Go to work item</div>
+        <form class="pop-jump" id="jumpForm">
+          <input id="jumpKey" class="pop-jump-key" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="popJumpPh" placeholder="Issue key…" />
+          <select id="jumpTarget" class="pop-jump-target" hidden></select>
+          <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
+        </form>
+        <hr class="pop-div" />
+      </div>
 
       <label class="pop-toggle">
         <span data-i18n="popEnabled">Enabled</span>

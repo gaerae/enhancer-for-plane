@@ -744,6 +744,9 @@
       "count": { "content": "$1" }
     }
   },
+  "popJumpLabel": {
+    "message": "Go to work item"
+  },
   "popJumpPh": {
     "message": "Issue key…"
   },

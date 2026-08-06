@@ -744,6 +744,9 @@
       "count": { "content": "$1" }
     }
   },
+  "popJumpLabel": {
+    "message": "작업 항목으로 이동"
+  },
   "popJumpPh": {
     "message": "이슈 키…"
   },
