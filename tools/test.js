@@ -1490,6 +1490,23 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
   eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
 });
 
+// Why no message carries a line break, written down so the question does not come back: a JSON
+// string cannot span physical lines, so a "\n" inside one buys the file nothing — the line is
+// exactly as long to read and to diff — while changing what the user sees. Nothing in our CSS
+// sets white-space to anything but a collapsing value, so a break vanishes in the pages; in a
+// title attribute it does the opposite and breaks the tooltip in two. Copy that has grown too
+// long to read is split into two keys instead (optKeysWhyTyping / optKeysWhyCommand).
+test("i18n: no message carries a line break", () => {
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      if (/[\n\r]/.test(String((entry && entry.message) || ""))) bad.push(loc + "/" + key);
+    }
+  }
+  eq(bad, [], "a line break inside a message: " + bad.join(", "));
+});
+
 // The other half of the same inconsistency: the templates card marked its shortcut up as
 // <kbd>, the focus card used <b> and the copy card <code>, so three cards described a
 // keystroke three ways on one settings page. Only messages that already carry markup are

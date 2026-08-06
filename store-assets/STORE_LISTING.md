@@ -26,8 +26,10 @@ Enhancer for Plane — Quick Open & Issue Templates
 > Enhancer for Plane" is something you can say, and a descriptive phrase is not. The half
 > after the dash is the searchable one: "Plane" on its own loses to aircraft, and nobody
 > types "enhancer", so the two features people actually search for sit where the store can
-> index them. "makeplane" and "plane.so" belong in the summary and description rather than
-> the name, which they only lengthen. "Jira" stays out of the name too: quick open works
+> index them. "makeplane" and "plane.so" are searchable spellings rather than reading matter:
+> they stay in the summary and at the foot of the description, out of the name (which they
+> only lengthen) and out of the extension's own description (where the reader is already
+> looking at a Plane extension). "Jira" stays out of the name too: quick open works
 > there, but the other five features need Plane's own pages, and a name must not promise
 > otherwise.
 
@@ -47,11 +49,8 @@ English
 
 ## Detailed description  (max 16,000)
 
-Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it.
-This fills them for Plane (makeplane / plane.so), the open-source Jira alternative — inside the Plane UI, on any plan, with no changes to your Plane server.
-
-Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira.
-This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
+Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it, no way to put the side panels away and read.
+This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
 
 ✨ WHAT YOU GET
 
@@ -123,6 +122,9 @@ See the privacy policy for details.
 
 Open source. Feedback and issues welcome.
 
+Works with Plane (makeplane / plane.so), the open-source project management, issues and wiki tool, and a self-hosted alternative to Jira.
+An independent, unofficial add-on: not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
+
 ---
 
 ## Single purpose  (review form)
@@ -193,7 +195,9 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 > "Enhancer for Plane 설치하세요"는 말이 되지만 서술형 문구는 그렇지 않습니다. 붙임표
 > 뒤가 검색되는 쪽입니다. "Plane"만으로는 항공기 명사에 밀리고 "enhancer"는 아무도
 > 검색하지 않으므로, 사람들이 실제로 찾는 두 기능을 스토어가 색인할 자리에 둡니다.
-> "makeplane"과 "plane.so"는 이름을 길게만 만들어서 요약과 상세 설명에 남겼습니다.
+> "makeplane"과 "plane.so"는 읽을 문구가 아니라 검색용 표기라서 요약과 상세 설명 맨 아래에만
+> 두었습니다. 이름은 길어지기만 하고, 익스텐션 자체 설명은 이미 Plane 익스텐션을 보고 있는
+> 사람이 읽는 문구라서 뺐습니다.
 > 이름을 바꿔도 확장 ID와 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
@@ -204,11 +208,8 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 
 ### 상세 설명 (max 16,000)
 
-어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없습니다.
-오픈소스 Jira 대안 Plane(makeplane / plane.so)에서 그 빈 곳을 채웁니다. Plane UI 안에서, 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
-
-Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira의 자체 호스팅 대안입니다.
-본 익스텐션은 독립적인 비공식 애드온으로, Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
+어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없고, 측면 패널을 치워 본문만 볼 방법이 없습니다.
+그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
 
 ✨ 무엇을 제공하나
 
@@ -282,6 +283,12 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 3. 설정에서 템플릿·복사 형식·폭 규칙을 추가합니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
+
+makeplane / plane.so — 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira의 자체 호스팅 대안인 Plane에서 동작합니다.
+독립적인 비공식 애드온입니다. Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
+
+---
+
 ### 단일 목적 / 권한 정당화 (심사 폼)
 심사 폼(단일 목적, 권한 정당화, 데이터 사용)은 Google 리뷰어를 위해 **영문 그대로
 제출**하세요. 위 영문 섹션을 사용하면 됩니다. 한국어 번역이 반드시 필요한 칸은

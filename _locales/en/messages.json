@@ -8,8 +8,8 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, focus mode, sync.",
-    "description": "Short description shown in the Chrome Web Store."
+    "message": "Issue templates, quick open by key, copy reference, and a focus mode that hides the side panels — inside Plane, on any plan.",
+    "description": "Short description shown in the Chrome Web Store, and the extension's own description in chrome://extensions. It says what the extension does and nothing else: whoever reads it is looking at a Plane extension already, so \"the open-source Jira alternative\" only spent characters, and the searchable spellings (makeplane, plane.so) sit at the foot of the store description where they cost the reader nothing."
   },
   "cmdToggleFocus": {
     "message": "Focus mode: hide the side panels",
@@ -19,8 +19,8 @@
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.",
-    "description": "Sub-line under the settings header. Deliberately does not explain what Plane is — the store listing does that for a stranger, and whoever is reading this already installed the extension. Order matches extName: quick open first."
+    "message": "Fills the gaps in Plane — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.",
+    "description": "Sub-line under the settings header. It names features and nothing else — whoever is reading it installed the extension, so neither what Plane is nor how it is spelled on GitHub belongs here. Order matches extName: quick open first. Two lines is the budget, and the harness measures it in both locales."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -60,7 +60,8 @@
     "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices."
   },
   "optRulesTitle": {
-    "message": "Style rules (width / length)"
+    "message": "Style rules",
+    "description": "Was \"Style rules (width / length)\" while every shipped rule set a width. Focus mode's presets set display and padding in the same list, so the parenthetical had become a promise the card no longer keeps; the description under it says what a rule is instead."
   },
   "optRulesAdd": {
     "message": "＋ Add rule"
@@ -215,7 +216,8 @@
     "message": "Name (e.g. QA standards)"
   },
   "optSrcUrlPh": {
-    "message": "https://plane.example.com/templates.json"
+    "message": "https://plane.example.com/templates.json",
+    "description": "Placeholder text: an example URL. Nothing here is prose."
   },
   "optSrcInterval": {
     "message": "Sync interval"
@@ -287,6 +289,7 @@
   },
   "msgSrcSkipped": {
     "message": " ($COUNT$ skipped over limit)",
+    "description": "Appended to msgSrcSynced, so the leading space is deliberate — without it the two run together as \"12 templates(3 skipped\".",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -303,6 +306,7 @@
   },
   "msgSrcLastGood": {
     "message": " — using last good copy ($TIME$)",
+    "description": "Appended to msgSrcFailed. Leading space deliberate, as with msgSrcSkipped.",
     "placeholders": {
       "time": {
         "content": "$1"
@@ -330,6 +334,7 @@
   },
   "msgSrcHidden": {
     "message": " ($COUNT$ hidden)",
+    "description": "Appended to a source's summary line. Leading space deliberate.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -491,10 +496,12 @@
     }
   },
   "msgStorageOver": {
-    "message": " — over the sync limit; saving may fail"
+    "message": " — over the sync limit; saving may fail",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "msgStorageOverItem": {
     "message": " — one block is over its ~$LIMIT$ KB limit; saving will fail",
+    "description": "Appended to msgStorageUsed. Leading space deliberate.",
     "placeholders": {
       "limit": {
         "content": "$1"
@@ -502,7 +509,8 @@
     }
   },
   "msgStorageNear": {
-    "message": " — approaching the limit"
+    "message": " — approaching the limit",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "popEnabled": {
     "message": "Extension enabled"
@@ -661,7 +669,8 @@
     "message": "name (e.g. Chat)"
   },
   "optCopyFormatPh": {
-    "message": "{{item.key}} {{item.title}}"
+    "message": "{{item.key}} {{item.title}}",
+    "description": "Placeholder text, and an example of the format language. {{item.key}} and {{item.title}} are tokens the expander looks for — translate around them, never inside them."
   },
   "optCopySampleTitle": {
     "message": "Fix the login failure"
@@ -706,13 +715,13 @@
     "message": "No work item on this page — open one, or click a row to open its panel."
   },
   "msgFocusOn": {
-    "message": "Focus mode on — Alt+Shift+F brings the panels back."
+    "message": "Focus mode on — Alt+Shift+F (⌥+⇧+F) brings the panels back."
   },
   "msgFocusOff": {
     "message": "Focus mode off."
   },
   "msgFocusRestored": {
-    "message": "Focus mode is still on in this tab — Alt+Shift+F brings the panels back.",
+    "message": "Focus mode is still on in this tab — Alt+Shift+F (⌥+⇧+F) brings the panels back.",
     "description": "Shown once per page load, not on the toggle. A reload is the one way to meet a hidden properties panel without having just asked for it."
   },
   "msgCopyLimit": {
@@ -747,7 +756,7 @@
     "message": "This device needs to approve access"
   },
   "optPermDesc": {
-    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ listed site(s)/source(s) are not yet approved on this device. Until you approve, the extension stays inactive here.",
+    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ of the sites and sources you listed are not approved on this one yet. Until you approve them, the extension stays inactive here.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -837,7 +846,10 @@
     "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The other two are handled inside the page and are fixed."
   },
   "optKeysWhyTyping": {
-    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives. Focus mode escapes that trade-off by being a browser command, which Chrome intercepts before the page ever sees the key."
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives."
+  },
+  "optKeysWhyCommand": {
+    "message": "Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key."
   },
   "optQuickTitle": {
     "message": "Quick open"
@@ -858,10 +870,12 @@
     "message": "prefix"
   },
   "optQuickUrlPh": {
-    "message": "https://…/browse/{{key}}"
+    "message": "https://…/browse/{{key}}",
+    "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
+    "description": "Layout only — a key, an arrow, the URL it lands on. No words to translate.",
     "placeholders": {
       "key": {
         "content": "$1"

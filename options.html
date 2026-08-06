@@ -13,7 +13,7 @@
           <img src="icons/icon48.png" alt="" width="28" height="28" />
           <div>
             <h1 data-i18n="extShort">Enhancer for Plane</h1>
-            <p data-i18n="optTagline">Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.</p>
+            <p data-i18n="optTagline">Fills the gaps in Plane — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.</p>
             <p class="about"><span id="appVersion"></span><a class="about-link" href="https://github.com/gaerae/enhancer-for-plane" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg><span data-i18n="optGitHub">GitHub</span></a> <span class="about-sep">·</span> <a class="about-link" href="https://github.com/gaerae/enhancer-for-plane/issues" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M14 8.2c0 2.7-2.7 4.9-6 4.9-.6 0-1.2-.07-1.7-.2L3 14.5l.7-2.5C2.6 11 2 9.7 2 8.2 2 5.5 4.7 3.3 8 3.3s6 2.2 6 4.9Z"/></svg><span data-i18n="optFeedback">Send feedback</span></a> <span class="about-sep">·</span> <a class="about-link" href="https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo/reviews" target="_blank" rel="noopener"><svg class="about-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .74 4.3L8 11.4l-3.84 2 .74-4.3-3.1-3 4.3-.6z"/></svg><span data-i18n="optRate">Rate it</span></a></p>
           </div>
         </div>
@@ -256,7 +256,8 @@
             </table>
           </div>
           <p class="desc" data-i18n-html="optKeysRebind">Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The other two are handled inside the page and are fixed.</p>
-          <p class="desc" data-i18n-html="optKeysWhyTyping"><kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives. Focus mode escapes that trade-off by being a browser command, which Chrome intercepts before the page ever sees the key.</p>
+          <p class="desc" data-i18n-html="optKeysWhyTyping"><kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives.</p>
+          <p class="desc" data-i18n="optKeysWhyCommand">Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key.</p>
         </section>
       </div>
 

@@ -94,7 +94,7 @@ Plane server**, applied only on the domains you enable.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
 
-4. **📐 Style rules (width / length) — a generic engine**
+4. **📐 Style rules — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector

@@ -8,7 +8,7 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "오픈소스 Jira 대안, 자체 호스팅 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 참조 복사, 집중 모드, 팀 동기화.",
+    "message": "이슈 템플릿, 키로 바로 열기, 참조 복사, 그리고 측면 패널을 숨기는 집중 모드 — Plane 화면 안에서, 서버는 건드리지 않고.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "cmdToggleFocus": {
@@ -19,7 +19,7 @@
     "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "Plane(makeplane / plane.so)의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
+    "message": "Plane의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -58,7 +58,7 @@
     "message": "켠 탭에서만 적용되고, 그 탭에서는 새로 고쳐도 유지되며, 탭을 닫으면 사라집니다. 다른 기기로는 동기화되지 않습니다."
   },
   "optRulesTitle": {
-    "message": "스타일 규칙 (폭 / 길이)"
+    "message": "스타일 규칙"
   },
   "optRulesAdd": {
     "message": "＋ 규칙 추가"
@@ -213,7 +213,8 @@
     "message": "이름 (예: QA 표준)"
   },
   "optSrcUrlPh": {
-    "message": "https://plane.example.com/templates.json"
+    "message": "https://plane.example.com/templates.json",
+    "description": "Placeholder text: an example URL. Nothing here is prose."
   },
   "optSrcInterval": {
     "message": "동기화 주기"
@@ -285,6 +286,7 @@
   },
   "msgSrcSkipped": {
     "message": " (한도 초과로 $COUNT$개 생략)",
+    "description": "Appended to msgSrcSynced, so the leading space is deliberate.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -301,6 +303,7 @@
   },
   "msgSrcLastGood": {
     "message": " — 마지막 정상본 사용 ($TIME$)",
+    "description": "Appended to msgSrcFailed. Leading space deliberate.",
     "placeholders": {
       "time": {
         "content": "$1"
@@ -328,6 +331,7 @@
   },
   "msgSrcHidden": {
     "message": " ($COUNT$개 숨김)",
+    "description": "Appended to a source's summary line. Leading space deliberate.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -381,7 +385,7 @@
     "message": "설정 백업이 아니라 템플릿 동기화 소스 파일로 보입니다. 대신 “템플릿 동기화”에 URL을 추가하세요."
   },
   "msgImportNewer": {
-    "message": "가져오기 실패: 더 새로운 버전의 백업입니다 (파일 schema $FILE$, 현재 빌드는 $HERE$). 확장을 먼저 업데이트하세요.",
+    "message": "가져오기 실패: 더 새로운 버전의 백업입니다. 파일의 schema는 $FILE$이고 이 빌드가 읽는 것은 $HERE$입니다. 확장을 먼저 업데이트하세요.",
     "placeholders": {
       "file": {
         "content": "$1"
@@ -489,10 +493,12 @@
     }
   },
   "msgStorageOver": {
-    "message": " — 동기화 한도 초과. 저장이 실패할 수 있습니다"
+    "message": " — 동기화 한도 초과. 저장이 실패할 수 있습니다",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "msgStorageOverItem": {
     "message": " — 블록 하나가 약 $LIMIT$ KB 한도를 넘었습니다. 저장이 실패합니다",
+    "description": "Appended to msgStorageUsed. Leading space deliberate.",
     "placeholders": {
       "limit": {
         "content": "$1"
@@ -500,7 +506,8 @@
     }
   },
   "msgStorageNear": {
-    "message": " — 한도에 근접했습니다"
+    "message": " — 한도에 근접했습니다",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "popEnabled": {
     "message": "확장 프로그램 사용"
@@ -659,7 +666,8 @@
     "message": "이름 (예: 메신저)"
   },
   "optCopyFormatPh": {
-    "message": "{{item.key}} {{item.title}}"
+    "message": "{{item.key}} {{item.title}}",
+    "description": "Placeholder text, and an example of the format language. {{item.key}} and {{item.title}} are tokens the expander looks for — translate around them, never inside them."
   },
   "optCopySampleTitle": {
     "message": "로그인 실패 수정"
@@ -704,13 +712,13 @@
     "message": "이 화면에는 작업 항목이 없습니다. 항목을 열거나 목록에서 한 줄을 눌러 패널을 여세요."
   },
   "msgFocusOn": {
-    "message": "집중 모드를 켰습니다. Alt+Shift+F를 누르면 패널이 다시 나옵니다."
+    "message": "집중 모드를 켰습니다. Alt+Shift+F(⌥+⇧+F)를 누르면 패널이 다시 나옵니다."
   },
   "msgFocusOff": {
     "message": "집중 모드를 껐습니다."
   },
   "msgFocusRestored": {
-    "message": "이 탭은 집중 모드입니다. Alt+Shift+F를 누르면 패널이 다시 나옵니다.",
+    "message": "이 탭은 집중 모드입니다. Alt+Shift+F(⌥+⇧+F)를 누르면 패널이 다시 나옵니다.",
     "description": "Shown once per page load, not on the toggle. A reload is the one way to meet a hidden properties panel without having just asked for it."
   },
   "msgCopyLimit": {
@@ -835,7 +843,10 @@
     "message": "집중 모드는 브라우저 명령이라 <code>chrome://extensions/shortcuts</code>에서 다른 키로 바꾸거나 비울 수 있습니다. 나머지 둘은 페이지 안에서 처리하는 키라 고정입니다."
   },
   "optKeysWhyTyping": {
-    "message": "<kbd>Alt</kbd>+<kbd>T</kbd>는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다. <kbd>Alt</kbd>+<kbd>C</kbd>는 일부러 그렇게 하지 않았습니다. macOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다. 집중 모드는 브라우저 명령이라 이 선택을 하지 않아도 됩니다 — Chrome이 페이지보다 먼저 키를 가로챕니다."
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd>는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다. <kbd>Alt</kbd>+<kbd>C</kbd>는 일부러 그렇게 하지 않았습니다. macOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다."
+  },
+  "optKeysWhyCommand": {
+    "message": "집중 모드는 페이지 안의 키 핸들러가 아니라 브라우저 명령이라 이 선택을 하지 않아도 됩니다 — Chrome이 페이지보다 먼저 키를 가로챕니다."
   },
   "optQuickTitle": {
     "message": "바로 열기"
@@ -856,10 +867,12 @@
     "message": "접두사"
   },
   "optQuickUrlPh": {
-    "message": "https://…/browse/{{key}}"
+    "message": "https://…/browse/{{key}}",
+    "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
+    "description": "Layout only — a key, an arrow, the URL it lands on. No words to translate.",
     "placeholders": {
       "key": {
         "content": "$1"
