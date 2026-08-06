@@ -177,6 +177,12 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   works. The focus presets are asserted equal from both sides; do the same for the next ones.
   Appending in a migration is only allowed because those ids never existed before: it is new
   content, not the resurrection above, and once the stamp moves a deletion is final.
+- **An answer arrives after the question has moved on.** The popup asks the tab whether focus
+  mode is on, and shows the switch when the tab says yes. Flip the master switch off while that
+  reply is in flight and it lands anyway — putting a Focus mode control on screen underneath a
+  status line reading "the extension is off". Number the question and drop replies to older
+  ones. Every `chrome.tabs.sendMessage` from the popup has this shape; the one that writes the
+  status line (Re-scan) can overwrite a newer status the same way.
 - **A percentage in `padding` measures the containing block, not the element.** The
   reading-width preset centres a column with `padding-inline: max(2.25rem, (100% - 60rem) / 2)`,
   which is right in Plane (the column is the flex child filling its parent) — but the first

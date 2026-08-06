@@ -1276,6 +1276,17 @@ test("focus: a value that tries to close the block cannot reach either half", ()
   eq(out.always, "", "and it stayed on the focus side");
 });
 
+// The caller passes a validator that rejects braces, but this function is what writes the
+// stylesheet, so it must not depend on being handed one.
+test("focus: a selector that would close the rule is refused with no validator at all", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, selector: "a { color: red } b", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".x}", property: "display", value: "none" }
+  ]);
+  eq(out, { always: "", focus: "" });
+});
+
 test("focus: an unreadable selector is dropped by the caller's own check", () => {
   const { peBuildRuleCss } = loadCommon();
   const seen = [];
@@ -1490,12 +1501,20 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
   eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
 });
 
-// Why no message carries a line break, written down so the question does not come back: a JSON
-// string cannot span physical lines, so a "\n" inside one buys the file nothing — the line is
-// exactly as long to read and to diff — while changing what the user sees. Nothing in our CSS
-// sets white-space to anything but a collapsing value, so a break vanishes in the pages; in a
-// title attribute it does the opposite and breaks the tooltip in two. Copy that has grown too
-// long to read is split into two keys instead (optKeysWhyTyping / optKeysWhyCommand).
+// Why no message carries a line break — a choice, not a limit of the format. `\n` is a perfectly
+// good JSON escape and chrome.i18n hands it back untouched; what it does not do is what someone
+// reaching for it usually wants:
+//   * It does not make the file readable. A JSON string cannot span physical lines, so the line
+//     stays exactly as long to read and to diff, with two more characters in it.
+//   * It does not show up on the pages. Nothing in our CSS sets white-space to anything but a
+//     collapsing value, so the break renders as the space it collapses to. A visible break there
+//     is `<br>` in a message that renders as HTML, or `white-space: pre-line` on that element.
+//   * It does show up in a plain-text sink: a title attribute keeps the newline, so the same
+//     escape that vanishes in a card would split that button's tooltip in two.
+// So a break would be invisible in one place and load-bearing in another, from one escape that
+// reads the same in the file. Copy too long to read is split into two keys instead
+// (optKeysWhyTyping / optKeysWhyCommand); tooltips keep their " · " separator on one line, the
+// same as the copy and template buttons beside them.
 test("i18n: no message carries a line break", () => {
   const bad = [];
   for (const loc of ["en", "ko"]) {

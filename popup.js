@@ -47,15 +47,21 @@
   // rather than read it from state. No answer means no content script here — a tab opened
   // before the site was enabled, or a page that has not been reloaded since — and in that
   // case the switch is hidden instead of shown in a position it cannot honour.
+  // Numbered because the answer arrives after the question has moved on: flipping the master
+  // switch off calls this again, and an in-flight reply from when the site was still active
+  // would put the switch back on screen under a status line that says the extension is off.
+  let focusQuery = 0;
   function refreshFocusToggle(active) {
     const wrap = $("focusWrap");
     if (!wrap) return;
+    const mine = ++focusQuery;
     if (!active || currentTabId == null) {
       wrap.hidden = true;
       return;
     }
     try {
       chrome.tabs.sendMessage(currentTabId, { type: "pe-focus-state" }, (resp) => {
+        if (mine !== focusQuery) return; // a newer question is already out
         if (chrome.runtime.lastError || !resp || !resp.active) {
           wrap.hidden = true;
           return;

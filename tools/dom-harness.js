@@ -1001,6 +1001,33 @@ const suites = [
       check("the switch opens in the position the page reports, not a default", () => {
         eq(box().checked, true, "the page said focus mode was already on");
       });
+      // The answer comes back after the question may have changed. Hold one reply, take the
+      // site away, then let the reply land: a switch that reappears under "the extension is
+      // off" is a control the popup cannot honour.
+      const held = [];
+      chrome.tabs.sendMessage = (id, msg, cb) => held.push(() => cb({ ok: true, active: true, focus: true }));
+      document.getElementById("enabled").dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => held.length, "the state query to go out");
+      const master = document.getElementById("enabled");
+      master.checked = false;
+      master.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => wrap().hidden, "the switch to go away with the extension");
+      held.forEach((reply) => reply());
+      check("a reply to a question that has moved on is ignored", () => {
+        ok(wrap().hidden, "the switch came back after the extension was switched off");
+      });
+      // Put it back the way the rest of the case expects.
+      master.checked = true;
+      chrome.tabs.sendMessage = (id, msg, cb) => {
+        sent.push(msg);
+        if (msg.type === "pe-focus-state") cb({ ok: true, active: true, focus: pageFocus });
+        else if (msg.type === "pe-focus-toggle") {
+          pageFocus = typeof msg.on === "boolean" ? msg.on : !pageFocus;
+          cb({ ok: true, active: true, focus: pageFocus });
+        }
+      };
+      master.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => !wrap().hidden, "the switch to come back with the extension");
       check("moving it sends that position, so the two copies cannot drift", () => {
         box().checked = false;
         box().dispatchEvent(new Event("change", { bubbles: true }));

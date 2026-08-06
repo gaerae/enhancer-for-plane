@@ -84,12 +84,12 @@
   }
 }
 
-/* copy-reference button — sits beside the work item key, above the title. Icon only and
-   borderless: the key next to it is small, quiet text, and a bordered button there would
-   read as the louder of the two. It gains contrast on hover instead. */
-/* The focus toggle shares every metric with the copy button beside it: two buttons of
-   different sizes next to a key read as a mistake. What it adds is a pressed state, because
-   a toggle that looks identical in both positions says nothing about which one it is in. */
+/* The two buttons beside the work item key, above the title: copy reference and the focus
+   toggle. Icon only and borderless, because the key next to them is small, quiet text and a
+   bordered button there would read as the louder thing on the line — they gain contrast on
+   hover instead. One rule for both: two buttons of different sizes side by side read as a
+   mistake. The focus toggle adds a pressed state, since a toggle that looks identical in
+   both positions says nothing about which one it is in. */
 .pe-copy-ref-btn,
 .pe-focus-btn {
   display: inline-flex;

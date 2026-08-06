@@ -215,6 +215,10 @@ function peBuildRuleCss(rules, isValidSelector) {
       .trim();
     if (!sel || !val) return;
     if (!/^-?[a-zA-Z][a-zA-Z-]*$/.test(prop)) return;
+    // A brace in the selector would close our own rule and open whatever follows it. The
+    // caller's check catches this too, but it is the caller's — and this function decides
+    // what reaches a stylesheet, so it does not lean on being handed a good one.
+    if (/[{}]/.test(sel)) return;
     if (!ok(sel)) return;
     (r.focus ? focus : always).push(`${sel} { ${prop}: ${val} !important; }`);
   });

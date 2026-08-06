@@ -8,11 +8,11 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "이슈 템플릿, 키로 바로 열기, 참조 복사, 그리고 측면 패널을 숨기는 집중 모드 — Plane 화면 안에서, 서버는 건드리지 않고.",
+    "message": "Plane 화면 안에서 쓰는 이슈 템플릿, 키로 바로 열기, 참조 복사, 측면 패널을 숨기는 집중 모드.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "cmdToggleFocus": {
-    "message": "집중 모드: 측면 패널 숨기기",
+    "message": "집중 모드: 측면 패널 숨기기·보이기",
     "description": "Shown in chrome://extensions/shortcuts, where the user can rebind the key. It has to say what the shortcut does with no surrounding UI to lean on."
   },
   "optPageTitle": {
@@ -688,11 +688,11 @@
     "message": "참조 복사  ·  Alt/⌥+C"
   },
   "focusBtnTitle": {
-    "message": "집중 모드: 측면 패널 숨기기  ·  Alt+Shift+F (⌥+⇧+F)",
-    "description": "Title and aria-label of the toggle beside a work item's key, while focus mode is off. Both states name the shortcut, because the button is also where people learn it exists."
+    "message": "집중 모드 켜기: 측면 패널 숨기기  ·  Alt+Shift+F (⌥+⇧+F)",
+    "description": "Title and aria-label of the toggle beside a work item's key. The two states are a matching pair naming the action, not a label and a status line."
   },
   "focusBtnOnTitle": {
-    "message": "집중 모드가 켜져 있습니다 — 측면 패널 보이기  ·  Alt+Shift+F (⌥+⇧+F)"
+    "message": "집중 모드 끄기: 측면 패널 다시 보이기  ·  Alt+Shift+F (⌥+⇧+F)"
   },
   "msgCopied": {
     "message": "복사했습니다."
@@ -797,7 +797,7 @@
     "message": "키보드 단축키"
   },
   "optKeysDesc": {
-    "message": "키보드로 닿는 것을 한자리에 모았습니다. macOS에서 <kbd>Alt</kbd>는 <kbd>⌥</kbd> Option 키입니다."
+    "message": "단축키를 한자리에 모았습니다. macOS에서 <kbd>Alt</kbd>는 <kbd>⌥</kbd> Option 키입니다."
   },
   "optKeysColWhat": {
     "message": "동작"

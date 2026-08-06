@@ -8,11 +8,11 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "Issue templates, quick open by key, copy reference, and a focus mode that hides the side panels — inside Plane, on any plan.",
-    "description": "Short description shown in the Chrome Web Store, and the extension's own description in chrome://extensions. It says what the extension does and nothing else: whoever reads it is looking at a Plane extension already, so \"the open-source Jira alternative\" only spent characters, and the searchable spellings (makeplane, plane.so) sit at the foot of the store description where they cost the reader nothing."
+    "message": "Issue templates, quick open by key, copy reference, and a focus mode that hides the side panels — inside the Plane UI.",
+    "description": "Short description shown in the Chrome Web Store, and the extension's own description in chrome://extensions. Features and where they appear, nothing else: an extension not touching the server is not news, \"the open-source Jira alternative\" only spent characters on a reader already looking at a Plane extension, and the searchable spellings (makeplane, plane.so) sit at the foot of the store description."
   },
   "cmdToggleFocus": {
-    "message": "Focus mode: hide the side panels",
+    "message": "Focus mode: hide or show the side panels",
     "description": "Shown in chrome://extensions/shortcuts, where the user can rebind the key. It has to say what the shortcut does with no surrounding UI to lean on."
   },
   "optPageTitle": {
@@ -691,11 +691,11 @@
     "message": "Copy reference  ·  Alt/⌥+C"
   },
   "focusBtnTitle": {
-    "message": "Focus mode: hide the side panels  ·  Alt+Shift+F (⌥+⇧+F)",
-    "description": "Title and aria-label of the toggle beside a work item's key, while focus mode is off. Both states name the shortcut, because the button is also where people learn it exists."
+    "message": "Turn focus mode on: hide the side panels  ·  Alt+Shift+F (⌥+⇧+F)",
+    "description": "Title and aria-label of the toggle beside a work item's key. The two states are a matching pair naming the action, not a label and a status line — the pressed state is what says which position it is in. Both name the shortcut, because the button is also where people find out it exists."
   },
   "focusBtnOnTitle": {
-    "message": "Focus mode is on — show the side panels  ·  Alt+Shift+F (⌥+⇧+F)"
+    "message": "Turn focus mode off: show the side panels  ·  Alt+Shift+F (⌥+⇧+F)"
   },
   "msgCopied": {
     "message": "Copied."
