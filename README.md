@@ -54,15 +54,12 @@ enable.
    - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
      bootstrap poll) re-inserts the button. The button is cloned from Attach so
      it always looks native. (Comment templates are not provided.)
-![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
-
-3. **🔤 Template variables** — substituted on insert: `{{date}}` (today,
-   `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
-   `{{date+7}}` for a deadline), `{{week}}` (this week's range,
-   `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). Open
-   the template menu while editing a description with `Alt/⌥+T`.
-   On macOS, Option+T changes `e.key` to a special
-   character, so the shortcut is detected via `e.code === "KeyT"`.
+   - **🔤 Variables are substituted on insert** — `{{date}}` (today,
+     `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
+     `{{date+7}}` for a deadline), `{{week}}` (this week's range,
+     `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). On
+     macOS, Option+T changes `e.key` to a special character, so `Alt/⌥+T` is
+     detected via `e.code === "KeyT"`.
    - **Your own variables (up to 5)** — define `name` → `value` pairs in Settings
      and use them as `{{var.name}}`, e.g. `{{var.team}}` → `Platform`. The `var.`
      prefix is what keeps them from ever colliding with a built-in: a future
@@ -71,7 +68,9 @@ enable.
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-4. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
+![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
+
+3. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
    to a chat message, a pull request body, or a branch name is one click instead of three
    selections.
@@ -95,7 +94,7 @@ enable.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
 
-5. **📐 Style rules (width / length) — a generic engine**
+4. **📐 Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -110,7 +109,7 @@ enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
+5. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -121,7 +120,7 @@ enable.
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-7. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
+6. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
@@ -138,9 +137,9 @@ enable.
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-8. **🏠 Active domains** — runs only on the domains you specify. Wildcards
+7. **🏠 Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-9. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
+8. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
    domains, rules, templates, variables, copy formats, quick open links, and sync sources
    (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
