@@ -20,7 +20,7 @@
     "message": "Report an issue"
   },
   "optEnabled": {
-    "message": "Enabled"
+    "message": "Extension enabled"
   },
   "optDomainsTitle": {
     "message": "Active domains"
@@ -48,6 +48,9 @@
   },
   "optQuickAdd": {
     "message": "Quick add:"
+  },
+  "optQuickAddLink": {
+    "message": "＋ Add quick link"
   },
   "optPresetModuleName": {
     "message": "Module / item name width"
@@ -464,7 +467,10 @@
     "message": " — approaching the limit"
   },
   "popEnabled": {
-    "message": "Enabled"
+    "message": "Extension enabled"
+  },
+  "popSiteLabel": {
+    "message": "This site"
   },
   "popTemplates": {
     "message": "Templates"
@@ -482,10 +488,10 @@
     "message": "Enable on this site"
   },
   "popChecking": {
-    "message": "Current site: checking…"
+    "message": "Checking…"
   },
   "popUnknown": {
-    "message": "Current site: unknown"
+    "message": "No site in this tab"
   },
   "popActive": {
     "message": "Active: $HOST$",
@@ -496,15 +502,10 @@
     }
   },
   "popDisabled": {
-    "message": "Disabled: $HOST$",
-    "placeholders": {
-      "host": {
-        "content": "$1"
-      }
-    }
+    "message": "The extension is off"
   },
   "popInactive": {
-    "message": "Inactive site: $HOST$",
+    "message": "Not in your site list: $HOST$",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -728,9 +729,6 @@
   "optQuickTitle": {
     "message": "Quick jump"
   },
-  "optQuickAdd": {
-    "message": "＋ Add quick link"
-  },
   "optQuickDesc": {
     "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. It is on the toolbar popup too."
   },
@@ -752,14 +750,20 @@
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "url": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
     }
   },
   "msgQuickLimit": {
     "message": "At most $COUNT$ quick links.",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "popJumpLabel": {
@@ -783,8 +787,12 @@
   "omniboxOpen": {
     "message": "Open $KEY$ in $NAME$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "name": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
     }
   }
 }

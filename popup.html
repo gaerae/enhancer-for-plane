@@ -12,10 +12,12 @@
         <strong>Enhancer for Plane</strong>
       </header>
 
-      <!-- Quick jump is its own concern: it works on any tab, regardless of the enable /
-           per-site controls below, so it is grouped and divided off from them. -->
+      <!-- Three groups, in the order you reach for them: jumping to an item works anywhere
+           and does not care about the switches; the extension's own on/off is global; the
+           rest is about the tab you are looking at. The labels say which is which — an
+           unlabelled "Enabled" sitting above the site status read as "enabled here". -->
       <div class="pop-jump-block" id="jumpBlock" hidden>
-        <div class="pop-jump-label" data-i18n="popJumpLabel">Go to work item</div>
+        <div class="pop-label" data-i18n="popJumpLabel">Go to work item</div>
         <form class="pop-jump" id="jumpForm">
           <input id="jumpKey" class="pop-jump-key" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="popJumpPh" placeholder="Issue key…" />
           <select id="jumpTarget" class="pop-jump-target" hidden></select>
@@ -25,26 +27,29 @@
       </div>
 
       <label class="pop-toggle">
-        <span data-i18n="popEnabled">Enabled</span>
+        <span data-i18n="popEnabled">Extension enabled</span>
         <input type="checkbox" id="enabled" />
         <span class="switch"></span>
       </label>
 
-      <div class="pop-status" id="domainStatus" data-i18n="popChecking">Current site: checking…</div>
+      <div class="pop-label pop-label-spaced" data-i18n="popSiteLabel">This site</div>
+      <div class="pop-status" id="domainStatus" data-i18n="popChecking">Checking…</div>
 
       <button class="pop-perm" id="permNotice" hidden>
         <span data-i18n="popPermGap">⚠ Some sites need access on this device — open Settings to approve.</span>
       </button>
 
+      <button class="pop-btn ghost" id="addDomain" hidden data-i18n="popEnableSite">Enable on this site</button>
+      <button class="pop-btn ghost" id="pickEl" hidden data-i18n="popPick">🎯 Pick element → add rule</button>
+      <button class="pop-btn ghost" id="rescan" hidden data-i18n="popRescan">↻ Re-scan this page</button>
+
+      <hr class="pop-div" />
+
       <div class="pop-row">
         <span class="pop-row-label" data-i18n="popTemplates">Templates</span>
         <span class="pop-badge" id="tplCount">0</span>
       </div>
-
-      <button class="pop-btn ghost" id="pickEl" hidden data-i18n="popPick">🎯 Pick element → add rule</button>
-      <button class="pop-btn ghost" id="rescan" hidden data-i18n="popRescan">↻ Re-scan this page</button>
       <button class="pop-btn primary" id="openOptions" data-i18n="popSettings">Settings · Manage templates</button>
-      <button class="pop-btn ghost" id="addDomain" hidden data-i18n="popEnableSite">Enable on this site</button>
     </div>
     <script src="common.js"></script>
     <script src="popup.js"></script>

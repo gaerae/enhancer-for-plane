@@ -20,7 +20,7 @@
     "message": "문제 신고"
   },
   "optEnabled": {
-    "message": "사용"
+    "message": "확장 프로그램 사용"
   },
   "optDomainsTitle": {
     "message": "적용 도메인"
@@ -48,6 +48,9 @@
   },
   "optQuickAdd": {
     "message": "빠른 추가:"
+  },
+  "optQuickAddLink": {
+    "message": "＋ 링크 추가"
   },
   "optPresetModuleName": {
     "message": "모듈 / 항목 이름 폭"
@@ -464,7 +467,10 @@
     "message": " — 한도에 근접했습니다"
   },
   "popEnabled": {
-    "message": "사용"
+    "message": "확장 프로그램 사용"
+  },
+  "popSiteLabel": {
+    "message": "이 사이트"
   },
   "popTemplates": {
     "message": "템플릿"
@@ -482,10 +488,10 @@
     "message": "이 사이트에서 사용"
   },
   "popChecking": {
-    "message": "현재 사이트: 확인 중…"
+    "message": "확인 중…"
   },
   "popUnknown": {
-    "message": "현재 사이트: 알 수 없음"
+    "message": "이 탭에는 사이트가 없습니다"
   },
   "popActive": {
     "message": "동작 중: $HOST$",
@@ -496,15 +502,10 @@
     }
   },
   "popDisabled": {
-    "message": "사용 안 함: $HOST$",
-    "placeholders": {
-      "host": {
-        "content": "$1"
-      }
-    }
+    "message": "확장 프로그램이 꺼져 있습니다"
   },
   "popInactive": {
-    "message": "적용되지 않은 사이트: $HOST$",
+    "message": "목록에 없는 사이트: $HOST$",
     "placeholders": {
       "host": {
         "content": "$1"
@@ -728,9 +729,6 @@
   "optQuickTitle": {
     "message": "빠른 이동"
   },
-  "optQuickAdd": {
-    "message": "＋ 링크 추가"
-  },
   "optQuickDesc": {
     "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다. 키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다. 접두사가 빈 대상이 기본값입니다. 툴바 팝업에서도 됩니다."
   },
@@ -752,14 +750,20 @@
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "placeholders": {
-      "key": { "content": "$1" },
-      "url": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
     }
   },
   "msgQuickLimit": {
     "message": "링크는 최대 $COUNT$개까지입니다.",
     "placeholders": {
-      "count": { "content": "$1" }
+      "count": {
+        "content": "$1"
+      }
     }
   },
   "popJumpLabel": {
@@ -783,8 +787,12 @@
   "omniboxOpen": {
     "message": "$NAME$에서 $KEY$ 열기",
     "placeholders": {
-      "key": { "content": "$1" },
-      "name": { "content": "$2" }
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
     }
   }
 }

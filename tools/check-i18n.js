@@ -39,6 +39,10 @@ const GLOSSARY = {
   ]
 };
 
+// Assigned once the catalogues are read. Declared here, not at first use: report() can
+// run before that point (a parse failure bails out early), and touching a const still in
+// its temporal dead zone throws a ReferenceError that buries the error being reported.
+let refKeys = null;
 const errors = [];
 const warnings = [];
 const err = (m) => errors.push(m);
@@ -55,20 +59,45 @@ if (!locales.includes(REF)) {
   process.exit(1);
 }
 
+// A duplicate key is legal JSON and the last one silently wins, so JSON.parse can never
+// see it — and every check below runs on the parsed object. That is not hypothetical: a
+// second "optQuickAdd" added for a new button quietly took over the style-rule chips label
+// that already used that name, in both locales, and shipped. Scan the raw text for the
+// top-level keys before parsing.
+function duplicateKeys(text) {
+  const seen = new Set();
+  const dupes = new Set();
+  // Top-level entries only: they sit at exactly two spaces of indent in these catalogues.
+  for (const m of text.matchAll(/^ {2}"([A-Za-z0-9_]+)"\s*:/gm)) {
+    if (seen.has(m[1])) dupes.add(m[1]);
+    seen.add(m[1]);
+  }
+  return [...dupes];
+}
+
 const catalogs = {};
+let parseFailed = false;
 for (const loc of locales) {
   const file = path.join(LOCALES_DIR, loc, "messages.json");
   try {
-    catalogs[loc] = JSON.parse(fs.readFileSync(file, "utf8"));
+    const text = fs.readFileSync(file, "utf8");
+    for (const k of duplicateKeys(text)) {
+      err(`[${loc}] "${k}" is defined more than once — the last one silently wins`);
+    }
+    catalogs[loc] = JSON.parse(text);
   } catch (e) {
     err(`[${loc}] messages.json is not valid JSON: ${e.message}`);
+    parseFailed = true;
   }
 }
-if (errors.length) {
+// Only a parse failure has to stop here — without a catalogue nothing below can run. A
+// duplicate key parses fine, so it is reported alongside everything else in one pass
+// rather than hiding whatever else is wrong.
+if (parseFailed) {
   report();
 }
 
-const refKeys = Object.keys(catalogs[REF]);
+refKeys = Object.keys(catalogs[REF]);
 
 /* ---------- collect key references from source ---------- */
 // The i18n helper documents `data-i18n="key"` in its own comment block, which would

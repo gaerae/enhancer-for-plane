@@ -29,7 +29,9 @@
       statusEl.className = "pop-status on";
       addBtn.hidden = true;
     } else if (!state.enabled) {
-      statusEl.textContent = peMsg("popDisabled", [currentHost]);
+      // The master switch is off everywhere, so this says nothing about the host — naming
+      // it here was what made the switch above read as a per-site one.
+      statusEl.textContent = peMsg("popDisabled");
       statusEl.className = "pop-status off";
       addBtn.hidden = true;
     } else {
