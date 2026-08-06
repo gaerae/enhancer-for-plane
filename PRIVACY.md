@@ -57,6 +57,12 @@ you delete the source, and Chrome Sync never carries it to other devices.
   "Copy reference" writes that one string to your clipboard. The extension never
   reads the clipboard, and needs no clipboard permission to do this — the write
   happens in your click.
+- **The work item key you type for Quick open.** The key you enter in the address
+  bar (or the popup) is matched against the links **you** configured and used to
+  build a URL, entirely inside the browser. Nothing is sent anywhere, no search
+  service sees it, and it is not stored — the extension then simply navigates the
+  tab to that address, the same as if you had typed it yourself. Quick open needs
+  no site access at all and works with no domain granted.
 - **The current tab's address (activeTab).** When you click the toolbar icon,
   the popup reads the active tab's hostname to tell you whether the extension is
   active there. This value is used only in that moment and is not stored or

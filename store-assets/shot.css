@@ -7,7 +7,8 @@
  *     --screenshot=screenshot-1-templates.png file://$PWD/screenshot-1-templates.html
  *
  * Layout is absolute on purpose: these are fixed-size posters, not responsive pages, and
- * a fixed grid is what keeps the four of them looking like a set.
+ * a fixed grid is what keeps the set looking like a set. Promo tiles live alongside them
+ * as promo-<name>-<W>x<H>.html and override the canvas size this file fixes.
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

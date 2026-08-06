@@ -21,9 +21,13 @@ runner has Chrome, a missing browser is a failure — a check that quietly ran
 nothing is worse than no check. It generates its pages into a temp dir, forces the
 dark blocks on by rewriting the media condition in a copy of the stylesheet, and
 uses `--dump-dom --virtual-time-budget` so timers and transitions settle
-deterministically instead of being slept on. Do not give it `--user-data-dir`
-unless you have measured it on your platform: a fresh profile directory never
-finishes initialising on macOS and every launch hangs.
+deterministically instead of being slept on. A suite can ask for either locale
+(`lang: "ko"`), which is not about parity: Korean strings are longer and break
+differently, and the header that wrapped in Korean at full width fit perfectly in
+English. Reach for it whenever a layout has to hold text it did not choose.
+
+Do not give it `--user-data-dir` unless you have measured it on your platform: a
+fresh profile directory never finishes initialising on macOS and every launch hangs.
 
 **Passing them is not the same as working.** Every one of them passed while the
 picker was showing stale templates, because the bug was in data, not code. If you

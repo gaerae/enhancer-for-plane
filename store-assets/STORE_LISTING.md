@@ -253,7 +253,9 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
   everyday actions, then the two that shape the page. The name, the description and
   the carousel run in the same order — keep all three in step when one moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
-• Marquee 1400×560 (optional) ... not provided (optional)
+• Marquee 1400×560 .............. store-assets/promo-marquee-1400x560.png ✓
+  (Optional for a listing, but the Featured badge is a review of listing quality among
+  other things, so it is worth having. Korean: promo-marquee-1400x560.ko.png)
 
 The Korean listing gets its own set: `screenshot-N-*.ko.png`. The store keeps screenshots
 per language, so a Korean visitor sees Korean captures — which is the point of shipping
@@ -265,8 +267,15 @@ from `icons/icon.svg`), and carries its own copy for both languages in a `window
 block, applied by `?lang=`. One layout serves both listings, so a fix to a mock cannot
 land in one language and not the other:
 
-    sh store-assets/render.sh        # all four, both languages
+    sh store-assets/render.sh        # every capture and promo tile, both languages
     sh store-assets/render.sh 4      # just screenshot-4-*
+    sh store-assets/render.sh promo  # just the promo tiles
+
+The promo tiles work the same way, except each carries its size in its filename
+(`promo-<name>-<W>x<H>.html`) and is rendered at exactly that — `shot.css` fixes the
+capture canvas at 1280×800, so a tile overrides it. The small 440×280 tile predates this
+and has no HTML source, so it is the one asset that cannot be regenerated; give it one if
+it ever needs changing.
 
 What is translated and what is quoted differ. Headlines, ledes and captions are ours to
 write in each language. The strings inside a mocked menu are not: "＋ 템플릿 관리",

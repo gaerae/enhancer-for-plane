@@ -1,0 +1,129 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store promo — marquee 1400x560</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  /* shot.css fixes its canvas at 1280x560 for the captures; a promo tile is its own size,
+     so the size and the absolute layout are both overridden here rather than there. */
+  html, body { width: 1400px; height: 560px; }
+  body { background: linear-gradient(150deg, #edeff2 0%, #f4f5f7 46%, #fafbfc 100%); }
+
+  .left { position: absolute; left: 84px; top: 128px; width: 560px; }
+  .left .brand { margin-bottom: 30px; }
+  .left h1 {
+    font-size: 58px;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    font-weight: 800;
+  }
+  .left .lede { margin-top: 22px; font-size: 18px; line-height: 1.6; width: 520px; }
+  .pill { margin-top: 26px; }
+
+  /* The omnibox, which is the one picture that explains the whole thing at a glance. */
+  .win {
+    position: absolute;
+    left: 700px;
+    top: 150px;
+    width: 620px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 24px 60px -24px rgba(18, 18, 18, 0.28), 0 2px 6px rgba(18, 18, 18, 0.05);
+    overflow: hidden;
+  }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 15px 17px; background: #fbfbfc; }
+  .omni {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 33px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid #e3e5e9;
+  }
+  .kw {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: #121212; border-radius: 5px; padding: 2px 7px;
+  }
+  .typed {
+    font-size: 14px; font-weight: 600; color: #121212;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .caret { width: 1.5px; height: 17px; background: #121212; margin-left: -3px; }
+
+  .sugg { border-top: 1px solid #eceef1; }
+  .sugg .row { display: flex; align-items: center; gap: 12px; padding: 12px 19px; }
+  .sugg .row + .row { border-top: 1px solid #f4f5f7; }
+  .sugg .row.on { background: #f7f8fa; }
+  .go {
+    width: 22px; height: 22px; flex: 0 0 22px; border-radius: 6px;
+    background: #eceef1; color: #121212;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .sname { font-size: 13.5px; font-weight: 650; letter-spacing: -0.01em; }
+  .surl {
+    margin-left: auto; font-size: 11.5px; color: #79818c;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .lang-ko .left h1 { font-size: 52px; line-height: 1.16; }
+  .lang-ko .sname { font-weight: 700; }
+</style>
+
+<div class="left">
+  <div class="brand"></div>
+  <h1 data-t="head"></h1>
+  <p class="lede" data-t="lede"></p>
+  <div class="pill">issue PROJ-142<span class="dot">·</span>Enter</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <div class="omni">
+      <span class="kw">issue</span>
+      <span class="typed">PROJ-142</span>
+      <span class="caret"></span>
+    </div>
+  </div>
+  <div class="sugg">
+    <div class="row on">
+      <span class="go">→</span><span class="sname" data-t="s1"></span>
+      <span class="surl">plane.example.com/acme/browse/PROJ-142</span>
+    </div>
+    <div class="row">
+      <span class="go">→</span><span class="sname" data-t="s2"></span>
+      <span class="surl">jira.acme.com/browse/PROJ-142</span>
+    </div>
+    <div class="row">
+      <span class="go">→</span><span class="sname" data-t="s3"></span>
+      <span class="surl">linear.app/acme/issue/PROJ-142</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // A promo tile is read in a glance, so it carries the two features the name leads with
+  // and nothing else. The suggestion wording is omniboxOpen, as in the captures.
+  window.T = {
+    en: {
+      head: "Type the key.<br />You are there.",
+      lede:
+        "Quick open and issue templates for Plane (makeplane) — " +
+        "and for Jira and Linear alongside it.",
+      s1: "Open PROJ-142 in Plane",
+      s2: "Open PROJ-142 in Jira",
+      s3: "Open PROJ-142 in Linear"
+    },
+    ko: {
+      head: "키만 입력하면<br />바로 그 항목.",
+      lede:
+        "Plane(makeplane)용 바로 열기와 이슈 템플릿 — " +
+        "Jira·Linear에서도 함께 씁니다.",
+      s1: "Plane에서 PROJ-142 열기",
+      s2: "Jira에서 PROJ-142 열기",
+      s3: "Linear에서 PROJ-142 열기"
+    }
+  };
+</script>
+<script src="shot.js"></script>
