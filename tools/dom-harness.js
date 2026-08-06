@@ -193,6 +193,8 @@ function buildPage({ name, html, css, js, seed, dark, lang, body }) {
   return out;
 }
 
+// How long one Chrome launch may take before it counts as hung, not slow.
+const LAUNCH_TIMEOUT_MS = 30000;
 let launch = 0;
 function run(chrome, page, hash) {
   const url = fileUrl(page) + (hash || "");
@@ -224,11 +226,13 @@ function run(chrome, page, hash) {
         // A browser that never exits would otherwise stall the run with no output at all —
         // the failure mode that looks exactly like a pass. A good launch takes about three
         // seconds, so anything past thirty is broken, not slow: kill it and report it.
-        timeout: 30000
+        timeout: LAUNCH_TIMEOUT_MS
       }
     );
   } catch (e) {
-    const why = e && e.killed ? "timed out after 60s" : String(e.message).slice(0, 200);
+    // The message reads the constant rather than restating it: it said 60s while the timeout
+    // was 30s, which sends whoever hits it looking for a hang twice as long as the real one.
+    const why = e && e.killed ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : String(e.message).slice(0, 200);
     return [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail: why }];
   }
   const m = dom.match(/<pre id="pe-results">([\s\S]*?)<\/pre>/);
@@ -403,6 +407,44 @@ const suites = [
       check("…and the message points at something now visible", () => {
         ok(!document.getElementById("panel-appearance").hidden, "the rules panel is shown");
         eq(document.querySelectorAll("#ruleList .rule-item").length, 2, "rule rows");
+      });`
+  },
+  {
+    // Its own page: the assertion needs a clean form, and it ends by replacing every value.
+    name: "options · import",
+    page: { name: "opt-import", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.getElementById("tab-backup").click();
+      check("Import starts from the Backup tab", () => eq(sel(), "backup"));
+      // Drive the FileReader the way the browser would, rather than reaching into options.js:
+      // a real <input type=file> cannot be populated from script, so the change handler gets a
+      // File built here. Everything after that is the production path.
+      // The real export shape: { _app, settings }. A bare settings object is rejected by
+      // design ("not exported by this extension"), so it would not exercise the success path.
+      const file = new File([JSON.stringify({
+        _app: "enhancer-for-plane",
+        settings: {
+          schema: 6, enabled: true, allDomains: false, domains: ["imported.example.com"],
+          rules: [], templates: [], variables: [], copyFormats: [], quickLinks: [],
+          templateSync: { enabled: false, sources: [] }
+        }
+      })], "backup.json", { type: "application/json" });
+      const input = document.getElementById("importFile");
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => document.getElementById("domains").value.indexOf("imported.example.com") !== -1,
+                    "the imported settings to land in the form");
+      check("the import reports success rather than a rejection", () => {
+        eq(document.getElementById("status").textContent, "Imported — review, then click Save to apply.");
+      });
+      check("a finished import leaves the user somewhere they can review it", () => {
+        // "Imported — review, then click Save to apply" used to be flashed while the user sat
+        // on Backup, which shows none of what the import just replaced.
+        ok(sel() !== "backup", "still on Backup, where none of the imported settings are shown");
+        eq(sel(), document.querySelector("#tabs .tab").dataset.tab, "landed on the first tab");
+        ok(!document.getElementById("panel-" + sel()).hidden, "that panel is visible");
+        return sel();
       });`
   },
   {

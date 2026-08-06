@@ -855,6 +855,11 @@
       try {
         state = peDeepMerge(PE_DEFAULTS, peSanitizeSettings(peMigrate(raw)));
         render();
+        // An import replaces every tab's contents, and the message it flashes asks the user
+        // to review before saving — but Import lives on the Backup tab, which shows none of
+        // what just changed. Leaving them there meant "review, then Save" pointed at panels
+        // that were hidden. Send them to the first tab so reviewing can actually start.
+        showTab(PE_TABS[0]);
         flash(peMsg("msgImported"));
       } catch (e) {
         flash(peMsg("msgImportInvalid"), true);

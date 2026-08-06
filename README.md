@@ -257,7 +257,7 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 | `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
 | `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
 | `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
-| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Templates · Work items · Appearance · Sites · Backup), still one form with one Save |
+| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Work items · Templates · Appearance · Sites · Backup), still one form with one Save |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
 | `_locales/` | `en` + `ko` message catalogues |
 | `tools/` | Checks (not shipped) — see below |
