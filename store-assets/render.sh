@@ -5,8 +5,13 @@
 #   sh store-assets/render.sh            # all of them, both languages
 #   sh store-assets/render.sh 4          # just screenshot-4-*
 #
-# Chrome is used headless rather than a screenshot tool so the result is identical on any
-# machine: same viewport, same device scale, no window chrome, no retina doubling.
+# Chrome is used headless rather than a screenshot tool so the result looks identical on
+# any machine: same viewport, same device scale, no window chrome, no retina doubling.
+#
+# The bytes, though, are not reproducible — rendering the same unchanged page twice can
+# produce a PNG a few bytes different, so `git status` may show captures as modified after
+# a full run with nothing visibly changed. Re-render only what you actually changed
+# (`render.sh 3`), and `git checkout -- store-assets/` to drop the rest.
 set -eu
 
 DIR=$(cd "$(dirname "$0")" && pwd)
