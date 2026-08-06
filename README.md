@@ -1,4 +1,4 @@
-# Enhancer for Plane — Projects, Wiki & Issues
+# Issue Templates & Quick Jump for Plane (makeplane) — Projects, Wiki & Issues
 
 **English** · [한국어](README.ko.md)
 
@@ -22,7 +22,20 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ## Features
 
-1. **Body templates (title + body)** — register reusable templates and insert
+1. **Quick jump** — type a work item key and go straight to it. In the address bar type
+   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
+   toolbar popup.
+   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
+     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
+     are its two halves), or the key appended when the link has no token. Plane's is
+     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
+   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
+     target with an empty prefix is the default. The popup shows a target picker once you
+     have more than one, and the address bar suggests the other targets as you type.
+   - It **opens a URL and nothing more** — no host permission, no content script — so it
+     works on any tab, including ones where the rest of the extension never runs. Ships with
+     no targets; add yours in Settings, where each row previews where a sample key lands.
+2. **Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
      description toolbar (last item in the row, equal spacing, document icon).
@@ -41,7 +54,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
      bootstrap poll) re-inserts the button. The button is cloned from Attach so
      it always looks native. (Comment templates are not provided.)
-2. **Template variables** — substituted on insert: `{{date}}` (today,
+3. **Template variables** — substituted on insert: `{{date}}` (today,
    `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
    `{{date+7}}` for a deadline), `{{week}}` (this week's range,
    `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). Open
@@ -56,7 +69,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-3. **Copy reference** — on a work item — its own page, or the panel a list opens — the
+4. **Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
    to a chat message, a pull request body, or a branch name is one click instead of three
    selections.
@@ -80,19 +93,6 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-2-copy.png)
 
-4. **Quick jump** — type a work item key and go straight to it. In the address bar type
-   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
-   toolbar popup.
-   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
-     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
-     are its two halves), or the key appended when the link has no token. Plane's is
-     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
-   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
-     target with an empty prefix is the default. The popup shows a target picker once you
-     have more than one, and the address bar suggests the other targets as you type.
-   - It **opens a URL and nothing more** — no host permission, no content script — so it
-     works on any tab, including ones where the rest of the extension never runs. Ships with
-     no targets; add yours in Settings, where each row previews where a sample key lands.
 5. **Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
@@ -226,7 +226,7 @@ access to that one site. It stays completely inert on every other site.
 
 **From the Chrome Web Store (recommended)**
 
-[Install Enhancer for Plane](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo),
+[Install Issue Templates & Quick Jump](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo),
 then click the toolbar icon and **Enable on this site** on your Plane instance.
 
 **Developer mode (from source)**

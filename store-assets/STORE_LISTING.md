@@ -1,4 +1,4 @@
-# Chrome Web Store — Listing copy (Enhancer for Plane)
+# Chrome Web Store — Listing copy (Issue Templates & Quick Jump for Plane (makeplane))
 
 > **Published:** https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo
 
@@ -10,8 +10,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 > listing tab only if the package ships a `_locales/<lang>` directory with a
 > `default_locale`. This package now ships `_locales/en` (default) and
 > `_locales/ko` — so the store recognizes English + Korean, and the extension's
-> own name/description are localized (Korean users see "Enhancer for Plane —
-> 프로젝트·위키·이슈"). In the dashboard, set the default listing to English and
+> own name/description are localized (Korean users see "이슈 템플릿·빠른 이동 — Plane(makeplane)"). In the dashboard, set the default listing to English and
 > add a Korean listing (Store listing ▸ language selector) using the Korean
 > summary + description below, and its own screenshots — the `*.ko.png` set in
 > store-assets (screenshots are stored per language, so the Korean tab does not
@@ -21,7 +20,14 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 ---
 
 ## Product name  (max 75)
-Enhancer for Plane — Projects, Wiki & Issues
+Issue Templates & Quick Jump for Plane (makeplane)
+
+> Why this name: "Plane" alone is unsearchable — the word belongs to aircraft — and
+> "Enhancer" is not a term anyone types. People search for the feature they are missing,
+> so the two they search for lead, and "(makeplane)" is the one token that disambiguates
+> the tool. Renaming does not change the extension ID or this listing's URL, so reviews
+> and installs carry over. "Jira" stays out of the name: quick jump works there, but the
+> other five features need Plane's own pages, and the name must not promise otherwise.
 
 ## Summary / short description  (max 132)
 Jump to a work item by key from the address bar. Plus templates, copy reference and full names for Plane (makeplane).
@@ -36,7 +42,7 @@ English
 
 ## Detailed description  (max 16,000)
 
-Stop retyping the same work items. Enhancer for Plane brings reusable templates, one-click copying, and readable names right into the Plane UI — with no changes to your Plane server.
+Every issue tracker leaves the same gaps: no reusable templates, no way to open an item from its key, no way to hand one to a chat message without retyping it. This fills them for Plane (makeplane / plane.so), the open-source Jira alternative — inside the Plane UI, with no changes to your Plane server.
 
 Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira. This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
 
@@ -90,7 +96,7 @@ Open source. Feedback and issues welcome.
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
+This extension has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
 
 ---
 
@@ -150,10 +156,12 @@ Standard for open-source extensions — gives users a support/contact path.
 붙이세요.
 
 ### 이름 (max 75)
-Enhancer for Plane — 프로젝트·위키·이슈
+이슈 템플릿·빠른 이동 — Plane(makeplane)
 
-> 참고: 스토어 이름은 브랜드 일관성을 위해 영문 "Enhancer for Plane" 유지를
-> 권장합니다. 위 한글 병기는 선택 사항입니다.
+> 이름을 이렇게 정한 이유: "Plane"만으로는 검색되지 않고(항공기 명사에 밀립니다),
+> "Enhancer"는 아무도 검색하지 않는 단어입니다. 사람들은 자기에게 없는 기능으로
+> 검색하므로 그 두 단어를 앞에 두고, "(makeplane)"으로 어느 도구인지 분명히 합니다.
+> 이름을 바꿔도 확장 ID와 이 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
 주소창에서 작업 항목 키로 바로 이동. 여기에 Plane용 템플릿·참조 복사·이름 폭 조정까지.
@@ -163,7 +171,7 @@ Enhancer for Plane — 프로젝트·위키·이슈
 
 ### 상세 설명 (max 16,000)
 
-같은 작업 항목을 매번 다시 타이핑하지 마세요. Enhancer for Plane 은 재사용 템플릿, 원클릭 복사, 읽기 좋은 이름을 Plane UI 안으로 바로 가져옵니다 — Plane 서버는 전혀 건드리지 않습니다.
+어느 이슈 트래커든 비어 있는 곳은 같습니다 — 재사용할 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없습니다. 오픈소스 Jira 대안 Plane(makeplane / plane.so)에서 그 빈 곳을 채웁니다. Plane UI 안에서, Plane 서버는 전혀 건드리지 않습니다.
 
 Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira 의 자체 호스팅 대안입니다. 본 익스텐션은 독립적인 비공식 애드온으로, Plane 과 제휴하거나 승인받지 않았으며 "Plane" 은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
 

@@ -430,9 +430,9 @@ async function refreshBadge() {
 const PE_ACTION_TITLE = (() => {
   try {
     const a = chrome.runtime.getManifest().action;
-    return (a && a.default_title) || "Enhancer for Plane";
+    return (a && a.default_title) || "Issue Templates & Quick Jump";
   } catch (_) {
-    return "Enhancer for Plane";
+    return "Issue Templates & Quick Jump";
   }
 })();
 
