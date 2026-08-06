@@ -281,6 +281,16 @@ lies:
   moves the two card counts it asserts, and the Korean line-breaking loop now derives its list
   from the tab strip — a tab added without touching the harness would otherwise be the one tab
   nobody measured Korean on.
+- **A settings description breaks at every sentence, and the break is in the message.** The
+  store copy has been one sentence per line for the same reason: a four-sentence paragraph in a
+  12.5px grey block is a wall, and Korean makes it a denser one. So the messages carry `\n` at
+  each sentence end and `.desc` is `white-space: pre-line`. Two things follow. A message with a
+  newline may only be rendered somewhere that keeps it — never a `title`, an aria-label, a toast
+  or a status line, where the same escape is either invisible or splits a tooltip in two. And a
+  newline goes at a sentence end, never mid-sentence: hand-wrapped text re-wraps at every window
+  width and reads as a mistake. `test.js` holds both, and the harness measures that the sentence
+  after a break actually starts a new line — only the stylesheet decides that, and the source
+  looks identical either way.
 - **One shortcut, one spelling.** `Alt+Shift+F` was written for macOS as `⌥⇧F` in eleven
   places while the Windows form kept its plus signs, and three settings cards marked a
   keystroke up three ways (`<kbd>`, `<b>`, `<code>`). Both are now rules in `test.js`: a

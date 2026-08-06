@@ -1501,29 +1501,64 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
   eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
 });
 
-// Why no message carries a line break — a choice, not a limit of the format. `\n` is a perfectly
-// good JSON escape and chrome.i18n hands it back untouched; what it does not do is what someone
-// reaching for it usually wants:
-//   * It does not make the file readable. A JSON string cannot span physical lines, so the line
-//     stays exactly as long to read and to diff, with two more characters in it.
-//   * It does not show up on the pages. Nothing in our CSS sets white-space to anything but a
-//     collapsing value, so the break renders as the space it collapses to. A visible break there
-//     is `<br>` in a message that renders as HTML, or `white-space: pre-line` on that element.
-//   * It does show up in a plain-text sink: a title attribute keeps the newline, so the same
-//     escape that vanishes in a card would split that button's tooltip in two.
-// So a break would be invisible in one place and load-bearing in another, from one escape that
-// reads the same in the file. Copy too long to read is split into two keys instead
-// (optKeysWhyTyping / optKeysWhyCommand); tooltips keep their " · " separator on one line, the
-// same as the copy and template buttons beside them.
-test("i18n: no message carries a line break", () => {
+// A newline in a message is a line break the reader sees: the settings descriptions carry one at
+// every sentence end and `.desc` renders them (white-space: pre-line). That only holds while the
+// break lands where a break is wanted, so two rules keep it honest.
+//
+// First: a message with a newline may only be rendered where one shows. Everywhere else it is
+// either invisible (a collapsing sink swallows it) or wrong (a title attribute keeps it and
+// splits the tooltip in two), and both failures are silent in review.
+test("i18n: a message with a line break is only used where a break renders", () => {
+  const pages = { "options.html": read("options.html"), "popup.html": read("popup.html") };
+  const scripts = ["common.js", "background.js", "content.js", "options.js", "popup.js"]
+    .map((f) => read(f))
+    .join("\n");
   const bad = [];
   for (const loc of ["en", "ko"]) {
     const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
     for (const [key, entry] of Object.entries(cat)) {
-      if (/[\n\r]/.test(String((entry && entry.message) || ""))) bad.push(loc + "/" + key);
+      if (!/\n/.test(String((entry && entry.message) || ""))) continue;
+      // Attribute sinks keep the newline; peMsg() in a script lands in a toast or a status
+      // line, neither of which is pre-line.
+      for (const [file, src] of Object.entries(pages)) {
+        const attr = new RegExp(`data-i18n-(?!html)[a-z-]+="${key}"`).exec(src);
+        if (attr) bad.push(`${loc}/${key} → ${file} ${attr[0]}`);
+      }
+      if (new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
+      // And where it IS rendered, the element has to be one the stylesheet keeps breaks in.
+      const uses = [];
+      for (const src of Object.values(pages)) {
+        for (const m of src.matchAll(new RegExp(`<([a-z]+)([^>]*?)data-i18n(?:-html)?="${key}"`, "g"))) {
+          uses.push(m[0]);
+        }
+      }
+      if (!uses.length) bad.push(`${loc}/${key} → rendered nowhere`);
+      for (const use of uses) if (!/class="[^"]*\bdesc\b/.test(use)) bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);
     }
   }
-  eq(bad, [], "a line break inside a message: " + bad.join(", "));
+  eq(bad, [], "a line break where it does not render as one:\n  " + bad.join("\n  "));
+});
+
+// Second: a break belongs at the end of a sentence, not wherever a line got long. This is what
+// stops the convention from decaying into hand-wrapped text, which would re-wrap at every window
+// width and look like a mistake.
+test("i18n: every line break sits at the end of a sentence", () => {
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      const msg = String((entry && entry.message) || "");
+      for (const m of msg.matchAll(/\n/g)) {
+        const before = msg.slice(0, m.index);
+        const after = msg.slice(m.index + 1);
+        if (!/[.!?)]$/.test(before)) bad.push(`${loc}/${key}: "…${before.slice(-24)}⏎"`);
+        if (!after || /^\s/.test(after)) bad.push(`${loc}/${key}: a break with nothing after it`);
+        // A break inside a tag would produce markup nobody wrote.
+        if (/<[^>]*$/.test(before)) bad.push(`${loc}/${key}: a break inside a tag`);
+      }
+    }
+  }
+  eq(bad, [], "a break that is not a sentence end:\n  " + bad.join("\n  "));
 });
 
 // The other half of the same inconsistency: the templates card marked its shortcut up as

@@ -352,6 +352,14 @@ const midWordBreaks = (root) => {
     for (let i = 0; i < text.length; i++) {
       range.setStart(node, i);
       range.setEnd(node, i + 1);
+      // A newline the copy asked for is a break at a sentence end, not a wrapped word — and
+      // it must clear the previous character, or the one before it and the one after read as
+      // one word split in half. That is a real false positive: a Korean sentence ending in a
+      // syllable, followed by one starting with a syllable, reported "다|다".
+      if (text[i] === "\\n") {
+        prev = null;
+        continue;
+      }
       const rect = range.getBoundingClientRect();
       if (!rect.height) continue; // collapsed whitespace has no box to place
       const cur = { ch: text[i], top: Math.round(rect.top) };
@@ -668,6 +676,34 @@ const suites = [
       });
       check("Work items is the first tab", () => {
         eq(document.querySelector("#tabs .tab").dataset.tab, "items");
+      });
+      // The descriptions carry a newline at every sentence end; only the stylesheet decides
+      // whether that is a line break or a space, and the difference is invisible in the source.
+      // So measure it: the characters either side of a newline have to land on different lines.
+      check("each sentence of a description starts its own line", () => {
+        const measured = [];
+        for (const el of document.querySelectorAll(".panel:not([hidden]) .desc, #panel-items .desc")) {
+          eq(getComputedStyle(el).whiteSpace, "pre-line", "a description that would swallow the break");
+          const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          const range = document.createRange();
+          let node;
+          while ((node = walk.nextNode())) {
+            const text = node.nodeValue;
+            const at = text.indexOf("\\n");
+            if (at < 1 || at + 1 >= text.length) continue;
+            const topOf = (i) => {
+              range.setStart(node, i);
+              range.setEnd(node, i + 1);
+              return Math.round(range.getBoundingClientRect().top);
+            };
+            const before = topOf(at - 1);
+            const after = topOf(at + 1);
+            ok(after > before, "the sentence after a break stayed on the same line");
+            measured.push(text.slice(Math.max(0, at - 12), at).trim() + "⏎" + text.slice(at + 1, at + 13).trim());
+          }
+        }
+        ok(measured.length > 0, "no description on this tab carries a sentence break to measure");
+        return measured.length + " breaks, e.g. " + measured[0];
       });
       // The tagline names the features, so every release wants to add a word to it. It was
       // shortened once already for wrapping to three lines and pushing the tab strip down;

@@ -215,7 +215,12 @@ body {
   gap: 8px;
   justify-content: flex-end;
 }
+/* One sentence per line, because that is how these read: the messages carry a newline at each
+   sentence end and pre-line is what renders it. Spaces still collapse and the text still wraps —
+   the only thing kept is the break the copy asked for. A sink without this (a tooltip, a toast)
+   must not be given a message that contains one; tools/test.js holds that line. */
 .desc {
+  white-space: pre-line;
   margin: 4px 0 12px;
   font-size: 12.5px;
   color: var(--muted-2);
