@@ -11,6 +11,10 @@
     "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, width rules, sync.",
     "description": "Short description shown in the Chrome Web Store."
   },
+  "cmdToggleFocus": {
+    "message": "Focus mode: hide the side panels",
+    "description": "Shown in chrome://extensions/shortcuts, where the user can rebind the key. It has to say what the shortcut does with no surrounding UI to lean on."
+  },
   "optPageTitle": {
     "message": "Enhancer for Plane — Settings"
   },
@@ -43,6 +47,18 @@
   "optDomainsTip": {
     "message": "Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b>"
   },
+  "optFocusTitle": {
+    "message": "Focus mode"
+  },
+  "optFocusDesc": {
+    "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off."
+  },
+  "optFocusHow": {
+    "message": "Turn it on with <b>Alt+Shift+F</b>, or from the toolbar popup. To change the shortcut, open <code>chrome://extensions/shortcuts</code>."
+  },
+  "optFocusScope": {
+    "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices."
+  },
   "optRulesTitle": {
     "message": "Style rules (width / length)"
   },
@@ -69,6 +85,19 @@
   },
   "optPresetDropdown": {
     "message": "Search dropdown width"
+  },
+  "optPresetFocusProps": {
+    "message": "Focus: hide the work item properties panel"
+  },
+  "optPresetFocusNav": {
+    "message": "Focus: hide the left navigation"
+  },
+  "optPresetFocusWidth": {
+    "message": "Focus: centre the body at a reading width",
+    "description": "Ships switched off — capping the line length is a preference, unlike hiding a panel the user just asked to hide."
+  },
+  "optRuleFocusOnly": {
+    "message": "Only while focus mode is on"
   },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
@@ -484,6 +513,9 @@
   "popTemplates": {
     "message": "Templates"
   },
+  "popFocus": {
+    "message": "Focus mode"
+  },
   "popPick": {
     "message": "🎯 Pick element → add rule"
   },
@@ -665,6 +697,16 @@
   },
   "msgCopyNoItem": {
     "message": "No work item on this page — open one, or click a row to open its panel."
+  },
+  "msgFocusOn": {
+    "message": "Focus mode on — Alt+Shift+F brings the panels back."
+  },
+  "msgFocusOff": {
+    "message": "Focus mode off."
+  },
+  "msgFocusRestored": {
+    "message": "Focus mode is still on in this tab — Alt+Shift+F brings the panels back.",
+    "description": "Shown once per page load, not on the toggle. A reload is the one way to meet a hidden properties panel without having just asked for it."
   },
   "msgCopyLimit": {
     "message": "Up to $MAX$ formats. Remove one to add another.",

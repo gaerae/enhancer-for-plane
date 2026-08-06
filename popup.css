@@ -199,6 +199,14 @@ input:checked + .switch::after {
   font-weight: 700;
   color: var(--text);
 }
+/* Sits among the site-scoped buttons, so it takes their spacing rather than the top
+   switch's — .pop-toggle itself carries none. */
+.pop-focus {
+  margin-top: 8px;
+}
+.pop-focus[hidden] {
+  display: none;
+}
 .pop-btn {
   width: 100%;
   margin-top: 8px;

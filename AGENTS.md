@@ -37,6 +37,14 @@ changed anything a user sees, drive it:
   it is for, and it turns a one-off check into one that runs forever. Reach for a
   hand-served page with a stubbed `chrome` (see "Driving the UI" below) only while
   exploring. Node cannot render CSS.
+- **Style rules and focus mode (`content.js`)**: `buildPlanePage` in the harness serves a
+  synthetic work item page — the classes and the id the shipped rules select on, and no more
+  than that. Extend that markup rather than mocking Plane. It is also the only check that
+  a selector we ship still matches the class Plane writes, escaping and all: a probe element
+  carrying `min-w-[300px]` proves `.min-w-\[300px\]` in one direction that no data test can.
+  Keep the positive and negative cases on one page — `settings` arrives asynchronously, and
+  while it is null the script reports "not active" for the same reason an unenabled site does,
+  so a suite that opens on an inactive site cannot tell a refusal from a slow start.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
@@ -58,6 +66,33 @@ why the template button is found via structure (a button wrapping a file input) 
 than text. Anything that reaches into Plane's editor schema or DOM shape is a future
 breakage. This is the project's core design principle; weigh it before adding features
 that need it.
+
+**Never drive Plane's own UI state; put the change in our own layer.** Focus mode wants the
+work item's properties panel gone, and Plane already has a flag for exactly that
+(`issue_detail_sidebar_collapsed` in `localStorage`, `toggleIssueDetailSidebar` in its theme
+store). Reaching for it is the wrong instinct twice over: nothing in Plane's UI sets it, so it
+is undocumented internal state, and on a work item's own page Plane's own resize effect writes
+`false` back over it above 768px — the feature would spend its life losing an argument. A rule
+in our stylesheet cannot be argued with, works the same on Jira and Linear, and degrades to a
+no-op instead of a fight when the markup moves. Same conclusion for "just mirror whatever
+Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
+to implement, not theirs to be observed.
+
+**A shortcut you need while typing is a `chrome.commands` entry, not a key handler.** Alt+T and
+Alt+C live in `content.js` because they act on the element under the cursor; focus mode does
+not, and it is reached mid-sentence while writing a description. In the page that is a
+contradiction — on macOS `⌥`+letter *is* a character, so an in-page handler either eats it or
+has to bail out while the user is typing, which is precisely when they wanted it. A command is
+intercepted by Chrome before the page, needs no permission, and is rebindable at
+`chrome://extensions/shortcuts`, which no in-page handler can offer. The worker relays it to
+the tab; a tab with no content script simply does not answer, and that is the whole handling.
+
+**Per-tab state does not go in `chrome.storage.sync`, and settings are not per-tab.** Focus
+mode is a moment, so it lives in the page's `sessionStorage` — that tab, that origin, surviving
+a reload, gone with the tab. Syncing it would hide a properties panel on a second machine for
+someone who never asked and has no way to know what did it. The mirror-image rule matters as
+much: which rules *belong* to focus mode is a setting (the `focus` flag on a rule), and it goes
+to sync like everything else.
 
 **Synced templates are read-only, and the UI must not pretend otherwise.** Edit and
 delete affordances on synced content would be reverted by the next sync — a button
@@ -125,6 +160,19 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **New default content has two homes, and only one of them is obvious.** `PE_DEFAULTS`
+  serves a fresh install; every existing one has the array already, so `peDeepMerge` will not
+  backfill into it and the migration has to append. Ship a preset to one of the two and half
+  the users never see it — which is invisible, because whichever half you are is the half that
+  works. The focus presets are asserted equal from both sides; do the same for the next ones.
+  Appending in a migration is only allowed because those ids never existed before: it is new
+  content, not the resurrection above, and once the stamp moves a deletion is final.
+- **A percentage in `padding` measures the containing block, not the element.** The
+  reading-width preset centres a column with `padding-inline: max(2.25rem, (100% - 60rem) / 2)`,
+  which is right in Plane (the column is the flex child filling its parent) — but the first
+  assertion for it set a width on the probe itself, read back the 2.25rem floor, and would have
+  passed on a value the engine had thrown away entirely. If a check on a computed value can be
+  satisfied by the fallback, it is not checking the value. Nest the probe.
 - **An Alt-letter shortcut in a capture-phase handler eats that letter.** `onKeyDown` is
   registered with capture `true` and calls `preventDefault`, so a shortcut keyed on
   `e.code` fires before the page — and on macOS `Option`+a letter IS a character (`⌥C` =

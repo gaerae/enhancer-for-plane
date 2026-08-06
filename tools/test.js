@@ -972,8 +972,11 @@ test("defaults: seed labels fall back to English when i18n is unavailable", () =
 test("migrate: a v1 widths object becomes rules", () => {
   const ctx = loadCommon();
   const out = ctx.peMigrate({ widths: { moduleName: { px: 400 }, dropdown: { px: 300 } } });
-  eq(out.rules.length, 2);
-  eq(out.rules[0].value, "400px");
+  // Count the always-on rules, not every rule: the same call also appends the focus
+  // presets (v6 → v7), and this test is about the two widths becoming two rules.
+  const widths = out.rules.filter((r) => !r.focus);
+  eq(widths.length, 2);
+  eq(widths[0].value, "400px");
   ok(!out.widths, "old shape removed");
 });
 
@@ -992,7 +995,8 @@ test("migrate: a v2 user keeps their rules and gains the sync defaults", () => {
   const ctx = loadCommon();
   const stored = { schema: 2, rules: [{ id: "r", selector: ".x", property: "width", value: "1px" }], templates: [], domains: ["a.com"] };
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate(stored));
-  eq(merged.rules.length, 1, "rules preserved");
+  eq(merged.rules[0].id, "r", "the user's rule is still theirs, and still first");
+  eq(merged.rules.filter((r) => !r.focus).length, 1, "nothing new applies unconditionally");
   eq(merged.domains, ["a.com"], "domains preserved");
   eq(merged.templateSync, { enabled: false, sources: [] }, "sync backfilled");
 });
@@ -1235,13 +1239,97 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 6, "PE_SCHEMA is 6");
+  eq(ctx.__SCHEMA, 7, "PE_SCHEMA is 7");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
   ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
   eq(merged.quickLinks.length, 0, "and it is empty by default");
-  eq(ctx.peMigrate({ schema: 5 }).schema, 6, "stamp advances to PE_SCHEMA");
+  eq(ctx.peMigrate({ schema: 5 }).schema, 7, "stamp advances to PE_SCHEMA");
+});
+
+/* ---------------- focus mode ---------------- */
+
+test("focus: the css splits by rule, and both halves are validated the same way", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, selector: ".a", property: "max-width", value: "320px" },
+    { enabled: true, focus: true, selector: "#b", property: "display", value: "none" },
+    { enabled: false, focus: true, selector: ".off", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".bad", property: "colour: red; body", value: "x" },
+    { enabled: true, focus: true, selector: "", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".c", property: "display", value: "" }
+  ]);
+  eq(out.always, ".a { max-width: 320px !important; }", "an ordinary rule is always on");
+  eq(out.focus, "#b { display: none !important; }", "a focus rule waits, and the junk never lands");
+});
+
+// The reason the split is here and not in content.js: a focus rule that leaked into the
+// always-on half would hide the properties panel of somebody who never asked for focus
+// mode, and nothing in a browser check would look wrong until they opened a work item.
+test("focus: a value that tries to close the block cannot reach either half", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, focus: true, selector: ".a", property: "display", value: "none } body { display: none" }
+  ]);
+  eq(out.focus, ".a { display: none  body  display: none !important; }", "braces and semicolons are stripped");
+  eq(out.always, "", "and it stayed on the focus side");
+});
+
+test("focus: an unreadable selector is dropped by the caller's own check", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const seen = [];
+  const out = peBuildRuleCss([{ enabled: true, focus: true, selector: ".a", property: "display", value: "none" }], (sel) => {
+    seen.push(sel);
+    return false;
+  });
+  eq(seen, [".a"], "the check is asked about the selector");
+  eq(out, { always: "", focus: "" }, "and its answer is honoured");
+});
+
+test("focus: a v6 install gains the presets, and only once", () => {
+  const ctx = loadCommon();
+  const mine = { id: "mine", enabled: true, selector: ".x", property: "width", value: "1px" };
+  const out = ctx.peMigrate({ schema: 6, rules: [mine] });
+  eq(out.rules[0], mine, "the user's rule keeps its place");
+  const focus = out.rules.filter((r) => r.focus);
+  eq(focus.length, ctx.peFocusPresetRules().length, "every preset arrived");
+  eq(out.schema, 7, "and the stamp moved, so this does not run again");
+  // A user who deletes a preset and saves must not get it back on the next read.
+  const again = ctx.peMigrate({ schema: 7, rules: [mine] });
+  eq(again.rules.length, 1, "a v7 object is left exactly as it is");
+});
+
+test("focus: an id already present is not appended twice", () => {
+  const ctx = loadCommon();
+  const first = ctx.peFocusPresetRules()[0];
+  const edited = Object.assign({}, first, { value: "block", label: "my own wording" });
+  const out = ctx.peMigrate({ schema: 6, rules: [edited] });
+  eq(out.rules.filter((r) => r.id === first.id).length, 1, "the edited copy is the only one");
+  eq(out.rules[0].value, "block", "and the edit survives");
+  // Without this the test would also pass on a migration that appended nothing at all.
+  eq(out.rules.length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
+});
+
+// Two places ship the same presets — PE_DEFAULTS for a new install, peMigrate for everyone
+// else — and a preset added to one of them alone would reach half the users.
+test("focus: a fresh install and an upgraded one get the same presets", () => {
+  const ctx = loadCommon();
+  const ids = (rules) => rules.filter((r) => r.focus).map((r) => r.id);
+  eq(ids(ctx.__DEFAULTS.rules), ids(ctx.peMigrate({ schema: 6, rules: [] }).rules));
+  ok(ids(ctx.__DEFAULTS.rules).length > 0, "and there is something to compare");
+});
+
+test("focus: the flag survives an import, and its absence means always-on", () => {
+  const ctx = loadCommon();
+  const out = ctx.peSanitizeSettings({
+    rules: [
+      { id: "a", selector: ".a", property: "display", value: "none", focus: true },
+      { id: "b", selector: ".b", property: "display", value: "none" },
+      { id: "c", selector: ".c", property: "display", value: "none", focus: "yes please" }
+    ]
+  });
+  eq(out.rules.map((r) => r.focus), [true, false, false], "only a real boolean turns it on");
 });
 
 test("quick: an import is clamped the same way the form is", () => {

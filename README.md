@@ -109,7 +109,26 @@ enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-5. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
+5. **🧘 Focus mode** — `Alt+Shift+F` (or the popup switch) hides the side panels so the
+   description is what is left. On a work item's own page Plane pins properties to the right
+   with no way to collapse them; in the panel a list opens they sit under the body, which is
+   already out of the way — so this is about the full page.
+   - It is the **rules engine with a switch on it**: any rule can be marked *"Only while
+     focus mode is on"*, which is what makes it yours. Two presets ship ready — the work
+     item's properties panel, and the left navigation — and a third, capping the reading
+     width, ships switched off because with both panels gone the description otherwise
+     spans the whole window.
+   - **Per tab, and only for that tab.** It survives a reload there, disappears when the tab
+     closes, and is never synced — waking up on another machine to a hidden properties panel,
+     with no idea what hid it, is not a feature. The toast names the shortcut both when you
+     turn it on and once per load while it is still on, so the way back is never a guess.
+   - The shortcut is a **browser command, not a page key handler**, so it fires while you are
+     typing a description (where you want it most) without eating a character — on macOS every
+     `⌥`+letter *is* a character. Rebind it at `chrome://extensions/shortcuts`.
+   - Plane keeps a collapse flag for that panel in `localStorage`, but nothing in its UI
+     reaches it and its own resize effect forces it back open above 768px — so this hides the
+     panel with CSS instead of driving Plane's state, which would be a fight.
+6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -120,7 +139,7 @@ enable.
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-6. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
+7. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
@@ -137,9 +156,9 @@ enable.
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-7. **🏠 Active domains** — runs only on the domains you specify. Wildcards
+8. **🏠 Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-8. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
+9. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
    domains, rules, templates, variables, copy formats, quick open links, and sync sources
    (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
@@ -255,10 +274,10 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 |------|------|
 | `manifest.json` | MV3 manifest |
 | `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
-| `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
-| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
+| `content.js` / `content.css` | Style-rule injection (including the focus-mode half) + template insertion UI + picker |
+| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page; relays the focus-mode keyboard command to the tab in front. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
 | `options.html/js/css` | Full settings page — the sections are grouped into tabs (Work items · Templates · Appearance · Sites · Backup), still one form with one Save |
-| `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
+| `popup.html/js/css` | Toolbar popup (quick toggle · status · focus mode · picker · re-scan) |
 | `_locales/` | `en` + `ko` message catalogues |
 | `tools/` | Checks (not shipped) — see below |
 | `examples/` | Sample team-template files (not shipped) |
@@ -271,7 +290,7 @@ No dependencies, no build step — stock node:
 node tools/test.js          # behaviour: sync engine, normalization, sections, counts
 node tools/check-i18n.js    # translation contract (--strict in CI)
 node tools/check-source.js  # architectural invariants
-node tools/dom-harness.js   # the settings page and popup, in a real browser
+node tools/dom-harness.js   # the settings page, popup and content script, in a real browser
 ```
 
 CI runs all four on every push and PR. `check-source.js` enforces what a reviewer
@@ -280,8 +299,10 @@ would otherwise have to remember — network access confined to the worker, no
 counterpart for every light surface, and that the release zip actually contains
 every file the extension loads. `dom-harness.js` covers what is only true of a
 real layout engine — which tab is showing, that an unsaved edit survives one, what
-a label says, what a colour resolves to against the surface behind it — by running
-the pages in headless Chrome with a stubbed `chrome` API. It needs a browser
+a label says, what a colour resolves to against the surface behind it, whether focus
+mode actually hides the panel it aims at — by running the pages in headless Chrome
+with a stubbed `chrome` API (the content script gets a synthetic work item page,
+carrying the classes the shipped rules select on). It needs a browser
 (`PE_CHROME=/path` to choose one); locally it skips loudly without one, and in CI
 a missing browser is a failure rather than a quiet pass. Contributor rules live in
 [AGENTS.md](AGENTS.md).

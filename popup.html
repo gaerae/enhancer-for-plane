@@ -40,6 +40,15 @@
       </button>
 
       <button class="pop-btn ghost" id="addDomain" hidden data-i18n="popEnableSite">Enable on this site</button>
+
+      <!-- A switch rather than a button: focus mode has a state the popup should show, and
+           this tab is the only place that state exists. Hidden unless the content script
+           answers, because a switch that cannot move is worse than no switch. -->
+      <label class="pop-toggle pop-focus" id="focusWrap" hidden>
+        <span data-i18n="popFocus">Focus mode</span>
+        <input type="checkbox" id="focusToggle" />
+        <span class="switch"></span>
+      </label>
       <button class="pop-btn ghost" id="pickEl" hidden data-i18n="popPick">🎯 Pick element → add rule</button>
       <button class="pop-btn ghost" id="rescan" hidden data-i18n="popRescan">↻ Re-scan this page</button>
 

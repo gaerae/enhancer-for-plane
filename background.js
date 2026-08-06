@@ -505,6 +505,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Keyboard command — toggle focus mode on the tab in front.            */
+/*                                                                      */
+/* A browser command, not a key handler in the page, and that is the     */
+/* whole point: on macOS every Option+letter is a character (⌥C is "ç"), */
+/* which is why content.js has to refuse Alt+C while you are typing.     */
+/* Focus mode is the opposite case — you reach for it *while* writing a  */
+/* description — so a shortcut that either eats a character or declines  */
+/* to fire in an editor would be wrong both ways. Chrome intercepts a    */
+/* command before the page sees the keystroke, and the user can rebind   */
+/* it at chrome://extensions/shortcuts, which no in-page handler offers. */
+/* ------------------------------------------------------------------ */
+try {
+  chrome.commands.onCommand.addListener((command, tab) => {
+    if (command !== "toggle-focus") return;
+    const id = tab && tab.id;
+    if (id == null) return;
+    try {
+      chrome.tabs.sendMessage(id, { type: "pe-focus-toggle" }, () => {
+        // No content script here (a site the extension does not run on) — nothing to
+        // toggle. The callback exists to read lastError: leaving it unread is what prints
+        // "Unchecked runtime.lastError" into the worker's console on every such press.
+        void chrome.runtime.lastError;
+      });
+    } catch (_) {}
+  });
+} catch (_) {}
+
+/* ------------------------------------------------------------------ */
 /* Omnibox — "issue <KEY>" in the address bar jumps straight to the    */
 /* item. It only opens a URL: no host permission, no content script,   */
 /* so it works on any tab, including where the enhancer never runs.    */

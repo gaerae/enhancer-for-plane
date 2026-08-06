@@ -48,7 +48,6 @@
   /* ================================================================== */
   /* 1. Inject user-defined style rules (adoptedStyleSheets)              */
   /* ================================================================== */
-  const sanitizeValue = (v) => String(v == null ? "" : v).replace(/[;{}]/g, "").trim();
   function validSelector(sel) {
     if (!sel || /[{}]/.test(sel)) return false;
     try {
@@ -58,19 +57,11 @@
       return false;
     }
   }
-  const validProperty = (p) => /^-?[a-zA-Z][a-zA-Z-]*$/.test((p || "").trim());
 
   function buildCss() {
-    const lines = [];
-    (settings.rules || []).forEach((r) => {
-      if (!r || !r.enabled) return;
-      const sel = (r.selector || "").trim();
-      const prop = (r.property || "").trim();
-      const val = sanitizeValue(r.value);
-      if (!sel || !validProperty(prop) || !val || !validSelector(sel)) return;
-      lines.push(`${sel} { ${prop}: ${val} !important; }`);
-    });
-    return lines.join("\n");
+    const css = peBuildRuleCss(settings.rules, validSelector);
+    if (!focusOn) return css.always;
+    return [css.always, css.focus].filter(Boolean).join("\n");
   }
 
   // Plane is a Next.js/React SPA, so a <style> node in <head>/<body> can be removed
@@ -101,6 +92,57 @@
       styleObserver.observe(document.documentElement, { childList: true });
     }
     fallbackStyleEl.textContent = css;
+  }
+
+  /* ================================================================== */
+  /* 1b. Focus mode — the rules marked "focus only", on for this tab      */
+  /* ================================================================== */
+  // Focus mode is a moment, not a setting, so it is deliberately not in chrome.storage.sync:
+  // syncing it would hide the properties panel on a second machine the user never asked, and
+  // they would have no idea what did it. sessionStorage is the shape the state actually has —
+  // this tab, this origin, surviving a reload, gone when the tab closes.
+  const PE_FOCUS_KEY = "pe-focus";
+  let focusOn = false;
+  let focusAnnounced = false;
+
+  const readStoredFocus = () => {
+    try {
+      return sessionStorage.getItem(PE_FOCUS_KEY) === "1";
+    } catch (_) {
+      return false; // storage can be blocked; focus mode is not worth an exception
+    }
+  };
+
+  function storeFocus(on) {
+    try {
+      if (on) sessionStorage.setItem(PE_FOCUS_KEY, "1");
+      else sessionStorage.removeItem(PE_FOCUS_KEY);
+    } catch (_) {}
+  }
+
+  // A class on <html> as well as the injected CSS: it is what a user's own rule can hang
+  // off (`:root.pe-focus .foo`) before they ever tick the checkbox, and it is the one part
+  // of the state a test can see from outside.
+  function applyFocusClass() {
+    try {
+      document.documentElement.classList.toggle("pe-focus", focusOn && isActive());
+    } catch (_) {}
+  }
+
+  function setFocus(on, announce) {
+    focusOn = !!on;
+    storeFocus(focusOn);
+    applyFocusClass();
+    applyStyles();
+    if (announce) toast(peMsg(focusOn ? "msgFocusOn" : "msgFocusOff"));
+  }
+
+  // Landing in focus mode after a reload is the one way a user meets a hidden properties
+  // panel without having just asked for it. Say so once, with the way back in the message.
+  function announceFocusOnce() {
+    if (focusAnnounced || !focusOn || !isActive()) return;
+    focusAnnounced = true;
+    toast(peMsg("msgFocusRestored"));
   }
 
   /* ================================================================== */
@@ -1400,7 +1442,12 @@
       settings = s;
       syncCache = c;
       recountTemplates();
+      // Read once per load, before the first applyStyles: on a settings change this
+      // re-reads the same value, and nothing else in the browser writes that key.
+      focusOn = readStoredFocus();
+      applyFocusClass();
       applyStyles();
+      announceFocusOnce();
       syncObserver();
       injectAll();
       if (bootstrapTimer) clearInterval(bootstrapTimer);
@@ -1438,12 +1485,23 @@
     });
   } catch (_) {}
 
-  // popup messages: start the element picker, or force a re-scan (self-heal)
+  // messages from the popup (picker, re-scan, focus) and from the service worker, which is
+  // where the keyboard command for focus mode arrives.
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg && msg.type === "pe-start-picker") {
         if (isActive()) startPicker();
         if (sendResponse) sendResponse({ ok: isActive() });
+      } else if (msg && msg.type === "pe-focus-toggle") {
+        // Only on a site the extension runs on: elsewhere there are no rules to apply, and
+        // a toast about a mode that changed nothing would be a lie.
+        const active = isActive();
+        // The popup sends the position its switch is now in; the keyboard command sends
+        // nothing and means "the other one".
+        if (active) setFocus(typeof msg.on === "boolean" ? msg.on : !focusOn, true);
+        if (sendResponse) sendResponse({ ok: active, active, focus: focusOn });
+      } else if (msg && msg.type === "pe-focus-state") {
+        if (sendResponse) sendResponse({ ok: true, active: isActive(), focus: focusOn });
       } else if (msg && msg.type === "pe-rescan") {
         // "Re-scan this page": force a fresh settings load + re-injection, then report status.
         refresh().then(() =>

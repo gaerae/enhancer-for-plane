@@ -82,6 +82,12 @@ Plane cuts long names off in lists and dropdowns until you can't tell items apar
 One "selector → property → value" rule forces any width (320px, 30rem) and names show completely.
 It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
 
+🧘 Just the description — focus mode
+Alt+Shift+F hides the properties panel and the left navigation so the work item's body is what is left.
+Plane pins properties to the right of a work item's own page with no way to collapse them; this collapses them.
+Any rule can be marked "Only while focus mode is on", so what disappears is up to you — two are ready to use, and one that centres the body at a reading width is one checkbox away.
+It applies to that tab, survives a reload there, and is never synced to your other devices.
+
 🎯 Build rules without DevTools — visual element picker
 Click "Pick element" in the popup, then click anything on the Plane page.
 You get candidate selectors with match counts (width classes first); the rule lands in Settings ready for a value.
@@ -233,6 +239,13 @@ Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
 Plane은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 구분하기 어렵게 만듭니다.
 "선택자 → 속성 → 값" 규칙 하나로 원하는 폭(320px, 30rem)을 지정하면 이름이 온전히 보입니다.
 범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
+
+🧘 본문만 남기기 — 집중 모드
+Alt+Shift+F로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
+Plane은 작업 항목 전용 페이지에서 속성을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
+어떤 규칙이든 "집중 모드에서만 적용"으로 표시할 수 있어 무엇을 숨길지는 직접 정합니다.
+두 개는 바로 쓸 수 있게 들어 있고, 본문을 읽기 좋은 폭으로 가운데 두는 규칙도 체크 한 번 거리입니다.
+켠 탭에서만 적용되고 그 탭에서는 새로 고쳐도 유지되며, 다른 기기로는 동기화되지 않습니다.
 
 🎯 DevTools 없이 규칙 만들기 — 비주얼 요소 피커
 팝업에서 "요소 선택 → 규칙 추가"를 누르고 Plane 화면의 요소를 클릭하세요.

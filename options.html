@@ -138,6 +138,15 @@
       </div>
 
       <div class="panel" id="panel-appearance" data-tab="appearance" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0" hidden>
+        <!-- Focus mode. First: it is what the checkbox on every rule below refers to, and it
+             is the only place the shortcut is written down. -->
+        <section class="card">
+          <h2 data-i18n="optFocusTitle">Focus mode</h2>
+          <p class="desc" data-i18n-html="optFocusDesc">A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off.</p>
+          <p class="desc" data-i18n-html="optFocusHow">Turn it on with <b>Alt+Shift+F</b>, or from the toolbar popup. To change the shortcut, open <code>chrome://extensions/shortcuts</code>.</p>
+          <p class="desc" data-i18n="optFocusScope">It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices.</p>
+        </section>
+
         <!-- Style rules -->
         <section class="card">
           <div class="card-head">
@@ -223,6 +232,10 @@
             <input class="rule-property mono" type="text" data-i18n-placeholder="optRulePropPh" placeholder="Property" list="propList" />
             <input class="rule-value mono" type="text" data-i18n-placeholder="optRuleValuePh" placeholder="Value (e.g. 320px)" />
           </div>
+          <label class="inline-check rule-focus-check">
+            <input type="checkbox" class="rule-focus" />
+            <span data-i18n="optRuleFocusOnly">Only while focus mode is on</span>
+          </label>
         </div>
         <button class="icon-btn rule-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
       </div>

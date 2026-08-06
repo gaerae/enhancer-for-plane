@@ -199,15 +199,18 @@
       const selector = node.querySelector(".rule-selector");
       const property = node.querySelector(".rule-property");
       const value = node.querySelector(".rule-value");
+      const focus = node.querySelector(".rule-focus");
       const del = node.querySelector(".rule-del");
 
       enabled.checked = rule.enabled !== false;
+      focus.checked = rule.focus === true;
       label.value = rule.label || "";
       selector.value = rule.selector || "";
       property.value = rule.property || "";
       value.value = rule.value || "";
 
       enabled.addEventListener("change", () => (state.rules[idx].enabled = enabled.checked));
+      focus.addEventListener("change", () => (state.rules[idx].focus = focus.checked));
       label.addEventListener("input", () => (state.rules[idx].label = label.value));
       selector.addEventListener("input", () => {
         state.rules[idx].selector = selector.value;

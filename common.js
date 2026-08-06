@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 6;
+const PE_SCHEMA = 7;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -143,6 +143,84 @@ const PE_IMPORT_LIMITS = {
   maxHiddenGroups: 100
 };
 
+// Focus mode: the rules that only apply while it is on. Shipped as data, like every other
+// rule, so a Plane release that renames a class costs a selector edit and nothing else —
+// and so a rule that stops matching is a no-op rather than a broken feature. Measured
+// against Plane 1.4:
+//
+//   * A work item's own page puts properties in a right-hand div carrying
+//     `fixed right-0 … min-w-[300px] border-l`, a flex sibling of the description column —
+//     hiding it lets that column take the whole width with no second rule. The peek
+//     panel's sidebar is a different element (`!w-[400px]`, neither `fixed` nor `right-0`),
+//     so this leaves the peek alone. That is what makes one global selector enough: rules
+//     are plain CSS and know nothing about routes.
+//   * The left navigation carries `id="main-sidebar"`, so there is no class to guess.
+//   * Reading width ships OFF. With both panels gone the description spans the entire
+//     window, which is worse to read rather than better — but it is a taste, so it is one
+//     checkbox away instead of on. `padding-inline` centres the column with a single
+//     property (`max-width` would need a second rule for the margins), and 2.25rem is the
+//     `px-9` Plane already applies there, so the value can only widen the gutter.
+//
+// Plane does hold a collapse state for that panel (`issue_detail_sidebar_collapsed` in
+// localStorage), but nothing in its UI reaches it, and on a work item's own page its own
+// resize effect forces it back to false above 768px. Driving Plane's state would mean
+// fighting that effect; CSS is the mechanism that stays.
+function peFocusPresetRules() {
+  return [
+    {
+      id: "rule-focus-item-properties",
+      enabled: true,
+      focus: true,
+      label: peMsg("optPresetFocusProps") || "Focus: hide the work item properties panel",
+      selector: ".fixed.right-0.border-l.min-w-\\[300px\\]",
+      property: "display",
+      value: "none"
+    },
+    {
+      id: "rule-focus-main-nav",
+      enabled: true,
+      focus: true,
+      label: peMsg("optPresetFocusNav") || "Focus: hide the left navigation",
+      selector: "#main-sidebar",
+      property: "display",
+      value: "none"
+    },
+    {
+      id: "rule-focus-reading-width",
+      enabled: false,
+      focus: true,
+      label: peMsg("optPresetFocusWidth") || "Focus: centre the body at a reading width",
+      selector: ".overflow-y-auto.px-9.py-5",
+      property: "padding-inline",
+      value: "max(2.25rem, (100% - 60rem) / 2)"
+    }
+  ];
+}
+
+// Split the rules into the CSS that is always on and the CSS that only applies in focus
+// mode. Two strings, not one: focus mode is a per-tab moment, so the caller re-joins them
+// on every toggle instead of re-deciding what each rule means. `isValidSelector` is passed
+// in because only a browser can answer it — that keeps this function testable in node,
+// which is where a wrong grouping would otherwise go unnoticed.
+function peBuildRuleCss(rules, isValidSelector) {
+  const ok = typeof isValidSelector === "function" ? isValidSelector : () => true;
+  const always = [];
+  const focus = [];
+  (Array.isArray(rules) ? rules : []).forEach((r) => {
+    if (!r || typeof r !== "object" || !r.enabled) return;
+    const sel = String(r.selector == null ? "" : r.selector).trim();
+    const prop = String(r.property == null ? "" : r.property).trim();
+    const val = String(r.value == null ? "" : r.value)
+      .replace(/[;{}]/g, "")
+      .trim();
+    if (!sel || !val) return;
+    if (!/^-?[a-zA-Z][a-zA-Z-]*$/.test(prop)) return;
+    if (!ok(sel)) return;
+    (r.focus ? focus : always).push(`${sel} { ${prop}: ${val} !important; }`);
+  });
+  return { always: always.join("\n"), focus: focus.join("\n") };
+}
+
 const PE_DEFAULTS = {
   schema: PE_SCHEMA,
   enabled: true,
@@ -169,7 +247,10 @@ const PE_DEFAULTS = {
       selector: '[id^="headlessui-combobox-options"] > div',
       property: "width",
       value: "320px" // Plane default 192px (w-48) → widened to 320px
-    }
+    },
+    // Same list, but each of these waits for focus mode. Existing installs get them from
+    // the v6 → v7 migration, not from here — peDeepMerge only backfills an absent array.
+    ...peFocusPresetRules()
   ],
 
   // Body (description) templates — title + body. Applied from the button next to
@@ -311,6 +392,12 @@ function peDeepMerge(def, cur) {
 //            format keeps an empty one and does not get the presets back.
 //   v5 → v6: quickLinks is additive and ships empty, so there is nothing to backfill —
 //            peDeepMerge carries an absent array through as []. Only the stamp moves.
+//   v6 → v7: focus mode arrives with rules of its own. `rules` is an array every install
+//            already has, and peDeepMerge only backfills an *absent* one, so the presets
+//            would reach new installs and nobody else — they are appended here instead.
+//            This is not the resurrection trap: these ids did not exist before v7, so
+//            nothing the user deleted comes back, and once the stamp reaches 7 deleting
+//            them is final.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -341,6 +428,14 @@ function peMigrate(raw) {
       });
     raw.rules = rules;
     delete raw.widths;
+  }
+  if (from < 7) {
+    const rules = Array.isArray(raw.rules) ? raw.rules : [];
+    const have = new Set(rules.map((r) => (r && typeof r === "object" ? r.id : null)));
+    peFocusPresetRules().forEach((r) => {
+      if (!have.has(r.id)) rules.push(r);
+    });
+    raw.rules = rules;
   }
   raw.schema = PE_SCHEMA;
   return raw;
@@ -375,6 +470,9 @@ function peSanitizeSettings(raw) {
     .map((r) => ({
       id: str(r.id, L.maxFieldLen) || "rule-" + peHash(str(r.selector, L.maxFieldLen)),
       enabled: bool(r.enabled, true),
+      // Absent means "always on": a backup written before focus mode existed describes
+      // rules that applied unconditionally, and that is what it should still mean.
+      focus: bool(r.focus, false),
       label: str(r.label, L.maxFieldLen),
       selector: str(r.selector, L.maxFieldLen),
       property: str(r.property, L.maxFieldLen),

@@ -347,6 +347,19 @@ input[type="number"]:focus {
   grid-template-columns: 1fr 130px 110px;
   gap: 7px;
 }
+/* Secondary to the three fields above it, and last in the row: this is the answer to
+   "when does this rule apply", which only matters once the rule itself says something.
+   .inline-check carries a bottom margin for stacked checkboxes; here it would hang below
+   the card's own padding. */
+.rule-focus-check {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rule-focus-check input {
+  width: 13px;
+  height: 13px;
+}
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
