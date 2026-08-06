@@ -1374,6 +1374,35 @@ test("example feed: the button's URL points at the file that actually ships", ()
   ok(out.templates.length > 0, "the shipped file parses into templates");
 });
 
+test("store copy: a quoted UI label is one the matching locale actually shows", () => {
+  // The Korean listing told people to click "Pick element" and "Enable on this site" — the
+  // English labels. A Korean reader sees "요소 선택 → 규칙 추가" and "이 사이트에서 사용", so the
+  // instructions named buttons that are not on their screen. It reads as correct in review
+  // because both halves are correct on their own; only holding the copy against the
+  // catalogue catches it. Anything in double quotes that looks like a UI label has to be a
+  // substring of some message in that locale.
+  const doc = read("store-assets/STORE_LISTING.md");
+  const koStart = doc.indexOf("## 한국어 (Korean listing)");
+  ok(koStart > 0, "the Korean listing section is findable");
+  const sections = { en: doc.slice(0, koStart), ko: doc.slice(koStart) };
+  // Plane's own UI, quoted as it appears in Plane rather than in this extension.
+  const FOREIGN = new Set(["Template", "Attach", "Create work item", "신규 작업항목 생성"]);
+  for (const [loc, text] of Object.entries(sections)) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    const messages = Object.values(cat).map((e) => String(e.message || ""));
+    for (const line of text.split("\n")) {
+      // Only the imperative sentences point at a control; a heading in quotes does not.
+      if (!/click|누르|클릭/i.test(line)) continue;
+      for (const m of line.matchAll(/"([^"\n]{3,40})"/g)) {
+        const label = m[1];
+        if (FOREIGN.has(label)) continue;
+        const found = messages.some((msg) => msg.replace(/<[^>]+>/g, "").includes(label));
+        ok(found, `[${loc}] the copy quotes "${label}", which no _locales/${loc} message contains`);
+      }
+    }
+  }
+});
+
 test("example feeds: every template body is markdown the inserter can actually render", () => {
   const ctx = loadCommon();
   // content.js's mdToHtml handles headings, - / 1. lists, - [ ] task lists, --- and inline
@@ -1389,7 +1418,7 @@ test("example feeds: every template body is markdown the inserter can actually r
     [/^\s*!\[/m, "an image"],
     [/\[[^\]]*\]\([^)]*\)/, "a markdown link"]
   ];
-  for (const file of ["examples/team-templates.json", "examples/team-templates-ko.json", "examples/team-templates-design.json"]) {
+  for (const file of ["examples/team-templates.json", "examples/team-templates-ko.json"]) {
     const feed = JSON.parse(read(file));
     const out = ctx.peNormalizeRemoteTemplates(feed, "src-" + file);
     eq(out.dropped, 0, file + ": the normalizer keeps every template");

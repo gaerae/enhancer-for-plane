@@ -24,6 +24,13 @@ body {
     "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  /* Korean breaks at any character by default, because that is right for Chinese and
+     Japanese and wrong for Korean: it split 조정 across two lines as "조 / 정" and 클립보드에
+     복사합니다 as "복 / 사합니다" in every description on this page. keep-all wraps at spaces
+     instead, so an 어절 stays whole. break-word is the safety net keep-all needs — a token
+     longer than the line (a URL, a long selector) can still break rather than overflow. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .wrap {
   max-width: 760px;
@@ -74,15 +81,14 @@ body {
 .about-link:hover {
   text-decoration-color: currentColor;
 }
+/* Every about-link is icon-then-label, so there is one rule and no side-specific variant.
+   Two of the three used to trail their icon, which made the row read as three different
+   kinds of link when they are all just links. */
 .about-ico {
   width: 12px;
   height: 12px;
   vertical-align: -2px;
   margin-right: 3px;
-}
-.about-ico-after {
-  margin-right: 0;
-  margin-left: 3px;
 }
 .about-sep {
   color: var(--muted);

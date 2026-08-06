@@ -284,13 +284,47 @@ const TAB_READY = `await waitFor(() => document.querySelector('.tab[aria-selecte
 const sel = () => document.querySelector('.tab[aria-selected="true"]').dataset.tab;
 const shown = () => [...document.querySelectorAll(".panel")].filter((p) => !p.hidden).map((p) => p.dataset.tab);`;
 
+// Where a line actually broke, as the layout engine decided it — a Range around one
+// character at a time, watching for the top edge to jump. If the last character of one line
+// and the first of the next are both Hangul syllables, the break landed inside a word,
+// because a break at a space would have left a space on one side of it.
+const KO_BREAKS = `
+const isHangul = (ch) => /[\\uAC00-\\uD7A3]/.test(ch);
+const midWordBreaks = (root) => {
+  const bad = [];
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let node;
+  while ((node = walk.nextNode())) {
+    // Per text node, not across them. Two separate elements that land on different lines are
+    // adjacent in this walk with only collapsed whitespace between them, and reading that as
+    // a wrapped word reported "용|이" for a label ending in 사용 above one starting with 이슈.
+    // A word split by wrapping is always inside one text node, so that is the only place to
+    // look — the popup, where every string is its own element, is nothing but such pairs.
+    let prev = null;
+    const text = node.nodeValue;
+    for (let i = 0; i < text.length; i++) {
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      const rect = range.getBoundingClientRect();
+      if (!rect.height) continue; // collapsed whitespace has no box to place
+      const cur = { ch: text[i], top: Math.round(rect.top) };
+      if (prev && cur.top > prev.top + 2 && isHangul(prev.ch) && isHangul(cur.ch)) {
+        bad.push(prev.ch + "|" + cur.ch);
+      }
+      prev = cur;
+    }
+  }
+  return bad;
+};`;
+
 const suites = [
   {
     name: "options · tabs",
     page: { name: "opt-tabs", ...OPTIONS, seed: seedOf() },
     body: `
       ${TAB_READY}
-      check("opens on Templates when a site is configured", () => { eq(sel(), "templates"); eq(location.hash, "#templates"); });
+      check("opens on the first tab when a site is configured", () => { eq(sel(), "items"); eq(location.hash, "#items"); });
       check("exactly one panel is visible", () => eq(shown().length, 1));
       check("all eight cards are inside a panel", () => {
         const inPanels = [...document.querySelectorAll(".panel section.card")].length;
@@ -318,15 +352,20 @@ const suites = [
       check("the preview shows a key appended when the url has no token", () => {
         ok(/jira\\.acme\\.com\\/browse\\/PROJ-123$/.test(document.querySelector("#quickList .qlk-preview").textContent));
       });
-      check("arrow keys and Home/End move between tabs", () => {
+      // Read the expected order out of the DOM rather than naming the tabs: the point is
+      // that arrowing follows what the user sees, and hardcoded names would keep passing
+      // after someone reorders the buttons without reordering options.js's PE_TABS.
+      check("arrow keys and Home/End follow the visible order", () => {
         const nav = document.getElementById("tabs");
+        const order = [...nav.querySelectorAll(".tab")].map((t) => t.dataset.tab);
         const key = (k) => nav.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
-        document.getElementById("tab-templates").click();
-        key("ArrowRight"); eq(sel(), "items", "ArrowRight");
-        key("ArrowLeft"); eq(sel(), "templates", "ArrowLeft");
-        key("End"); eq(sel(), "backup", "End");
-        key("Home"); eq(sel(), "templates", "Home");
-        eq(document.activeElement.dataset.tab, "templates", "focus follows the selection");
+        document.getElementById("tab-" + order[0]).click();
+        key("ArrowRight"); eq(sel(), order[1], "ArrowRight goes to the next button");
+        key("ArrowLeft"); eq(sel(), order[0], "ArrowLeft comes back");
+        key("End"); eq(sel(), order[order.length - 1], "End is the last button");
+        key("Home"); eq(sel(), order[0], "Home is the first button");
+        eq(document.activeElement.dataset.tab, order[0], "focus follows the selection");
+        return order.join(" → ");
       });
       check("only the selected tab is in the tab order", () => {
         const on = [...document.querySelectorAll(".tab")].filter((t) => t.tabIndex === 0);
@@ -347,8 +386,12 @@ const suites = [
     page: { name: "opt-picker", ...OPTIONS, seed: seedOf() },
     body: `
       ${TAB_READY}
-      check("starts on Templates with one rule", () => {
-        eq(sel(), "templates");
+      // What matters is that it does NOT start on Appearance, or the switch below would be
+      // a no-op that passes. Which tab it does start on is the landing-tab decision, tested
+      // in "options · tabs" — assert the property this case depends on, not the name.
+      check("starts somewhere other than the rules tab, with one rule", () => {
+        eq(document.querySelector("#tabs .tab").dataset.tab, sel(), "opens on the first tab");
+        ok(sel() !== "appearance", "not already on Appearance");
         eq(document.querySelectorAll("#ruleList .rule-item").length, 1);
       });
       const grown = JSON.parse(JSON.stringify(window.__SEED));
@@ -368,8 +411,8 @@ const suites = [
     hash: "#not-a-tab",
     body: `
       ${TAB_READY}
-      check("an unknown hash falls back to a real tab", () => eq(sel(), "templates"));
-      check("…and rewrites itself so the address matches the page", () => eq(location.hash, "#templates"));`
+      check("an unknown hash falls back to a real tab", () => eq(sel(), "items"));
+      check("…and rewrites itself so the address matches the page", () => eq(location.hash, "#items"));`
   },
   {
     // Both of these are order, and only order — nothing breaks if a card or a link moves,
@@ -381,6 +424,27 @@ const suites = [
     page: { name: "opt-order", ...OPTIONS, seed: seedOf() },
     body: `
       ${TAB_READY}
+      // Tab order now lives in three places — the nav buttons, the panel divs, and
+      // options.js's PE_TABS — and only the buttons are visible. If the panels disagree,
+      // Tab moves through the page in an order that does not match what is on screen; if
+      // PE_TABS disagrees, the arrow keys and the landing tab do. Neither shows up as a
+      // broken page, so read all three back against each other.
+      check("the tab strip, the panels and PE_TABS are in one order", () => {
+        const buttons = [...document.querySelectorAll("#tabs .tab")].map((t) => t.dataset.tab);
+        const panels = [...document.querySelectorAll(".panel")].map((p) => p.dataset.tab);
+        eq(panels.join(","), buttons.join(","), "panel order matches the tab strip");
+        // PE_TABS is module-private, so infer it from what it drives: an unknown hash lands
+        // on PE_TABS[0], and Home/End walk PE_TABS from either end.
+        const nav = document.getElementById("tabs");
+        const key = (k) => nav.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+        document.getElementById("tab-" + buttons[0]).click();
+        key("End"); eq(sel(), buttons[buttons.length - 1], "End lands on the last button");
+        key("Home"); eq(sel(), buttons[0], "Home lands on the first button");
+        return buttons.join(" → ");
+      });
+      check("Work items is the first tab", () => {
+        eq(document.querySelector("#tabs .tab").dataset.tab, "items");
+      });
       check("Work items opens with Quick open above Copy reference", () => {
         document.getElementById("tab-items").click();
         const cards = [...document.querySelectorAll("#panel-items section.card")];
@@ -432,7 +496,25 @@ const suites = [
       check("the tab row still fits without the page scrolling sideways", () => {
         ok(document.documentElement.scrollWidth <= window.innerWidth + 1,
            "page scrolls horizontally: " + document.documentElement.scrollWidth + " > " + window.innerWidth);
-      });`
+      });
+      // Where the layout actually broke each line, read back a character at a time. CSS
+      // defaults to breaking CJK anywhere, which is right for Chinese and Japanese and
+      // wrong for Korean: every description on this page was splitting an 어절 down the
+      // middle — "폭 조 / 정 규칙", "대상을 고 / 르므로", "클립보드에 복 / 사합니다". Nothing about
+      // that looks broken unless you read Korean, so it is measured rather than reviewed.
+      ${KO_BREAKS}
+      for (const tab of ["items", "templates", "appearance", "sites", "backup"]) {
+        check("ko: " + tab + " breaks Korean lines at spaces, not mid-word", () => {
+          document.getElementById("tab-" + tab).click();
+          const bad = [];
+          for (const el of document.querySelectorAll("#panel-" + tab + " .desc, .brand p")) {
+            if (!el.getClientRects().length) continue;
+            bad.push(...midWordBreaks(el));
+          }
+          ok(bad.length === 0, "split mid-word: " + bad.join(", "));
+          return bad.length === 0 ? "clean" : bad.join(", ");
+        });
+      }`
   },
   {
     name: "options · dark mode",
@@ -525,6 +607,40 @@ const suites = [
       check("jumping still works with the extension off", () => ok(!document.getElementById("jumpBlock").hidden));
       check("no site action is offered while it is off", () => {
         for (const id of ["addDomain", "pickEl", "rescan"]) ok(document.getElementById(id).hidden, id);
+      });`
+  },
+  {
+    // The popup is 260px wide, so nearly every Korean string in it wraps — the surface where
+    // breaking an 어절 in half is most likely and least visible to anyone reading English.
+    name: "popup · korean line breaking",
+    page: { name: "pop-ko", ...POPUP, seed: seedOf(), lang: "ko" },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("확인") === -1, "the popup to resolve");
+      ${KO_BREAKS}
+      check("the popup is in Korean", () => {
+        ok(/[\\uAC00-\\uD7A3]/.test(document.body.textContent), "no Hangul in the popup at all");
+      });
+      // The permission notice is the only popup string long enough to wrap inside one text
+      // node — 45 Korean characters in a 260px popup is three lines. Everything else here is
+      // a short label in its own element, so with the notice hidden this suite passed whether
+      // popup.css kept 어절 together or not, and proved nothing. Revealing it is not cheating:
+      // what is under test is how that text wraps, not the logic that decides to show it.
+      check("the permission notice is showing, so there is something that wraps", () => {
+        const notice = document.getElementById("permNotice");
+        notice.hidden = false;
+        const line = parseFloat(getComputedStyle(notice).lineHeight);
+        ok(notice.getBoundingClientRect().height > line * 1.8, "the notice did not wrap at all");
+        return notice.getBoundingClientRect().height.toFixed(0) + "px";
+      });
+      check("every Korean line breaks at a space, not mid-word", () => {
+        const bad = midWordBreaks(document.querySelector(".pop"));
+        ok(bad.length === 0, "split mid-word: " + bad.join(", "));
+        return bad.length === 0 ? "clean" : bad.join(", ");
+      });
+      check("nothing overflows the popup's fixed width", () => {
+        const pop = document.querySelector(".pop");
+        ok(pop.scrollWidth <= pop.clientWidth + 1,
+           "content is " + pop.scrollWidth + "px inside a " + pop.clientWidth + "px popup");
       });`
   },
   {

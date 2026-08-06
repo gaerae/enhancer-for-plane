@@ -22,7 +22,11 @@
   // settings object, and one Save commits every tab — so switching a tab shows a different
   // part of the same edits and deliberately does NOT clear `dirty`. The ids are also the
   // URL hash (options.html#items), which makes a tab linkable and survives a reload.
-  const PE_TABS = ["templates", "items", "appearance", "sites", "backup"];
+  // Work items leads because Quick open lives there and needs no host permission — it is
+  // the one thing a just-installed profile can use before granting anything. Order must
+  // match the buttons and panels in options.html: it is the arrow-key order and the focus
+  // order, and PE_TABS[0] is what an unknown hash falls back to.
+  const PE_TABS = ["items", "templates", "appearance", "sites", "backup"];
   let activeTab = "";
 
   const el = {
@@ -130,13 +134,15 @@
   }
 
   // Which tab to open on load. A hash wins. Otherwise: a profile with nowhere to run yet
-  // (no domains, and not "all sites") is a fresh install, and the one thing it must do is
-  // name a site — so start there instead of on templates it cannot use.
+  // (no domains, and not "all sites") is a fresh install, and everything that touches a
+  // page is inert until it names a site — so start there rather than on settings that
+  // cannot do anything yet. With a site configured, open the first tab; naming it PE_TABS[0]
+  // rather than a literal keeps the landing tab from drifting out of the visible order.
   function initialTab() {
     const fromHash = tabFromHash();
     if (fromHash) return fromHash;
     const hasSite = !!(state.allDomains || (state.domains || []).length);
-    return hasSite ? "templates" : "sites";
+    return hasSite ? PE_TABS[0] : "sites";
   }
 
   function bindTabs() {

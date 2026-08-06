@@ -297,6 +297,21 @@ for (const [loc, pairs] of Object.entries(GLOSSARY)) {
   }
 }
 
+// 8b. the two strings the Chrome Web Store measures for us, in every locale.
+// `extDesc` shipped at 133 characters once and was caught by printing its length by hand;
+// the store refuses the upload rather than truncating, so a release fails at the last step
+// for a reason nothing in the repo mentions. These are the store's documented ceilings.
+const STORE_LIMITS = { extName: 75, extDesc: 132 };
+for (const [loc, cat] of Object.entries(catalogs)) {
+  for (const [key, max] of Object.entries(STORE_LIMITS)) {
+    const msg = cat[key] && cat[key].message;
+    if (msg == null) continue;
+    // Characters, not bytes: the store counts what a reader sees, so Korean is not 3×.
+    const n = [...msg].length;
+    if (n > max) err(`[${loc}] "${key}" is ${n} characters — the Web Store caps it at ${max}`);
+  }
+}
+
 // 9. no hardcoded user-facing strings.
 // Rules 1–8 only police strings that already went through peMsg. A new feature that
 // simply assigns an English literal to textContent would pass every one of them — which

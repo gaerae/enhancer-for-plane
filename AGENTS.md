@@ -204,6 +204,21 @@ lies:
   Add new shipped files there too — `check-source.js` walks what the extension actually
   loads (manifest entries, page `<script>`/`<link>`, the worker's injection lists) and
   fails if the zip would miss any of it, so you will hear about it before a release does.
+- **Korean needs `word-break: keep-all`.** CSS breaks CJK at any character, which is right
+  for Chinese and Japanese and wrong for Korean: every description on the settings page was
+  splitting an 어절 down the middle ("폭 조 / 정 규칙"). Both `options.css` and `popup.css` set
+  `keep-all` with `overflow-wrap: break-word` as the escape hatch for a token longer than the
+  line. The harness measures it per tab by reading back where the layout actually broke, so a
+  new surface that sets its own `word-break` fails there rather than shipping.
+- **Tab order lives in three places** — the nav buttons and the panel divs in `options.html`,
+  and `PE_TABS` in `options.js`. Only the buttons are visible; a panel out of step breaks the
+  focus order and a `PE_TABS` out of step breaks the arrow keys and the landing tab, neither
+  of which looks broken. The harness reads all three back against each other.
+- **Store copy quotes real labels.** `store-assets/STORE_LISTING.md`'s Korean section told
+  readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
+  now holds every quoted label in an imperative sentence against that locale's catalogue.
+  The same file's detailed description is one sentence per line on purpose: the store keeps
+  the newlines literally, so that is what makes it scannable.
 - **Template bodies are only as rich as `mdToHtml`.** It handles headings, `-`/`1.` lists,
   `- [ ]` task lists, `---`, and inline bold/italic/code — nothing else. Everything it does
   not know becomes a paragraph of literal characters, so a markdown table pastes as rows of
