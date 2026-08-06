@@ -134,7 +134,68 @@
     storeFocus(focusOn);
     applyFocusClass();
     applyStyles();
+    syncFocusButtons();
     if (announce) toast(peMsg(focusOn ? "msgFocusOn" : "msgFocusOff"));
+  }
+
+  // The state has to be on the button, not only in the stylesheet: it is a toggle, and a
+  // toggle that looks the same in both positions tells you nothing about which one it is in.
+  function syncFocusButtons() {
+    [...document.querySelectorAll(".pe-focus-btn")].forEach((b) => {
+      b.setAttribute("aria-pressed", focusOn ? "true" : "false");
+      b.setAttribute("title", peMsg(focusOn ? "focusBtnOnTitle" : "focusBtnTitle"));
+      b.setAttribute("aria-label", peMsg(focusOn ? "focusBtnOnTitle" : "focusBtnTitle"));
+      b.classList.toggle("on", focusOn);
+    });
+  }
+
+  function makeFocusButton() {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pe-focus-btn";
+    // A panel glyph: the frame is the window, the bar is the side panel that goes away.
+    b.innerHTML =
+      '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
+      '<rect x="2.4" y="3.4" width="11.2" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M10.2 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M11 5.6h1.8M11 7.6h1.8M11 9.6h1.8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>';
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFocus(!focusOn, true);
+    });
+    return b;
+  }
+
+  function removeFocusButtons() {
+    [...document.querySelectorAll(".pe-focus-btn")].forEach((b) => b.remove());
+  }
+
+  // Beside the key, after the copy button — the same header, because that is where a reader
+  // is already looking and the only anchor in this page we trust (a leaf button whose text is
+  // a key). The fast path is the copy button's, for the same reason: findKeyEl scans every
+  // button under up to ten ancestors, and injectAll runs on every mutation burst.
+  function ensureFocusButton() {
+    const existing = document.querySelector(".pe-focus-btn");
+    if (existing) {
+      const prev = existing.previousElementSibling;
+      if (isKeyButton(prev) || (prev && prev.classList && prev.classList.contains("pe-copy-ref-btn"))) {
+        syncFocusButtons();
+        return;
+      }
+      removeFocusButtons();
+    }
+    const keyEl = findKeyEl();
+    if (!keyEl) {
+      removeFocusButtons();
+      return;
+    }
+    const row = keyEl.parentElement;
+    if (!row || row.querySelector(":scope > .pe-focus-btn")) return;
+    const after = row.querySelector(":scope > .pe-copy-ref-btn") || keyEl;
+    after.insertAdjacentElement("afterend", makeFocusButton());
+    syncFocusButtons();
   }
 
   // Landing in focus mode after a reload is the one way a user meets a hidden properties
@@ -262,6 +323,7 @@
   function removeButtons() {
     removeTemplateButtons();
     removeCopyButtons();
+    removeFocusButtons();
     hideMenu();
   }
 
@@ -501,6 +563,11 @@
 
     if (hasCopyFormats()) ensureCopyButton();
     else removeCopyButtons();
+
+    // No gate of its own beyond having somewhere to put it: unlike the other two, focus mode
+    // needs nothing configured. It is offered wherever an item header is, which is the surface
+    // it is about — and it stays out of a page that has no work item on it.
+    ensureFocusButton();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {

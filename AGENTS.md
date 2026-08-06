@@ -78,6 +78,16 @@ no-op instead of a fight when the markup moves. Same conclusion for "just mirror
 Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
 to implement, not theirs to be observed.
 
+**A feature reachable only from the popup exists for whoever already knows it exists.** Focus
+mode shipped its first draft with a shortcut and a popup switch, which is two places nobody
+looks while reading a work item. The affordance belongs where the reader's eyes already are, on
+an anchor we already trust — the same item header the copy button hangs off (a leaf button whose
+text is a key). A toggle there must also *show* its position: `aria-pressed` plus a pressed
+style, because a toggle that looks identical in both states says nothing about which one it is
+in. And when a keyboard is the only way in, write the keys down somewhere they can all be seen
+at once — Settings ▸ Shortcuts exists because each one used to be documented only inside the
+section of the feature that owned it.
+
 **A shortcut you need while typing is a `chrome.commands` entry, not a key handler.** Alt+T and
 Alt+C live in `content.js` because they act on the element under the cursor; focus mode does
 not, and it is reached mid-sentence while writing a description. In the page that is a
@@ -261,7 +271,10 @@ lies:
 - **Tab order lives in three places** — the nav buttons and the panel divs in `options.html`,
   and `PE_TABS` in `options.js`. Only the buttons are visible; a panel out of step breaks the
   focus order and a `PE_TABS` out of step breaks the arrow keys and the landing tab, neither
-  of which looks broken. The harness reads all three back against each other.
+  of which looks broken. The harness reads all three back against each other. Adding a tab also
+  moves the two card counts it asserts, and the Korean line-breaking loop now derives its list
+  from the tab strip — a tab added without touching the harness would otherwise be the one tab
+  nobody measured Korean on.
 - **Store copy quotes real labels.** `store-assets/STORE_LISTING.md`'s Korean section told
   readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
   now holds every quoted label in an imperative sentence against that locale's catalogue.

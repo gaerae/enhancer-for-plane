@@ -109,8 +109,10 @@ enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-5. **🧘 Focus mode** — `Alt+Shift+F` (or the popup switch) hides the side panels so the
-   description is what is left. On a work item's own page Plane pins properties to the right
+5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥⇧F`) hides the side panels so the description
+   is what is left. There is also a toggle beside the work item's key, next to Copy reference,
+   and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
+   knew it existed. On a work item's own page Plane pins properties to the right
    with no way to collapse them; in the panel a list opens they sit under the body, which is
    already out of the way — so this is about the full page.
    - It is the **rules engine with a switch on it**: any rule can be marked *"Only while
@@ -124,7 +126,9 @@ enable.
      turn it on and once per load while it is still on, so the way back is never a guess.
    - The shortcut is a **browser command, not a page key handler**, so it fires while you are
      typing a description (where you want it most) without eating a character — on macOS every
-     `⌥`+letter *is* a character. Rebind it at `chrome://extensions/shortcuts`.
+     `⌥`+letter *is* a character. Rebind it at `chrome://extensions/shortcuts`; Settings ▸
+     **Shortcuts** lists every key the extension answers to, for both platforms, since until
+     now each one was written down only in the section of the feature that owned it.
    - Plane keeps a collapse flag for that panel in `localStorage`, but nothing in its UI
      reaches it and its own resize effect forces it back open above 768px — so this hides the
      panel with CSS instead of driving Plane's state, which would be a fight.
@@ -276,7 +280,7 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 | `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
 | `content.js` / `content.css` | Style-rule injection (including the focus-mode half) + template insertion UI + picker |
 | `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page; relays the focus-mode keyboard command to the tab in front. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
-| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Work items · Templates · Appearance · Sites · Backup), still one form with one Save |
+| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Work items · Templates · Appearance · Sites · Backup · Shortcuts), still one form with one Save. Shortcuts is reference only: every key the extension answers to, for both platforms |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · focus mode · picker · re-scan) |
 | `_locales/` | `en` + `ko` message catalogues |
 | `tools/` | Checks (not shipped) — see below |

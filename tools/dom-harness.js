@@ -319,7 +319,8 @@ const PLANE = `
   <div class="fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-1/4" id="probe-props">properties</div>
 </div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
-<div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>`;
+<div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
+<div id="probe-header"><button type="button">PROJ-142</button><textarea id="title-input">A work item</textarea></div>`;
 
 /* ------------------------------------------------------------------ */
 /* Suites                                                             */
@@ -371,14 +372,17 @@ const suites = [
       ${TAB_READY}
       check("opens on the first tab when a site is configured", () => { eq(sel(), "items"); eq(location.hash, "#items"); });
       check("exactly one panel is visible", () => eq(shown().length, 1));
-      check("all nine cards are inside a panel", () => {
+      check("all ten cards are inside a panel", () => {
         const inPanels = [...document.querySelectorAll(".panel section.card")].length;
         eq(document.querySelectorAll("section.card").length, inPanels, "cards in panels");
-        eq(inPanels, 9, "card count");
+        eq(inPanels, 10, "card count");
       });
       check("each tab holds the sections it says it does", () => {
         const count = (t) => document.querySelectorAll("#panel-" + t + " section.card").length;
-        eq([count("templates"), count("items"), count("appearance"), count("sites"), count("backup")].join(","), "3,2,2,1,1");
+        eq(
+          [count("templates"), count("items"), count("appearance"), count("sites"), count("backup"), count("keys")].join(","),
+          "3,2,2,1,1,1"
+        );
       });
       check("clicking a tab switches the panel and the hash", () => {
         document.getElementById("tab-items").click();
@@ -448,6 +452,58 @@ const suites = [
       check("…and the message points at something now visible", () => {
         ok(!document.getElementById("panel-appearance").hidden, "the rules panel is shown");
         eq(document.querySelectorAll("#ruleList .rule-item").length, 2, "rule rows");
+      });`
+  },
+  {
+    // The shortcuts tab is reference material, so what it has to get right is being complete
+    // and being readable — every shortcut the extension answers to, and both platforms.
+    name: "options · shortcuts",
+    page: { name: "opt-keys", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      check("it is the last tab, and it is reachable", () => {
+        const tabs = [...document.querySelectorAll("#tabs .tab")].map((t) => t.dataset.tab);
+        eq(tabs[tabs.length - 1], "keys", "order: " + tabs.join(" > "));
+        document.getElementById("tab-keys").click();
+        eq(sel(), "keys");
+        eq(shown().join(), "keys", "one panel, and it is this one");
+      });
+      const rows = () => [...document.querySelectorAll("#panel-keys .keys tbody tr")];
+      check("every shortcut the extension answers to is listed", () => {
+        const keys = rows().map((r) => [...r.querySelectorAll("td")].slice(1, 3).map((td) => td.textContent.replace(/\\s+/g, " ").trim()));
+        eq(rows().length, 4, "rows");
+        const win = keys.map((k) => k[0]).join(" | ");
+        for (const combo of ["Alt+T", "Alt+C", "Alt+Shift+F", "issue"]) ok(win.indexOf(combo) > -1, combo + " missing from: " + win);
+      });
+      check("each row gives the macOS keys too, and neither column wraps", () => {
+        for (const r of rows()) {
+          const cells = [...r.querySelectorAll("td")];
+          const mac = cells[2].textContent.replace(/\\s+/g, " ").trim();
+          ok(mac.length > 0, "no macOS column in row: " + cells[0].textContent);
+          for (const i of [1, 2]) eq(getComputedStyle(cells[i]).whiteSpace, "nowrap", "column " + i + " may not wrap a key");
+        }
+        return rows().map((r) => r.querySelectorAll("td")[2].textContent.trim()).join(" | ");
+      });
+      check("the ⌥ rows say Option, not Alt, and the modifier order matches", () => {
+        const mac = rows().map((r) => r.querySelectorAll("td")[2].textContent.replace(/\\s+/g, "").trim());
+        ok(mac.indexOf("⌥+T") > -1, "template row: " + mac.join(" | "));
+        ok(mac.indexOf("⌥+⇧+F") > -1, "focus row: " + mac.join(" | "));
+        ok(mac.join("").indexOf("Alt") === -1, "an Alt leaked into the macOS column");
+      });
+      check("it says which of them can be rebound", () => {
+        const t = document.getElementById("panel-keys").textContent;
+        ok(t.indexOf("chrome://extensions/shortcuts") > -1, "the rebinding address");
+      });
+      // Four columns, one of them a sentence: on a narrow window the table has to scroll
+      // inside its own box rather than making the whole page scroll sideways.
+      check("a narrow window scrolls the table, not the page", () => {
+        const wrap = document.querySelector(".wrap");
+        wrap.style.maxWidth = "360px";
+        const doc = document.documentElement;
+        ok(doc.scrollWidth <= window.innerWidth + 1, "page scrolls sideways: " + doc.scrollWidth + " > " + window.innerWidth);
+        const box = document.querySelector(".keys-scroll");
+        eq(getComputedStyle(box).overflowX, "auto", "the table's own box scrolls");
+        wrap.style.maxWidth = "";
       });`
   },
   {
@@ -667,11 +723,14 @@ const suites = [
       // middle — "폭 조 / 정 규칙", "대상을 고 / 르므로", "클립보드에 복 / 사합니다". Nothing about
       // that looks broken unless you read Korean, so it is measured rather than reviewed.
       ${KO_BREAKS}
-      for (const tab of ["items", "templates", "appearance", "sites", "backup"]) {
+      // Derived from the tab strip, not listed: a tab added without a line here would be the
+      // one nobody measured, and Korean breaking mid-word is invisible to a reviewer who
+      // does not read Korean.
+      for (const tab of [...document.querySelectorAll("#tabs .tab")].map((t) => t.dataset.tab)) {
         check("ko: " + tab + " breaks Korean lines at spaces, not mid-word", () => {
           document.getElementById("tab-" + tab).click();
           const bad = [];
-          for (const el of document.querySelectorAll("#panel-" + tab + " .desc, .brand p")) {
+          for (const el of document.querySelectorAll("#panel-" + tab + " .desc, #panel-" + tab + " td, .brand p")) {
             if (!el.getClientRects().length) continue;
             bad.push(...midWordBreaks(el));
           }
@@ -796,6 +855,36 @@ const suites = [
         ok(shown(nav), "and so is the navigation");
         ok(!focusClass(), "no focus class on <html>");
         eq(stored(), null, "and nothing stored for this tab");
+      });
+
+      // The affordance in the page. Popup-only would mean the feature exists for whoever
+      // already knows it exists.
+      await waitFor(() => document.querySelector(".pe-focus-btn"), "the toggle to be injected beside the key");
+      check("the toggle sits in the item header, after the copy button", () => {
+        const btn = document.querySelector(".pe-focus-btn");
+        eq(btn.previousElementSibling.className, "pe-copy-ref-btn", "it follows the copy button");
+        eq(btn.parentElement.id, "probe-header", "in the header row, not floating somewhere");
+        eq(btn.getAttribute("aria-pressed"), "false", "and it starts in the off position");
+        ok((btn.getAttribute("title") || "").indexOf("Alt+Shift+F") > -1, "naming the shortcut is how it is learned");
+      });
+      check("it is the same size as the button beside it", () => {
+        const a = document.querySelector(".pe-copy-ref-btn").getBoundingClientRect();
+        const b = document.querySelector(".pe-focus-btn").getBoundingClientRect();
+        eq(Math.round(b.width), Math.round(a.width), "width");
+        eq(Math.round(b.height), Math.round(a.height), "height");
+      });
+      document.querySelector(".pe-focus-btn").click();
+      check("clicking it turns focus mode on and the button says so", () => {
+        const btn = document.querySelector(".pe-focus-btn");
+        eq(btn.getAttribute("aria-pressed"), "true", "pressed");
+        ok(btn.classList.contains("on"), "and it looks pressed");
+        ok(!shown(props), "the properties panel went away");
+        eq(stored(), "1", "the tab remembered");
+      });
+      document.querySelector(".pe-focus-btn").click();
+      check("clicking it again brings the panels back", () => {
+        eq(document.querySelector(".pe-focus-btn").getAttribute("aria-pressed"), "false");
+        ok(shown(props), "properties panel back");
       });
 
       const on = await send({ type: "pe-focus-toggle" });

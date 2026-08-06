@@ -398,6 +398,58 @@ input.invalid {
   }
 }
 
+/* keyboard shortcuts (reference table) */
+/* The table can outgrow a narrow window — four columns, one of them a sentence — so it
+   scrolls inside its own box rather than making the page scroll sideways. */
+.keys-scroll {
+  overflow-x: auto;
+  margin: 10px 0 14px;
+}
+.keys {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.keys th,
+.keys td {
+  padding: 8px 10px 8px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.keys th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+.keys tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* The key columns must not wrap: "Alt+Shift+F" broken across two lines stops being a key. */
+.keys td:nth-child(2),
+.keys td:nth-child(3) {
+  white-space: nowrap;
+}
+.keys .keys-where {
+  color: var(--muted-2);
+  min-width: 200px;
+}
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
 /* toggle switch */
 .master {
   display: inline-flex;

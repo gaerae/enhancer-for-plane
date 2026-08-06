@@ -54,7 +54,7 @@
     "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off."
   },
   "optFocusHow": {
-    "message": "Turn it on with <b>Alt+Shift+F</b>, or from the toolbar popup. To change the shortcut, open <code>chrome://extensions/shortcuts</code>."
+    "message": "Three ways in: <b>Alt+Shift+F</b> (macOS <b>⌥⇧F</b>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
   },
   "optFocusScope": {
     "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices."
@@ -681,6 +681,13 @@
   "copyBtnTitle": {
     "message": "Copy reference  ·  Alt/⌥+C"
   },
+  "focusBtnTitle": {
+    "message": "Focus mode: hide the side panels  ·  Alt+Shift+F (⌥⇧F)",
+    "description": "Title and aria-label of the toggle beside a work item's key, while focus mode is off. Both states name the shortcut, because the button is also where people learn it exists."
+  },
+  "focusBtnOnTitle": {
+    "message": "Focus mode is on — show the side panels  ·  Alt+Shift+F (⌥⇧F)"
+  },
   "msgCopied": {
     "message": "Copied."
   },
@@ -776,6 +783,61 @@
   },
   "optTabBackup": {
     "message": "Backup"
+  },
+  "optTabKeys": {
+    "message": "Shortcuts"
+  },
+  "optKeysTitle": {
+    "message": "Keyboard shortcuts"
+  },
+  "optKeysDesc": {
+    "message": "Everything the keyboard reaches, in one place. On macOS, Alt is the Option key."
+  },
+  "optKeysColWhat": {
+    "message": "Does"
+  },
+  "optKeysColWin": {
+    "message": "Windows · Linux"
+  },
+  "optKeysColMac": {
+    "message": "macOS"
+  },
+  "optKeysColWhere": {
+    "message": "Where"
+  },
+  "optKeysTpl": {
+    "message": "Insert a body template"
+  },
+  "optKeysTplWhere": {
+    "message": "While editing a description, and in the “Create work item” dialog"
+  },
+  "optKeysCopy": {
+    "message": "Copy this work item's reference"
+  },
+  "optKeysCopyWhere": {
+    "message": "On a work item — its own page, or the panel a list opens. Not while you are typing."
+  },
+  "optKeysFocus": {
+    "message": "Turn focus mode on or off"
+  },
+  "optKeysFocusWhere": {
+    "message": "Anywhere the extension runs, including while you are typing"
+  },
+  "optKeysJump": {
+    "message": "Open a work item by key"
+  },
+  "optKeysJumpWhere": {
+    "message": "The address bar, on any tab"
+  },
+  "optKeysThenKey": {
+    "message": "then the key",
+    "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
+  },
+  "optKeysRebind": {
+    "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The other two are handled inside the page and are fixed."
+  },
+  "optKeysWhyTyping": {
+    "message": "Alt+T is meant to be used mid-sentence, so it works while you type. Alt+C deliberately does not: on macOS Option+C is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives. Focus mode escapes that trade-off by being a browser command, which Chrome intercepts before the page ever sees the key."
   },
   "optQuickTitle": {
     "message": "Quick open"

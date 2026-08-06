@@ -25,8 +25,9 @@
   // Work items leads because Quick open lives there and needs no host permission — it is
   // the one thing a just-installed profile can use before granting anything. Order must
   // match the buttons and panels in options.html: it is the arrow-key order and the focus
-  // order, and PE_TABS[0] is what an unknown hash falls back to.
-  const PE_TABS = ["items", "templates", "appearance", "sites", "backup"];
+  // order, and PE_TABS[0] is what an unknown hash falls back to. Shortcuts is last because
+  // it is the only one holding nothing to save — reference rather than settings.
+  const PE_TABS = ["items", "templates", "appearance", "sites", "backup", "keys"];
   let activeTab = "";
 
   const el = {
