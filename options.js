@@ -18,6 +18,13 @@
   // rather than stringifying the ~100 KB `state` a second time on every event.
   let syncedJson = "";
 
+  // Section tabs. Grouping is presentation only: the page is still ONE form over one
+  // settings object, and one Save commits every tab — so switching a tab shows a different
+  // part of the same edits and deliberately does NOT clear `dirty`. The ids are also the
+  // URL hash (options.html#items), which makes a tab linkable and survives a reload.
+  const PE_TABS = ["templates", "items", "appearance", "sites", "backup"];
+  let activeTab = "";
+
   const el = {
     enabled: $("enabled"),
     allDomains: $("allDomains"),
@@ -45,6 +52,7 @@
     copyEmpty: $("copyEmpty"),
     addCopyFormat: $("addCopyFormat"),
     cpyRow: $("cpyRow"),
+    tabs: $("tabs"),
     quickList: $("quickList"),
     quickEmpty: $("quickEmpty"),
     addQuickLink: $("addQuickLink"),
@@ -86,6 +94,75 @@
   };
 
   const uid = (p) => p + "-" + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+
+  /* ---------------- tabs ---------------- */
+
+  // The hash only ever selects a tab; anything else in it is ignored rather than trusted,
+  // so a stale or hand-typed link cannot land the page on no tab at all.
+  function tabFromHash() {
+    const h = (location.hash || "").replace(/^#/, "").toLowerCase();
+    return PE_TABS.indexOf(h) !== -1 ? h : "";
+  }
+
+  function showTab(id, opts) {
+    if (PE_TABS.indexOf(id) === -1) id = PE_TABS[0];
+    activeTab = id;
+    for (const t of PE_TABS) {
+      const tab = $("tab-" + t);
+      const panel = $("panel-" + t);
+      const on = t === id;
+      if (tab) {
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        // Only the selected tab is in the tab order; the arrow keys move between them.
+        tab.tabIndex = on ? 0 : -1;
+      }
+      if (panel) panel.hidden = !on;
+    }
+    // replaceState, not `location.hash =`: a tab is not a place in history. Pushing one
+    // would make the browser Back button walk back through tabs instead of leaving the page.
+    try {
+      history.replaceState(null, "", "#" + id);
+    } catch (_) {}
+    if (opts && opts.focus) {
+      const tab = $("tab-" + id);
+      if (tab) tab.focus();
+    }
+  }
+
+  // Which tab to open on load. A hash wins. Otherwise: a profile with nowhere to run yet
+  // (no domains, and not "all sites") is a fresh install, and the one thing it must do is
+  // name a site — so start there instead of on templates it cannot use.
+  function initialTab() {
+    const fromHash = tabFromHash();
+    if (fromHash) return fromHash;
+    const hasSite = !!(state.allDomains || (state.domains || []).length);
+    return hasSite ? "templates" : "sites";
+  }
+
+  function bindTabs() {
+    el.tabs.addEventListener("click", (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest(".tab") : null;
+      if (btn && btn.dataset.tab) showTab(btn.dataset.tab);
+    });
+    // Arrow/Home/End move between tabs — what a tablist is expected to do, and the reason
+    // the unselected tabs are kept out of the tab order.
+    el.tabs.addEventListener("keydown", (e) => {
+      const i = PE_TABS.indexOf(activeTab);
+      let next = -1;
+      if (e.key === "ArrowRight") next = (i + 1) % PE_TABS.length;
+      else if (e.key === "ArrowLeft") next = (i - 1 + PE_TABS.length) % PE_TABS.length;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = PE_TABS.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      showTab(PE_TABS[next], { focus: true });
+    });
+    // A hash typed or linked from outside (the popup can deep-link a tab this way).
+    window.addEventListener("hashchange", () => {
+      const t = tabFromHash();
+      if (t && t !== activeTab) showTab(t);
+    });
+  }
 
   /* ---------------- render ---------------- */
   function render() {
@@ -665,8 +742,15 @@
             flash(peMsg("msgChangedElsewhere"), true);
             return;
           }
+          // The picker adds a style rule from another tab, and the message below points at
+          // it — so reveal the tab holding it, or we would announce something the user
+          // cannot see. Gated on the rules actually growing, which is the picker's
+          // signature: a settings change synced from another device must not yank the
+          // page to a tab the user was not working in.
+          const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
           render();
+          if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
         });
       });
@@ -935,21 +1019,29 @@
       }
     } catch (e) {
       const msg = e && e.message ? e.message : String(e);
+      // Each message below names something the user has to go and change, and with the
+      // sections split across tabs the named thing may be on a tab they are not looking
+      // at — so reveal it: the offending template is in Templates, and a quota failure is
+      // read off the storage meter, which lives in Backup beside the note explaining it.
+      //
       // One template too big for an item of its own is the one quota failure with a
       // specific cause and a specific fix, so it gets its own message and names the
       // template — "settings are too large" would send the user hunting through all of
       // them for the one that is actually the problem.
       if (e && e.code === PE_ERR_TEMPLATE_TOO_LARGE) {
+        showTab("templates");
         flash(
           peMsg("msgSaveTplTooLarge", [e.templateName || peMsg("menuUntitled"), String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]),
           true
         );
       } else if (/QUOTA_BYTES_PER_ITEM/i.test(msg)) {
+        showTab("backup");
         // The templates are already split across items, so this can only be the core
         // one: domains and style rules. Saying "settings are too large" would point at
         // the templates, which are not the problem and cannot help.
         flash(peMsg("msgSaveQuotaItem", [String(Math.round(PE_SYNC_ITEM_BYTES / 1024))]), true);
       } else if (/quota/i.test(msg)) {
+        showTab("backup");
         flash(peMsg("msgSaveQuota", [String(Math.round(PE_SYNC_QUOTA_BYTES / 1024))]), true);
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
@@ -1066,5 +1158,10 @@
     syncCache = c;
     render();
     bind();
+    bindTabs();
+    // After the first render, so the choice can look at the settings that just loaded.
+    // Not inside render(): that also runs after every save, and it would throw the user
+    // back to the default tab each time they pressed Save.
+    showTab(initialTab());
   });
 })();

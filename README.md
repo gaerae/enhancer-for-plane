@@ -149,9 +149,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 ## Team template file format
 
 Host a JSON file anywhere your team can reach over `http(s)` — an intranet path, a
-Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Team template sync.
+Git host's raw URL, an S3 bucket. Add its URL in Settings ▸ Templates ▸ Team template sync.
 
-You do not have to write it by hand. **Settings ▸ Body templates ▸ "Share with your
+You do not have to write it by hand. **Settings ▸ Templates ▸ Body templates ▸ "Share with your
 team"** writes this exact format from the templates you already have: build them in
 the UI, export, upload, share the URL. It asks for the collection's `name` and
 stamps today's date as `version`. It is a *publication*, not a backup — it carries
@@ -257,7 +257,7 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 | `common.js` | Settings defaults / storage / domain matching / sync cache + normalization / i18n runtime (shared by the worker, content script, and pages) |
 | `content.js` / `content.css` | Style-rule injection + template insertion UI + picker |
 | `background.js` | Service worker: registers the content script on granted origins and reconciles on permission/settings changes; opens the options page. **The only file that may touch the network** — it fetches team templates on an alarm and caches them |
-| `options.html/js/css` | Full settings page |
+| `options.html/js/css` | Full settings page — the sections are grouped into tabs (Templates · Work items · Appearance · Sites · Backup), still one form with one Save |
 | `popup.html/js/css` | Toolbar popup (quick toggle · status · picker · re-scan) |
 | `_locales/` | `en` + `ko` message catalogues |
 | `tools/` | Checks (not shipped) — see below |

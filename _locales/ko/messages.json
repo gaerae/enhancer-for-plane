@@ -707,6 +707,24 @@
   "popPermGap": {
     "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."
   },
+  "optTabsLabel": {
+    "message": "설정 구역"
+  },
+  "optTabTemplates": {
+    "message": "템플릿"
+  },
+  "optTabItems": {
+    "message": "작업 항목"
+  },
+  "optTabAppearance": {
+    "message": "화면"
+  },
+  "optTabSites": {
+    "message": "사이트"
+  },
+  "optTabBackup": {
+    "message": "백업"
+  },
   "optQuickTitle": {
     "message": "빠른 이동"
   },

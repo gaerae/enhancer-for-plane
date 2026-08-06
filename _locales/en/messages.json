@@ -707,6 +707,24 @@
   "popPermGap": {
     "message": "⚠ Some sites need access on this device — open Settings to approve."
   },
+  "optTabsLabel": {
+    "message": "Settings sections"
+  },
+  "optTabTemplates": {
+    "message": "Templates"
+  },
+  "optTabItems": {
+    "message": "Work items"
+  },
+  "optTabAppearance": {
+    "message": "Appearance"
+  },
+  "optTabSites": {
+    "message": "Sites"
+  },
+  "optTabBackup": {
+    "message": "Backup"
+  },
   "optQuickTitle": {
     "message": "Quick jump"
   },
