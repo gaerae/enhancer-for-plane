@@ -204,3 +204,11 @@ lies:
   Add new shipped files there too — `check-source.js` walks what the extension actually
   loads (manifest entries, page `<script>`/`<link>`, the worker's injection lists) and
   fails if the zip would miss any of it, so you will hear about it before a release does.
+- **Template bodies are only as rich as `mdToHtml`.** It handles headings, `-`/`1.` lists,
+  `- [ ]` task lists, `---`, and inline bold/italic/code — nothing else. Everything it does
+  not know becomes a paragraph of literal characters, so a markdown table pastes as rows of
+  pipes and a ` ``` ` fence pastes as backticks. Both shipped once, written by someone
+  reasonably reading the file as generic markdown. `tools/test.js` now rejects tables,
+  fences, blockquotes, images and links in `examples/*.json`; if you teach `mdToHtml` a new
+  construct, take it off that list in the same change. `examples/team-templates.json` and
+  `-ko.json` are one pack in two languages — same ids, same order, enforced by the same test.

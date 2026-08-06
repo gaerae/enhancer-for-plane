@@ -1374,6 +1374,41 @@ test("example feed: the button's URL points at the file that actually ships", ()
   ok(out.templates.length > 0, "the shipped file parses into templates");
 });
 
+test("example feeds: every template body is markdown the inserter can actually render", () => {
+  const ctx = loadCommon();
+  // content.js's mdToHtml handles headings, - / 1. lists, - [ ] task lists, --- and inline
+  // bold/italic/code. Anything else is passed through as a paragraph of literal characters.
+  // Markdown tables shipped once and pasted as rows of pipes; a ```mermaid fence shipped in
+  // the architecture doc and pasted as backticks. Both were written by someone reading the
+  // file as generic markdown, which is exactly what the next person will do — so the packs
+  // are checked against what the renderer supports rather than against markdown at large.
+  const UNSUPPORTED = [
+    [/^\s*\|/m, "a markdown table row"],
+    [/^\s*```/m, "a fenced code block"],
+    [/^\s*>\s/m, "a blockquote"],
+    [/^\s*!\[/m, "an image"],
+    [/\[[^\]]*\]\([^)]*\)/, "a markdown link"]
+  ];
+  for (const file of ["examples/team-templates.json", "examples/team-templates-ko.json", "examples/team-templates-design.json"]) {
+    const feed = JSON.parse(read(file));
+    const out = ctx.peNormalizeRemoteTemplates(feed, "src-" + file);
+    eq(out.dropped, 0, file + ": the normalizer keeps every template");
+    ok(out.templates.length > 0, file + ": has templates");
+    for (const t of feed.templates) {
+      for (const [re, what] of UNSUPPORTED) {
+        ok(!re.test(t.content), file + " / " + t.id + " contains " + what + ", which pastes as literal text");
+      }
+    }
+  }
+  // The Korean pack is a translation, not a second pack: same ids, same order, so a
+  // template added to one and forgotten in the other fails here instead of leaving one
+  // language quietly short.
+  const en = JSON.parse(read("examples/team-templates.json")).templates;
+  const ko = JSON.parse(read("examples/team-templates-ko.json")).templates;
+  eq(ko.map((t) => t.id).join(","), en.map((t) => t.id).join(","), "the two packs carry the same ids in the same order");
+  eq(new Set(en.map((t) => t.id)).size, en.length, "ids are unique");
+});
+
 test("permissions: desired origins are the domains plus every enabled source", () => {
   const ctx = loadCommon();
   // This is what a synced-in profile needs granted on a new device; the badge and the

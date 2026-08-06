@@ -372,6 +372,33 @@ const suites = [
       check("…and rewrites itself so the address matches the page", () => eq(location.hash, "#templates"));`
   },
   {
+    // Both of these are order, and only order — nothing breaks if a card or a link moves,
+    // so nothing would tell us it moved. The order is the decision: Quick open leads the
+    // Work items tab because it is the one feature there that needs no host permission
+    // and works on Jira and Linear too, and "Rate it" is last because a rating is what
+    // you ask for after the links that help someone.
+    name: "options · reading order",
+    page: { name: "opt-order", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      check("Work items opens with Quick open above Copy reference", () => {
+        document.getElementById("tab-items").click();
+        const cards = [...document.querySelectorAll("#panel-items section.card")];
+        const at = (id) => cards.findIndex((c) => c.querySelector("#" + id));
+        const quick = at("quickList");
+        const copy = at("copyList");
+        ok(quick >= 0 && copy >= 0, "both cards are in the panel");
+        ok(quick < copy, "Quick open is at " + quick + ", Copy reference at " + copy);
+        return "quick " + quick + " · copy " + copy;
+      });
+      check("the header links read GitHub → feedback → rating", () => {
+        const labels = [...document.querySelectorAll(".about .about-link")]
+          .map((a) => a.textContent.trim());
+        eq(labels.join(" · "), "GitHub · Send feedback · Rate it");
+        return labels.join(" · ");
+      });`
+  },
+  {
     name: "options · first run",
     page: { name: "opt-fresh", ...OPTIONS, seed: seedOf({ domains: [], quickLinks: [], rules: [], templates: [], variables: [], copyFormats: [] }) },
     body: `

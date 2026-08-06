@@ -15,13 +15,13 @@
     "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane / plane.so)을 위한 본문 템플릿과 스타일 규칙."
+    "message": "Plane(makeplane / plane.so)의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
   },
   "optGitHub": {
     "message": "GitHub"
   },
-  "optReportIssue": {
-    "message": "문제 신고"
+  "optFeedback": {
+    "message": "의견 보내기"
   },
   "optRate": {
     "message": "별점 남기기"

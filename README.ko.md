@@ -192,11 +192,12 @@ Git 호스트의 raw URL, S3 버킷. 그 URL을 설정 ▸ 템플릿 ▸ Team te
 으로 넘어가므로, 처음부터 `raw.githubusercontent.com` 주소를 넣으면 됩니다.
 
 그룹 순서는 파일에 처음 나온 순서를 따르고, 그룹 없는 항목이 먼저 옵니다. 실제 예시는
-[`examples/team-templates.json`](examples/team-templates.json)과
+"예시로 사용해 보기"가 구독하는 템플릿 26개 모음
+[`examples/team-templates.json`](examples/team-templates.json)과 그 한글판
+[`examples/team-templates-ko.json`](examples/team-templates-ko.json), 그리고 더 작은
 [`examples/team-templates-design.json`](examples/team-templates-design.json)에 있습니다.
-더 큰 문서·이슈 모음은
-[`examples/team-templates-data.json`](examples/team-templates-data.json)(영문)과
-[`examples/team-templates-data-ko.json`](examples/team-templates-data-ko.json)(한글)에 있습니다.
+하나를 복사해 직접 만든 주소로 서비스하고, 팀이 실제로 이슈를 쓰는 방식에 맞게
+템플릿을 고쳐 쓰면 됩니다.
 
 ## 자체 호스팅 Plane 전용
 

@@ -210,11 +210,12 @@ The common case is a Git host: `github.com/<org>/<repo>/raw/main/t.json` redirec
 `raw.githubusercontent.com`, so enter the `raw.githubusercontent.com` URL directly.
 
 Group ordering follows first appearance in the file; ungrouped items come first.
-Working examples: [`examples/team-templates.json`](examples/team-templates.json) and
-[`examples/team-templates-design.json`](examples/team-templates-design.json).
-A larger doc-and-issue set is in
-[`examples/team-templates-data.json`](examples/team-templates-data.json) (English) and
-[`examples/team-templates-data-ko.json`](examples/team-templates-data-ko.json) (Korean).
+Working examples: [`examples/team-templates.json`](examples/team-templates.json) — the
+26-template pack the "Try our example" button subscribes to, also translated in
+[`examples/team-templates-ko.json`](examples/team-templates-ko.json) — and a smaller
+[`examples/team-templates-design.json`](examples/team-templates-design.json). Fork one,
+serve it from your own URL, and edit the templates to match how your team actually
+writes an issue.
 
 ## Built for self-hosted Plane
 

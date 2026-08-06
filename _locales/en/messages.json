@@ -15,13 +15,15 @@
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Body templates & style rules for Plane — the open-source project management, issues & wiki tool (makeplane / plane.so)."
+    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, width rules. Quick open works on Jira and Linear too.",
+    "description": "Sub-line under the settings header. Deliberately does not explain what Plane is — the store listing does that for a stranger, and whoever is reading this already installed the extension. Order matches extName: quick open first."
   },
   "optGitHub": {
     "message": "GitHub"
   },
-  "optReportIssue": {
-    "message": "Report an issue"
+  "optFeedback": {
+    "message": "Send feedback",
+    "description": "Header link to the GitHub issue tracker. Deliberately an invitation, not \"Report an issue\" — most of what arrives is an idea or a question, and the narrower wording turned the tracker into a place you only visit when something is broken."
   },
   "optRate": {
     "message": "Rate it"

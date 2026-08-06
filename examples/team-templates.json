@@ -1,84 +1,189 @@
 {
   "schema": 1,
-  "name": "QA & Delivery standards",
-  "version": "2026-07-15b",
+  "name": "Team docs & issues",
+  "version": "2026-08-06",
   "templates": [
     {
-      "id": "bug-detailed",
-      "group": "QA Templates",
-      "name": "🐞 Bug (detailed)",
-      "title": "[Bug] ",
-      "content": "## Environment\n- Version: \n- OS / Browser: \n\n## Steps to reproduce\n1. \n2. \n3. \n\n## Expected\n\n## Actual\n\n## Logs\n- \n"
+      "id": "issue-feature",
+      "group": "Issues",
+      "name": "✨ Feature request",
+      "title": "[Feature] ",
+      "content": "## Request background\n(who is blocked by what, today)\n\n## Current approach and pain\n- Today we: \n- It costs: (time · errors · manual steps)\n\n## Desired outcome\n(state it so someone else could tell whether it is done)\n\n## Done criteria\n- [ ] \n- [ ] \n\n## Wanted by\n{{date+7}} — hard deadline? why: \n"
     },
     {
-      "id": "bug-quick",
-      "group": "QA Templates",
+      "id": "issue-bug",
+      "group": "Issues",
+      "name": "🐞 Bug",
+      "title": "[Bug] ",
+      "content": "## Occurrence\n- First seen: {{date}}\n- Pattern: one-off / intermittent / persistent\n- Environment: (prod / staging · version · OS · browser)\n\n## Symptoms\n(observed facts only — diagnosis goes further down)\n\n## Reproduction\n1. — actual result: \n2. — actual result: \n\n## Expected\n\n## Impact and SEV\nCheck the matching grade (when unsure, start high and lower it):\n- [ ] SEV-1 — full outage / data loss in progress (unrecoverable)\n- [ ] SEV-2 — core feature broken (no workaround) / data corruption (wrong values already exposed to consumers) or core pipeline down\n- [ ] SEV-3 — partial degradation (workaround exists) / past SLA, limited downstream\n- [ ] SEV-4 — minor, not consumer-facing\n- Basis (workaround? · who is downstream): \n\n## Evidence\n- Log · dashboard · query: \n"
+    },
+    {
+      "id": "issue-bug-quick",
+      "group": "Issues",
       "name": "⚡ Bug (quick)",
       "title": "[Bug] ",
-      "content": "## What happened\n\n## Where\n\n## Reported\n{{date}}\n"
+      "content": "## What happened\n\n## Where\n(URL · screen · job name)\n\n## Reported\n{{date}} — reporter: \n"
+    },
+    {
+      "id": "issue-task",
+      "group": "Issues",
+      "name": "✅ Task",
+      "title": "[Task] ",
+      "content": "## Details\n\n## Done criteria\n- [ ] \n\n## Links\n- \n"
+    },
+    {
+      "id": "issue-chore",
+      "group": "Issues",
+      "name": "🧹 Chore",
+      "title": "[Chore] ",
+      "content": "## What\n\n## Why now\n(what breaks, or gets slower, if this waits)\n\n## Notes\n"
+    },
+    {
+      "id": "issue-epic",
+      "group": "Issues",
+      "name": "🗺️ Epic",
+      "title": "[Epic] ",
+      "content": "## Goal\n(one sentence — the outcome, not the work)\n\n## Why now\n\n## Success metrics\n- (metric — from → to)\n\n## Milestones\n- [ ] \n- [ ] \n\n## Out of scope\n- \n\n## Target\n{{month}}\n"
     },
     {
       "id": "qa-checklist",
-      "group": "QA Templates",
+      "group": "Issues",
       "name": "🧪 QA checklist",
       "title": "[QA] ",
-      "content": "## Cases\n- [ ] Happy path\n- [ ] Edge cases\n- [ ] Regression\n- [ ] Accessibility\n\n## Sign-off\n- [ ] Reviewed by QA ({{date}})\n"
+      "content": "## Scope\n- Build · version: \n- Environment: \n\n## Cases\n- [ ] Happy path\n- [ ] Edge cases (empty · maximum · duplicate · permission denied)\n- [ ] Regression around the change\n- [ ] Error and retry paths\n- [ ] Accessibility (keyboard · contrast · labels)\n\n## Sign-off\n- [ ] Reviewed by QA — {{date}}\n"
     },
     {
-      "id": "spec",
-      "group": "Planning",
-      "name": "📋 Feature spec",
-      "title": "[Spec] ",
-      "content": "## Problem\n\n## Proposal\n\n## Out of scope\n\n## Open questions\n- \n\n## Definition of Done\n- [ ] \n- [ ] \n"
+      "id": "issue-infra",
+      "group": "Issues",
+      "name": "🧱 Infra request",
+      "title": "[Infra] ",
+      "content": "## Request\nFill these six per firewall rule (duplicate the block for more rules):\n- Source system: \n- Source address: \n- Destination system: \n- Destination address: \n- Port: \n- Purpose: \n\n## Reason\n\n## Approval and work\n- Approver: \n- Rollback method: \n- If temporary — expiry date · recall sub-issue: \n"
     },
     {
-      "id": "epic",
-      "group": "Planning",
-      "name": "🗺️ Epic",
-      "title": "[Epic] ",
-      "content": "## Goal\n\n## Success metrics\n- \n\n## Milestones\n- [ ] \n- [ ] \n\n## Target\n{{month}}\n"
+      "id": "issue-pipeline",
+      "group": "Issues",
+      "name": "🔀 Pipeline request",
+      "title": "[Pipeline] ",
+      "content": "## Spec\n- Source: \n- Destination: \n- Cadence: \n- Latency tolerance: \n- Volume (rows · size per run): \n- PII: included / not included\n- Schema: (repo link)\n\n## Requester and purpose\n- Requester · team: \n- Purpose (what decision this feeds): \n- Retention · who may read it: \n"
     },
     {
-      "id": "spike",
-      "group": "Planning",
-      "name": "🔍 Research spike",
-      "title": "[Spike] ",
-      "content": "## Question\n\n## Timebox\n{{date}} ~ {{date+3}}\n\n## Findings\n\n## Recommendation\n"
+      "id": "minutes",
+      "group": "Meetings",
+      "name": "🗒️ Meeting notes",
+      "title": "[Meeting] {{date}} ",
+      "content": "When: {{date}} · Attendees: \n\n## Agenda\n- \n\n## Discussion\n\n## Decisions\n- (a decision that outlives this meeting belongs in an ADR — link it: ADR-)\n\n## Actions\n- [ ] (owner · due · Plane link)\n\n## Next meeting\n{{date+7}}\n"
+    },
+    {
+      "id": "adr",
+      "group": "Decisions · Design",
+      "name": "🧭 ADR decision record",
+      "title": "[ADR] ",
+      "content": "## Status\nProposed / Accepted / Superseded — decided {{date}}\n\n## Context\n(the forces: constraint, deadline, cost, what we already run)\n\n## Decision\n**We adopt …**\n\n## Consequences\n- Positive: \n- Negative: \n- Neutral: \n\n## Alternatives considered\n- — why not: \n"
+    },
+    {
+      "id": "arch",
+      "group": "Decisions · Design",
+      "name": "🏗️ Architecture doc",
+      "title": "[ARCH] ",
+      "content": "## Scope\n\n## Diagram\n(paste the rendered diagram here and keep its source in the repo — link it)\n\n## Components\n- Name — responsibility — owner\n\n## Data flow\n1. \n\n## Failure modes\n- What breaks — what the user sees — where it is handled\n\n## Related decisions\n- ADR-\n"
+    },
+    {
+      "id": "rfc-proposal",
+      "group": "Decisions · Design",
+      "name": "📝 RFC proposal",
+      "title": "[RFC] ",
+      "content": "## Summary\n(three sentences someone can repeat in a meeting)\n\n## Background\n\n## Goals and non-goals\n- Goals: \n- Non-goals: \n\n## Proposal\n\n## Alternatives considered\n- — why not: \n\n## Open questions\n- \n\n## Review\n- Reviewers: \n- Comment by: {{date+7}}\n"
+    },
+    {
+      "id": "rfc-research",
+      "group": "Decisions · Design",
+      "name": "🔬 Research note",
+      "title": "[Research] ",
+      "content": "## Question\n(what were we investigating, and for whom)\n\n## What we looked at\n- Source · experiment — what it showed\n\n## Findings\n\n## Conclusion · recommendation\nSo what do we do next: \n"
+    },
+    {
+      "id": "rfc-prd",
+      "group": "Decisions · Design",
+      "name": "📦 PRD requirements",
+      "title": "[PRD] ",
+      "content": "## Target users and problem\n\n## Requirements\n- Functional: \n- Non-functional (load · latency · retention · privacy): \n\n## Success metrics\n- (metric — from → to — measured how)\n\n## Scope\n- In: \n- Out: \n\n## Dependencies · risks\n- \n"
+    },
+    {
+      "id": "rfc-design",
+      "group": "Decisions · Design",
+      "name": "📐 Design doc",
+      "title": "[Design] ",
+      "content": "## Background and goals\n\n## Design overview\n\n## Detailed design\n(interfaces and data models down to signature level — machine-readable specs live in the repo, link them)\n\n## Alternatives considered\n- — why not: \n\n## Rollout and migration\n- [ ] Behind a flag\n- [ ] Backfill · migration step\n- [ ] Rollback path\n\n## Test plan\n- \n"
+    },
+    {
+      "id": "runbook",
+      "group": "Ops",
+      "name": "📗 Runbook",
+      "title": "[Runbook] ",
+      "content": "## Trigger\n(the exact alert, log line, or complaint that brings someone here)\n\n## Severity · impact\n\n## Diagnosis\n1. — normal looks like: \n2. \n\n## Mitigation · recovery\n1. (say whether a step is safe to re-run)\n\n## Verification\n- \n\n## Escalation\n- Unresolved after 30 min — page: \n"
+    },
+    {
+      "id": "playbook",
+      "group": "Ops",
+      "name": "🎯 Playbook",
+      "title": "[Playbook] ",
+      "content": "## Purpose and scope\n\n## Scenarios and triggers\n- \n\n## Response strategy\n\n## Roles and responsibilities\n- Incident lead: \n- Comms: \n- Scribe: \n\n## Communication\n- Channel: \n- Update cadence: \n\n## Linked procedures\n- Runbook: \n"
+    },
+    {
+      "id": "postmortem",
+      "group": "Ops",
+      "name": "🚨 Postmortem",
+      "title": "[Postmortem] ",
+      "content": "## Summary\n(what broke, for how long, for whom — describe systems, not people)\n\n## Timeline\n- {{date}} — detected (by what)\n- {{date}} — mitigated\n- {{date}} — recovered\n\n## Impact\n(duration · scope · metrics)\n\n## Root cause\n\n## Contributing factors\n- \n\n## What went well\n- \n\n## Action items\n- [ ] (owner · due · Plane link)\n\n## Lessons learned\n- \n"
+    },
+    {
+      "id": "change",
+      "group": "Ops",
+      "name": "🔧 Change record",
+      "title": "[Change] ",
+      "content": "## Purpose\n\n## Impact and risk\n- Affected pipelines · teams: \n- Window · estimated duration: {{date}} \n- Notified: \n\n## Pre-checks\n- [ ] Backup · snapshot taken\n- [ ] Rollback rehearsed\n\n## Procedure\n1. \n\n## Rollback plan\n(runnable commands and steps, not intentions)\n\n## Result\n- Actual duration / notes / rolled back?: \n"
+    },
+    {
+      "id": "checklist",
+      "group": "Ops",
+      "name": "🔁 Recurring check",
+      "title": "[CHK] ",
+      "content": "## Cadence and owner\n- Cadence: \n- Owner (a role, not a person): \n\n## Checks\n- [ ] Item — how to check (link · command · query) — normal range\n\n## On anomaly\n- Runbook: \n- Raise a Bug at SEV: \n\n## This run\n{{date}} — checked by: \n"
     },
     {
       "id": "release-note",
       "group": "Release",
       "name": "🚀 Release note",
       "title": "[Release] ",
-      "content": "## Highlights\n\n## Breaking changes\n\n## Fixes\n\n## Rollout\n- Window: {{week}}\n"
+      "content": "## Highlights\n- \n\n## Breaking changes\n- (what breaks · what to do about it)\n\n## Fixes\n- \n\n## Rollout\n- Window: {{week}}\n- [ ] Verified on staging\n- [ ] Verified on production\n- Rollback: \n"
     },
     {
       "id": "hotfix",
       "group": "Release",
       "name": "🔥 Hotfix",
       "title": "[Hotfix] ",
-      "content": "## Impact\n\n## Root cause\n\n## Fix\n\n## Verification\n- [ ] Verified on staging\n- [ ] Verified on production\n"
+      "content": "## Impact\n(who is affected right now)\n\n## Root cause\n\n## Fix\n\n## Verification\n- [ ] Verified on staging\n- [ ] Verified on production\n\n## Follow-up\n- [ ] Postmortem needed? (SEV-1 / SEV-2 — yes)\n- [ ] Merged back to the main branch\n"
     },
     {
-      "id": "incident",
-      "group": "Ops",
-      "name": "🚨 Incident report",
-      "title": "[Incident] ",
-      "content": "## Summary\n\n## Timeline\n- {{date}} — detected\n- {{date}} — mitigated\n\n## Impact\n\n## Root cause\n\n## Action items\n- [ ] \n"
+      "id": "howto",
+      "group": "Guides · Standards",
+      "name": "🛠️ How-to guide",
+      "title": "[How-to] ",
+      "content": "## Purpose\n(what you will have when you finish)\n\n## Prerequisites\n- Access · tools: \n\n## Steps\n1. \n2. \n\n## Verification\n- (how you know it worked)\n\n## If it fails\n- \n"
     },
     {
-      "id": "runbook",
-      "group": "Ops",
-      "name": "📗 Runbook entry",
-      "title": "[Runbook] ",
-      "content": "## Trigger\n\n## Checks\n1. \n2. \n\n## Remediation\n\n## Escalation\n"
+      "id": "guidebook",
+      "group": "Guides · Standards",
+      "name": "📚 Guidebook",
+      "title": "[Guide] ",
+      "content": "## Overview and audience\n\n## Core concepts\n\n## Area map\n(weave the individual docs together with links)\n- \n\n## Getting started\n\n## Deep dive · reference\n- \n\n## Owner\n- Maintainer: \n- Last reviewed: {{date}}\n"
     },
     {
-      "id": "chore",
-      "group": "",
-      "name": "🧹 Chore",
-      "title": "",
-      "content": "## What\n\n## Why now\n\n## Notes\n"
+      "id": "std",
+      "group": "Guides · Standards",
+      "name": "📏 Standard (STD)",
+      "title": "[STD] ",
+      "content": "## Scope\n- In scope: \n- Out of scope: \n\n## Rules\n- MUST: \n- SHOULD: \n- MUST NOT: \n\n## How this is checked\n- (review · CI · lint — a rule nobody checks is only a suggestion)\n\n## Exceptions\n(approval path: who, how, for how long)\n\n## Rationale\n- ADR-\n"
     }
   ]
 }
