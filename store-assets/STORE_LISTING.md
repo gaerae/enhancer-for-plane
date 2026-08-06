@@ -253,6 +253,7 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
   everyday actions, then the two that shape the page. The name, the description and
   the carousel run in the same order — keep all three in step when one moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
+  (Korean: promo-small-440x280.ko.png)
 • Marquee 1400×560 .............. store-assets/promo-marquee-1400x560.png ✓
   (Optional for a listing, but the Featured badge is a review of listing quality among
   other things, so it is worth having. Korean: promo-marquee-1400x560.ko.png)
@@ -273,9 +274,12 @@ land in one language and not the other:
 
 The promo tiles work the same way, except each carries its size in its filename
 (`promo-<name>-<W>x<H>.html`) and is rendered at exactly that — `shot.css` fixes the
-capture canvas at 1280×800, so a tile overrides it. The small 440×280 tile predates this
-and has no HTML source, so it is the one asset that cannot be regenerated; give it one if
-it ever needs changing.
+capture canvas at 1280×800, so a tile overrides it. Both tiles have a source, so every
+published asset here can be regenerated from the repo — nothing is hand-composited. The
+tiles are dark where the captures are light: `#121212` is half the brand, the white mark
+reads best on it, and a dark tile is what separates this listing from a grid of pale ones.
+They pull `../icons/icon.svg` directly rather than a copy of its path, so a tile and the
+icon beside it in the store cannot drift apart.
 
 What is translated and what is quoted differ. Headlines, ledes and captions are ours to
 write in each language. The strings inside a mocked menu are not: "＋ 템플릿 관리",
