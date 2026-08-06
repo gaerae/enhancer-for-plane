@@ -1,4 +1,4 @@
-# Chrome Web Store — Listing copy (Issue Templates & Quick Jump for Plane (makeplane))
+# Chrome Web Store — Listing copy (Enhancer for Plane)
 
 > **Published:** https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo
 
@@ -10,7 +10,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 > listing tab only if the package ships a `_locales/<lang>` directory with a
 > `default_locale`. This package now ships `_locales/en` (default) and
 > `_locales/ko` — so the store recognizes English + Korean, and the extension's
-> own name/description are localized (Korean users see "이슈 템플릿·빠른 이동 — Plane(makeplane)"). In the dashboard, set the default listing to English and
+> own name/description are localized (Korean users see "Enhancer for Plane — 이슈 템플릿·빠른 이동"). In the dashboard, set the default listing to English and
 > add a Korean listing (Store listing ▸ language selector) using the Korean
 > summary + description below, and its own screenshots — the `*.ko.png` set in
 > store-assets (screenshots are stored per language, so the Korean tab does not
@@ -20,14 +20,19 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 ---
 
 ## Product name  (max 75)
-Issue Templates & Quick Jump for Plane (makeplane)
+Enhancer for Plane — Issue Templates & Quick Jump
 
-> Why this name: "Plane" alone is unsearchable — the word belongs to aircraft — and
-> "Enhancer" is not a term anyone types. People search for the feature they are missing,
-> so the two they search for lead, and "(makeplane)" is the one token that disambiguates
-> the tool. Renaming does not change the extension ID or this listing's URL, so reviews
-> and installs carry over. "Jira" stays out of the name: quick jump works there, but the
-> other five features need Plane's own pages, and the name must not promise otherwise.
+> Why this shape: the brand comes first because a name has to be repeatable — "install
+> Enhancer for Plane" is something you can say, and a descriptive phrase is not. The half
+> after the dash is the searchable one: "Plane" on its own loses to aircraft, and nobody
+> types "enhancer", so the two features people actually search for sit where the store can
+> index them. "makeplane" and "plane.so" belong in the summary and description rather than
+> the name, which they only lengthen. "Jira" stays out of the name too: quick jump works
+> there, but the other five features need Plane's own pages, and a name must not promise
+> otherwise.
+
+> The brand alone — "Enhancer for Plane" — is what the popup and settings headers show
+> (extShort), so the thing you install and the thing you point at match.
 
 ## Summary / short description  (max 132)
 Jump to a work item by key from the address bar. Plus templates, copy reference and full names for Plane (makeplane).
@@ -96,7 +101,7 @@ Open source. Feedback and issues welcome.
 
 ## Single purpose  (review form)
 
-This extension has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
 
 ---
 
@@ -156,12 +161,14 @@ Standard for open-source extensions — gives users a support/contact path.
 붙이세요.
 
 ### 이름 (max 75)
-이슈 템플릿·빠른 이동 — Plane(makeplane)
+Enhancer for Plane — 이슈 템플릿·빠른 이동
 
-> 이름을 이렇게 정한 이유: "Plane"만으로는 검색되지 않고(항공기 명사에 밀립니다),
-> "Enhancer"는 아무도 검색하지 않는 단어입니다. 사람들은 자기에게 없는 기능으로
-> 검색하므로 그 두 단어를 앞에 두고, "(makeplane)"으로 어느 도구인지 분명히 합니다.
-> 이름을 바꿔도 확장 ID와 이 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
+> 이 형태로 정한 이유: 이름은 남에게 그대로 옮길 수 있어야 하므로 브랜드가 앞에 옵니다 —
+> "Enhancer for Plane 설치하세요"는 말이 되지만 서술형 문구는 그렇지 않습니다. 붙임표
+> 뒤가 검색되는 쪽입니다. "Plane"만으로는 항공기 명사에 밀리고 "enhancer"는 아무도
+> 검색하지 않으므로, 사람들이 실제로 찾는 두 기능을 스토어가 색인할 자리에 둡니다.
+> "makeplane"과 "plane.so"는 이름을 길게만 만들어서 요약과 상세 설명에 남겼습니다.
+> 이름을 바꿔도 확장 ID와 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
 주소창에서 작업 항목 키로 바로 이동. 여기에 Plane용 템플릿·참조 복사·이름 폭 조정까지.

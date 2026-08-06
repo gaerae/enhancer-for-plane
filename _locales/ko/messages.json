@@ -1,18 +1,18 @@
 {
   "extName": {
-    "message": "이슈 템플릿·빠른 이동 — Plane(makeplane)",
+    "message": "Enhancer for Plane — 이슈 템플릿·빠른 이동",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extShort": {
-    "message": "이슈 템플릿·빠른 이동",
-    "description": "Short in-product name for the popup and settings headers."
+    "message": "Enhancer for Plane",
+    "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
     "message": "오픈소스 Jira 대안 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 템플릿, 참조 복사, 폭 조정 규칙.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {
-    "message": "이슈 템플릿·빠른 이동 — 설정 (makeplane / plane.so)"
+    "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
     "message": "오픈소스 프로젝트 관리·이슈·위키 도구 Plane(makeplane / plane.so)을 위한 본문 템플릿과 스타일 규칙."
@@ -707,7 +707,7 @@
     "message": "이 기기에서 접근을 승인했습니다."
   },
   "badgeNeedsAccess": {
-    "message": "이슈 템플릿·빠른 이동 — 이 기기에서 접근 승인 필요"
+    "message": "Enhancer for Plane — 이 기기에서 접근 승인 필요"
   },
   "popPermGap": {
     "message": "⚠ 이 기기에서 접근 승인이 필요한 사이트가 있습니다 — 설정을 열어 승인하세요."

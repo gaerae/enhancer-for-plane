@@ -1,8 +1,8 @@
-# Privacy Policy — Issue Templates & Quick Jump for Plane (makeplane)
+# Privacy Policy — Enhancer for Plane
 
 _Last updated: 2026-07-16_
 
-Issue Templates & Quick Jump for Plane (makeplane) ("the extension") is a browser add-on that customizes the
+Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
 your own browser.
 

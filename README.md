@@ -1,4 +1,4 @@
-# Issue Templates & Quick Jump for Plane (makeplane) — Projects, Wiki & Issues
+# Enhancer for Plane — Issue Templates & Quick Jump
 
 **English** · [한국어](README.ko.md)
 
@@ -226,7 +226,7 @@ access to that one site. It stays completely inert on every other site.
 
 **From the Chrome Web Store (recommended)**
 
-[Install Issue Templates & Quick Jump](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo),
+[Install Enhancer for Plane](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo),
 then click the toolbar icon and **Enable on this site** on your Plane instance.
 
 **Developer mode (from source)**

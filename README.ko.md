@@ -1,4 +1,4 @@
-# 이슈 템플릿·빠른 이동 for Plane(makeplane) — 프로젝트·위키·이슈
+# Enhancer for Plane — 이슈 템플릿·빠른 이동
 
 [English](README.md) · **한국어**
 
@@ -208,7 +208,7 @@ this site** 또는 설정의 활성 도메인에서 추가하기 전까지는 �
 
 **Chrome 웹 스토어에서 설치(권장)**
 
-[이슈 템플릿·빠른 이동 설치](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo) →
+[Enhancer for Plane 설치](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo) →
 툴바 아이콘 클릭 후 사용하는 Plane 인스턴스에서 **Enable on this site**.
 
 **개발자 모드(소스에서)**

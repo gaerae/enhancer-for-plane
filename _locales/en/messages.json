@@ -1,18 +1,18 @@
 {
   "extName": {
-    "message": "Issue Templates & Quick Jump for Plane (makeplane)",
+    "message": "Enhancer for Plane — Issue Templates & Quick Jump",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extShort": {
-    "message": "Issue Templates & Quick Jump",
-    "description": "Short in-product name for the popup and settings headers."
+    "message": "Enhancer for Plane",
+    "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
     "message": "Fills the gaps in Plane (makeplane / plane.so), the open-source Jira alternative: templates, copy reference, width rules.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {
-    "message": "Issue Templates & Quick Jump — Settings (makeplane / plane.so)"
+    "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
     "message": "Body templates & style rules for Plane — the open-source project management, issues & wiki tool (makeplane / plane.so)."
@@ -707,7 +707,7 @@
     "message": "Access approved on this device."
   },
   "badgeNeedsAccess": {
-    "message": "Issue Templates & Quick Jump — approve access on this device"
+    "message": "Enhancer for Plane — approve access on this device"
   },
   "popPermGap": {
     "message": "⚠ Some sites need access on this device — open Settings to approve."
