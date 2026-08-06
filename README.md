@@ -18,11 +18,24 @@ enable.
 > Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner.
 > (And no — nothing to do with airplanes.)
 
-![A native Template button fills a work item's title and body in one click](store-assets/screenshot-1-templates.png)
+![Typing a work item key in the address bar opens it — for Plane, Jira or Linear](store-assets/screenshot-1-open.png)
 
 ## Features
 
-1. **📝 Body templates (title + body)** — register reusable templates and insert
+1. **⚡ Quick open** — type a work item key and go straight to it. In the address bar type
+   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
+   toolbar popup.
+   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
+     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
+     are its two halves), or the key appended when the link has no token. Plane's is
+     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
+   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
+     target with an empty prefix is the default. The popup shows a target picker once you
+     have more than one, and the address bar suggests the other targets as you type.
+   - It **opens a URL and nothing more** — no host permission, no content script — so it
+     works on any tab, including ones where the rest of the extension never runs. Ships with
+     no targets; add yours in Settings, where each row previews where a sample key lands.
+2. **📝 Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
      description toolbar (last item in the row, equal spacing, document icon).
@@ -41,19 +54,8 @@ enable.
    - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
      bootstrap poll) re-inserts the button. The button is cloned from Attach so
      it always looks native. (Comment templates are not provided.)
-2. **⚡ Quick open** — type a work item key and go straight to it. In the address bar type
-   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
-   toolbar popup.
-   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
-     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
-     are its two halves), or the key appended when the link has no token. Plane's is
-     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
-   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
-     target with an empty prefix is the default. The popup shows a target picker once you
-     have more than one, and the address bar suggests the other targets as you type.
-   - It **opens a URL and nothing more** — no host permission, no content script — so it
-     works on any tab, including ones where the rest of the extension never runs. Ships with
-     no targets; add yours in Settings, where each row previews where a sample key lands.
+![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
+
 3. **🔤 Template variables** — substituted on insert: `{{date}}` (today,
    `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
    `{{date+7}}` for a deadline), `{{week}}` (this week's range,

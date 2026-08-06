@@ -10,7 +10,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 > listing tab only if the package ships a `_locales/<lang>` directory with a
 > `default_locale`. This package now ships `_locales/en` (default) and
 > `_locales/ko` — so the store recognizes English + Korean, and the extension's
-> own name/description are localized (Korean users see "Enhancer for Plane — 이슈 템플릿 & 바로 열기"). In the dashboard, set the default listing to English and
+> own name/description are localized (Korean users see "Enhancer for Plane — 바로 열기 & 이슈 템플릿"). In the dashboard, set the default listing to English and
 > add a Korean listing (Store listing ▸ language selector) using the Korean
 > summary + description below, and its own screenshots — the `*.ko.png` set in
 > store-assets (screenshots are stored per language, so the Korean tab does not
@@ -20,7 +20,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 ---
 
 ## Product name  (max 75)
-Enhancer for Plane — Issue Templates & Quick Open
+Enhancer for Plane — Quick Open & Issue Templates
 
 > Why this shape: the brand comes first because a name has to be repeatable — "install
 > Enhancer for Plane" is something you can say, and a descriptive phrase is not. The half
@@ -35,7 +35,7 @@ Enhancer for Plane — Issue Templates & Quick Open
 > (extShort), so the thing you install and the thing you point at match.
 
 ## Summary / short description  (max 132)
-Issue templates, quick open by key, copy reference — for Plane (makeplane), the open-source Jira alternative.
+Open any work item by key from the address bar — plus issue templates and copy reference for Plane (makeplane).
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -47,21 +47,22 @@ English
 
 ## Detailed description  (max 16,000)
 
-Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it. This fills them for Plane (makeplane / plane.so), the open-source Jira alternative — inside the Plane UI, with no changes to your Plane server.
+Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it. This fills them for Plane (makeplane / plane.so), the open-source Jira alternative — inside the Plane UI, on any plan, with no changes to your Plane server.
 
 Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira. This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
 
 ✨ WHAT YOU GET
 
-📝 Fill a work item in one click — issue templates (title + body)
-Register a template once, drop it into any work item with one click — title and description together. A native "Template" button sits in the description toolbar and in the "Create work item" dialog, so new items start fast.
-Bodies are Markdown: headings, lists, checkboxes. Variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}} — plus up to 5 of your own like {{var.team}}.
-Keyboard shortcut: Alt/⌥+T. Keep a bug report, a task and a spike ready to drop in.
-
 ⚡ Go straight to a work item — quick open
 Type "issue" in the address bar — Chrome's omnibox — then a space and a key like PROJ-142, and Enter opens it. The same box is on the toolbar popup, so a ticket is one keystroke away wherever you are.
 Each target is a base link you set, with {{key}} where the key belongs — so it works for Plane, and for Jira and Linear alongside it. The key's prefix picks the target: point ENG- at Linear and leave everything else on Plane.
 It only opens a URL, so it asks for no site access at all and works on any tab.
+
+📝 Fill a work item in one click — issue templates (title + body)
+Register a template once, drop it into any work item with one click — title and description together. A native "Template" button sits in the description toolbar and in the "Create work item" dialog, so new items start fast.
+Bodies are Markdown: headings, lists, checkboxes. Variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}} — plus up to 5 of your own like {{var.team}}.
+Keyboard shortcut: Alt/⌥+T. Keep a bug report, a task and a spike ready to drop in.
+Plane's own work item templates are a Pro feature — these run on any instance, including a free self-hosted one, and they need no change to your server.
 
 📋 Hand off a work item in one click — copy reference
 Send a work item to a chat message, a pull request, or a branch name without retyping it. The button beside its ID (or Alt/⌥+C) copies it in the format you pick — plain text, a Markdown link, a branch name — and every format is a row you can edit into your own. The preview in Settings is exactly what lands on the clipboard.
@@ -171,28 +172,29 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 > 이름을 바꿔도 확장 ID와 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
-오픈소스 Jira 대안 Plane(makeplane)용 이슈 템플릿, 키로 바로 열기, 참조 복사.
+주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿과 참조 복사까지.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)
 
 ### 상세 설명 (max 16,000)
 
-어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없습니다. 오픈소스 Jira 대안 Plane(makeplane / plane.so)에서 그 빈 곳을 채웁니다. Plane UI 안에서, Plane 서버는 전혀 건드리지 않습니다.
+어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없습니다. 오픈소스 Jira 대안 Plane(makeplane / plane.so)에서 그 빈 곳을 채웁니다. Plane UI 안에서, 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
 
 Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira 의 자체 호스팅 대안입니다. 본 익스텐션은 독립적인 비공식 애드온으로, Plane 과 제휴하거나 승인받지 않았으며 "Plane" 은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
 
 ✨ 무엇을 제공하나
 
-📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
-템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께. 설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
-본문은 마크다운입니다: 제목·목록·체크박스. 삽입 시 변수가 알아서 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}} — 그리고 {{var.team}}처럼 직접 만든 변수 최대 5개. 단축키는 Alt/⌥+T이고, 버그 리포트·태스크·스파이크를 미리 준비해 둘 수 있습니다.
-단축키: Alt/⌥+T.
-
 ⚡ 키만 입력해 작업 항목 열기 — 바로 열기
 주소창(Chrome 옴니박스)에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다. 같은 입력칸이 툴바 팝업에도 있어, 어디에 있든 티켓 하나가 키 입력 한 번 거리입니다.
 대상마다 기본 링크를 하나씩 정하고 키가 들어갈 자리에 {{key}}를 넣습니다. 그래서 Plane은 물론 Jira와 Linear도 함께 씁니다. 키의 접두사가 대상을 고르므로, ENG-는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
+
+📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
+템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께. 설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
+본문은 마크다운입니다: 제목·목록·체크박스. 삽입 시 변수가 알아서 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}} — 그리고 {{var.team}}처럼 직접 만든 변수 최대 5개. 단축키는 Alt/⌥+T이고, 버그 리포트·태스크·스파이크를 미리 준비해 둘 수 있습니다.
+Plane 자체의 작업 항목 템플릿은 Pro 기능입니다. 이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작하고, 서버를 손댈 필요가 없습니다.
+단축키: Alt/⌥+T.
 
 📋 작업 항목을 한 번에 넘기기 — 참조 복사
 작업 항목을 메신저, 풀 리퀘스트, 브랜치명으로 다시 타이핑 없이 넘기세요. 번호 옆 버튼(또는 Alt/⌥+C)이 원하는 형식으로 복사합니다 — 일반 텍스트, 마크다운 링크, 브랜치명 — 그리고 모든 형식은 직접 고쳐 쓸 수 있는 줄입니다. 설정의 미리보기가 곧 클립보드에 담길 내용입니다.
@@ -237,18 +239,19 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 ## Assets checklist
 
 • Store icon 128×128 ............ icons/icon128.png ✓
-• Screenshot 1 (1280×800) ....... store-assets/screenshot-1-templates.png ✓
-• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-open.png ✓
+• Screenshot 1 (1280×800) ....... store-assets/screenshot-1-open.png ✓
+• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-templates.png ✓
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-3-copy.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-4-width.png ✓
 • Screenshot 5 (1280×800) ....... store-assets/screenshot-5-picker.png ✓
 • The same five, Korean listing .. store-assets/screenshot-*.ko.png ✓
   (Upload in file order — the number in the filename IS the carousel position, so
-  moving a capture means renumbering the file. Templates opens because it is the
-  picture that says what this is; quick open follows because it is the thing a
-  visitor can use a second after installing; then the two everyday actions, then
-  the two that shape the page. The name, the description and the carousel now run
-  in the same order — keep all three in step when one of them moves.)
+  moving a capture means renumbering the file. Quick open opens the carousel: it is
+  the one feature that needs no setup, works on any Plane plan, and works next to
+  Jira and Linear too — so it is the thing that lands with a visitor who already
+  pays for Plane and has its templates built in. Templates follows, then the two
+  everyday actions, then the two that shape the page. The name, the description and
+  the carousel run in the same order — keep all three in step when one moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
 • Marquee 1400×560 (optional) ... not provided (optional)
 
