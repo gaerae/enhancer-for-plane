@@ -77,7 +77,7 @@
   .lang-ko .sname { font-weight: 700; }
 
   /* The same input on the toolbar popup, so the poster shows both ways in. */
-  .panel.pop { left: 742px; top: 446px; width: 264px; }
+  .panel.pop { left: 742px; top: 486px; width: 264px; }
   .panel.pop .head {
     font-size: 10.5px;
     font-weight: 700;
@@ -138,6 +138,11 @@
       <div class="row">
         <span class="go">→</span>
         <span class="sname" data-t="s2"></span>
+        <span class="surl">jira.acme.com/browse/PROJ-142</span>
+      </div>
+      <div class="row">
+        <span class="go">→</span>
+        <span class="sname" data-t="s3"></span>
         <span class="surl">linear.app/acme/issue/PROJ-142</span>
       </div>
     </div>
@@ -165,7 +170,8 @@
         "In the address bar type <b>issue</b>, a space, then the work item key — " +
         "<b>Enter opens it</b>. One base link per tool, so Plane, Jira and Linear all work.",
       s1: "Open PROJ-142 in Plane",
-      s2: "Open PROJ-142 in Linear",
+      s2: "Open PROJ-142 in Jira",
+      s3: "Open PROJ-142 in Linear",
       popLabel: "Go to work item",
       caption:
         "The key's prefix picks the target — and since it only opens a URL, it needs " +
@@ -177,7 +183,8 @@
         "주소창에 <b>issue</b>를 입력하고 한 칸 띄운 뒤 작업 항목 키를 입력하면 " +
         "<b>Enter로 열립니다</b>. 도구마다 기본 링크를 하나씩 두면 Plane·Jira·Linear를 함께 씁니다.",
       s1: "Plane에서 PROJ-142 열기",
-      s2: "Linear에서 PROJ-142 열기",
+      s2: "Jira에서 PROJ-142 열기",
+      s3: "Linear에서 PROJ-142 열기",
       popLabel: "작업 항목으로 이동",
       caption:
         "키의 접두사가 대상을 고르고, URL만 열기 때문에 <b>사이트 접근 권한이 없어도</b> " +

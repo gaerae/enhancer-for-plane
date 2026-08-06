@@ -23,6 +23,9 @@
   "optReportIssue": {
     "message": "문제 신고"
   },
+  "optRate": {
+    "message": "별점 남기기"
+  },
   "optEnabled": {
     "message": "확장 프로그램 사용"
   },

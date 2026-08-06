@@ -43,6 +43,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* The header is a flex row: without this the brand refuses to give up any of its own
+     width, and the toggle beside it gets squeezed instead. */
+  min-width: 0;
 }
 .brand img {
   border-radius: 7px;
@@ -383,6 +386,10 @@ input.invalid {
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  /* A control is not the thing that should shrink. Measured: at the default window width
+     the Korean label ("확장 프로그램 사용") wrapped to two lines — 39px tall where one line
+     is 20 — because the brand block beside it kept all of its width. */
+  flex-shrink: 0;
 }
 .master input,
 .row-toggle input {
@@ -431,6 +438,7 @@ input:checked + .switch.sm::after {
 .master-label {
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .row-toggle {
   cursor: pointer;

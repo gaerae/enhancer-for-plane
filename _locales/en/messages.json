@@ -23,6 +23,9 @@
   "optReportIssue": {
     "message": "Report an issue"
   },
+  "optRate": {
+    "message": "Rate it"
+  },
   "optEnabled": {
     "message": "Extension enabled"
   },

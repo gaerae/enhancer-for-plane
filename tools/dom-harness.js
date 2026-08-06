@@ -71,7 +71,12 @@ function findChrome() {
 /* Page construction                                                   */
 /* ------------------------------------------------------------------ */
 
-const EN = fs.readFileSync(path.join(ROOT, "_locales/en/messages.json"), "utf8");
+const CATALOGUES = {
+  en: fs.readFileSync(path.join(ROOT, "_locales/en/messages.json"), "utf8"),
+  // Korean matters here beyond parity: its strings are longer and break differently, so a
+  // header that fits in English can wrap in Korean and nobody sees it until a user does.
+  ko: fs.readFileSync(path.join(ROOT, "_locales/ko/messages.json"), "utf8")
+};
 const fileUrl = (p) => "file://" + path.resolve(p).split(path.sep).join("/");
 
 // A stylesheet copy with the dark blocks unconditionally applied.
@@ -84,9 +89,9 @@ function darkCss(name) {
 
 // The chrome API surface these pages actually touch — no more than that, so an
 // implementation cannot pass here by calling something production does not have.
-function stub(seed) {
+function stub(seed, lang) {
   return `<script>
-const __CAT = ${EN};
+const __CAT = ${CATALOGUES[lang] || CATALOGUES.en};
 function __msg(key, subs) {
   const e = __CAT[key];
   if (!e) return "";
@@ -104,7 +109,7 @@ window.__SEED = ${JSON.stringify(seed)};
 window.__opened = null;
 window.__closed = false;
 window.chrome = {
-  i18n: { getMessage: (k, s) => __msg(k, s), getUILanguage: () => "en" },
+  i18n: { getMessage: (k, s) => __msg(k, s), getUILanguage: () => "${lang || "en"}" },
   storage: {
     sync: {
       get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__SEED))),
@@ -162,7 +167,7 @@ const bg = (sel) => getComputedStyle(typeof sel === "string" ? document.querySel
 const report = () => { const el = document.createElement("pre"); el.id = "pe-results"; el.textContent = JSON.stringify(__out); document.body.appendChild(el); };
 `;
 
-function buildPage({ name, html, css, js, seed, dark, body }) {
+function buildPage({ name, html, css, js, seed, dark, lang, body }) {
   let src = fs.readFileSync(path.join(ROOT, html), "utf8");
   const cssPath = dark ? darkCss(css) : path.join(ROOT, css);
   src = src.replace(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
@@ -170,7 +175,7 @@ function buildPage({ name, html, css, js, seed, dark, body }) {
     src = src.replace(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
   }
   // The stub has to define `chrome` before the page's own scripts run.
-  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
+  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
   // Transitions off. Virtual time advances timers but not the compositor clock that drives
   // a CSS transition, so a colour read after a toggle came back mid-interpolation — the
   // toggle knob measured 1.1:1 here while a real browser settled at 9.5:1. Asserting the
@@ -373,6 +378,34 @@ const suites = [
       ${TAB_READY}
       check("a profile with nowhere to run opens on Sites", () => { eq(sel(), "sites"); eq(location.hash, "#sites"); });
       check("the domain box is the visible one", () => ok(!document.getElementById("panel-sites").hidden));`
+  },
+  {
+    // Korean, at full desktop width. The header is a flex row and the toggle had nothing
+    // stopping it from being squeezed, so "확장 프로그램 사용" wrapped onto a second line
+    // beside a brand block that was free to take the space.
+    name: "options · korean header",
+    page: { name: "opt-ko", ...OPTIONS, seed: seedOf(), lang: "ko" },
+    body: `
+      ${TAB_READY}
+      check("the interface is in Korean", () => {
+        eq(document.querySelector(".master-label").textContent, "확장 프로그램 사용");
+      });
+      check("the master switch label stays on one line", () => {
+        const el = document.querySelector(".master-label");
+        const oneLine = parseFloat(getComputedStyle(el).fontSize) * 2; // generous ceiling
+        const h = el.getBoundingClientRect().height;
+        ok(h < oneLine, "label is " + h.toFixed(1) + "px tall — it wrapped");
+        return h.toFixed(1) + "px";
+      });
+      check("the header stays a single row", () => {
+        const brand = document.querySelector(".brand").getBoundingClientRect();
+        const master = document.querySelector(".master").getBoundingClientRect();
+        ok(Math.abs(brand.top - master.top) < brand.height, "the toggle dropped below the brand");
+      });
+      check("the tab row still fits without the page scrolling sideways", () => {
+        ok(document.documentElement.scrollWidth <= window.innerWidth + 1,
+           "page scrolls horizontally: " + document.documentElement.scrollWidth + " > " + window.innerWidth);
+      });`
   },
   {
     name: "options · dark mode",
