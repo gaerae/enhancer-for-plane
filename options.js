@@ -45,6 +45,10 @@
     copyEmpty: $("copyEmpty"),
     addCopyFormat: $("addCopyFormat"),
     cpyRow: $("cpyRow"),
+    quickList: $("quickList"),
+    quickEmpty: $("quickEmpty"),
+    addQuickLink: $("addQuickLink"),
+    qlkRow: $("qlkRow"),
     save: $("save"),
     reset: $("reset"),
     status: $("status"),
@@ -93,6 +97,7 @@
     renderTemplates();
     renderVariables();
     renderCopyFormats();
+    renderQuickLinks();
     renderSources();
     updateStorageMeter();
     refreshPermGap(); // async; the banner updates when it resolves
@@ -277,6 +282,51 @@
 
       paint();
       el.copyList.appendChild(node);
+    });
+  }
+
+  // A sample key for the row previews. "PROJ-123" splits cleanly into proj/num, so a URL
+  // using {{key}}, {{key.proj}} or {{key.num}} all show something real.
+  const PE_QUICK_SAMPLE = "PROJ-123";
+
+  function renderQuickLinks() {
+    if (!Array.isArray(state.quickLinks)) state.quickLinks = [];
+    el.quickList.innerHTML = "";
+    const list = state.quickLinks;
+    el.quickEmpty.hidden = list.length > 0;
+    list.forEach((q, idx) => {
+      const node = el.qlkRow.content.firstElementChild.cloneNode(true);
+      peApplyI18n(node);
+      const name = node.querySelector(".qlk-name");
+      const prefix = node.querySelector(".qlk-prefix");
+      const url = node.querySelector(".qlk-url");
+      const preview = node.querySelector(".qlk-preview");
+      const del = node.querySelector(".qlk-del");
+
+      name.value = q.name || "";
+      prefix.value = q.prefix || "";
+      url.value = q.url || "";
+
+      // Where a sample key would land — the same expander the omnibox runs, so the preview
+      // cannot drift from the real jump.
+      const paint = () => {
+        const u = peExpandQuickLink(state.quickLinks[idx], PE_QUICK_SAMPLE);
+        preview.textContent = u ? peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]) : "";
+      };
+
+      name.addEventListener("input", () => (state.quickLinks[idx].name = name.value));
+      prefix.addEventListener("input", () => (state.quickLinks[idx].prefix = prefix.value));
+      url.addEventListener("input", () => {
+        state.quickLinks[idx].url = url.value;
+        paint();
+      });
+      del.addEventListener("click", () => {
+        state.quickLinks.splice(idx, 1);
+        renderQuickLinks();
+      });
+
+      paint();
+      el.quickList.appendChild(node);
     });
   }
 
@@ -486,6 +536,17 @@
       state.copyFormats.push({ id: uid("cpy"), name: "", format: "" });
       renderCopyFormats();
       focusLast(".cpy-name");
+    });
+
+    el.addQuickLink.addEventListener("click", () => {
+      if (!Array.isArray(state.quickLinks)) state.quickLinks = [];
+      if (state.quickLinks.length >= PE_MAX_QUICK_LINKS) {
+        flash(peMsg("msgQuickLimit", [String(PE_MAX_QUICK_LINKS)]), true);
+        return;
+      }
+      state.quickLinks.push({ id: uid("qlk"), name: "", prefix: "", url: "", enabled: true });
+      renderQuickLinks();
+      focusLast(".qlk-name");
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
@@ -831,6 +892,13 @@
     state.copyFormats = (state.copyFormats || [])
       .filter((c) => c && (c.format || "").trim())
       .slice(0, PE_MAX_COPY_FORMATS);
+
+    // A quick link with no url opens nothing. Same rule peSanitizeSettings applies to an
+    // import; trim the url so a stray space cannot make an otherwise-empty row survive.
+    state.quickLinks = (state.quickLinks || [])
+      .map((q) => (q ? Object.assign({}, q, { url: (q.url || "").trim() }) : q))
+      .filter((q) => q && q.url)
+      .slice(0, PE_MAX_QUICK_LINKS);
 
     // drop empty sources; enforce the source cap
     const sync = ensureSync();

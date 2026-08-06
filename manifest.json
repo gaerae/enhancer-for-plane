@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
   "homepage_url": "https://github.com/gaerae/enhancer-for-plane",
@@ -16,6 +16,9 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "omnibox": {
+    "keyword": "issue"
   },
   "action": {
     "default_popup": "popup.html",

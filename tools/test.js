@@ -51,6 +51,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__TPL_PREFIX = PE_TPL_KEY_PREFIX;" +
   "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;" +
   "\n;globalThis.__MAX_COPY = PE_MAX_COPY_FORMATS;" +
+  "\n;globalThis.__MAX_QUICK = PE_MAX_QUICK_LINKS;" +
   "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
   "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;" +
   "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;";
@@ -1158,6 +1159,110 @@ test("copy: formats survive a save/read round trip", async () => {
   const back = await ctx.peGetSettings();
   eq(back.copyFormats.length, 1);
   eq(back.copyFormats[0].format, "{{item.key}} {{item.url}}");
+});
+
+/* ------------------------------------------------------------------ */
+/* quick jump                                                          */
+/* ------------------------------------------------------------------ */
+
+test("quick: a key splits on its LAST dash", () => {
+  const { peSplitKey } = loadCommon();
+  eq(peSplitKey("PROJ-123").proj, "PROJ", "proj");
+  eq(peSplitKey("PROJ-123").num, "123", "num");
+  // A project identifier can hold a dash; the last dash is the true split.
+  eq(peSplitKey("ENG-INFRA-42").proj, "ENG-INFRA", "multi-part identifier stays whole");
+  eq(peSplitKey("ENG-INFRA-42").num, "42", "trailing number");
+  // An all-digit identifier ("42-7") must not be treated specially.
+  eq(peSplitKey("42-7").proj, "42", "numeric identifier");
+  // No usable dash → no split, and the tokens stay unexpanded rather than blanking.
+  eq(peSplitKey("PROJ").proj, "", "no dash");
+  eq(peSplitKey("PROJ").key, "PROJ", "key is the whole input");
+});
+
+test("quick: routing picks the longest matching prefix, else the empty-prefix default", () => {
+  const { peRouteQuickLink } = loadCommon();
+  const links = [
+    { id: "plane", prefix: "", url: "https://plane.test/w/browse/{{key}}" },
+    { id: "linear", prefix: "ENG-", url: "https://linear.test/{{key}}" },
+    { id: "infra", prefix: "ENG-INFRA-", url: "https://infra.test/{{key}}" }
+  ];
+  eq(peRouteQuickLink(links, "ENG-12").id, "linear", "prefix match");
+  eq(peRouteQuickLink(links, "ENG-INFRA-9").id, "infra", "longest prefix wins over a shorter one");
+  eq(peRouteQuickLink(links, "DATA-3").id, "plane", "no prefix match falls back to the empty-prefix default");
+  eq(peRouteQuickLink(links, ""), null, "an empty key routes nowhere");
+  eq(peRouteQuickLink([], "K-1"), null, "no links routes nowhere");
+});
+
+test("quick: routing skips disabled and url-less links", () => {
+  const { peRouteQuickLink } = loadCommon();
+  const links = [
+    { id: "off", prefix: "ENG-", url: "https://x.test/{{key}}", enabled: false },
+    { id: "empty", prefix: "ENG-", url: "   " },
+    { id: "on", prefix: "", url: "https://plane.test/w/browse/{{key}}" }
+  ];
+  // "ENG-1" would match the first two on prefix, but both are unusable, so it lands on the default.
+  eq(peRouteQuickLink(links, "ENG-1").id, "on", "disabled and empty links are not routed to");
+});
+
+test("quick: a {{key}} token is substituted, and a url without one gets the key appended", () => {
+  const { peExpandQuickLink } = loadCommon();
+  eq(
+    peExpandQuickLink({ url: "https://plane.test/acme/browse/{{key}}" }, "DATA-5"),
+    "https://plane.test/acme/browse/DATA-5",
+    "token substitution"
+  );
+  eq(
+    peExpandQuickLink({ url: "https://jira.test/browse/" }, "DATA-5"),
+    "https://jira.test/browse/DATA-5",
+    "base link + the typed key appended"
+  );
+  eq(
+    peExpandQuickLink({ url: "https://l.test/{{key.proj}}/{{key.num}}" }, "ENG-INFRA-42"),
+    "https://l.test/ENG-INFRA/42",
+    "proj/num halves"
+  );
+  // A space in a partially typed key cannot break the address.
+  match(peExpandQuickLink({ url: "https://x.test/{{key}}" }, "A B"), /A%20B$/, "the key is URL-encoded");
+});
+
+test("quick: only http(s) urls are treated as navigable", () => {
+  const { peIsHttpUrl } = loadCommon();
+  ok(peIsHttpUrl("https://x.test/a"), "https");
+  ok(peIsHttpUrl("http://x.test/a"), "http");
+  ok(!peIsHttpUrl("javascript:alert(1)"), "javascript: is rejected");
+  ok(!peIsHttpUrl("/acme/browse/K-1"), "a bare path is not navigable on its own");
+});
+
+test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
+  const ctx = loadCommon();
+  eq(ctx.__SCHEMA, 6, "PE_SCHEMA is 6");
+  // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
+  // and the stamp advances so the migration does not run forever.
+  const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
+  ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
+  eq(merged.quickLinks.length, 0, "and it is empty by default");
+  eq(ctx.peMigrate({ schema: 5 }).schema, 6, "stamp advances to PE_SCHEMA");
+});
+
+test("quick: an import is clamped the same way the form is", () => {
+  const ctx = loadCommon();
+  const over = Array.from({ length: 25 }, (_, i) => ({ id: "q" + i, url: "https://x.test/{{key}}" }));
+  eq(ctx.peSanitizeSettings({ quickLinks: over }).quickLinks.length, ctx.__MAX_QUICK, "count cap");
+  const out = ctx.peSanitizeSettings({
+    quickLinks: [{ name: "named but no url", prefix: "X-" }, { url: "https://x.test/{{key}}" }, "junk", null]
+  });
+  eq(out.quickLinks.length, 1, "a row with no url opens nothing, so it is dropped");
+  ok(out.quickLinks[0].id, "an id is generated for a row that arrived without one");
+});
+
+test("quick: links survive a save/read round trip", async () => {
+  const { ctx } = loadCommonWithSyncStorage();
+  const settings = clone(ctx.__DEFAULTS);
+  settings.quickLinks = [{ id: "qlk-1", name: "Plane", prefix: "", url: "https://plane.test/w/browse/{{key}}", enabled: true }];
+  await ctx.peSaveSettings(settings);
+  const back = await ctx.peGetSettings();
+  eq(back.quickLinks.length, 1);
+  eq(back.quickLinks[0].url, "https://plane.test/w/browse/{{key}}");
 });
 
 test("copy: on the item's own page the link is the address bar, not a composition", () => {

@@ -195,7 +195,7 @@
     "message": "Backup"
   },
   "optBackupDesc1": {
-    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, and <b>sync source URLs</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
+    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick jump links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
   },
   "optBackupDesc2": {
     "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save."
@@ -706,5 +706,67 @@
   },
   "popPermGap": {
     "message": "⚠ Some sites need access on this device — open Settings to approve."
+  },
+  "optQuickTitle": {
+    "message": "Quick jump"
+  },
+  "optQuickAdd": {
+    "message": "＋ Add quick link"
+  },
+  "optQuickDesc": {
+    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. It is on the toolbar popup too."
+  },
+  "optQuickTokens": {
+    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land."
+  },
+  "optQuickEmpty": {
+    "message": "No quick links yet. Click “Add quick link”."
+  },
+  "optQuickNamePh": {
+    "message": "name (e.g. Jira)"
+  },
+  "optQuickPrefixPh": {
+    "message": "prefix"
+  },
+  "optQuickUrlPh": {
+    "message": "https://…/browse/{{key}}"
+  },
+  "optQuickPreview": {
+    "message": "$KEY$ → $URL$",
+    "placeholders": {
+      "key": { "content": "$1" },
+      "url": { "content": "$2" }
+    }
+  },
+  "msgQuickLimit": {
+    "message": "At most $COUNT$ quick links.",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "popJumpLabel": {
+    "message": "Go to work item"
+  },
+  "popJumpPh": {
+    "message": "Issue key…"
+  },
+  "popJumpGo": {
+    "message": "Open"
+  },
+  "popJumpAuto": {
+    "message": "Auto"
+  },
+  "omniboxHint": {
+    "message": "Type a work item key to open it"
+  },
+  "omniboxNoTarget": {
+    "message": "No quick link set — Enter opens Settings"
+  },
+  "omniboxOpen": {
+    "message": "Open $KEY$ in $NAME$",
+    "placeholders": {
+      "key": { "content": "$1" },
+      "name": { "content": "$2" }
+    }
   }
 }

@@ -39,10 +39,55 @@
     }
   }
 
+  // Quick jump: type a key, Enter opens it in a new tab. Only shown when at least one
+  // quick link is configured; the target picker appears only when there is more than one.
+  // It just opens a URL — no host permission, and it works regardless of the current site.
+  function setupJump() {
+    const block = $("jumpBlock");
+    const form = $("jumpForm");
+    const input = $("jumpKey");
+    const targetSel = $("jumpTarget");
+    const links = (state.quickLinks || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
+    if (!links.length) return; // nothing to jump to → leave the block (label + divider) hidden
+
+    block.hidden = false;
+    if (links.length > 1) {
+      // "Auto" routes by the key's prefix; the named rows force one target.
+      targetSel.innerHTML = "";
+      const opts = [{ v: "", t: peMsg("popJumpAuto") || "Auto" }].concat(
+        links.map((l) => ({ v: l.id, t: l.name || l.url }))
+      );
+      for (const o of opts) {
+        const opt = document.createElement("option");
+        opt.value = o.v;
+        opt.textContent = o.t;
+        targetSel.appendChild(opt);
+      }
+      targetSel.hidden = false;
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const key = (input.value || "").trim();
+      if (!key) return;
+      let link = null;
+      const forced = targetSel.hidden ? "" : targetSel.value;
+      if (forced) link = links.find((l) => l.id === forced) || null;
+      if (!link) link = peRouteQuickLink(links, key);
+      const url = link ? peExpandQuickLink(link, key) : "";
+      if (peIsHttpUrl(url)) {
+        chrome.tabs.create({ url });
+        window.close();
+      }
+    });
+    input.focus();
+  }
+
   function init() {
     peApplyI18n(document);
     $("enabled").checked = !!state.enabled;
     $("tplCount").textContent = peCountTemplates(peBuildTemplateSections(state, syncCache));
+    setupJump();
     updateDomainStatus();
 
     $("enabled").addEventListener("change", async () => {

@@ -489,6 +489,26 @@ input:checked + .switch.sm::after {
   color: #b45309;
 }
 
+/* quick jump rows reuse .cpy-item / .copy-list; only the field widths differ */
+.qlk-fields {
+  flex-wrap: wrap;
+}
+.qlk-name {
+  flex: 0 0 130px;
+  font-weight: 600;
+}
+.qlk-prefix {
+  flex: 0 0 90px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.qlk-url {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
 /* template sync sources */
 .src-list {
   display: flex;
