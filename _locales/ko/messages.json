@@ -12,14 +12,14 @@
     "description": "Short description shown in the Chrome Web Store."
   },
   "cmdToggleFocus": {
-    "message": "집중 모드: 측면 패널 숨기기·보이기",
+    "message": "집중 모드: 측면 패널을 숨기거나 다시 보이기",
     "description": "Shown in chrome://extensions/shortcuts, where the user can rebind the key. It has to say what the shortcut does with no surrounding UI to lean on."
   },
   "optPageTitle": {
     "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "Plane의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
+    "message": "바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 스타일 규칙.\n바로 열기는 Jira와 Linear에서도 동작합니다."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -152,7 +152,7 @@
     "message": "내 템플릿과 동기화된 템플릿 어디에나 <code>{{var.name}}</code> 형태로 넣을 수 있는 값입니다.\n동기화된 템플릿이 <code>{{var.team}}</code>을 쓰면, 삽입하는 사람마다 각자의 값으로 해석됩니다."
   },
   "optVarsUndefined": {
-    "message": "<code>var.</code> 접두어 덕분에 내장 변수 <code>{{date}}</code>·<code>{{week}}</code>·<code>{{month}}</code>와 이름이 겹칠 수 없습니다.\n정의하지 않은 변수는 빈 문자열이 되지 않고 <code>{{var.name}}</code> 그대로 남아 눈에 보입니다."
+    "message": "<code>var.</code> 접두어 덕분에 내장 변수 <code>{{date}}</code>, <code>{{week}}</code>, <code>{{month}}</code>와 이름이 겹칠 수 없습니다.\n정의하지 않은 변수는 빈 문자열이 되지 않고 <code>{{var.name}}</code> 그대로 남아 눈에 보입니다."
   },
   "optVarsEmpty": {
     "message": "변수가 없습니다. “변수 추가”를 눌러 시작하세요."
@@ -164,7 +164,7 @@
     "message": "대신 삽입될 값"
   },
   "msgVarBadName": {
-    "message": "영문·숫자·하이픈·밑줄만 쓸 수 있습니다."
+    "message": "영문, 숫자, 하이픈, 밑줄만 쓸 수 있습니다."
   },
   "msgVarDupe": {
     "message": "같은 이름의 변수가 이미 있습니다."
@@ -238,7 +238,7 @@
     "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>바로 열기 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다.\n가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
-    "message": "파일에는 도메인·소스 URL·변수 값이 평문으로 들어갑니다.\n변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요.\n동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
+    "message": "파일에는 도메인, 소스 URL, 변수 값이 평문으로 들어갑니다.\n변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요.\n동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
   },
   "optBackupExport": {
     "message": "↓ JSON 내보내기"
@@ -588,10 +588,10 @@
     "message": "템플릿"
   },
   "menuBtnAria": {
-    "message": "제목·본문 템플릿 삽입 (Alt/⌥+T)"
+    "message": "제목과 본문 템플릿 삽입 (Alt/⌥+T)"
   },
   "menuBtnTitle": {
-    "message": "제목·본문 템플릿 삽입  ·  Alt/⌥+T"
+    "message": "제목과 본문 템플릿 삽입  ·  Alt/⌥+T"
   },
   "menuFilterPh": {
     "message": "템플릿 검색…"
@@ -753,7 +753,7 @@
     "message": "이 기기에서 접근 승인이 필요합니다"
   },
   "optPermDesc": {
-    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트·소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 확장이 동작하지 않습니다.",
+    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트와 소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 확장이 동작하지 않습니다.",
     "placeholders": {
       "count": {
         "content": "$1"

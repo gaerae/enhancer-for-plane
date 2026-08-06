@@ -19,8 +19,8 @@
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Fills the gaps in Plane — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.",
-    "description": "Sub-line under the settings header. It names features and nothing else — whoever is reading it installed the extension, so neither what Plane is nor how it is spelled on GitHub belongs here. Order matches extName: quick open first. Two lines is the budget, and the harness measures it in both locales."
+    "message": "Quick open, issue templates, copy reference, focus mode, style rules.\nQuick open works on Jira and Linear too.",
+    "description": "Sub-line under the settings header: the feature list, then the one thing about it that surprises people. No lead clause — the product name is directly above it, and \"fills the gaps in Plane\" was doing its work in the store listing anyway. Order matches extName: quick open first. Two lines is the budget, one sentence each, and the harness measures it in both locales."
   },
   "optGitHub": {
     "message": "GitHub"

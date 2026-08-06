@@ -262,6 +262,15 @@ lies:
     with 존댓말 in one breath.
   - Sets must read as a set. `1시간마다 / 6시간마다 / 12시간마다 / 하루에 한 번` — the
     last one breaks a pattern the first three establish.
+  - Don't keep an English sentence's frame when Korean has no such sentence. "Fills the gaps
+    in Plane" became `부족한 기능을 채웁니다`, and a 기능 is not something you 채우다 — the
+    fix was to drop the clause, not to find a better verb for it. Same for a feature as the
+    subject of 씁니다: `바로 열기는 Jira에서도 씁니다` needs a person doing the using, so it
+    is `…에서도 동작합니다`.
+  - 가운뎃점 is correct Korean and almost nobody types it. In prose, enumerate with commas or
+    와/과 — `영문, 숫자, 하이픈, 밑줄`, not `영문·숫자·하이픈·밑줄`. Keep it only where it
+    separates two independent things with spaces around it, which is a UI separator rather
+    than prose: `설정 · 템플릿 관리`, `참조 복사  ·  Alt/⌥+C`.
 - **Only `background.js` may touch the network.** The picker reads the cache, so inserting
   a template costs no request and works offline.
 - `examples/` and `tools/` are not shipped: `release.yml` zips an explicit allowlist.

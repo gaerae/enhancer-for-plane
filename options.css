@@ -218,9 +218,13 @@ body {
 /* One sentence per line, because that is how these read: the messages carry a newline at each
    sentence end and pre-line is what renders it. Spaces still collapse and the text still wraps —
    the only thing kept is the break the copy asked for. A sink without this (a tooltip, a toast)
-   must not be given a message that contains one; tools/test.js holds that line. */
-.desc {
+   must not be given a message that contains one, and tools/test.js reads the class names out of
+   this very rule to decide which sinks those are — so a new one is added here, not there. */
+.desc,
+.tagline {
   white-space: pre-line;
+}
+.desc {
   margin: 4px 0 12px;
   font-size: 12.5px;
   color: var(--muted-2);

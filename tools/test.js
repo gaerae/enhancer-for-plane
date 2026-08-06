@@ -1509,6 +1509,16 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
 // either invisible (a collapsing sink swallows it) or wrong (a title attribute keeps it and
 // splits the tooltip in two), and both failures are silent in review.
 test("i18n: a message with a line break is only used where a break renders", () => {
+  // Read the answer out of the stylesheet rather than restating it: whichever classes carry
+  // `white-space: pre-line` are the sinks where a newline is a line break. A rule added there
+  // and forgotten here would otherwise fail this test for being right.
+  const css = read("options.css");
+  const rule = /([^{}]+)\{[^{}]*white-space:\s*pre-line[^{}]*\}/g;
+  const PRE_LINE = [];
+  for (const m of css.matchAll(rule)) {
+    for (const cls of m[1].matchAll(/\.([a-zA-Z][\w-]*)/g)) PRE_LINE.push(cls[1]);
+  }
+  ok(PRE_LINE.length > 0, "no pre-line sink in options.css — then no message may carry a break");
   const pages = { "options.html": read("options.html"), "popup.html": read("popup.html") };
   const scripts = ["common.js", "background.js", "content.js", "options.js", "popup.js"]
     .map((f) => read(f))
@@ -1533,7 +1543,11 @@ test("i18n: a message with a line break is only used where a break renders", () 
         }
       }
       if (!uses.length) bad.push(`${loc}/${key} → rendered nowhere`);
-      for (const use of uses) if (!/class="[^"]*\bdesc\b/.test(use)) bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);
+      for (const use of uses) {
+        if (!PRE_LINE.some((cls) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(use))) {
+          bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);
+        }
+      }
     }
   }
   eq(bad, [], "a line break where it does not render as one:\n  " + bad.join("\n  "));
