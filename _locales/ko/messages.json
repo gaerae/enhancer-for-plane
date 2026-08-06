@@ -8,7 +8,7 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "오픈소스 Jira 대안 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 템플릿, 참조 복사, 폭 조정 규칙.",
+    "message": "오픈소스 Jira 대안, 자체 호스팅 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 참조 복사, 폭 조정 규칙, 팀 동기화.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {

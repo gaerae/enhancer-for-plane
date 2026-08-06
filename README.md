@@ -9,20 +9,20 @@
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
 open-source **project management, issues & wiki** tool and a self-hosted
-alternative to Jira. It fixes small day-to-day annoyances directly in the Plane
+alternative to Jira. It fills the gaps every issue tracker leaves — reusable
+**issue templates** for the tickets you file over and over, **quick open** to reach
+a ticket from its key, and a one-click **copy reference** — directly in the Plane
 UI, with **no changes to your Plane server**, applied only on the domains you
 enable.
 
 > Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner.
 > (And no — nothing to do with airplanes.)
 
-Brand: follows Plane's monochrome tone (near-black `#121212` + white).
-
 ![A native Template button fills a work item's title and body in one click](store-assets/screenshot-1-templates.png)
 
 ## Features
 
-1. **Body templates (title + body)** — register reusable templates and insert
+1. **📝 Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
      description toolbar (last item in the row, equal spacing, document icon).
@@ -41,7 +41,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
      bootstrap poll) re-inserts the button. The button is cloned from Attach so
      it always looks native. (Comment templates are not provided.)
-2. **Quick open** — type a work item key and go straight to it. In the address bar type
+2. **⚡ Quick open** — type a work item key and go straight to it. In the address bar type
    `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
    toolbar popup.
    - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
@@ -54,7 +54,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - It **opens a URL and nothing more** — no host permission, no content script — so it
      works on any tab, including ones where the rest of the extension never runs. Ships with
      no targets; add yours in Settings, where each row previews where a sample key lands.
-3. **Template variables** — substituted on insert: `{{date}}` (today,
+3. **🔤 Template variables** — substituted on insert: `{{date}}` (today,
    `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
    `{{date+7}}` for a deadline), `{{week}}` (this week's range,
    `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). Open
@@ -69,7 +69,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-4. **Copy reference** — on a work item — its own page, or the panel a list opens — the
+4. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
    to a chat message, a pull request body, or a branch name is one click instead of three
    selections.
@@ -93,7 +93,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
 
-5. **Style rules (width / length) — a generic engine**
+5. **📐 Style rules (width / length) — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
      injected as `selector { property: value !important; }`.
    - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
@@ -108,7 +108,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
-6. **Visual element picker** — click **"Pick element → add rule"** in the popup,
+6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the Plane page. A **candidate selector list**
    appears (individual classes / full / id, each with a match count, width
    classes ranked first) so you can choose the right one. The picked rule is
@@ -119,7 +119,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
      edits).
    - During picking, press events are suppressed with `stopPropagation` only
      (not `preventDefault`, which would cancel the click and break the picker).
-7. **Team template sync** — point the extension at a JSON file (your intranet, a
+7. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
    Git host, any URL) and everyone pulls the same templates. Off by default.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
@@ -136,9 +136,9 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    - **Remote data is treated as untrusted**: size-capped, rendered as text only
      (never markup), ids namespaced per source so they can't collide with your own.
    - See [the file format](#team-template-file-format) and `examples/`.
-8. **Active domains** — runs only on the domains you specify. Wildcards
+8. **🏠 Active domains** — runs only on the domains you specify. Wildcards
    (`*.example.com`) and a "run on all sites" switch are supported.
-9. **Backup (Import / Export)** — export your settings to a JSON file from the
+9. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
    domains, rules, templates, variables, copy formats, quick open links, and sync sources
    (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
@@ -323,6 +323,9 @@ a missing browser is a failure rather than a quiet pass. Contributor rules live 
   (or pressing Alt/⌥+T) re-scans, and the popup's **↻ Re-scan this page** forces a
   fresh injection. If the content script never loaded at all (e.g. a tab opened
   before you enabled this domain), Re-scan reports it so you can reload.
+- **Brand.** The popup and Settings follow Plane's monochrome tone (near-black
+  `#121212` + white) and your system light/dark theme, so the extension's own
+  surfaces do not look bolted on.
 
 ## Permissions
 

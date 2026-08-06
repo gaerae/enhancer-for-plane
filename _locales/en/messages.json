@@ -8,7 +8,7 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "Fills the gaps in Plane (makeplane / plane.so), the open-source Jira alternative: templates, copy reference, width rules.",
+    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, width rules, sync.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "optPageTitle": {
