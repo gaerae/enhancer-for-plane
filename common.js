@@ -980,22 +980,29 @@ function peSaveSyncCache(cache) {
 // redirect to exactly that. It is the one place here that would still "work" if Plane
 // changed its URL scheme, and quietly copy a dead link, so it is the line to re-check
 // against a new Plane version.
+// The key an item's own page carries in its path, or "" for anything else — a list route with a
+// peek panel over it has none. Two callers: peItemUrl, to notice it is already looking at the
+// item, and the content script, to tell this item's key from another one shown beside it.
+function peKeyFromPath(pathname) {
+  const seg = String(pathname || "")
+    .split("/")
+    .filter(Boolean);
+  const i = seg.indexOf("browse");
+  if (i === -1 || seg.length !== i + 2) return "";
+  try {
+    return decodeURIComponent(seg[i + 1]);
+  } catch (_) {
+    return seg[i + 1]; // keep it raw rather than lose it
+  }
+}
+
 function peItemUrl(origin, pathname, key) {
   if (!origin || !key) return "";
   const seg = String(pathname || "")
     .split("/")
     .filter(Boolean);
-  const i = seg.indexOf("browse");
-  if (i !== -1 && seg.length === i + 2) {
-    let seen = seg[i + 1];
-    try {
-      seen = decodeURIComponent(seen);
-    } catch (_) {
-      /* keep it raw */
-    }
-    // Same page, same item → hand back what the user is looking at.
-    if (seen === key) return origin + pathname;
-  }
+  // Same page, same item → hand back what the user is looking at.
+  if (peKeyFromPath(pathname) === key) return origin + pathname;
   if (!seg.length) return "";
   return origin + "/" + seg[0] + "/browse/" + key;
 }

@@ -181,7 +181,10 @@
     const existing = document.querySelector(".pe-focus-btn");
     if (existing) {
       const prev = existing.previousElementSibling;
-      if (isKeyButton(prev) || (prev && prev.classList && prev.classList.contains("pe-copy-ref-btn"))) {
+      const placed =
+        (isKeyButton(prev) && !isLinkedKeyButton(prev)) ||
+        (prev && prev.classList && prev.classList.contains("pe-copy-ref-btn"));
+      if (placed) {
         syncFocusButtons();
         return;
       }
@@ -415,13 +418,50 @@
   //
   // The peek panel a list opens has this identical structure — same title field, same key
   // button, same wrapper — which is why one function serves both.
+  // A key button that links somewhere is a key belonging to some other item — you do not link
+  // to the page you are already on. This is how the parent chip's key gives itself away, and it
+  // is cheap enough to check on the injection fast path.
+  const isLinkedKeyButton = (e) => isKeyButton(e) && !!(e.closest && e.closest("a[href]"));
+
+  // Which of the keys on screen is *this* item's. An item with a parent shows the parent's key
+  // above the title, in the same block, from the same component — so it is also a leaf button
+  // whose text is a key, and it comes first in document order. Taking the first match put the
+  // copy and focus buttons on the parent's chip, and made Copy reference hand over the parent.
+  //
+  // Ranked rather than filtered, so a Plane that changes one of these signals degrades to a
+  // worse guess instead of to no button at all:
+  //   * the URL. An item's own page is /{workspace}/browse/{KEY}, so a button whose text is that
+  //     key is this item beyond doubt. A list route with a peek panel over it has no key to
+  //     compare, which is why the other two signals exist.
+  //   * a link. The parent's key is inside an <a href> to the parent; the sibling menu's keys too.
+  //   * disabled. Plane makes this item's key click-to-copy and leaves the parent's inert.
+  function rankKeyButton(el, urlKey) {
+    let score = 0;
+    if (urlKey && (el.textContent || "").trim() === urlKey) score += 4;
+    if (!isLinkedKeyButton(el)) score += 2;
+    if (!el.disabled) score += 1;
+    return score;
+  }
+
   function findKeyEl() {
     const title = document.querySelector("#title-input");
     if (!title) return null;
+    const urlKey = peKeyFromPath(location.pathname);
     let scope = title.parentElement;
     for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
-      const hit = [...scope.querySelectorAll("button")].find(isKeyButton);
-      if (hit) return hit;
+      const hits = [...scope.querySelectorAll("button")].filter(isKeyButton);
+      if (!hits.length) continue;
+      // Ties keep document order, which is what the single-key case has always done.
+      let best = hits[0];
+      let bestScore = rankKeyButton(hits[0], urlKey);
+      for (const el of hits.slice(1)) {
+        const score = rankKeyButton(el, urlKey);
+        if (score > bestScore) {
+          best = el;
+          bestScore = score;
+        }
+      }
+      return best;
     }
     return null;
   }
@@ -465,10 +505,13 @@
     // placed — leave it and skip findKeyEl. This spares the whole-page button scan on every
     // mutation-driven inject in the steady state, and reading the key's CURRENT text at copy
     // time means an in-place key change (a peek panel switching items) still copies the right
-    // one. A stale button (its key gone) fails this check and is rebuilt below.
+    // one. A stale button (its key gone) fails this check and is rebuilt below — and so does one
+    // sitting on a linked key, which is never this item's (see rankKeyButton). Without that
+    // second half the fast path would defend a button that landed on a parent chip.
     const existing = document.querySelector(".pe-copy-ref-btn");
     if (existing) {
-      if (isKeyButton(existing.previousElementSibling)) return;
+      const prev = existing.previousElementSibling;
+      if (isKeyButton(prev) && !isLinkedKeyButton(prev)) return;
       removeCopyButtons();
     }
     const keyEl = findKeyEl();

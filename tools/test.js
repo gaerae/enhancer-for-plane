@@ -1364,6 +1364,22 @@ test("quick: links survive a save/read round trip", async () => {
   eq(back.quickLinks[0].url, "https://plane.test/w/browse/{{key}}");
 });
 
+// An item with a parent shows two keys, and the content script has to know which one is this
+// item's. On the item's own page the path settles it, and that reading is here rather than in
+// the browser because it is the one signal that is pure data.
+test("copy: the path says which key is this item's, or says nothing", () => {
+  const { peKeyFromPath } = loadCommon();
+  eq(peKeyFromPath("/acme/browse/PROJ-142"), "PROJ-142", "the item's own page");
+  eq(peKeyFromPath("/acme/browse/42-7"), "42-7", "an all-digit project identifier is still a key");
+  eq(peKeyFromPath("/acme/browse/K%2D1"), "K-1", "percent-decoded");
+  eq(peKeyFromPath("/data/projects/86965b22/issues/"), "", "a list route, where a peek panel has no key");
+  eq(peKeyFromPath("/acme/browse/K-1/activity"), "", "a sub-page is not the item page");
+  eq(peKeyFromPath("/"), "", "nothing to read");
+  eq(peKeyFromPath(""), "", "no path at all");
+  // A half-written escape throws in decodeURIComponent; the raw segment beats losing it.
+  eq(peKeyFromPath("/acme/browse/K-%E0%A4%A"), "K-%E0%A4%A", "a broken escape is kept raw");
+});
+
 test("copy: on the item's own page the link is the address bar, not a composition", () => {
   const { peItemUrl } = loadCommon();
   eq(

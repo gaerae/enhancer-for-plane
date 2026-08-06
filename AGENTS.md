@@ -213,6 +213,17 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   there (`/{workspace}/browse/{KEY}`, which is what Plane redirects to). Composition is
   the only part of the copy feature that could go wrong silently rather than visibly;
   `peItemUrl` says so and is where to look first against a new Plane version.
+- **A work item page can show more than one key.** An item with a parent shows the parent's
+  key above the title, from the same component, so it is also a leaf `<button>` whose text is a
+  key — and it comes first in document order. `findKeyEl` took the first match, so both header
+  buttons hung off the parent's chip and Copy reference handed over the parent's reference: a
+  wrong link that looks right until someone follows it. Which key is this item's is now ranked,
+  not filtered — the path (`/{workspace}/browse/{KEY}`, absent on a peek), then whether the key
+  sits in an `<a href>` (you do not link to the page you are on), then whether it is disabled
+  (Plane leaves the parent's inert). Ranking rather than filtering matters: any one of those
+  signals can change in a Plane release, and the cost should be a worse guess, not no button.
+  Sub-items, relations and the sibling menu put still more keys on the page — anything new that
+  reads "the key" has to say which one it means.
 - **A work item key is not `ABC-123`.** A project identifier can be all digits — a
   Plane project can have one, so a key can read `42-7`. Any regex anchored
   on letters silently matches nothing there. The same measurement killed the branch-name

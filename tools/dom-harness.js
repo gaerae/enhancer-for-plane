@@ -320,7 +320,16 @@ const PLANE = `
 </div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
 <div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
-<div id="probe-header"><button type="button">PROJ-142</button><textarea id="title-input">A work item</textarea></div>`;
+<div id="probe-header">
+  <!-- An item with a parent, which is where the buttons were landing on the wrong key. Plane
+       renders both keys from one component: the parent's inside a link to the parent and inert,
+       this item's on its own and click-to-copy. The parent comes first in document order. -->
+  <div class="mb-5 flex w-min items-center gap-3 rounded-md border">
+    <a href="/acme/browse/PROJ-100"><button type="button" disabled>PROJ-100</button></a>
+  </div>
+  <button type="button">PROJ-142</button>
+  <textarea id="title-input">A work item</textarea>
+</div>`;
 
 /* ------------------------------------------------------------------ */
 /* Suites                                                             */
@@ -919,6 +928,18 @@ const suites = [
       // The affordance in the page. Popup-only would mean the feature exists for whoever
       // already knows it exists.
       await waitFor(() => document.querySelector(".pe-focus-btn"), "the toggle to be injected beside the key");
+      // The regression this page now carries: with a parent above the title, the first key in
+      // document order is the parent's, and both buttons hung off it — Copy reference then handed
+      // over the parent's reference, which is wrong in a way you only notice after pasting it.
+      check("both buttons attach to this item's key, not the parent's", () => {
+        for (const sel of [".pe-copy-ref-btn", ".pe-focus-btn"]) {
+          const btn = document.querySelector(sel);
+          ok(!btn.closest("a[href]"), sel + " landed inside the link to the parent");
+        }
+        const copy = document.querySelector(".pe-copy-ref-btn");
+        eq(copy.previousElementSibling.textContent.trim(), "PROJ-142", "the key the copy button follows");
+        eq(document.querySelectorAll("a[href] .pe-copy-ref-btn, a[href] .pe-focus-btn").length, 0, "none inside a link");
+      });
       check("the toggle sits in the item header, after the copy button", () => {
         const btn = document.querySelector(".pe-focus-btn");
         eq(btn.previousElementSibling.className, "pe-copy-ref-btn", "it follows the copy button");
