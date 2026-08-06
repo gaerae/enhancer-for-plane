@@ -10,7 +10,7 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 > listing tab only if the package ships a `_locales/<lang>` directory with a
 > `default_locale`. This package now ships `_locales/en` (default) and
 > `_locales/ko` — so the store recognizes English + Korean, and the extension's
-> own name/description are localized (Korean users see "Enhancer for Plane — 이슈 템플릿·빠른 이동"). In the dashboard, set the default listing to English and
+> own name/description are localized (Korean users see "Enhancer for Plane — 이슈 템플릿·바로 열기"). In the dashboard, set the default listing to English and
 > add a Korean listing (Store listing ▸ language selector) using the Korean
 > summary + description below, and its own screenshots — the `*.ko.png` set in
 > store-assets (screenshots are stored per language, so the Korean tab does not
@@ -20,14 +20,14 @@ Paste these into the Web Store Developer Dashboard fields. The English listing i
 ---
 
 ## Product name  (max 75)
-Enhancer for Plane — Issue Templates & Quick Jump
+Enhancer for Plane — Issue Templates & Quick Open
 
 > Why this shape: the brand comes first because a name has to be repeatable — "install
 > Enhancer for Plane" is something you can say, and a descriptive phrase is not. The half
 > after the dash is the searchable one: "Plane" on its own loses to aircraft, and nobody
 > types "enhancer", so the two features people actually search for sit where the store can
 > index them. "makeplane" and "plane.so" belong in the summary and description rather than
-> the name, which they only lengthen. "Jira" stays out of the name too: quick jump works
+> the name, which they only lengthen. "Jira" stays out of the name too: quick open works
 > there, but the other five features need Plane's own pages, and a name must not promise
 > otherwise.
 
@@ -53,7 +53,7 @@ Plane (makeplane / plane.so) is the open-source project management, issues, and 
 
 WHAT YOU GET
 
-▸ Go straight to a work item — quick jump
+▸ Go straight to a work item — quick open
 Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it. The same box is on the toolbar popup.
 Each target is a base link you set, with {{key}} where the key belongs — so it works for Plane, and for Jira and Linear alongside it. The key's prefix picks the target: point ENG- at Linear and leave everything else on Plane.
 It only opens a URL, so it asks for no site access at all and works on any tab.
@@ -161,7 +161,7 @@ Standard for open-source extensions — gives users a support/contact path.
 붙이세요.
 
 ### 이름 (max 75)
-Enhancer for Plane — 이슈 템플릿·빠른 이동
+Enhancer for Plane — 이슈 템플릿·바로 열기
 
 > 이 형태로 정한 이유: 이름은 남에게 그대로 옮길 수 있어야 하므로 브랜드가 앞에 옵니다 —
 > "Enhancer for Plane 설치하세요"는 말이 되지만 서술형 문구는 그렇지 않습니다. 붙임표
@@ -184,7 +184,7 @@ Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 
 
 무엇을 제공하나
 
-▸ 작업 항목으로 바로 가기 — 빠른 이동
+▸ 키만 입력해 작업 항목 열기 — 바로 열기
 주소창에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다. 같은 입력칸이 툴바 팝업에도 있습니다.
 대상마다 기본 링크를 하나씩 정하고 키가 들어갈 자리에 {{key}}를 넣습니다. 그래서 Plane은 물론 Jira와 Linear도 함께 씁니다. 키의 접두사가 대상을 고르므로, ENG-는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
@@ -241,12 +241,12 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 • Screenshot 2 (1280×800) ....... store-assets/screenshot-2-copy.png ✓
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-3-width.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-4-picker.png ✓
-• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-jump.png ✓
+• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-open.png ✓
 • The same five, Korean listing .. store-assets/screenshot-*.ko.png ✓
   (Upload in file order. The carousel opens on templates, then the two everyday
   actions — insert a template, copy a reference — before the two that shape the
-  page, and closes on quick jump, the one that needs no setup at all. The listing
-  description leads with quick jump because it is the thing a visitor can use a
+  page, and closes on quick open, the one that needs no setup at all. The listing
+  description leads with quick open because it is the thing a visitor can use a
   second after installing; the carousel keeps templates first because it is the
   picture that says what this is. Keep the three in step when one of them moves.)
 • Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓

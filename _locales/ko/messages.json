@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Enhancer for Plane — 이슈 템플릿·빠른 이동",
+    "message": "Enhancer for Plane — 이슈 템플릿·바로 열기",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extShort": {
@@ -202,7 +202,7 @@
     "message": "백업"
   },
   "optBackupDesc1": {
-    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>빠른 이동 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
+    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>바로 열기 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다. 가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
     "message": "파일에는 도메인·소스 URL·변수 값이 평문으로 들어갑니다. 변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요. 동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
@@ -731,7 +731,7 @@
     "message": "백업"
   },
   "optQuickTitle": {
-    "message": "빠른 이동"
+    "message": "바로 열기"
   },
   "optQuickDesc": {
     "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다. 키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다. 접두사가 빈 대상이 기본값입니다. 툴바 팝업에서도 됩니다."

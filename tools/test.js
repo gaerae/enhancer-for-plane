@@ -1162,7 +1162,7 @@ test("copy: formats survive a save/read round trip", async () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* quick jump                                                          */
+/* quick open                                                         */
 /* ------------------------------------------------------------------ */
 
 test("quick: a key splits on its LAST dash", () => {

@@ -380,7 +380,7 @@ const suites = [
     body: `
       ${TAB_READY}
       // Every row style that sits on a card. .var-item and .cpy-item shipped without a dark
-      // background and drew a white block; .cpy-item is also the Quick jump row.
+      // background and drew a white block; .cpy-item is also the Quick open row.
       const ROWS = [
         ["#templateList .tpl-item", "templates"],
         ["#ruleList .rule-item", "appearance"],

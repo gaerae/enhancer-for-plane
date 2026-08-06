@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Enhancer for Plane — Issue Templates & Quick Jump",
+    "message": "Enhancer for Plane — Issue Templates & Quick Open",
     "description": "Extension name shown in the Chrome Web Store and browser."
   },
   "extShort": {
@@ -202,7 +202,7 @@
     "message": "Backup"
   },
   "optBackupDesc1": {
-    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick jump links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
+    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick open links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
   },
   "optBackupDesc2": {
     "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save."
@@ -731,7 +731,7 @@
     "message": "Backup"
   },
   "optQuickTitle": {
-    "message": "Quick jump"
+    "message": "Quick open"
   },
   "optQuickDesc": {
     "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. It is on the toolbar popup too."

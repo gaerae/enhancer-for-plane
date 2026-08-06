@@ -41,7 +41,7 @@
     }
   }
 
-  // Quick jump: type a key, Enter opens it in a new tab. Only shown when at least one
+  // Quick open: type a key, Enter opens it in a new tab. Only shown when at least one
   // quick link is configured; the target picker appears only when there is more than one.
   // It just opens a URL — no host permission, and it works regardless of the current site.
   function setupJump() {

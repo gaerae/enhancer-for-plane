@@ -79,7 +79,7 @@ const PE_MAX_COPY_FORMATS = 5;
 // is not something Plane hands out.)
 const PE_ITEM_KEY_RE = /^[A-Za-z0-9]{1,12}-[1-9]\d*$/;
 
-// Quick jump — a key typed in the omnibox (or the popup) opens straight to that item.
+// Quick open — a key typed in the omnibox (or the popup) opens straight to that item.
 // A quick link is { id, name, prefix, url, enabled }: `url` is a base carrying an optional
 // {{key}} token (its variants {{key.proj}} / {{key.num}} split the key on its last "-"), and
 // `prefix` routes — the typed key picks the link whose prefix it starts with, so one person
@@ -220,7 +220,7 @@ const PE_DEFAULTS = {
     }
   ],
 
-  // Quick jump targets — see PE_MAX_QUICK_LINKS. Ships empty like `domains`: a target's
+  // Quick open targets — see PE_MAX_QUICK_LINKS. Ships empty like `domains`: a target's
   // url carries the user's own host and workspace ("https://plane.acme.com/team/browse/
   // {{key}}"), so a shipped preset would only open a broken address. The Settings section
   // shows the shape and the omnibox keyword. Each: { id, name, prefix, url, enabled }.

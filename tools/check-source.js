@@ -213,7 +213,7 @@ for (const f of SHIPPED) {
    hardcoded light background is a promise to override it — and a missed one does not fail
    anywhere: it renders a white block on a dark card, which only a human looking at the
    page in dark mode ever notices. Three row styles shipped that way (.var-item, .cpy-item,
-   and the Quick jump row that reuses .cpy-item). So: find the selectors that set a light
+   and the Quick open row that reuses .cpy-item). So: find the selectors that set a light
    background outside a dark block, and require each to appear inside one. */
 {
   const lightness = (hex) => {

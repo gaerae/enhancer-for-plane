@@ -1,4 +1,4 @@
-# Enhancer for Plane — Issue Templates & Quick Jump
+# Enhancer for Plane — Issue Templates & Quick Open
 
 **English** · [한국어](README.ko.md)
 
@@ -22,7 +22,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
 
 ## Features
 
-1. **Quick jump** — type a work item key and go straight to it. In the address bar type
+1. **Quick open** — type a work item key and go straight to it. In the address bar type
    `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
    toolbar popup.
    - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
@@ -140,7 +140,7 @@ Brand: follows Plane's monochrome tone (near-black `#121212` + white).
    (`*.example.com`) and a "run on all sites" switch are supported.
 9. **Backup (Import / Export)** — export your settings to a JSON file from the
    "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, copy formats, quick jump links, and sync sources
+   domains, rules, templates, variables, copy formats, quick open links, and sync sources
    (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
    per-device cache that the next sync refetches, so a backup stays a backup of
    your settings rather than a snapshot of someone else's file. Imported settings
