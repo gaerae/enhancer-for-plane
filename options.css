@@ -215,6 +215,15 @@ body {
   gap: 8px;
   justify-content: flex-end;
 }
+/* One sentence per line, because that is how these read: the messages carry a newline at each
+   sentence end and pre-line is what renders it. Spaces still collapse and the text still wraps —
+   the only thing kept is the break the copy asked for. A sink without this (a tooltip, a toast)
+   must not be given a message that contains one, and tools/test.js reads the class names out of
+   this very rule to decide which sinks those are — so a new one is added here, not there. */
+.desc,
+.tagline {
+  white-space: pre-line;
+}
 .desc {
   margin: 4px 0 12px;
   font-size: 12.5px;
@@ -347,6 +356,19 @@ input[type="number"]:focus {
   grid-template-columns: 1fr 130px 110px;
   gap: 7px;
 }
+/* Secondary to the three fields above it, and last in the row: this is the answer to
+   "when does this rule apply", which only matters once the rule itself says something.
+   .inline-check carries a bottom margin for stacked checkboxes; here it would hang below
+   the card's own padding. */
+.rule-focus-check {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rule-focus-check input {
+  width: 13px;
+  height: 13px;
+}
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -383,6 +405,58 @@ input.invalid {
   .rule-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* keyboard shortcuts (reference table) */
+/* The table can outgrow a narrow window — four columns, one of them a sentence — so it
+   scrolls inside its own box rather than making the page scroll sideways. */
+.keys-scroll {
+  overflow-x: auto;
+  margin: 10px 0 14px;
+}
+.keys {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.keys th,
+.keys td {
+  padding: 8px 10px 8px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.keys th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+.keys tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* The key columns must not wrap: "Alt+Shift+F" broken across two lines stops being a key. */
+.keys td:nth-child(2),
+.keys td:nth-child(3) {
+  white-space: nowrap;
+}
+.keys .keys-where {
+  color: var(--muted-2);
+  min-width: 200px;
+}
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
 }
 
 /* toggle switch */

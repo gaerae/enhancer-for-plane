@@ -26,8 +26,10 @@ Enhancer for Plane — Quick Open & Issue Templates
 > Enhancer for Plane" is something you can say, and a descriptive phrase is not. The half
 > after the dash is the searchable one: "Plane" on its own loses to aircraft, and nobody
 > types "enhancer", so the two features people actually search for sit where the store can
-> index them. "makeplane" and "plane.so" belong in the summary and description rather than
-> the name, which they only lengthen. "Jira" stays out of the name too: quick open works
+> index them. "makeplane" and "plane.so" are searchable spellings rather than reading matter:
+> they stay in the summary and at the foot of the description, out of the name (which they
+> only lengthen) and out of the extension's own description (where the reader is already
+> looking at a Plane extension). "Jira" stays out of the name too: quick open works
 > there, but the other five features need Plane's own pages, and a name must not promise
 > otherwise.
 
@@ -35,7 +37,7 @@ Enhancer for Plane — Quick Open & Issue Templates
 > (extShort), so the thing you install and the thing you point at match.
 
 ## Summary / short description  (max 132)
-Open any work item by key from the address bar — plus issue templates and copy reference for Plane (makeplane).
+Open any work item by key from the address bar — plus issue templates, copy reference and focus mode for Plane (makeplane).
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -47,11 +49,8 @@ English
 
 ## Detailed description  (max 16,000)
 
-Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it.
-This fills them for Plane (makeplane / plane.so), the open-source Jira alternative — inside the Plane UI, on any plan, with no changes to your Plane server.
-
-Plane (makeplane / plane.so) is the open-source project management, issues, and wiki tool, a self-hosted alternative to Jira.
-This is an independent, unofficial add-on — not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
+Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it, no way to put the side panels away and read.
+This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
 
 ✨ WHAT YOU GET
 
@@ -81,6 +80,13 @@ Works from the item's own page and from the preview panel a list opens, so you n
 Plane cuts long names off in lists and dropdowns until you can't tell items apart.
 One "selector → property → value" rule forces any width (320px, 30rem) and names show completely.
 It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
+
+🧘 Just the description — focus mode
+Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation so the work item's body is what is left.
+There is a toggle beside the work item's key too, and a switch in the toolbar popup.
+Plane pins properties to the right of a work item's own page with no way to collapse them; this collapses them.
+Any rule can be marked "Only while focus mode is on", so what disappears is up to you — two are ready to use, and one that centres the body at a reading width is one checkbox away.
+It applies to that tab, survives a reload there, and is never synced to your other devices.
 
 🎯 Build rules without DevTools — visual element picker
 Click "Pick element" in the popup, then click anything on the Plane page.
@@ -115,6 +121,9 @@ See the privacy policy for details.
 3. Open Settings to add templates, copy formats, and width rules.
 
 Open source. Feedback and issues welcome.
+
+Works with Plane (makeplane / plane.so), the open-source project management, issues and wiki tool, and a self-hosted alternative to Jira.
+An independent, unofficial add-on: not affiliated with or endorsed by Plane, and "Plane" is a trademark of its owner. (And no — nothing to do with airplanes.)
 
 ---
 
@@ -186,22 +195,21 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 > "Enhancer for Plane 설치하세요"는 말이 되지만 서술형 문구는 그렇지 않습니다. 붙임표
 > 뒤가 검색되는 쪽입니다. "Plane"만으로는 항공기 명사에 밀리고 "enhancer"는 아무도
 > 검색하지 않으므로, 사람들이 실제로 찾는 두 기능을 스토어가 색인할 자리에 둡니다.
-> "makeplane"과 "plane.so"는 이름을 길게만 만들어서 요약과 상세 설명에 남겼습니다.
+> "makeplane"과 "plane.so"는 읽을 문구가 아니라 검색용 표기라서 요약과 상세 설명 맨 아래에만
+> 두었습니다. 이름은 길어지기만 하고, 익스텐션 자체 설명은 이미 Plane 익스텐션을 보고 있는
+> 사람이 읽는 문구라서 뺐습니다.
 > 이름을 바꿔도 확장 ID와 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
-주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿과 참조 복사까지.
+주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿, 참조 복사, 집중 모드까지.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)
 
 ### 상세 설명 (max 16,000)
 
-어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없습니다.
-오픈소스 Jira 대안 Plane(makeplane / plane.so)에서 그 빈 곳을 채웁니다. Plane UI 안에서, 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
-
-Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira의 자체 호스팅 대안입니다.
-본 익스텐션은 독립적인 비공식 애드온으로, Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
+어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없고, 측면 패널을 치워 본문만 볼 방법이 없습니다.
+그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
 
 ✨ 무엇을 제공하나
 
@@ -209,17 +217,17 @@ Plane(makeplane / plane.so)은 오픈소스 프로젝트 관리·이슈·위키 
 주소창(Chrome 옴니박스)에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다.
 같은 입력칸이 툴바 팝업에도 있어, 어디에 있든 티켓 하나가 키 입력 한 번 거리입니다.
 대상마다 기본 링크를 하나씩 정하고 키가 들어갈 자리에 {{key}}를 넣습니다.
-그래서 Plane은 물론 Jira와 Linear도 함께 씁니다.
+그래서 Plane은 물론 Jira와 Linear에서도 그대로 동작합니다.
 키의 접두사가 대상을 고르므로, ENG-는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
 
 📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
 템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께.
 설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
-본문은 마크다운입니다: 제목·목록·체크박스.
+본문은 마크다운입니다: 제목, 목록, 체크박스.
 삽입 시 변수가 알아서 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}} — 그리고 {{var.team}}처럼 직접 만든 변수 최대 5개.
 단축키는 Alt/⌥+T.
-버그 리포트·태스크·스파이크를 미리 준비해 두고 바로 꺼내 쓰세요.
+버그 리포트, 태스크, 스파이크를 미리 준비해 두고 바로 꺼내 쓰세요.
 Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
 이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작하고, 서버를 손댈 필요가 없습니다.
 
@@ -229,17 +237,25 @@ Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
 설정의 미리보기가 곧 클립보드에 담길 내용입니다.
 항목 자신의 화면에서도, 목록에서 열리는 미리보기 패널에서도 동작하므로 목록을 벗어날 필요가 없습니다.
 
-📐 이름을 온전히 보기 — 폭·스타일 규칙
+📐 이름을 온전히 보기 — 스타일 규칙
 Plane은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 구분하기 어렵게 만듭니다.
 "선택자 → 속성 → 값" 규칙 하나로 원하는 폭(320px, 30rem)을 지정하면 이름이 온전히 보입니다.
 범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
+
+🧘 본문만 남기기 — 집중 모드
+Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
+작업 항목 번호 옆의 토글 버튼과 툴바 팝업의 스위치로도 됩니다.
+Plane은 작업 항목 전용 페이지에서 속성을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
+어떤 규칙이든 "집중 모드에서만 적용"으로 표시할 수 있어 무엇을 숨길지는 직접 정합니다.
+두 개는 바로 쓸 수 있게 들어 있고, 본문을 읽기 좋은 폭으로 가운데 두는 규칙도 체크 한 번 거리입니다.
+켠 탭에서만 적용되고 그 탭에서는 새로 고쳐도 유지되며, 다른 기기로는 동기화되지 않습니다.
 
 🎯 DevTools 없이 규칙 만들기 — 비주얼 요소 피커
 팝업에서 "요소 선택 → 규칙 추가"를 누르고 Plane 화면의 요소를 클릭하세요.
 매칭 개수와 함께 후보 선택자가 뜨고(폭 관련 클래스 우선), 규칙은 값만 넣으면 되는 상태로 설정에 담깁니다.
 
 🔄 팀 전체가 한 벌의 템플릿을 — 팀 템플릿 동기화
-JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀 전체가 같은 템플릿을 씁니다.
+JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키면 팀 전체가 같은 템플릿을 씁니다.
 선택한 주기로, 또는 즉시 갱신됩니다.
 기본은 꺼져 있습니다: 직접 등록한 URL만 받아 오고, 로컬 캐시에서 읽어 오프라인에서도 삽입되며, 동기화된 템플릿은 읽기 전용이라 누구의 편집도 덮이지 않습니다.
 처음이라면 "예시 사용해 보기"가 살아 있는 피드를 채워 넣어 바로 확인할 수 있습니다.
@@ -250,13 +266,13 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 와일드카드(*.example.com)도 지원합니다.
 
 💾 내 것으로 보관 — 가져오기 / 내보내기
-도메인·규칙·템플릿·변수·복사 형식·동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원합니다.
+도메인, 규칙, 템플릿, 변수, 복사 형식, 동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원합니다.
 
 🌗 다크 모드와 라이트
 팝업과 설정이 시스템 테마를 따르며 Plane의 모노크롬 톤과 어울립니다.
 
 🔒 개인정보 — 브라우저 밖으로 나가지 않습니다
-계정·추적·분석·서버가 없습니다.
+계정도, 추적도, 분석도, 서버도 없습니다.
 설정은 브라우저 자체 저장소(chrome.storage)에 보관되고, Chrome 동기화를 쓰는 경우에만 본인 Google 계정으로 동기화됩니다.
 익스텐션이 보내는 유일한 요청은 사용자가 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것이며, 그 요청에는 사용자의 데이터가 담기지 않습니다.
 자세한 내용은 개인정보 처리방침을 참고하세요.
@@ -264,9 +280,15 @@ JSON 파일 하나(사내 서버·Git 호스트·아무 URL)를 가리키면 팀
 🚀 시작하기
 1. 자체 호스팅 Plane 인스턴스를 엽니다.
 2. 툴바 아이콘을 눌러 "이 사이트에서 사용"을 클릭합니다(Chrome 프롬프트에서 접근 허용).
-3. 설정에서 템플릿·복사 형식·폭 규칙을 추가합니다.
+3. 설정에서 템플릿, 복사 형식, 스타일 규칙을 추가합니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
+
+makeplane / plane.so — 오픈소스 프로젝트 관리·이슈·위키 도구이자 Jira의 자체 호스팅 대안인 Plane에서 동작합니다.
+독립적인 비공식 애드온입니다. Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
+
+---
+
 ### 단일 목적 / 권한 정당화 (심사 폼)
 심사 폼(단일 목적, 권한 정당화, 데이터 사용)은 Google 리뷰어를 위해 **영문 그대로
 제출**하세요. 위 영문 섹션을 사용하면 됩니다. 한국어 번역이 반드시 필요한 칸은

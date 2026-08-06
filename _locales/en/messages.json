@@ -8,15 +8,19 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, width rules, sync.",
-    "description": "Short description shown in the Chrome Web Store."
+    "message": "Issue templates, quick open by key, copy reference, and a focus mode that hides the side panels — inside the Plane UI.",
+    "description": "Short description shown in the Chrome Web Store, and the extension's own description in chrome://extensions. Features and where they appear, nothing else: an extension not touching the server is not news, \"the open-source Jira alternative\" only spent characters on a reader already looking at a Plane extension, and the searchable spellings (makeplane, plane.so) sit at the foot of the store description."
+  },
+  "cmdToggleFocus": {
+    "message": "Focus mode: hide or show the side panels",
+    "description": "Shown in chrome://extensions/shortcuts, where the user can rebind the key. It has to say what the shortcut does with no surrounding UI to lean on."
   },
   "optPageTitle": {
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, width rules. Quick open works on Jira and Linear too.",
-    "description": "Sub-line under the settings header. Deliberately does not explain what Plane is — the store listing does that for a stranger, and whoever is reading this already installed the extension. Order matches extName: quick open first."
+    "message": "Quick open, issue templates, copy reference, focus mode, style rules.\nQuick open works on Jira and Linear too.",
+    "description": "Sub-line under the settings header: the feature list, then the one thing about it that surprises people. No lead clause — the product name is directly above it, and \"fills the gaps in Plane\" was doing its work in the store listing anyway. Order matches extName: quick open first. Two lines is the budget, one sentence each, and the harness measures it in both locales."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -35,7 +39,7 @@
     "message": "Active domains"
   },
   "optDomainsDesc": {
-    "message": "Runs only on the domains listed below. One per line. Wildcards like <code>*.example.com</code> are supported. Saving prompts Chrome to grant access to each newly added domain."
+    "message": "Runs only on the domains listed below.\nOne per line.\nWildcards like <code>*.example.com</code> are supported.\nSaving prompts Chrome to grant access to each newly added domain."
   },
   "optDomainsAll": {
     "message": "Run on all sites (ignore the list below)"
@@ -43,14 +47,27 @@
   "optDomainsTip": {
     "message": "Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b>"
   },
+  "optFocusTitle": {
+    "message": "Focus mode"
+  },
+  "optFocusDesc": {
+    "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it.\nTwo ship ready to use: hide a work item's properties panel, and hide the left navigation.\nA third caps the reading width and starts switched off."
+  },
+  "optFocusHow": {
+    "message": "Three ways in: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> (macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), the toggle beside a work item's key, and the switch in the toolbar popup.\nTo rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
+  },
+  "optFocusScope": {
+    "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab.\nIt never syncs to your other devices."
+  },
   "optRulesTitle": {
-    "message": "Style rules (width / length)"
+    "message": "Style rules",
+    "description": "Was \"Style rules (width / length)\" while every shipped rule set a width. Focus mode's presets set display and padding in the same list, so the parenthetical had become a promise the card no longer keeps; the description under it says what a rule is instead."
   },
   "optRulesAdd": {
     "message": "＋ Add rule"
   },
   "optRulesDesc": {
-    "message": "Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>). If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
+    "message": "Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>).\nIf Plane's class names change, just edit the selector.\nType the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
   },
   "optRulesEmpty": {
     "message": "No rules yet. Click “Add rule” to start."
@@ -69,6 +86,19 @@
   },
   "optPresetDropdown": {
     "message": "Search dropdown width"
+  },
+  "optPresetFocusProps": {
+    "message": "Focus: hide the work item properties panel"
+  },
+  "optPresetFocusNav": {
+    "message": "Focus: hide the left navigation"
+  },
+  "optPresetFocusWidth": {
+    "message": "Focus: centre the body at a reading width",
+    "description": "Ships switched off — capping the line length is a preference, unlike hiding a panel the user just asked to hide."
+  },
+  "optRuleFocusOnly": {
+    "message": "Only while focus mode is on"
   },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
@@ -89,13 +119,13 @@
     "message": "＋ Add template"
   },
   "optTplDesc1": {
-    "message": "Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional."
+    "message": "Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together.\nThe title is optional."
   },
   "optTplDesc2": {
     "message": "The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>."
   },
   "optTplDesc3": {
-    "message": "Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description."
+    "message": "Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>.\nShortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description."
   },
   "optTplEmpty": {
     "message": "No templates yet. Click “Add template” to start."
@@ -104,7 +134,7 @@
     "message": "↓ Share with your team…"
   },
   "optTplShareDesc": {
-    "message": "<b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included."
+    "message": "<b>Share with your team</b> saves your own templates as a file your teammates can subscribe to.\nHost it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below.\nTemplates you received from a source are not included."
   },
   "optTplNamePh": {
     "message": "Template name (e.g. 🐞 Bug report)"
@@ -122,10 +152,10 @@
     "message": "＋ Add variable"
   },
   "optVarsDesc": {
-    "message": "Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>. A synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it."
+    "message": "Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>.\nA synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it."
   },
   "optVarsUndefined": {
-    "message": "The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>. A variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string."
+    "message": "The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>.\nA variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string."
   },
   "optVarsEmpty": {
     "message": "No variables yet. Click “Add variable” to start."
@@ -162,13 +192,13 @@
     "message": "Template sync"
   },
   "optSyncDesc": {
-    "message": "Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page. Synced templates are <b>read-only</b> — edit them at the source. Host the file on the <b>same domain as Plane</b> to avoid a separate access prompt."
+    "message": "Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page.\nSynced templates are <b>read-only</b> — edit them at the source.\nHost the file on the <b>same domain as Plane</b> to avoid a separate access prompt."
   },
   "optSyncFormat": {
     "message": "File format"
   },
   "optSyncFormatDesc": {
-    "message": "A flat list; each item carries its own <code>group</code> string. The top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank."
+    "message": "A flat list; each item carries its own <code>group</code> string.\nThe top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank."
   },
   "optSyncEmpty": {
     "message": "No sources yet. Click “Add source”."
@@ -186,7 +216,8 @@
     "message": "Name (e.g. QA standards)"
   },
   "optSrcUrlPh": {
-    "message": "https://plane.example.com/templates.json"
+    "message": "https://plane.example.com/templates.json",
+    "description": "Placeholder text: an example URL. Nothing here is prose."
   },
   "optSrcInterval": {
     "message": "Sync interval"
@@ -207,10 +238,10 @@
     "message": "Backup"
   },
   "optBackupDesc1": {
-    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick open links</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply."
+    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick open links</b>) to a JSON file, or import a previously exported file.\nImported settings load into the form — review, then <b>Save</b> to apply."
   },
   "optBackupDesc2": {
-    "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save."
+    "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal.\nSynced templates are <b>not</b> included: they re-download from their source after you Save."
   },
   "optBackupExport": {
     "message": "↓ Export JSON"
@@ -219,7 +250,7 @@
     "message": "↑ Import JSON…"
   },
   "optStorageNote": {
-    "message": "Settings sync across your devices via Chrome, which allows ~100 KB in total. Templates are stored in blocks of ~8 KB, so any one template has to fit a single block."
+    "message": "Settings sync across your devices via Chrome, which allows ~100 KB in total.\nTemplates are stored in blocks of ~8 KB, so any one template has to fit a single block."
   },
   "optDelete": {
     "message": "Delete"
@@ -258,6 +289,7 @@
   },
   "msgSrcSkipped": {
     "message": " ($COUNT$ skipped over limit)",
+    "description": "Appended to msgSrcSynced, so the leading space is deliberate — without it the two run together as \"12 templates(3 skipped\".",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -274,6 +306,7 @@
   },
   "msgSrcLastGood": {
     "message": " — using last good copy ($TIME$)",
+    "description": "Appended to msgSrcFailed. Leading space deliberate, as with msgSrcSkipped.",
     "placeholders": {
       "time": {
         "content": "$1"
@@ -301,6 +334,7 @@
   },
   "msgSrcHidden": {
     "message": " ($COUNT$ hidden)",
+    "description": "Appended to a source's summary line. Leading space deliberate.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -462,10 +496,12 @@
     }
   },
   "msgStorageOver": {
-    "message": " — over the sync limit; saving may fail"
+    "message": " — over the sync limit; saving may fail",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "msgStorageOverItem": {
     "message": " — one block is over its ~$LIMIT$ KB limit; saving will fail",
+    "description": "Appended to msgStorageUsed. Leading space deliberate.",
     "placeholders": {
       "limit": {
         "content": "$1"
@@ -473,7 +509,8 @@
     }
   },
   "msgStorageNear": {
-    "message": " — approaching the limit"
+    "message": " — approaching the limit",
+    "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
   "popEnabled": {
     "message": "Extension enabled"
@@ -483,6 +520,9 @@
   },
   "popTemplates": {
     "message": "Templates"
+  },
+  "popFocus": {
+    "message": "Focus mode"
   },
   "popPick": {
     "message": "🎯 Pick element → add rule"
@@ -617,10 +657,10 @@
     "message": "＋ Add format"
   },
   "optCopyDesc": {
-    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <code>Alt/⌥+C</code>) copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
+    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>) copies that item to your clipboard in one of the formats below.\nUse it to hand a work item to a chat message, a pull request, or a branch name."
   },
   "optCopyTokens": {
-    "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
+    "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>.\nEverything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
   },
   "optCopyEmpty": {
     "message": "No formats yet. Click “Add format” to start."
@@ -629,7 +669,8 @@
     "message": "name (e.g. Chat)"
   },
   "optCopyFormatPh": {
-    "message": "{{item.key}} {{item.title}}"
+    "message": "{{item.key}} {{item.title}}",
+    "description": "Placeholder text, and an example of the format language. {{item.key}} and {{item.title}} are tokens the expander looks for — translate around them, never inside them."
   },
   "optCopySampleTitle": {
     "message": "Fix the login failure"
@@ -649,6 +690,13 @@
   "copyBtnTitle": {
     "message": "Copy reference  ·  Alt/⌥+C"
   },
+  "focusBtnTitle": {
+    "message": "Turn focus mode on: hide the side panels  ·  Alt+Shift+F (⌥+⇧+F)",
+    "description": "Title and aria-label of the toggle beside a work item's key. The two states are a matching pair naming the action, not a label and a status line — the pressed state is what says which position it is in. Both name the shortcut, because the button is also where people find out it exists."
+  },
+  "focusBtnOnTitle": {
+    "message": "Turn focus mode off: show the side panels  ·  Alt+Shift+F (⌥+⇧+F)"
+  },
   "msgCopied": {
     "message": "Copied."
   },
@@ -665,6 +713,16 @@
   },
   "msgCopyNoItem": {
     "message": "No work item on this page — open one, or click a row to open its panel."
+  },
+  "msgFocusOn": {
+    "message": "Focus mode on — Alt+Shift+F (⌥+⇧+F) brings the panels back."
+  },
+  "msgFocusOff": {
+    "message": "Focus mode off."
+  },
+  "msgFocusRestored": {
+    "message": "Focus mode is still on in this tab — Alt+Shift+F (⌥+⇧+F) brings the panels back.",
+    "description": "Shown once per page load, not on the toggle. A reload is the one way to meet a hidden properties panel without having just asked for it."
   },
   "msgCopyLimit": {
     "message": "Up to $MAX$ formats. Remove one to add another.",
@@ -698,7 +756,7 @@
     "message": "This device needs to approve access"
   },
   "optPermDesc": {
-    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ listed site(s)/source(s) are not yet approved on this device. Until you approve, the extension stays inactive here.",
+    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ of the sites and sources you listed are not approved on this one yet. Until you approve them, the extension stays inactive here.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -735,14 +793,72 @@
   "optTabBackup": {
     "message": "Backup"
   },
+  "optTabKeys": {
+    "message": "Shortcuts"
+  },
+  "optKeysTitle": {
+    "message": "Keyboard shortcuts"
+  },
+  "optKeysDesc": {
+    "message": "Everything the keyboard reaches, in one place.\nOn macOS, <kbd>Alt</kbd> is <kbd>⌥</kbd> Option."
+  },
+  "optKeysColWhat": {
+    "message": "Does"
+  },
+  "optKeysColWin": {
+    "message": "Windows · Linux"
+  },
+  "optKeysColMac": {
+    "message": "macOS"
+  },
+  "optKeysColWhere": {
+    "message": "Where"
+  },
+  "optKeysTpl": {
+    "message": "Insert a body template"
+  },
+  "optKeysTplWhere": {
+    "message": "While editing a description, and in the “Create work item” dialog"
+  },
+  "optKeysCopy": {
+    "message": "Copy this work item's reference"
+  },
+  "optKeysCopyWhere": {
+    "message": "On a work item — its own page, or the panel a list opens. Not while you are typing."
+  },
+  "optKeysFocus": {
+    "message": "Turn focus mode on or off"
+  },
+  "optKeysFocusWhere": {
+    "message": "Anywhere the extension runs, including while you are typing"
+  },
+  "optKeysJump": {
+    "message": "Open a work item by key"
+  },
+  "optKeysJumpWhere": {
+    "message": "The address bar, on any tab"
+  },
+  "optKeysThenKey": {
+    "message": "then the key",
+    "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
+  },
+  "optKeysRebind": {
+    "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>.\nThe other two are handled inside the page and are fixed."
+  },
+  "optKeysWhyTyping": {
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type.\n<kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives."
+  },
+  "optKeysWhyCommand": {
+    "message": "Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key."
+  },
   "optQuickTitle": {
     "message": "Quick open"
   },
   "optQuickDesc": {
-    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. It is on the toolbar popup too."
+    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too."
   },
   "optQuickTokens": {
-    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land."
+    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe line under each row shows where a sample key would land."
   },
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
@@ -754,10 +870,12 @@
     "message": "prefix"
   },
   "optQuickUrlPh": {
-    "message": "https://…/browse/{{key}}"
+    "message": "https://…/browse/{{key}}",
+    "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
+    "description": "Layout only — a key, an arrow, the URL it lands on. No words to translate.",
     "placeholders": {
       "key": {
         "content": "$1"

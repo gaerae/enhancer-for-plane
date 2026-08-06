@@ -84,10 +84,14 @@
   }
 }
 
-/* copy-reference button — sits beside the work item key, above the title. Icon only and
-   borderless: the key next to it is small, quiet text, and a bordered button there would
-   read as the louder of the two. It gains contrast on hover instead. */
-.pe-copy-ref-btn {
+/* The two buttons beside the work item key, above the title: copy reference and the focus
+   toggle. Icon only and borderless, because the key next to them is small, quiet text and a
+   bordered button there would read as the louder thing on the line — they gain contrast on
+   hover instead. One rule for both: two buttons of different sizes side by side read as a
+   mistake. The focus toggle adds a pressed state, since a toggle that looks identical in
+   both positions says nothing about which one it is in. */
+.pe-copy-ref-btn,
+.pe-focus-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -103,17 +107,29 @@
   opacity: 0.75;
   vertical-align: middle;
 }
-.pe-copy-ref-btn:hover {
+.pe-copy-ref-btn:hover,
+.pe-focus-btn:hover {
   opacity: 1;
   background: rgba(18, 18, 18, 0.06);
   color: #121212;
 }
+.pe-focus-btn.on {
+  opacity: 1;
+  background: rgba(18, 18, 18, 0.1);
+  color: #121212;
+}
 @media (prefers-color-scheme: dark) {
-  .pe-copy-ref-btn {
+  .pe-copy-ref-btn,
+  .pe-focus-btn {
     color: #9aa4b2;
   }
-  .pe-copy-ref-btn:hover {
+  .pe-copy-ref-btn:hover,
+  .pe-focus-btn:hover {
     background: rgba(255, 255, 255, 0.1);
+    color: #f4f4f5;
+  }
+  .pe-focus-btn.on {
+    background: rgba(255, 255, 255, 0.16);
     color: #f4f4f5;
   }
 }

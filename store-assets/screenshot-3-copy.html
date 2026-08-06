@@ -13,6 +13,20 @@
     width: 22px; height: 22px; border-radius: 6px; background: #eceef1;
     display: flex; align-items: center; justify-content: center; color: #121212;
   }
+  /* The focus toggle is the copy button's neighbour in the real header, so it is its
+     neighbour here. Quieter than the copy button: this capture is about copying, and the
+     toggle is here to be recognised later rather than explained now. */
+  .focusbtn {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: #79818c;
+  }
+  .keytag {
+    margin-left: 4px; font-size: 11.5px; color: #9aa1aa; letter-spacing: -0.01em;
+  }
+  .keytag .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: #79818c;
+  }
   .doc-title { margin-top: 9px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
 
   .panel.formats { left: 610px; top: 376px; width: 396px; }
@@ -39,6 +53,14 @@
           <path d="M10.5 3.75H3.9a1.15 1.15 0 0 0-1.15 1.15v6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
       </span>
+      <!-- the focus toggle, the same three-column glyph the content script injects -->
+      <span class="focusbtn">
+        <svg viewBox="0 0 16 16" width="13" height="13">
+          <rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </span>
+      <span class="keytag" data-t="focusTag"></span>
     </div>
     <div class="doc-title" data-t="itemTitle"></div>
   </div>
@@ -68,10 +90,11 @@
   // actually produces from those formats, title and all.
   window.T = {
     en: {
-      head: "Take the item<br />with you.",
+      head: "Two buttons<br />beside the ID.",
       lede:
-        "One click beside a work item's ID copies it in <b>the format you wrote</b> — " +
-        "for a chat message, a pull request, or a branch name.",
+        "<b>Copy reference</b> hands the item to a chat message, a pull request or a " +
+        "branch name, in the format you wrote. <b>Focus mode</b> puts the side panels " +
+        "away when you only want to read the description.",
       crumb: "work item",
       itemTitle: "Checkout fails on Safari",
       f1: "Plain text",
@@ -80,13 +103,14 @@
       p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Checkout fails on Safari",
       f3: "Branch name",
       manage: "＋ Manage copy formats",
-      caption: "Every format is yours to edit — and the preview <b>is</b> what lands on the clipboard"
+      focusTag: "focus mode · <span class=\"kbd\">Alt+Shift+F</span>",
+      caption: "Every format is yours to edit, and the preview <b>is</b> what lands on the clipboard"
     },
     ko: {
-      head: "항목을 그대로<br />가져가기.",
+      head: "번호 옆<br />버튼 두 개.",
       lede:
-        "작업 항목 번호 옆 버튼을 한 번 누르면 <b>직접 정한 형식</b>으로 복사됩니다 — " +
-        "메신저로, 풀 리퀘스트 본문으로, 브랜치명으로.",
+        "<b>참조 복사</b>는 직접 정한 형식으로 항목을 넘겨줍니다 — 메신저로, 풀 리퀘스트 " +
+        "본문으로, 브랜치명으로. <b>집중 모드</b>는 본문만 읽고 싶을 때 측면 패널을 치웁니다.",
       crumb: "작업 항목",
       itemTitle: "Safari에서 결제가 실패합니다",
       f1: "일반 텍스트",
@@ -95,6 +119,7 @@
       p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Safari에서 결제가 실패합니다",
       f3: "브랜치명",
       manage: "＋ 참조 복사 형식 관리",
+      focusTag: "집중 모드 · <span class=\"kbd\">Alt+Shift+F</span>",
       caption: "형식은 마음대로 고칠 수 있고, 미리보기가 <b>곧</b> 클립보드에 담길 내용입니다"
     }
   };

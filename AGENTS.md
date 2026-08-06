@@ -37,6 +37,14 @@ changed anything a user sees, drive it:
   it is for, and it turns a one-off check into one that runs forever. Reach for a
   hand-served page with a stubbed `chrome` (see "Driving the UI" below) only while
   exploring. Node cannot render CSS.
+- **Style rules and focus mode (`content.js`)**: `buildPlanePage` in the harness serves a
+  synthetic work item page — the classes and the id the shipped rules select on, and no more
+  than that. Extend that markup rather than mocking Plane. It is also the only check that
+  a selector we ship still matches the class Plane writes, escaping and all: a probe element
+  carrying `min-w-[300px]` proves `.min-w-\[300px\]` in one direction that no data test can.
+  Keep the positive and negative cases on one page — `settings` arrives asynchronously, and
+  while it is null the script reports "not active" for the same reason an unenabled site does,
+  so a suite that opens on an inactive site cannot tell a refusal from a slow start.
 - **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
   pattern is in this session's history; rebuild it rather than guessing.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
@@ -58,6 +66,43 @@ why the template button is found via structure (a button wrapping a file input) 
 than text. Anything that reaches into Plane's editor schema or DOM shape is a future
 breakage. This is the project's core design principle; weigh it before adding features
 that need it.
+
+**Never drive Plane's own UI state; put the change in our own layer.** Focus mode wants the
+work item's properties panel gone, and Plane already has a flag for exactly that
+(`issue_detail_sidebar_collapsed` in `localStorage`, `toggleIssueDetailSidebar` in its theme
+store). Reaching for it is the wrong instinct twice over: nothing in Plane's UI sets it, so it
+is undocumented internal state, and on a work item's own page Plane's own resize effect writes
+`false` back over it above 768px — the feature would spend its life losing an argument. A rule
+in our stylesheet cannot be argued with, works the same on Jira and Linear, and degrades to a
+no-op instead of a fight when the markup moves. Same conclusion for "just mirror whatever
+Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
+to implement, not theirs to be observed.
+
+**A feature reachable only from the popup exists for whoever already knows it exists.** Focus
+mode shipped its first draft with a shortcut and a popup switch, which is two places nobody
+looks while reading a work item. The affordance belongs where the reader's eyes already are, on
+an anchor we already trust — the same item header the copy button hangs off (a leaf button whose
+text is a key). A toggle there must also *show* its position: `aria-pressed` plus a pressed
+style, because a toggle that looks identical in both states says nothing about which one it is
+in. And when a keyboard is the only way in, write the keys down somewhere they can all be seen
+at once — Settings ▸ Shortcuts exists because each one used to be documented only inside the
+section of the feature that owned it.
+
+**A shortcut you need while typing is a `chrome.commands` entry, not a key handler.** Alt+T and
+Alt+C live in `content.js` because they act on the element under the cursor; focus mode does
+not, and it is reached mid-sentence while writing a description. In the page that is a
+contradiction — on macOS `⌥`+letter *is* a character, so an in-page handler either eats it or
+has to bail out while the user is typing, which is precisely when they wanted it. A command is
+intercepted by Chrome before the page, needs no permission, and is rebindable at
+`chrome://extensions/shortcuts`, which no in-page handler can offer. The worker relays it to
+the tab; a tab with no content script simply does not answer, and that is the whole handling.
+
+**Per-tab state does not go in `chrome.storage.sync`, and settings are not per-tab.** Focus
+mode is a moment, so it lives in the page's `sessionStorage` — that tab, that origin, surviving
+a reload, gone with the tab. Syncing it would hide a properties panel on a second machine for
+someone who never asked and has no way to know what did it. The mirror-image rule matters as
+much: which rules *belong* to focus mode is a setting (the `focus` flag on a rule), and it goes
+to sync like everything else.
 
 **Synced templates are read-only, and the UI must not pretend otherwise.** Edit and
 delete affordances on synced content would be reverted by the next sync — a button
@@ -125,6 +170,25 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   users the two sample templates back on every load — and the test passed anyway, because
   the compatibility mirror happened to hold the same empty list. Assert the rule against
   the assembler directly, not through whatever else agrees with it today.
+- **New default content has two homes, and only one of them is obvious.** `PE_DEFAULTS`
+  serves a fresh install; every existing one has the array already, so `peDeepMerge` will not
+  backfill into it and the migration has to append. Ship a preset to one of the two and half
+  the users never see it — which is invisible, because whichever half you are is the half that
+  works. The focus presets are asserted equal from both sides; do the same for the next ones.
+  Appending in a migration is only allowed because those ids never existed before: it is new
+  content, not the resurrection above, and once the stamp moves a deletion is final.
+- **An answer arrives after the question has moved on.** The popup asks the tab whether focus
+  mode is on, and shows the switch when the tab says yes. Flip the master switch off while that
+  reply is in flight and it lands anyway — putting a Focus mode control on screen underneath a
+  status line reading "the extension is off". Number the question and drop replies to older
+  ones. Every `chrome.tabs.sendMessage` from the popup has this shape; the one that writes the
+  status line (Re-scan) can overwrite a newer status the same way.
+- **A percentage in `padding` measures the containing block, not the element.** The
+  reading-width preset centres a column with `padding-inline: max(2.25rem, (100% - 60rem) / 2)`,
+  which is right in Plane (the column is the flex child filling its parent) — but the first
+  assertion for it set a width on the probe itself, read back the 2.25rem floor, and would have
+  passed on a value the engine had thrown away entirely. If a check on a computed value can be
+  satisfied by the fallback, it is not checking the value. Nest the probe.
 - **An Alt-letter shortcut in a capture-phase handler eats that letter.** `onKeyDown` is
   registered with capture `true` and calls `preventDefault`, so a shortcut keyed on
   `e.code` fires before the page — and on macOS `Option`+a letter IS a character (`⌥C` =
@@ -149,6 +213,22 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   there (`/{workspace}/browse/{KEY}`, which is what Plane redirects to). Composition is
   the only part of the copy feature that could go wrong silently rather than visibly;
   `peItemUrl` says so and is where to look first against a new Plane version.
+- **A work item page can show more than one key.** An item with a parent shows the parent's
+  key above the title, from the same component, so it is also a leaf `<button>` whose text is a
+  key — and it comes first in document order. `findKeyEl` took the first match, so both header
+  buttons hung off the parent's chip and Copy reference handed over the parent's reference: a
+  wrong link that looks right until someone follows it. Which key is this item's is now ranked,
+  not filtered — the path (`/{workspace}/browse/{KEY}`, absent on a peek), then whether the key
+  sits in an `<a href>` (you do not link to the page you are on), then whether it is disabled
+  (Plane leaves the parent's inert). Ranking rather than filtering matters: any one of those
+  signals can change in a Plane release, and the cost should be a worse guess, not no button.
+  Sub-items, relations and the sibling menu put still more keys on the page — measured: every one
+  of them is a `ControlLink` (an `<a href>`) wrapping an inert identifier, so the link signal
+  covers them all, and the harness page carries two sub-items and a relation to keep proving it.
+  Anything new that reads "the key" has to say which one it means. One caveat about that harness
+  page: it also carries a linked key that is *not* inert, which Plane does not render today. Every
+  other key being inert would otherwise make `disabled` sufficient on its own and leave the link
+  signal untested — one release enabling click-to-copy on a chip is all that would take.
 - **A work item key is not `ABC-123`.** A project identifier can be all digits — a
   Plane project can have one, so a key can read `42-7`. Any regex anchored
   on letters silently matches nothing there. The same measurement killed the branch-name
@@ -198,6 +278,15 @@ lies:
     with 존댓말 in one breath.
   - Sets must read as a set. `1시간마다 / 6시간마다 / 12시간마다 / 하루에 한 번` — the
     last one breaks a pattern the first three establish.
+  - Don't keep an English sentence's frame when Korean has no such sentence. "Fills the gaps
+    in Plane" became `부족한 기능을 채웁니다`, and a 기능 is not something you 채우다 — the
+    fix was to drop the clause, not to find a better verb for it. Same for a feature as the
+    subject of 씁니다: `바로 열기는 Jira에서도 씁니다` needs a person doing the using, so it
+    is `…에서도 동작합니다`.
+  - 가운뎃점 is correct Korean and almost nobody types it. In prose, enumerate with commas or
+    와/과 — `영문, 숫자, 하이픈, 밑줄`, not `영문·숫자·하이픈·밑줄`. Keep it only where it
+    separates two independent things with spaces around it, which is a UI separator rather
+    than prose: `설정 · 템플릿 관리`, `참조 복사  ·  Alt/⌥+C`.
 - **Only `background.js` may touch the network.** The picker reads the cache, so inserting
   a template costs no request and works offline.
 - `examples/` and `tools/` are not shipped: `release.yml` zips an explicit allowlist.
@@ -213,7 +302,26 @@ lies:
 - **Tab order lives in three places** — the nav buttons and the panel divs in `options.html`,
   and `PE_TABS` in `options.js`. Only the buttons are visible; a panel out of step breaks the
   focus order and a `PE_TABS` out of step breaks the arrow keys and the landing tab, neither
-  of which looks broken. The harness reads all three back against each other.
+  of which looks broken. The harness reads all three back against each other. Adding a tab also
+  moves the two card counts it asserts, and the Korean line-breaking loop now derives its list
+  from the tab strip — a tab added without touching the harness would otherwise be the one tab
+  nobody measured Korean on.
+- **A settings description breaks at every sentence, and the break is in the message.** The
+  store copy has been one sentence per line for the same reason: a four-sentence paragraph in a
+  12.5px grey block is a wall, and Korean makes it a denser one. So the messages carry `\n` at
+  each sentence end and `.desc` is `white-space: pre-line`. Two things follow. A message with a
+  newline may only be rendered somewhere that keeps it — never a `title`, an aria-label, a toast
+  or a status line, where the same escape is either invisible or splits a tooltip in two. And a
+  newline goes at a sentence end, never mid-sentence: hand-wrapped text re-wraps at every window
+  width and reads as a mistake. `test.js` holds both, and the harness measures that the sentence
+  after a break actually starts a new line — only the stylesheet decides that, and the source
+  looks identical either way.
+- **One shortcut, one spelling.** `Alt+Shift+F` was written for macOS as `⌥⇧F` in eleven
+  places while the Windows form kept its plus signs, and three settings cards marked a
+  keystroke up three ways (`<kbd>`, `<b>`, `<code>`). Both are now rules in `test.js`: a
+  modifier symbol is followed by `+` or by nothing, and a key named in copy that renders as
+  HTML sits inside `<kbd>`. Plain-text sinks — a `title`, an aria-label, a toast — are exempt
+  because markup cannot reach them; they carry `Alt/⌥+C` style text instead.
 - **Store copy quotes real labels.** `store-assets/STORE_LISTING.md`'s Korean section told
   readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
   now holds every quoted label in an imperative sentence against that locale's catalogue.

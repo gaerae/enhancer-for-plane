@@ -972,8 +972,11 @@ test("defaults: seed labels fall back to English when i18n is unavailable", () =
 test("migrate: a v1 widths object becomes rules", () => {
   const ctx = loadCommon();
   const out = ctx.peMigrate({ widths: { moduleName: { px: 400 }, dropdown: { px: 300 } } });
-  eq(out.rules.length, 2);
-  eq(out.rules[0].value, "400px");
+  // Count the always-on rules, not every rule: the same call also appends the focus
+  // presets (v6 → v7), and this test is about the two widths becoming two rules.
+  const widths = out.rules.filter((r) => !r.focus);
+  eq(widths.length, 2);
+  eq(widths[0].value, "400px");
   ok(!out.widths, "old shape removed");
 });
 
@@ -992,7 +995,8 @@ test("migrate: a v2 user keeps their rules and gains the sync defaults", () => {
   const ctx = loadCommon();
   const stored = { schema: 2, rules: [{ id: "r", selector: ".x", property: "width", value: "1px" }], templates: [], domains: ["a.com"] };
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate(stored));
-  eq(merged.rules.length, 1, "rules preserved");
+  eq(merged.rules[0].id, "r", "the user's rule is still theirs, and still first");
+  eq(merged.rules.filter((r) => !r.focus).length, 1, "nothing new applies unconditionally");
   eq(merged.domains, ["a.com"], "domains preserved");
   eq(merged.templateSync, { enabled: false, sources: [] }, "sync backfilled");
 });
@@ -1235,13 +1239,108 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 6, "PE_SCHEMA is 6");
+  eq(ctx.__SCHEMA, 7, "PE_SCHEMA is 7");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
   ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
   eq(merged.quickLinks.length, 0, "and it is empty by default");
-  eq(ctx.peMigrate({ schema: 5 }).schema, 6, "stamp advances to PE_SCHEMA");
+  eq(ctx.peMigrate({ schema: 5 }).schema, 7, "stamp advances to PE_SCHEMA");
+});
+
+/* ---------------- focus mode ---------------- */
+
+test("focus: the css splits by rule, and both halves are validated the same way", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, selector: ".a", property: "max-width", value: "320px" },
+    { enabled: true, focus: true, selector: "#b", property: "display", value: "none" },
+    { enabled: false, focus: true, selector: ".off", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".bad", property: "colour: red; body", value: "x" },
+    { enabled: true, focus: true, selector: "", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".c", property: "display", value: "" }
+  ]);
+  eq(out.always, ".a { max-width: 320px !important; }", "an ordinary rule is always on");
+  eq(out.focus, "#b { display: none !important; }", "a focus rule waits, and the junk never lands");
+});
+
+// The reason the split is here and not in content.js: a focus rule that leaked into the
+// always-on half would hide the properties panel of somebody who never asked for focus
+// mode, and nothing in a browser check would look wrong until they opened a work item.
+test("focus: a value that tries to close the block cannot reach either half", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, focus: true, selector: ".a", property: "display", value: "none } body { display: none" }
+  ]);
+  eq(out.focus, ".a { display: none  body  display: none !important; }", "braces and semicolons are stripped");
+  eq(out.always, "", "and it stayed on the focus side");
+});
+
+// The caller passes a validator that rejects braces, but this function is what writes the
+// stylesheet, so it must not depend on being handed one.
+test("focus: a selector that would close the rule is refused with no validator at all", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const out = peBuildRuleCss([
+    { enabled: true, selector: "a { color: red } b", property: "display", value: "none" },
+    { enabled: true, focus: true, selector: ".x}", property: "display", value: "none" }
+  ]);
+  eq(out, { always: "", focus: "" });
+});
+
+test("focus: an unreadable selector is dropped by the caller's own check", () => {
+  const { peBuildRuleCss } = loadCommon();
+  const seen = [];
+  const out = peBuildRuleCss([{ enabled: true, focus: true, selector: ".a", property: "display", value: "none" }], (sel) => {
+    seen.push(sel);
+    return false;
+  });
+  eq(seen, [".a"], "the check is asked about the selector");
+  eq(out, { always: "", focus: "" }, "and its answer is honoured");
+});
+
+test("focus: a v6 install gains the presets, and only once", () => {
+  const ctx = loadCommon();
+  const mine = { id: "mine", enabled: true, selector: ".x", property: "width", value: "1px" };
+  const out = ctx.peMigrate({ schema: 6, rules: [mine] });
+  eq(out.rules[0], mine, "the user's rule keeps its place");
+  const focus = out.rules.filter((r) => r.focus);
+  eq(focus.length, ctx.peFocusPresetRules().length, "every preset arrived");
+  eq(out.schema, 7, "and the stamp moved, so this does not run again");
+  // A user who deletes a preset and saves must not get it back on the next read.
+  const again = ctx.peMigrate({ schema: 7, rules: [mine] });
+  eq(again.rules.length, 1, "a v7 object is left exactly as it is");
+});
+
+test("focus: an id already present is not appended twice", () => {
+  const ctx = loadCommon();
+  const first = ctx.peFocusPresetRules()[0];
+  const edited = Object.assign({}, first, { value: "block", label: "my own wording" });
+  const out = ctx.peMigrate({ schema: 6, rules: [edited] });
+  eq(out.rules.filter((r) => r.id === first.id).length, 1, "the edited copy is the only one");
+  eq(out.rules[0].value, "block", "and the edit survives");
+  // Without this the test would also pass on a migration that appended nothing at all.
+  eq(out.rules.length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
+});
+
+// Two places ship the same presets — PE_DEFAULTS for a new install, peMigrate for everyone
+// else — and a preset added to one of them alone would reach half the users.
+test("focus: a fresh install and an upgraded one get the same presets", () => {
+  const ctx = loadCommon();
+  const ids = (rules) => rules.filter((r) => r.focus).map((r) => r.id);
+  eq(ids(ctx.__DEFAULTS.rules), ids(ctx.peMigrate({ schema: 6, rules: [] }).rules));
+  ok(ids(ctx.__DEFAULTS.rules).length > 0, "and there is something to compare");
+});
+
+test("focus: the flag survives an import, and its absence means always-on", () => {
+  const ctx = loadCommon();
+  const out = ctx.peSanitizeSettings({
+    rules: [
+      { id: "a", selector: ".a", property: "display", value: "none", focus: true },
+      { id: "b", selector: ".b", property: "display", value: "none" },
+      { id: "c", selector: ".c", property: "display", value: "none", focus: "yes please" }
+    ]
+  });
+  eq(out.rules.map((r) => r.focus), [true, false, false], "only a real boolean turns it on");
 });
 
 test("quick: an import is clamped the same way the form is", () => {
@@ -1263,6 +1362,22 @@ test("quick: links survive a save/read round trip", async () => {
   const back = await ctx.peGetSettings();
   eq(back.quickLinks.length, 1);
   eq(back.quickLinks[0].url, "https://plane.test/w/browse/{{key}}");
+});
+
+// An item with a parent shows two keys, and the content script has to know which one is this
+// item's. On the item's own page the path settles it, and that reading is here rather than in
+// the browser because it is the one signal that is pure data.
+test("copy: the path says which key is this item's, or says nothing", () => {
+  const { peKeyFromPath } = loadCommon();
+  eq(peKeyFromPath("/acme/browse/PROJ-142"), "PROJ-142", "the item's own page");
+  eq(peKeyFromPath("/acme/browse/42-7"), "42-7", "an all-digit project identifier is still a key");
+  eq(peKeyFromPath("/acme/browse/K%2D1"), "K-1", "percent-decoded");
+  eq(peKeyFromPath("/data/projects/86965b22/issues/"), "", "a list route, where a peek panel has no key");
+  eq(peKeyFromPath("/acme/browse/K-1/activity"), "", "a sub-page is not the item page");
+  eq(peKeyFromPath("/"), "", "nothing to read");
+  eq(peKeyFromPath(""), "", "no path at all");
+  // A half-written escape throws in decodeURIComponent; the raw segment beats losing it.
+  eq(peKeyFromPath("/acme/browse/K-%E0%A4%A"), "K-%E0%A4%A", "a broken escape is kept raw");
 });
 
 test("copy: on the item's own page the link is the address bar, not a composition", () => {
@@ -1372,6 +1487,126 @@ test("example feed: the button's URL points at the file that actually ships", ()
   // And it has to be a feed the normalizer accepts, or the example would sync to nothing.
   const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
   ok(out.templates.length > 0, "the shipped file parses into templates");
+});
+
+// Alt+Shift+F was written for macOS as "⌥⇧F" in eleven places while Windows kept its plus
+// signs — the same shortcut spelled two ways, in the one part of the UI whose whole job is to
+// say which keys to press. Nothing was wrong enough to notice line by line, which is why this
+// is a rule rather than a reading: a modifier is followed by "+" or by nothing at all.
+test("shortcuts: a modifier chain reads the same on both platforms", () => {
+  const FILES = [
+    "_locales/en/messages.json",
+    "_locales/ko/messages.json",
+    "options.html",
+    "popup.html",
+    "README.md",
+    "README.ko.md",
+    "store-assets/STORE_LISTING.md"
+  ];
+  // A modifier symbol butting straight into the next key: ⌥⇧, ⌥T, ⌘⇧K. A trailing space, a
+  // "+", a bracket or Hangul after it is prose, not a chain.
+  const GLUED = /[⌥⇧⌘⌃](?=[⌥⇧⌘⌃A-Za-z0-9])/;
+  const bad = [];
+  for (const f of FILES) {
+    read(f)
+      .split("\n")
+      .forEach((line, i) => {
+        if (GLUED.test(line)) bad.push(`${f}:${i + 1}`);
+      });
+  }
+  eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
+});
+
+// A newline in a message is a line break the reader sees: the settings descriptions carry one at
+// every sentence end and `.desc` renders them (white-space: pre-line). That only holds while the
+// break lands where a break is wanted, so two rules keep it honest.
+//
+// First: a message with a newline may only be rendered where one shows. Everywhere else it is
+// either invisible (a collapsing sink swallows it) or wrong (a title attribute keeps it and
+// splits the tooltip in two), and both failures are silent in review.
+test("i18n: a message with a line break is only used where a break renders", () => {
+  // Read the answer out of the stylesheet rather than restating it: whichever classes carry
+  // `white-space: pre-line` are the sinks where a newline is a line break. A rule added there
+  // and forgotten here would otherwise fail this test for being right.
+  const css = read("options.css");
+  const rule = /([^{}]+)\{[^{}]*white-space:\s*pre-line[^{}]*\}/g;
+  const PRE_LINE = [];
+  for (const m of css.matchAll(rule)) {
+    for (const cls of m[1].matchAll(/\.([a-zA-Z][\w-]*)/g)) PRE_LINE.push(cls[1]);
+  }
+  ok(PRE_LINE.length > 0, "no pre-line sink in options.css — then no message may carry a break");
+  const pages = { "options.html": read("options.html"), "popup.html": read("popup.html") };
+  const scripts = ["common.js", "background.js", "content.js", "options.js", "popup.js"]
+    .map((f) => read(f))
+    .join("\n");
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      if (!/\n/.test(String((entry && entry.message) || ""))) continue;
+      // Attribute sinks keep the newline; peMsg() in a script lands in a toast or a status
+      // line, neither of which is pre-line.
+      for (const [file, src] of Object.entries(pages)) {
+        const attr = new RegExp(`data-i18n-(?!html)[a-z-]+="${key}"`).exec(src);
+        if (attr) bad.push(`${loc}/${key} → ${file} ${attr[0]}`);
+      }
+      if (new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
+      // And where it IS rendered, the element has to be one the stylesheet keeps breaks in.
+      const uses = [];
+      for (const src of Object.values(pages)) {
+        for (const m of src.matchAll(new RegExp(`<([a-z]+)([^>]*?)data-i18n(?:-html)?="${key}"`, "g"))) {
+          uses.push(m[0]);
+        }
+      }
+      if (!uses.length) bad.push(`${loc}/${key} → rendered nowhere`);
+      for (const use of uses) {
+        if (!PRE_LINE.some((cls) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(use))) {
+          bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);
+        }
+      }
+    }
+  }
+  eq(bad, [], "a line break where it does not render as one:\n  " + bad.join("\n  "));
+});
+
+// Second: a break belongs at the end of a sentence, not wherever a line got long. This is what
+// stops the convention from decaying into hand-wrapped text, which would re-wrap at every window
+// width and look like a mistake.
+test("i18n: every line break sits at the end of a sentence", () => {
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      const msg = String((entry && entry.message) || "");
+      for (const m of msg.matchAll(/\n/g)) {
+        const before = msg.slice(0, m.index);
+        const after = msg.slice(m.index + 1);
+        if (!/[.!?)]$/.test(before)) bad.push(`${loc}/${key}: "…${before.slice(-24)}⏎"`);
+        if (!after || /^\s/.test(after)) bad.push(`${loc}/${key}: a break with nothing after it`);
+        // A break inside a tag would produce markup nobody wrote.
+        if (/<[^>]*$/.test(before)) bad.push(`${loc}/${key}: a break inside a tag`);
+      }
+    }
+  }
+  eq(bad, [], "a break that is not a sentence end:\n  " + bad.join("\n  "));
+});
+
+// The other half of the same inconsistency: the templates card marked its shortcut up as
+// <kbd>, the focus card used <b> and the copy card <code>, so three cards described a
+// keystroke three ways on one settings page. Only messages that already carry markup are
+// checked — a title attribute or a toast has nowhere to put a tag.
+test("shortcuts: a key named in rendered copy is marked up as one", () => {
+  const KEY = /\bAlt\b|⌥|⇧|⌘|⌃/;
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      const msg = String((entry && entry.message) || "");
+      if (!/<[a-z]+>/.test(msg)) continue;
+      if (KEY.test(msg.replace(/<kbd>.*?<\/kbd>/g, ""))) bad.push(loc + "/" + key);
+    }
+  }
+  eq(bad, [], "a key outside <kbd> in copy that renders as HTML: " + bad.join(", "));
 });
 
 test("store copy: a quoted UI label is one the matching locale actually shows", () => {

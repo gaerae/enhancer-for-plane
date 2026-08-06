@@ -18,12 +18,14 @@
       addBtn.hidden = true;
       pickBtn.hidden = true;
       rescanBtn.hidden = true;
+      refreshFocusToggle(false);
       return;
     }
     const matched = state.allDomains || peDomainMatches(state.domains, currentHost);
     const active = state.enabled && matched;
     pickBtn.hidden = !active; // picker is only offered on active sites
     rescanBtn.hidden = !active; // re-scan/self-heal is only relevant on active sites
+    refreshFocusToggle(active);
     if (active) {
       statusEl.textContent = peMsg("popActive", [currentHost]);
       statusEl.className = "pop-status on";
@@ -38,6 +40,37 @@
       statusEl.textContent = peMsg("popInactive", [currentHost]);
       statusEl.className = "pop-status off";
       addBtn.hidden = false;
+    }
+  }
+
+  // Focus mode lives in the tab, not in settings, so the popup has to ask the page for it
+  // rather than read it from state. No answer means no content script here — a tab opened
+  // before the site was enabled, or a page that has not been reloaded since — and in that
+  // case the switch is hidden instead of shown in a position it cannot honour.
+  // Numbered because the answer arrives after the question has moved on: flipping the master
+  // switch off calls this again, and an in-flight reply from when the site was still active
+  // would put the switch back on screen under a status line that says the extension is off.
+  let focusQuery = 0;
+  function refreshFocusToggle(active) {
+    const wrap = $("focusWrap");
+    if (!wrap) return;
+    const mine = ++focusQuery;
+    if (!active || currentTabId == null) {
+      wrap.hidden = true;
+      return;
+    }
+    try {
+      chrome.tabs.sendMessage(currentTabId, { type: "pe-focus-state" }, (resp) => {
+        if (mine !== focusQuery) return; // a newer question is already out
+        if (chrome.runtime.lastError || !resp || !resp.active) {
+          wrap.hidden = true;
+          return;
+        }
+        $("focusToggle").checked = !!resp.focus;
+        wrap.hidden = false;
+      });
+    } catch (_) {
+      wrap.hidden = true;
     }
   }
 
@@ -126,6 +159,22 @@
         });
       }
     })();
+
+    // Send the position the switch was just moved to, not "flip it": the popup and the page
+    // are two copies of one boolean, and only the box the user clicked knows what they meant.
+    $("focusToggle").addEventListener("change", () => {
+      const box = $("focusToggle");
+      if (currentTabId == null) return;
+      try {
+        chrome.tabs.sendMessage(currentTabId, { type: "pe-focus-toggle", on: box.checked }, (resp) => {
+          if (chrome.runtime.lastError || !resp || !resp.ok) {
+            $("focusWrap").hidden = true;
+            return;
+          }
+          box.checked = !!resp.focus;
+        });
+      } catch (_) {}
+    });
 
     $("pickEl").addEventListener("click", () => {
       if (currentTabId == null) return;

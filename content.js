@@ -48,7 +48,6 @@
   /* ================================================================== */
   /* 1. Inject user-defined style rules (adoptedStyleSheets)              */
   /* ================================================================== */
-  const sanitizeValue = (v) => String(v == null ? "" : v).replace(/[;{}]/g, "").trim();
   function validSelector(sel) {
     if (!sel || /[{}]/.test(sel)) return false;
     try {
@@ -58,19 +57,11 @@
       return false;
     }
   }
-  const validProperty = (p) => /^-?[a-zA-Z][a-zA-Z-]*$/.test((p || "").trim());
 
   function buildCss() {
-    const lines = [];
-    (settings.rules || []).forEach((r) => {
-      if (!r || !r.enabled) return;
-      const sel = (r.selector || "").trim();
-      const prop = (r.property || "").trim();
-      const val = sanitizeValue(r.value);
-      if (!sel || !validProperty(prop) || !val || !validSelector(sel)) return;
-      lines.push(`${sel} { ${prop}: ${val} !important; }`);
-    });
-    return lines.join("\n");
+    const css = peBuildRuleCss(settings.rules, validSelector);
+    if (!focusOn) return css.always;
+    return [css.always, css.focus].filter(Boolean).join("\n");
   }
 
   // Plane is a Next.js/React SPA, so a <style> node in <head>/<body> can be removed
@@ -101,6 +92,122 @@
       styleObserver.observe(document.documentElement, { childList: true });
     }
     fallbackStyleEl.textContent = css;
+  }
+
+  /* ================================================================== */
+  /* 1b. Focus mode — the rules marked "focus only", on for this tab      */
+  /* ================================================================== */
+  // Focus mode is a moment, not a setting, so it is deliberately not in chrome.storage.sync:
+  // syncing it would hide the properties panel on a second machine the user never asked, and
+  // they would have no idea what did it. sessionStorage is the shape the state actually has —
+  // this tab, this origin, surviving a reload, gone when the tab closes.
+  const PE_FOCUS_KEY = "pe-focus";
+  let focusOn = false;
+  let focusAnnounced = false;
+
+  const readStoredFocus = () => {
+    try {
+      return sessionStorage.getItem(PE_FOCUS_KEY) === "1";
+    } catch (_) {
+      return false; // storage can be blocked; focus mode is not worth an exception
+    }
+  };
+
+  function storeFocus(on) {
+    try {
+      if (on) sessionStorage.setItem(PE_FOCUS_KEY, "1");
+      else sessionStorage.removeItem(PE_FOCUS_KEY);
+    } catch (_) {}
+  }
+
+  // A class on <html> as well as the injected CSS: it is what a user's own rule can hang
+  // off (`:root.pe-focus .foo`) before they ever tick the checkbox, and it is the one part
+  // of the state a test can see from outside.
+  function applyFocusClass() {
+    try {
+      document.documentElement.classList.toggle("pe-focus", focusOn && isActive());
+    } catch (_) {}
+  }
+
+  function setFocus(on, announce) {
+    focusOn = !!on;
+    storeFocus(focusOn);
+    applyFocusClass();
+    applyStyles();
+    syncFocusButtons();
+    if (announce) toast(peMsg(focusOn ? "msgFocusOn" : "msgFocusOff"));
+  }
+
+  // The state has to be on the button, not only in the stylesheet: it is a toggle, and a
+  // toggle that looks the same in both positions tells you nothing about which one it is in.
+  function syncFocusButtons() {
+    [...document.querySelectorAll(".pe-focus-btn")].forEach((b) => {
+      b.setAttribute("aria-pressed", focusOn ? "true" : "false");
+      b.setAttribute("title", peMsg(focusOn ? "focusBtnOnTitle" : "focusBtnTitle"));
+      b.setAttribute("aria-label", peMsg(focusOn ? "focusBtnOnTitle" : "focusBtnTitle"));
+      b.classList.toggle("on", focusOn);
+    });
+  }
+
+  function makeFocusButton() {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pe-focus-btn";
+    // Three columns: the frame is the window, and both outer columns are what goes away —
+    // the panel on the right and the navigation on the left. A glyph with a bar down one side
+    // only says half of what the button does.
+    b.innerHTML =
+      '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
+      '<rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+      '<path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFocus(!focusOn, true);
+    });
+    return b;
+  }
+
+  function removeFocusButtons() {
+    [...document.querySelectorAll(".pe-focus-btn")].forEach((b) => b.remove());
+  }
+
+  // Beside the key, after the copy button — the same header, because that is where a reader
+  // is already looking and the only anchor in this page we trust (a leaf button whose text is
+  // a key). The fast path is the copy button's, for the same reason: findKeyEl scans every
+  // button under up to ten ancestors, and injectAll runs on every mutation burst.
+  function ensureFocusButton() {
+    const existing = document.querySelector(".pe-focus-btn");
+    if (existing) {
+      const prev = existing.previousElementSibling;
+      const placed =
+        (isKeyButton(prev) && !isLinkedKeyButton(prev)) ||
+        (prev && prev.classList && prev.classList.contains("pe-copy-ref-btn"));
+      if (placed) {
+        syncFocusButtons();
+        return;
+      }
+      removeFocusButtons();
+    }
+    const keyEl = findKeyEl();
+    if (!keyEl) {
+      removeFocusButtons();
+      return;
+    }
+    const row = keyEl.parentElement;
+    if (!row || row.querySelector(":scope > .pe-focus-btn")) return;
+    const after = row.querySelector(":scope > .pe-copy-ref-btn") || keyEl;
+    after.insertAdjacentElement("afterend", makeFocusButton());
+    syncFocusButtons();
+  }
+
+  // Landing in focus mode after a reload is the one way a user meets a hidden properties
+  // panel without having just asked for it. Say so once, with the way back in the message.
+  function announceFocusOnce() {
+    if (focusAnnounced || !focusOn || !isActive()) return;
+    focusAnnounced = true;
+    toast(peMsg("msgFocusRestored"));
   }
 
   /* ================================================================== */
@@ -220,6 +327,7 @@
   function removeButtons() {
     removeTemplateButtons();
     removeCopyButtons();
+    removeFocusButtons();
     hideMenu();
   }
 
@@ -310,13 +418,56 @@
   //
   // The peek panel a list opens has this identical structure — same title field, same key
   // button, same wrapper — which is why one function serves both.
+  // A key button that links somewhere is a key belonging to some other item — you do not link
+  // to the page you are already on. This is how the parent chip's key gives itself away, and it
+  // is cheap enough to check on the injection fast path.
+  const isLinkedKeyButton = (e) => isKeyButton(e) && !!(e.closest && e.closest("a[href]"));
+
+  // Which of the keys on screen is *this* item's. An item with a parent shows the parent's key
+  // above the title, in the same block, from the same component — so it is also a leaf button
+  // whose text is a key, and it comes first in document order. Taking the first match put the
+  // copy and focus buttons on the parent's chip, and made Copy reference hand over the parent.
+  //
+  // Ranked rather than filtered, so a Plane that changes one of these signals degrades to a
+  // worse guess instead of to no button at all:
+  //   * the URL. An item's own page is /{workspace}/browse/{KEY}, so a button whose text is that
+  //     key is this item beyond doubt. A list route with a peek panel over it has no key to
+  //     compare, which is why the other two signals exist.
+  //   * a link. The parent's key is inside an <a href> to the parent, as are the keys of every
+  //     sub-item, relation and sibling-menu entry. You do not link to the page you are on.
+  //   * disabled. Plane makes this item's key click-to-copy and leaves every other one inert.
+  //
+  // Against Plane 1.4 the first two decide every case, and the harness fails if either is taken
+  // away. `disabled` is the spare, and deliberately so: it costs one boolean and it is what would
+  // carry this if a release ever rendered the parent chip as a div with an onClick instead of a
+  // link. It has no case of its own, because Plane has no such DOM to write a case against.
+  function rankKeyButton(el, urlKey) {
+    let score = 0;
+    if (urlKey && (el.textContent || "").trim() === urlKey) score += 4;
+    if (!isLinkedKeyButton(el)) score += 2;
+    if (!el.disabled) score += 1;
+    return score;
+  }
+
   function findKeyEl() {
     const title = document.querySelector("#title-input");
     if (!title) return null;
+    const urlKey = peKeyFromPath(location.pathname);
     let scope = title.parentElement;
     for (let i = 0; i < 10 && scope; i++, scope = scope.parentElement) {
-      const hit = [...scope.querySelectorAll("button")].find(isKeyButton);
-      if (hit) return hit;
+      const hits = [...scope.querySelectorAll("button")].filter(isKeyButton);
+      if (!hits.length) continue;
+      // Ties keep document order, which is what the single-key case has always done.
+      let best = hits[0];
+      let bestScore = rankKeyButton(hits[0], urlKey);
+      for (const el of hits.slice(1)) {
+        const score = rankKeyButton(el, urlKey);
+        if (score > bestScore) {
+          best = el;
+          bestScore = score;
+        }
+      }
+      return best;
     }
     return null;
   }
@@ -360,10 +511,13 @@
     // placed — leave it and skip findKeyEl. This spares the whole-page button scan on every
     // mutation-driven inject in the steady state, and reading the key's CURRENT text at copy
     // time means an in-place key change (a peek panel switching items) still copies the right
-    // one. A stale button (its key gone) fails this check and is rebuilt below.
+    // one. A stale button (its key gone) fails this check and is rebuilt below — and so does one
+    // sitting on a linked key, which is never this item's (see rankKeyButton). Without that
+    // second half the fast path would defend a button that landed on a parent chip.
     const existing = document.querySelector(".pe-copy-ref-btn");
     if (existing) {
-      if (isKeyButton(existing.previousElementSibling)) return;
+      const prev = existing.previousElementSibling;
+      if (isKeyButton(prev) && !isLinkedKeyButton(prev)) return;
       removeCopyButtons();
     }
     const keyEl = findKeyEl();
@@ -459,6 +613,11 @@
 
     if (hasCopyFormats()) ensureCopyButton();
     else removeCopyButtons();
+
+    // No gate of its own beyond having somewhere to put it: unlike the other two, focus mode
+    // needs nothing configured. It is offered wherever an item header is, which is the surface
+    // it is about — and it stays out of a page that has no work item on it.
+    ensureFocusButton();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -1400,7 +1559,12 @@
       settings = s;
       syncCache = c;
       recountTemplates();
+      // Read once per load, before the first applyStyles: on a settings change this
+      // re-reads the same value, and nothing else in the browser writes that key.
+      focusOn = readStoredFocus();
+      applyFocusClass();
       applyStyles();
+      announceFocusOnce();
       syncObserver();
       injectAll();
       if (bootstrapTimer) clearInterval(bootstrapTimer);
@@ -1438,12 +1602,23 @@
     });
   } catch (_) {}
 
-  // popup messages: start the element picker, or force a re-scan (self-heal)
+  // messages from the popup (picker, re-scan, focus) and from the service worker, which is
+  // where the keyboard command for focus mode arrives.
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg && msg.type === "pe-start-picker") {
         if (isActive()) startPicker();
         if (sendResponse) sendResponse({ ok: isActive() });
+      } else if (msg && msg.type === "pe-focus-toggle") {
+        // Only on a site the extension runs on: elsewhere there are no rules to apply, and
+        // a toast about a mode that changed nothing would be a lie.
+        const active = isActive();
+        // The popup sends the position its switch is now in; the keyboard command sends
+        // nothing and means "the other one".
+        if (active) setFocus(typeof msg.on === "boolean" ? msg.on : !focusOn, true);
+        if (sendResponse) sendResponse({ ok: active, active, focus: focusOn });
+      } else if (msg && msg.type === "pe-focus-state") {
+        if (sendResponse) sendResponse({ ok: true, active: isActive(), focus: focusOn });
       } else if (msg && msg.type === "pe-rescan") {
         // "Re-scan this page": force a fresh settings load + re-injection, then report status.
         refresh().then(() =>
