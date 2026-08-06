@@ -35,7 +35,7 @@ Enhancer for Plane — Quick Open & Issue Templates
 > (extShort), so the thing you install and the thing you point at match.
 
 ## Summary / short description  (max 132)
-Open any work item by key from the address bar — plus issue templates and copy reference for Plane (makeplane).
+Open any work item by key from the address bar — plus issue templates, copy reference and focus mode for Plane (makeplane).
 
 ## Category
 Developer Tools  (alternative: Workflow & Planning)
@@ -197,7 +197,7 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 > 이름을 바꿔도 확장 ID와 리스팅 URL은 그대로이므로 리뷰와 설치 수는 유지됩니다.
 
 ### 요약 / 짧은 설명 (max 132)
-주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿과 참조 복사까지.
+주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿, 참조 복사, 집중 모드까지.
 
 ### 카테고리
 개발자 도구 (또는 워크플로 및 계획)

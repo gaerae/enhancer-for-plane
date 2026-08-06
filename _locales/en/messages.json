@@ -8,7 +8,7 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, width rules, sync.",
+    "message": "Fills the gaps in self-hosted Plane (makeplane / plane.so), the open-source Jira alternative: copy reference, focus mode, sync.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "cmdToggleFocus": {
@@ -19,7 +19,7 @@
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, width rules. Quick open works on Jira and Linear too.",
+    "message": "Fills the gaps in Plane (makeplane / plane.so) — quick open, issue templates, copy reference, focus mode, width rules. Quick open works on Jira and Linear too.",
     "description": "Sub-line under the settings header. Deliberately does not explain what Plane is — the store listing does that for a stranger, and whoever is reading this already installed the extension. Order matches extName: quick open first."
   },
   "optGitHub": {
@@ -54,7 +54,7 @@
     "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off."
   },
   "optFocusHow": {
-    "message": "Three ways in: <b>Alt+Shift+F</b> (macOS <b>⌥+⇧+F</b>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
+    "message": "Three ways in: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> (macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
   },
   "optFocusScope": {
     "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices."
@@ -649,7 +649,7 @@
     "message": "＋ Add format"
   },
   "optCopyDesc": {
-    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <code>Alt/⌥+C</code>) copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
+    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>) copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name."
   },
   "optCopyTokens": {
     "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
@@ -791,7 +791,7 @@
     "message": "Keyboard shortcuts"
   },
   "optKeysDesc": {
-    "message": "Everything the keyboard reaches, in one place. On macOS, Alt is the Option key."
+    "message": "Everything the keyboard reaches, in one place. On macOS, <kbd>Alt</kbd> is <kbd>⌥</kbd> Option."
   },
   "optKeysColWhat": {
     "message": "Does"
@@ -837,7 +837,7 @@
     "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The other two are handled inside the page and are fixed."
   },
   "optKeysWhyTyping": {
-    "message": "Alt+T is meant to be used mid-sentence, so it works while you type. Alt+C deliberately does not: on macOS Option+C is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives. Focus mode escapes that trade-off by being a browser command, which Chrome intercepts before the page ever sees the key."
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives. Focus mode escapes that trade-off by being a browser command, which Chrome intercepts before the page ever sees the key."
   },
   "optQuickTitle": {
     "message": "Quick open"

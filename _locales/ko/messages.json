@@ -8,7 +8,7 @@
     "description": "The brand on its own — the name you can say out loud. Used where a name has to be short: the popup and settings headers, and the toolbar tooltip. extName adds the searchable half after it."
   },
   "extDesc": {
-    "message": "오픈소스 Jira 대안, 자체 호스팅 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 참조 복사, 폭 조정 규칙, 팀 동기화.",
+    "message": "오픈소스 Jira 대안, 자체 호스팅 Plane(makeplane / plane.so)의 빈 곳을 채웁니다 — 참조 복사, 집중 모드, 팀 동기화.",
     "description": "Short description shown in the Chrome Web Store."
   },
   "cmdToggleFocus": {
@@ -19,7 +19,7 @@
     "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "Plane(makeplane / plane.so)의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
+    "message": "Plane(makeplane / plane.so)의 부족한 기능을 채웁니다 — 바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 폭 조정 규칙. 바로 열기는 Jira·Linear에서도 씁니다."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -52,7 +52,7 @@
     "message": "규칙에 <b>“집중 모드에서만 적용”</b>을 켜 두면 평소에는 적용되지 않고, 집중 모드를 켤 때만 적용됩니다. 작업 항목의 속성 패널을 숨기는 규칙과 왼쪽 내비게이션을 숨기는 규칙이 바로 쓸 수 있게 들어 있습니다. 본문 읽기 폭을 잡아 주는 규칙도 하나 있고, 이것만 꺼진 채로 시작합니다."
   },
   "optFocusHow": {
-    "message": "켜는 길은 셋입니다 — <b>Alt+Shift+F</b>(macOS <b>⌥+⇧+F</b>), 작업 항목 번호 옆의 토글 버튼, 그리고 툴바 팝업의 스위치. 단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요."
+    "message": "켜는 길은 셋입니다 — <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>(macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), 작업 항목 번호 옆의 토글 버튼, 그리고 툴바 팝업의 스위치. 단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요."
   },
   "optFocusScope": {
     "message": "켠 탭에서만 적용되고, 그 탭에서는 새로 고쳐도 유지되며, 탭을 닫으면 사라집니다. 다른 기기로는 동기화되지 않습니다."
@@ -647,7 +647,7 @@
     "message": "＋ 형식 추가"
   },
   "optCopyDesc": {
-    "message": "작업 항목에서 — 항목 화면이든 목록에서 열리는 패널이든 — 번호 옆 버튼 또는 <code>Alt/⌥+C</code>를 누르면 아래 형식 중 하나로 클립보드에 복사합니다. 메신저, 풀 리퀘스트 본문, 브랜치명으로 넘길 때 씁니다."
+    "message": "작업 항목에서 — 항목 화면이든 목록에서 열리는 패널이든 — 번호 옆 버튼 또는 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>를 누르면 아래 형식 중 하나로 클립보드에 복사합니다. 메신저, 풀 리퀘스트 본문, 브랜치명으로 넘길 때 씁니다."
   },
   "optCopyTokens": {
     "message": "치환되는 값은 세 가지입니다: <code>{{item.key}}</code>, <code>{{item.title}}</code>, <code>{{item.url}}</code>. 나머지는 적은 그대로 복사되므로, 각 줄 아래 미리보기가 곧 클립보드에 들어갈 내용입니다."
@@ -789,7 +789,7 @@
     "message": "키보드 단축키"
   },
   "optKeysDesc": {
-    "message": "키보드로 닿는 것을 한자리에 모았습니다. macOS에서 Alt는 Option 키입니다."
+    "message": "키보드로 닿는 것을 한자리에 모았습니다. macOS에서 <kbd>Alt</kbd>는 <kbd>⌥</kbd> Option 키입니다."
   },
   "optKeysColWhat": {
     "message": "동작"
@@ -835,7 +835,7 @@
     "message": "집중 모드는 브라우저 명령이라 <code>chrome://extensions/shortcuts</code>에서 다른 키로 바꾸거나 비울 수 있습니다. 나머지 둘은 페이지 안에서 처리하는 키라 고정입니다."
   },
   "optKeysWhyTyping": {
-    "message": "Alt+T는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다. Alt+C는 일부러 그렇게 하지 않았습니다. macOS에서 Option+C는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다. 집중 모드는 브라우저 명령이라 이 선택을 하지 않아도 됩니다 — Chrome이 페이지보다 먼저 키를 가로챕니다."
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd>는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다. <kbd>Alt</kbd>+<kbd>C</kbd>는 일부러 그렇게 하지 않았습니다. macOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다. 집중 모드는 브라우저 명령이라 이 선택을 하지 않아도 됩니다 — Chrome이 페이지보다 먼저 키를 가로챕니다."
   },
   "optQuickTitle": {
     "message": "바로 열기"

@@ -275,6 +275,12 @@ lies:
   moves the two card counts it asserts, and the Korean line-breaking loop now derives its list
   from the tab strip — a tab added without touching the harness would otherwise be the one tab
   nobody measured Korean on.
+- **One shortcut, one spelling.** `Alt+Shift+F` was written for macOS as `⌥⇧F` in eleven
+  places while the Windows form kept its plus signs, and three settings cards marked a
+  keystroke up three ways (`<kbd>`, `<b>`, `<code>`). Both are now rules in `test.js`: a
+  modifier symbol is followed by `+` or by nothing, and a key named in copy that renders as
+  HTML sits inside `<kbd>`. Plain-text sinks — a `title`, an aria-label, a toast — are exempt
+  because markup cannot reach them; they carry `Alt/⌥+C` style text instead.
 - **Store copy quotes real labels.** `store-assets/STORE_LISTING.md`'s Korean section told
   readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
   now holds every quoted label in an imperative sentence against that locale's catalogue.

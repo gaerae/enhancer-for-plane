@@ -536,9 +536,13 @@ const suites = [
         eq(cards.length, 2, "two cards");
         eq(cards[0], peMsg("optFocusTitle"), "focus first — it is what the checkbox on every rule below refers to");
         eq(cards[1], peMsg("optRulesTitle"), "then the rules");
-        const html = document.getElementById("panel-appearance").innerHTML;
-        ok(html.indexOf("Alt+Shift+F") > -1, "the shortcut is written down somewhere the user will look");
-        ok(html.indexOf("chrome://extensions/shortcuts") > -1, "and so is the way to change it");
+        // textContent, not innerHTML: the keys are marked up one <kbd> at a time, so the
+        // chord only reads as a chord once the tags are out of the way.
+        const text = document.getElementById("panel-appearance").textContent;
+        ok(text.indexOf("Alt+Shift+F") > -1, "the shortcut is written down somewhere the user will look");
+        ok(text.indexOf("⌥+⇧+F") > -1, "with the macOS keys beside it");
+        ok(text.indexOf("chrome://extensions/shortcuts") > -1, "and so is the way to change it");
+        ok(document.querySelectorAll("#panel-appearance kbd").length >= 6, "and they are marked up as keys");
       });
       // The one thing no data test can check: whether a class Plane writes as
       // min-w-[300px] is matched by the escaping we ship for it.
@@ -665,6 +669,16 @@ const suites = [
       check("Work items is the first tab", () => {
         eq(document.querySelector("#tabs .tab").dataset.tab, "items");
       });
+      // The tagline names the features, so every release wants to add a word to it. It was
+      // shortened once already for wrapping to three lines and pushing the tab strip down;
+      // two is the budget, and this is what makes the next addition trade rather than grow.
+      check("the tagline still fits in two lines", () => {
+        const el = document.querySelector(".brand p");
+        const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.5;
+        const lines = Math.round(el.getBoundingClientRect().height / lh);
+        ok(lines <= 2, lines + " lines — trade a feature out of it rather than adding one more");
+        return lines + " lines";
+      });
       check("Work items opens with Quick open above Copy reference", () => {
         document.getElementById("tab-items").click();
         const cards = [...document.querySelectorAll("#panel-items section.card")];
@@ -707,6 +721,15 @@ const suites = [
         const h = el.getBoundingClientRect().height;
         ok(h < oneLine, "label is " + h.toFixed(1) + "px tall — it wrapped");
         return h.toFixed(1) + "px";
+      });
+      // Same budget as the English page, measured again because the Korean line is shorter in
+      // characters and wider per character — neither one predicts the other.
+      check("the Korean tagline still fits in two lines", () => {
+        const el = document.querySelector(".brand p");
+        const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.5;
+        const lines = Math.round(el.getBoundingClientRect().height / lh);
+        ok(lines <= 2, lines + " lines");
+        return lines + " lines";
       });
       check("the header stays a single row", () => {
         const brand = document.querySelector(".brand").getBoundingClientRect();

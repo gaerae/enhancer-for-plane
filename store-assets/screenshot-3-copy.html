@@ -13,6 +13,20 @@
     width: 22px; height: 22px; border-radius: 6px; background: #eceef1;
     display: flex; align-items: center; justify-content: center; color: #121212;
   }
+  /* The focus toggle is the copy button's neighbour in the real header, so it is its
+     neighbour here. Quieter than the copy button: this capture is about copying, and the
+     toggle is here to be recognised later rather than explained now. */
+  .focusbtn {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: #79818c;
+  }
+  .keytag {
+    margin-left: 4px; font-size: 11.5px; color: #9aa1aa; letter-spacing: -0.01em;
+  }
+  .keytag .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: #79818c;
+  }
   .doc-title { margin-top: 9px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
 
   .panel.formats { left: 610px; top: 376px; width: 396px; }
@@ -39,6 +53,14 @@
           <path d="M10.5 3.75H3.9a1.15 1.15 0 0 0-1.15 1.15v6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
       </span>
+      <!-- the focus toggle, the same three-column glyph the content script injects -->
+      <span class="focusbtn">
+        <svg viewBox="0 0 16 16" width="13" height="13">
+          <rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </span>
+      <span class="keytag" data-t="focusTag"></span>
     </div>
     <div class="doc-title" data-t="itemTitle"></div>
   </div>
@@ -80,7 +102,8 @@
       p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Checkout fails on Safari",
       f3: "Branch name",
       manage: "＋ Manage copy formats",
-      caption: "Every format is yours to edit — and the preview <b>is</b> what lands on the clipboard"
+      focusTag: "focus mode · <span class=\"kbd\">Alt+Shift+F</span>",
+      caption: "Every format is yours to edit — the preview <b>is</b> what lands on the clipboard. Next to it, <b>focus mode</b> hides the side panels."
     },
     ko: {
       head: "항목을 그대로<br />가져가기.",
@@ -95,7 +118,8 @@
       p2: "[PROJ-142](https://plane.example.com/acme/browse/PROJ-142) Safari에서 결제가 실패합니다",
       f3: "브랜치명",
       manage: "＋ 참조 복사 형식 관리",
-      caption: "형식은 마음대로 고칠 수 있고, 미리보기가 <b>곧</b> 클립보드에 담길 내용입니다"
+      focusTag: "집중 모드 · <span class=\"kbd\">Alt+Shift+F</span>",
+      caption: "형식은 마음대로 고칠 수 있고, 미리보기가 <b>곧</b> 클립보드에 담길 내용입니다. 그 옆 버튼은 <b>집중 모드</b>로, 측면 패널을 숨깁니다."
     }
   };
 </script>

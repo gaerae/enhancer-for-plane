@@ -1490,6 +1490,24 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
   eq(bad, [], "a macOS chain written without separators: " + bad.join(", "));
 });
 
+// The other half of the same inconsistency: the templates card marked its shortcut up as
+// <kbd>, the focus card used <b> and the copy card <code>, so three cards described a
+// keystroke three ways on one settings page. Only messages that already carry markup are
+// checked — a title attribute or a toast has nowhere to put a tag.
+test("shortcuts: a key named in rendered copy is marked up as one", () => {
+  const KEY = /\bAlt\b|⌥|⇧|⌘|⌃/;
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const [key, entry] of Object.entries(cat)) {
+      const msg = String((entry && entry.message) || "");
+      if (!/<[a-z]+>/.test(msg)) continue;
+      if (KEY.test(msg.replace(/<kbd>.*?<\/kbd>/g, ""))) bad.push(loc + "/" + key);
+    }
+  }
+  eq(bad, [], "a key outside <kbd> in copy that renders as HTML: " + bad.join(", "));
+});
+
 test("store copy: a quoted UI label is one the matching locale actually shows", () => {
   // The Korean listing told people to click "Pick element" and "Enable on this site" — the
   // English labels. A Korean reader sees "요소 선택 → 규칙 추가" and "이 사이트에서 사용", so the

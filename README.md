@@ -11,9 +11,9 @@ A lightweight, unofficial Chrome extension (Manifest V3) for
 open-source **project management, issues & wiki** tool and a self-hosted
 alternative to Jira. It fills the gaps every issue tracker leaves — reusable
 **issue templates** for the tickets you file over and over, **quick open** to reach
-a ticket from its key, and a one-click **copy reference** — directly in the Plane
-UI, with **no changes to your Plane server**, applied only on the domains you
-enable.
+a ticket from its key, a one-click **copy reference**, and a **focus mode** that
+puts the side panels away — directly in the Plane UI, with **no changes to your
+Plane server**, applied only on the domains you enable.
 
 > Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner.
 > (And no — nothing to do with airplanes.)
