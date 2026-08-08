@@ -51,6 +51,22 @@ Schema 7 → 8.
   release. The checks now hold both generations on one page, including the near misses:
   `.shrink-0.bg-surface-1` without the `.z-[5]` also catches an unrelated chip on Cloud's
   cycles route, and hiding it would be focus mode reaching outside the page it is for.
+- **The template button never appeared on Plane Cloud.** The biggest thing this extension
+  does, missing on one of the two places it runs, for a release. It anchors on the
+  description toolbar's attach button, found by walking up from the editor, and the walk
+  stopped at 8 levels. Measured 2026-08-09 on a real work item in each generation: 1.4 puts
+  that button within 8 of the editor, Cloud puts it at **10**. Two levels short, and nothing
+  said so — a button that was never injected looks exactly like a page still loading.
+
+  The ceiling is 12 now, and both sides of that number are load-bearing. It has to reach 10
+  or Cloud stays broken; it has to stop short of **14**, which is where the *comment* box's
+  attach button sits — raising it until Cloud worked would have put a template button on a
+  comment, and a template fills a title a comment has not got. Comment templates are
+  deliberately not a feature.
+
+  This had no browser check at all, which is why a number tuned to one generation survived
+  the other. It now has a page carrying an editor at each of those three depths, and setting
+  the ceiling to 8 or to 16 fails it.
 - **Copy reference read no title on Jira.** Plane and Linear write a tab title as
   `KEY title`; Jira writes `[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira`, and the
   brackets meant the key never matched, so the popup offered the key with an empty title. The

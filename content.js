@@ -318,12 +318,30 @@
   const isCandidateButton = (b) =>
     !b.classList.contains("pe-body-tmpl-btn") && !(b.parentElement && b.parentElement.closest("button"));
 
+  // How far up from an editor the shared toolbar wrapper can be. Measured 2026-08-09 on a
+  // work item in each generation, from the editor to the ancestor that contains the attach
+  // button:
+  //
+  //   self-hosted 1.4   description → within 8
+  //   Plane Cloud       description → 10,  comment → 14
+  //
+  // It was 8, so on Cloud the walk gave up two levels short and the template button — the
+  // biggest thing this extension does — silently never appeared. Nothing said so: a button
+  // that is not injected looks exactly like a page that has not finished loading.
+  //
+  // 12 is chosen to sit between those two numbers, and both sides of that matter. It has to
+  // reach 10 or Cloud's description toolbar stays out of range; it has to stop short of 14
+  // or the COMMENT editor would find the description's attach button and put a template
+  // button on a box that has no title to fill. The scan widens one level at a time and takes
+  // the first hit, so 1.4 still matches at its own shorter distance and is unaffected.
+  const PE_TOOLBAR_WALK = 12;
+
   // Find a given editor's toolbar attach button by walking up to the shared wrapper.
   // Primary: a button wrapping a file input (any language). Fallback: attach/첨부 text.
   function findToolbarAnchor(editor) {
     const scan = (pred) => {
       let n = editor;
-      for (let i = 0; i < 8 && n; i++) {
+      for (let i = 0; i < PE_TOOLBAR_WALK && n; i++) {
         if (n.querySelectorAll) {
           const hit = [...n.querySelectorAll("button")].find(pred);
           if (hit) return hit;

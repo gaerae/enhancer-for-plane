@@ -862,6 +862,66 @@ const suites = [
       });`
   },
   {
+    // The template button, which had no browser coverage at all — and went a release without
+    // appearing on Plane Cloud because of it. It is anchored on the description toolbar's
+    // attach button, found by walking up from the editor, and the walk had a fixed ceiling
+    // of 8 levels. Measured 2026-08-09 on a real work item in each generation: self-hosted
+    // 1.4 puts the attach button within 8 of the editor, Plane Cloud puts it at 10 — and the
+    // comment editor's is at 14. So the ceiling has a floor AND a lid, and this page holds
+    // one editor at each of those three depths to hold it there.
+    name: "content · the template button finds its toolbar",
+    page: {
+      name: "ct-tmpl",
+      plane: `<div id="editors"></div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      // Build an editor whose attach button sits exactly \`depth\` levels above it: depth-1
+      // wrappers between the shared container and the editor puts the container at depth.
+      const make = (id, depth) => {
+        const box = document.createElement("div");
+        box.id = id;
+        let n = box;
+        for (let i = 0; i < depth - 1; i++) { const d = document.createElement("div"); n.appendChild(d); n = d; }
+        const ed = document.createElement("div");
+        ed.className = "ProseMirror";
+        ed.id = id + "-editor";
+        n.appendChild(ed);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("aria-label", "Attach");
+        const f = document.createElement("input");
+        f.type = "file";
+        btn.appendChild(f);
+        box.appendChild(btn);
+        document.getElementById("editors").appendChild(box);
+        return box;
+      };
+      make("shallow", 6);   // self-hosted 1.4
+      make("cloud", 10);    // Plane Cloud's description
+      make("far", 14);      // Plane Cloud's comment box
+      document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await sleep(1200);
+
+      const btnIn = (id) => document.getElementById(id).querySelectorAll(".pe-body-tmpl-btn").length;
+      check("it reaches a toolbar 10 levels up, which is where Cloud puts it", () => {
+        eq(btnIn("cloud"), 1, "no template button on Plane Cloud's description editor");
+      });
+      check("and still finds the one self-hosted Plane puts closer", () => {
+        eq(btnIn("shallow"), 1);
+      });
+      // The lid. Raising the ceiling until "it works" would hand the comment box the
+      // description's attach button, and a template fills a title the comment box has not
+      // got. Comment templates are deliberately not a feature.
+      check("but stops short of the comment box's own toolbar", () => {
+        eq(btnIn("far"), 0, "a template button landed on a comment editor");
+      });
+      check("one button per toolbar, not one per mutation", () => {
+        eq(document.querySelectorAll(".pe-body-tmpl-btn").length, 2, "duplicates");
+      });`
+  },
+  {
     // Paste beats a list of five, and the list of five is what the chooser was. Everything
     // here is a question about the assembled page: whether the box reports what it read
     // before anything is committed, whether refusing looks like refusing, and where the caret
