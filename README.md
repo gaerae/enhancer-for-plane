@@ -44,10 +44,14 @@ Plane server**, applied only on the domains you enable.
      search. Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is
      not — so there is no prefix or mode to remember. Give a target a **search URL** with
      `{{q}}` in Settings; a target without one simply does not answer a search.
-     - Plane's is `https://your-plane/{workspace}/search/?q={{q}}` — the search *page*, which
-       comes up with the box pre-filled. Not the `/api/…/search/?search=…` address behind it:
-       that is the request the app makes and opening it shows raw JSON. Settings says so if
-       what you paste looks like an API path.
+     - **How much this gets you depends on the tracker.** Jira and GitHub run the search from
+       the URL and land you on results. Plane, measured on app.plane.so (2026-08-08), does
+       not: `/{workspace}/search/?q=…` opens the search page with your words already in the
+       box, but still shows "Start typing to search" — so it saves the retyping and leaves
+       you a keystroke away, which is worth having but is not results.
+     - Whatever you use, give it the **page**, not the API behind it. Plane's
+       `/api/…/search/?search=…` is the request the app makes; opening it shows raw JSON.
+       Settings says so if what you paste looks like an API path.
    - **The recent list and the search row are the extension's, not Chrome's history** — the
      omnibox API has no way to put an icon on a row, so recents are labelled `Recent ·` and
      the rest name what they will do (`Open PROJ-123 in Plane`). The only icon Chrome shows

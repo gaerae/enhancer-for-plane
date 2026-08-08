@@ -1446,6 +1446,27 @@ const typed = (w, text) => new Promise((r) => w.ctx.state ? r() : r()).then(() =
   w.state.onInput(text, (rows) => res(rows));
 }));
 
+// Chrome offers no per-row icon in the omnibox — the only icon an extension gets is the one
+// in the address bar once the keyword is active — so the label at the front of each row is
+// the whole of what tells these apart from Chrome's own history. That makes the shape a
+// contract rather than a wording choice: one label, one separator, in every locale. The
+// separator is also where an emoji would go if anyone wants one later; it is a message edit,
+// not a code change, which is the reason the label lives in the catalogue at all.
+test("omnibox: every row is labelled, in the same shape, in both locales", () => {
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const key of ["omniboxOpen", "omniboxSearch", "omniboxRecent"]) {
+      const m = (cat[key] || {}).message || "";
+      if (!/^[^$·]+ · /.test(m)) bad.push(loc + "/" + key + ': "' + m + '"');
+      // A label that is itself a placeholder would put a target's name where the row type
+      // belongs, and the row would read as data rather than as an action.
+      if (/^\$/.test(m)) bad.push(loc + "/" + key + " starts with a value, not a label");
+    }
+  }
+  eq(bad, [], "an omnibox row without a leading label:\n  " + bad.join("\n  "));
+});
+
 test("omnibox: a key routes, and the row says where Enter will land", async () => {
   const w = loadOmnibox();
   const rows = await typed(w, "GAERA-6");

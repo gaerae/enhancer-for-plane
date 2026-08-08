@@ -890,7 +890,7 @@
     "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too."
   },
   "optQuickTokens": {
-    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe second line is optional: give it a search URL with <code>{{q}}</code> and typing words instead of a key searches there — Plane's is <code>/{workspace}/search/?q={{q}}</code>, the page, not the <code>/api/</code> address behind it.\nThe lines under each row show where a sample key and a sample phrase would land."
+    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe second line is optional: give it a search URL with <code>{{q}}</code> and typing words instead of a key goes there. Give it the page, not the <code>/api/</code> address behind it — and note that some trackers only pre-fill the box rather than run the search.\nThe lines under each row show where a sample key and a sample phrase would land."
   },
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
@@ -955,7 +955,7 @@
     "description": "Right-click menu entry, shown only when text is selected. It reads the key out of whatever was selected, so the wording says \"from selection\" rather than naming a key it cannot know yet."
   },
   "omniboxSearch": {
-    "message": "Search $NAME$ for “$Q$”",
+    "message": "Search · $NAME$ · “$Q$”",
     "description": "Omnibox row when what was typed is words rather than a key.",
     "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
   },
@@ -971,7 +971,7 @@
     "message": "No quick link set — Enter opens Settings"
   },
   "omniboxOpen": {
-    "message": "Open $KEY$ in $NAME$",
+    "message": "Open · $KEY$ · $NAME$",
     "placeholders": {
       "key": {
         "content": "$1"

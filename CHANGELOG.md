@@ -75,10 +75,12 @@ Schema 7 → 8.
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
   loads, it returns 200 — so the row where it is typed is the only place to say anything. A
   hint, not a refusal.
-- **Omnibox rows say what they are.** Recents were indistinguishable from Chrome's own
-  history, and the omnibox API has no way to put an icon on a row, so they are now labelled
-  `Recent ·` (the other rows already name their action). The only icon Chrome offers an
-  extension here is the one in the address bar, once the keyword is active.
+- **Omnibox rows say what they are, in one shape.** They were indistinguishable from Chrome's
+  own history, and the omnibox API has no way to put an icon on a row — the only icon an
+  extension gets there is the one in the address bar, once the keyword is active. So every
+  row now leads with a label: `Open · PROJ-123 · Plane`, `Search · Plane · "login bug"`,
+  `Recent · PROJ-123 · Plane`. The labels are ordinary translated messages, so changing one
+  (adding an emoji, say) is a catalogue edit rather than a code change.
 - **The element picker now offers stable selectors first, and marks the ones that expire.**
   It ranked on one axis — "is this a Tailwind width class" — which says nothing about the
   question that decides whether a rule survives: did a person write this handle, or did a
