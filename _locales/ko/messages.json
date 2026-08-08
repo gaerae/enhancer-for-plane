@@ -643,10 +643,22 @@
   "pickerHint": {
     "message": "요소를 클릭하면 규칙이 만들어집니다 · Esc로 취소"
   },
-  "pickGenerated": {
-    "message": "곧 바뀔 수 있음",
-    "description": "Badge on a picker candidate whose class or id looks build-generated (a hash, a uuid, a counter) rather than authored. Short: it sits inline beside the selector and a match count."
+  "pickGroupDurable": {
+    "message": "추천 — 사람이 붙인 이름",
+    "description": "Heading over the first group of picker candidates. The ranking is invisible without it: a reader cannot see an order, and the dimmed rows below read as the normal colour."
   },
+  "pickGroupExpiring": {
+    "message": "곧 바뀔 수 있음 — 빌드가 만든 이름",
+    "description": "Heading over the demoted picker candidates: hashes, uuids, counters. Still pickable — this is a guess about someone else's markup."
+  },
+  "pickKindId": { "message": "id" },
+  "pickKindIdPrefix": { "message": "id 접두사" },
+  "pickKindData": { "message": "data 속성" },
+  "pickKindLabel": { "message": "라벨" },
+  "pickKindRole": { "message": "역할" },
+  "pickKindClass": { "message": "클래스" },
+  "pickKindTagClasses": { "message": "태그 + 클래스" },
+  "pickKindPath": { "message": "위치" },
   "pickMatches": {
     "message": "$COUNT$개 일치",
     "placeholders": {

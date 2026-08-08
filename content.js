@@ -1435,28 +1435,51 @@
     h.className = "pe-pick-header";
     h.textContent = peMsg("pickHeader");
     chooserEl.appendChild(h);
+    // What kind of handle each row is. buildCandidates has always known this and the list
+    // never showed it, which left the ordering to speak for itself — and an order speaks to
+    // nobody without something to compare against. These are the words that say why a row
+    // is where it is.
+    const KIND_LABEL = {
+      id: peMsg("pickKindId"),
+      "id-prefix": peMsg("pickKindIdPrefix"),
+      data: peMsg("pickKindData"),
+      label: peMsg("pickKindLabel"),
+      role: peMsg("pickKindRole"),
+      class: peMsg("pickKindClass"),
+      "tag+classes": peMsg("pickKindTagClasses"),
+      auto: peMsg("pickKindPath")
+    };
+    // Two groups under two headings, because a heading is the one thing that makes a
+    // ranking legible: without it, a dimmed row reads as the normal colour and the order
+    // reads as no order at all.
+    let group = null;
     cands.forEach((c) => {
+      const want = c.generated ? "expiring" : "durable";
+      if (group !== want) {
+        group = want;
+        const g = document.createElement("div");
+        g.className = "pe-pick-group";
+        // Two literal calls, not one with a ternary inside: check-i18n reads the key out of
+        // the call site, and an expression there hides it from the contract.
+        g.textContent = want === "durable" ? peMsg("pickGroupDurable") : peMsg("pickGroupExpiring");
+        chooserEl.appendChild(g);
+      }
       const it = document.createElement("button");
       it.type = "button";
       it.className = "pe-pick-item";
       const s = document.createElement("span");
       s.className = "pe-pick-sel";
       s.textContent = c.sel;
+      const k = document.createElement("span");
+      k.className = "pe-pick-kind";
+      k.textContent = KIND_LABEL[c.kind] || "";
       const n = document.createElement("span");
       n.className = "pe-pick-count";
       n.textContent = peMsg("pickMatches", [String(c.count)]);
       it.appendChild(s);
+      it.appendChild(k);
       it.appendChild(n);
-      // Ranking alone moves a hashed class down a list the user is about to pick from
-      // anyway. Saying why is what stops them picking it: the selector looks perfectly
-      // ordinary, and nothing else on screen suggests it expires.
-      if (c.generated) {
-        it.classList.add("generated");
-        const w = document.createElement("span");
-        w.className = "pe-pick-warn";
-        w.textContent = peMsg("pickGenerated");
-        it.appendChild(w);
-      }
+      if (c.generated) it.classList.add("generated");
       it.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();

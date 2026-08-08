@@ -178,26 +178,39 @@
 }
 #pe-pick-menu .pe-pick-count {
   flex-shrink: 0;
+  margin-left: 0;
   font-size: 10.5px;
   color: #9ca3af;
   background: #f1f2f4;
   border-radius: 999px;
   padding: 1px 8px;
 }
-/* A selector whose handle looks generated. Dimmed rather than struck through or disabled:
-   it is still the right answer sometimes (a one-off tweak, a page you own), and the row has
-   to stay pickable. The badge beside it is what actually says why. */
-#pe-pick-menu .pe-pick-item.generated .pe-pick-sel {
+/* The two group headings. These carry the ranking: an order is invisible without something
+   to compare against, and a dimmed row on its own reads as the normal colour — which is
+   exactly how the first version was understood, or rather was not. */
+#pe-pick-menu .pe-pick-group {
+  padding: 9px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: #6b7280;
 }
-#pe-pick-menu .pe-pick-warn {
-  flex-shrink: 0;
+#pe-pick-menu .pe-pick-group:first-of-type {
+  padding-top: 2px;
+}
+/* What kind of handle this row is — id, data attribute, class, position. Computed since the
+   picker was written and never shown, which left the order to explain itself. */
+#pe-pick-menu .pe-pick-kind {
+  flex: 0 0 auto;
+  margin-left: auto;
   font-size: 10.5px;
-  color: #92400e;
-  background: #fff8ec;
-  border: 1px solid #fcd9a4;
-  border-radius: 999px;
-  padding: 0 7px;
+  color: #9ca3af;
+}
+/* A selector whose handle looks generated. Dimmed rather than struck through or disabled:
+   it is still the right answer sometimes (a one-off tweak, a page you own), and the row has
+   to stay pickable. Its heading is what says why. */
+#pe-pick-menu .pe-pick-item.generated .pe-pick-sel {
+  color: #6b7280;
 }
 @media (prefers-color-scheme: dark) {
   #pe-pick-menu {
@@ -214,14 +227,10 @@
     background: #262b31;
     color: #9aa4b2;
   }
-  #pe-pick-menu .pe-pick-item.generated .pe-pick-sel {
+  #pe-pick-menu .pe-pick-item.generated .pe-pick-sel,
+  #pe-pick-menu .pe-pick-group,
+  #pe-pick-menu .pe-pick-kind {
     color: #9aa4b2;
-  }
-  /* The amber wash is a near-white block on a dark menu; tint the dark surface instead. */
-  #pe-pick-menu .pe-pick-warn {
-    color: #fbbf24;
-    background: #241d10;
-    border-color: #4d3a17;
   }
 }
 

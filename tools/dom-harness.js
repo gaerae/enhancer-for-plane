@@ -1354,21 +1354,39 @@ const suites = [
         ok(s.indexOf(".max-w-40") < s.indexOf(".sx-3nfvp2"), "Tailwind above the hash");
         ok(s.indexOf('[aria-label="Issue description"]') < s.indexOf(".max-w-40"), "attributes above Tailwind");
       });
-      // Ranking moves it down a list the user is about to pick from anyway. Only the badge
-      // tells them the selector expires — nothing else on the row looks any different.
-      check("and the hashes are marked, not just demoted", () => {
+      // Order alone is not legible — a reader has nothing to compare a position against, and
+      // a dimmed row reads as the normal colour. It was reported as exactly that: "I thought
+      // grey was the default." So the ranking has to be said in words, twice: a heading over
+      // each group, and the kind of handle on each row.
+      check("the two groups are named, in order", () => {
+        const heads = [...document.querySelectorAll("#pe-pick-menu .pe-pick-group")].map((g) => g.textContent);
+        eq(heads, [peMsg("pickGroupDurable"), peMsg("pickGroupExpiring")], "both headings, durable first");
+      });
+      check("every row says what kind of handle it is", () => {
+        const pairs = rows().map((r) => [r.querySelector(".pe-pick-sel").textContent, r.querySelector(".pe-pick-kind").textContent]);
+        for (const [sel, kind] of pairs) ok(kind, "no kind on " + sel);
+        const kindOf = (sel) => (pairs.find((p) => p[0] === sel) || [])[1];
+        eq(kindOf("[data-view-id]"), peMsg("pickKindData"));
+        eq(kindOf(".max-w-40"), peMsg("pickKindClass"));
+        eq(kindOf('[id^="editor-container"]'), peMsg("pickKindIdPrefix"));
+      });
+      check("the hashes sit under the second heading, not scattered", () => {
         const marked = rows().filter((r) => r.classList.contains("generated"));
         const names = marked.map((r) => r.querySelector(".pe-pick-sel").textContent);
-        ok(names.indexOf(".sx-3nfvp2") > -1, "the hash is marked: " + names.join(" | "));
+        ok(names.indexOf(".sx-3nfvp2") > -1, "the hash is in it: " + names.join(" | "));
         ok(names.indexOf(".max-w-40") === -1, "and Tailwind is not");
         ok(names.indexOf('[aria-label="Issue description"]') === -1, "nor the aria-label");
-        const warn = marked[0].querySelector(".pe-pick-warn");
-        ok(warn && warn.textContent === peMsg("pickGenerated"), "with a badge that says why");
+        // Grouped means contiguous: the marked rows must be the tail of the list, or the
+        // heading above them is describing rows it does not cover.
+        const all = rows();
+        const firstMarked = all.findIndex((r) => r.classList.contains("generated"));
+        ok(all.slice(firstMarked).every((r) => r.classList.contains("generated")), "the groups interleave");
       });
-      check("the badge is legible where it sits", () => {
-        const warn = document.querySelector("#pe-pick-menu .pe-pick-warn");
-        const c = contrast(getComputedStyle(warn).color, bg(warn));
-        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      check("both headings are legible", () => {
+        for (const g of document.querySelectorAll("#pe-pick-menu .pe-pick-group")) {
+          const c = contrast(getComputedStyle(g).color, bg(document.getElementById("pe-pick-menu")));
+          ok(c >= 4.5, g.textContent + ": contrast " + c.toFixed(2));
+        }
       });
       check("the counts are still real", () => {
         const row = rows().find((r) => r.querySelector(".pe-pick-sel").textContent === ".max-w-40");
