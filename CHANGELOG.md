@@ -26,6 +26,13 @@ Schema 7 → 8.
   release. The checks now hold both generations on one page, including the near misses:
   `.shrink-0.bg-surface-1` without the `.z-[5]` also catches an unrelated chip on Cloud's
   cycles route, and hiding it would be focus mode reaching outside the page it is for.
+- **Copy reference read no title on Jira.** Plane and Linear write a tab title as
+  `KEY title`; Jira writes `[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira`, and the
+  brackets meant the key never matched, so the popup offered the key with an empty title. The
+  key leads in all three and only Jira wraps it, so that is the one extra shape accepted. The
+  trailing ` - Jira` is left alone deliberately: cutting a trailing ` - something` is a guess
+  about titles rather than about keys, and it would eat the last words of a title that
+  genuinely ends that way. It is on screen in the popup before anything is copied.
 
 ### New
 - **Quick open remembers what you opened.** Its one real barrier was having to already know
@@ -124,6 +131,12 @@ Schema 7 → 8.
   shadow appears at whichever edge has content behind it — two pairs of CSS gradients, one
   scrolling with the content and one fixed, so there is no scroll position for a script to keep
   in sync. A short popup stays short: `max-height`, not `height`.
+- **Shortcuts says why the address-bar keyword is not a setting.** `issue` looks like one,
+  because Chrome lists it under Search engines → Extensions — but an extension declares its
+  keyword in its manifest and there is no API to change it, and that row's own menu offers
+  only Manage and Deactivate (checked on Chrome 151, not assumed). So the tab says so, and
+  points at Chrome's Site search on the same page for anyone who wants a shorter one, with
+  what that costs: one fixed address, no prefix routing, no recents, no search fallback.
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
