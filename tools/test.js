@@ -43,7 +43,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
   "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
   "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
-  "\n;globalThis.__V8_DROPDOWN_SELECTOR = PE_V8_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.__V7_DROPDOWN_SELECTOR = PE_V7_DROPDOWN_SELECTOR;" +
   "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
@@ -1276,7 +1276,7 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 9, "PE_SCHEMA is 9");
+  eq(ctx.__SCHEMA, 8, "PE_SCHEMA is 8");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
@@ -2181,9 +2181,9 @@ test("focus: a v6 install lands on the current selectors in one pass", () => {
 // The same rot, one release later and one rule over. Plane Cloud moved its property
 // dropdowns from Headless UI to Base UI; self-hosted 1.4 has not, so this is a union rather
 // than a replacement. Measured 2026-08-08 with the module dropdown open on both instances.
-test("dropdown: v9 repoints the search dropdown preset onto both generations", () => {
+test("dropdown: v8 repoints the search dropdown preset onto both generations", () => {
   const ctx = loadCommon();
-  const was = ctx.__V8_DROPDOWN_SELECTOR;
+  const was = ctx.__V7_DROPDOWN_SELECTOR;
   const now = ctx.PE_DROPDOWN_SELECTOR;
   ok(now !== was, "the selector actually changed");
   ok(now.indexOf(was) === 0, "Plane 1.4's shape still leads, as with the focus selectors");
@@ -2193,7 +2193,7 @@ test("dropdown: v9 repoints the search dropdown preset onto both generations", (
   ok(now.indexOf(":has(input)") > -1, "the search box is part of what identifies it");
 
   const out = ctx.peMigrate({
-    schema: 8,
+    schema: 7,
     rules: [
       { id: "rule-combobox-dropdown", enabled: true, selector: was, property: "width", value: "320px" },
       { id: "rule-module-name", enabled: true, selector: ".max-w-40", property: "max-width", value: "320px" }
@@ -2205,15 +2205,15 @@ test("dropdown: v9 repoints the search dropdown preset onto both generations", (
   eq(out.rules.length, 2, "and nothing was appended");
 });
 
-test("dropdown: v9 leaves an edited selector, and a deleted preset, alone", () => {
+test("dropdown: v8 leaves an edited selector, and a deleted preset, alone", () => {
   const ctx = loadCommon();
   const mine = '[data-base-ui-portal] [role="dialog"]';
   const out = ctx.peMigrate({
-    schema: 8,
+    schema: 7,
     rules: [{ id: "rule-combobox-dropdown", selector: mine, property: "width", value: "400px" }]
   });
   eq(out.rules[0].selector, mine, "someone who already worked it out keeps their fix");
-  eq(ctx.peMigrate({ schema: 8, rules: [] }).rules.length, 0, "and a deleted preset stays deleted");
+  eq(ctx.peMigrate({ schema: 7, rules: [] }).rules.length, 0, "and a deleted preset stays deleted");
 });
 
 // The two places that ship this preset must agree, or half the users get the dead selector.

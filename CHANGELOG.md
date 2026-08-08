@@ -12,7 +12,7 @@ first read, never rewritten by hand.
 
 ## v1.8.0 — 2026-08-08
 
-Schema 7 → 9.
+Schema 7 → 8.
 
 ### Fixed
 - **The search dropdown preset had stopped matching on Plane Cloud too.** Same rot as the
@@ -27,7 +27,8 @@ Schema 7 → 9.
   | Plane Cloud | 0 | 1 |
 
   So the selector is a union of both, Plane 1.4 first, and installs still carrying exactly
-  what v8 shipped are repointed on first read. A selector you edited is left alone.
+  what v7 shipped are repointed on first read — the same schema step as the focus selectors,
+  because this is one release's worth of the same rot. A selector you edited is left alone.
 
   `:has(input)` is what keeps this a *search* dropdown rather than every popover — a plain
   menu has no search box. Two things it deliberately does not catch, both checked with them

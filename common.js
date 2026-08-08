@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 9;
+const PE_SCHEMA = 8;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -265,14 +265,19 @@ const PE_FOCUS_WIDTH_SELECTOR = ".overflow-y-auto.px-9.py-5, .overflow-y-auto.px
 const PE_DROPDOWN_SELECTOR =
   '[id^="headlessui-combobox-options"] > div, [data-base-ui-portal] [role="dialog"]:has(input)';
 
-// What earlier versions shipped, kept only so a migration can tell an untouched preset from
-// one the user edited. Never widen this into "any selector we ever shipped" — a value here
-// is a licence to overwrite what is in somebody's storage.
+// What v7 — the last released version — shipped for the three selectors that stopped
+// matching Plane Cloud, kept only so the migration can tell an untouched preset from one the
+// user edited. Never widen this into "any selector we ever shipped": a value here is a
+// licence to overwrite what is in somebody's storage.
+//
+// The dropdown one arrived a day after the other two and got its own schema step at first,
+// which was churn: v8 has not been released, so no install is at 8 and a `from < 9` branch
+// could never have run for anybody. One unreleased version, one schema number.
 const PE_V7_FOCUS_SELECTORS = {
   "rule-focus-item-properties": ".fixed.right-0.border-l.min-w-\\[300px\\]",
   "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"
 };
-const PE_V8_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
+const PE_V7_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
 
 function peFocusPresetRules() {
   return [
@@ -774,22 +779,18 @@ function peMigrate(raw) {
     raw.rules = rules;
   }
   if (from < 8) {
+    // Three selectors that stopped matching Plane Cloud, repointed in one step because they
+    // are one release's worth of the same rot. Guarded the same way in each case: a rule is
+    // moved ONLY while its selector is character-for-character what v7 shipped. Anyone who
+    // edited theirs — including anyone who already worked Cloud's markup out by hand — keeps
+    // exactly what they typed, and a preset they deleted stays deleted.
     const shipped = {};
     peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+    shipped["rule-combobox-dropdown"] = PE_DROPDOWN_SELECTOR;
+    const was = Object.assign({ "rule-combobox-dropdown": PE_V7_DROPDOWN_SELECTOR }, PE_V7_FOCUS_SELECTORS);
     (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
       if (!r || typeof r !== "object") return;
-      const was = PE_V7_FOCUS_SELECTORS[r.id];
-      if (was && r.selector === was) r.selector = shipped[r.id];
-    });
-  }
-  if (from < 9) {
-    // Same shape as the v8 focus repoint, and the same guard: only a selector that is
-    // character-for-character what v8 shipped gets moved. Anyone who edited theirs — to
-    // point at a different dropdown, or because they had already worked around this — keeps
-    // exactly what they typed. A preset they deleted stays deleted.
-    (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
-      if (!r || typeof r !== "object" || r.id !== "rule-combobox-dropdown") return;
-      if (r.selector === PE_V8_DROPDOWN_SELECTOR) r.selector = PE_DROPDOWN_SELECTOR;
+      if (was[r.id] && r.selector === was[r.id]) r.selector = shipped[r.id];
     });
   }
   raw.schema = PE_SCHEMA;

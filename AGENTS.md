@@ -52,6 +52,13 @@ changed anything a user sees, drive it:
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
   value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
   `tools/test.js`; the DOM timing is only provable in a browser.
+- **One schema number per released version.** `PE_SCHEMA` describes what is in somebody's
+  storage, so it only needs to move when storage on a machine somewhere differs from what the
+  code expects. While a release is unreleased, its number has not reached anyone — a second
+  bump in the same cycle adds a `from < N` branch that can never run, and every later reader
+  has to work out that it is dead. Check `git show main:common.js | grep PE_SCHEMA` before
+  bumping: if the number you are about to leave behind is not on `main`, fold your step into
+  the existing one instead, and guard it against what the last *released* version shipped.
 - **A shipped preset has to be driven from a real migration, not from a hand-written seed.**
   `seedOf` carries a synthetic `.max-w-40` rule, and for a long time that meant no shipped
   preset except the focus ones was ever applied in a browser — which is how the search
