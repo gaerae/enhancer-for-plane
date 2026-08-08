@@ -111,6 +111,19 @@ Schema 7 → 8.
   work out. And **Tab walks the remaining blanks** before it goes anywhere else, across both
   URL fields; GitHub's shape leaves four, and the other three were being dragged over by hand.
   Once none are left, Tab is Tab again.
+- **The popup stays inside the window Chrome gives it, and says when there is more.** Chrome
+  caps a toolbar popup at 600px tall and cuts the rest without a word. Recents, the copy block
+  and the search field had taken it to 606px on an ordinary work item tab and 761px with every
+  block showing — so **Settings**, the one control worth reaching from any state, was the part
+  below the line. And macOS hides overlay scrollbars at rest, so nothing on screen said there
+  was a below.
+
+  The popup is now a column: the header and a footer holding the template count and Settings
+  are pinned, and everything between them scrolls in a bounded box. Its scrollbar is styled,
+  which opts it out of overlay mode so the track is visible the whole time it overflows, and a
+  shadow appears at whichever edge has content behind it — two pairs of CSS gradients, one
+  scrolling with the content and one fixed, so there is no scroll position for a script to keep
+  in sync. A short popup stays short: `max-height`, not `height`.
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it

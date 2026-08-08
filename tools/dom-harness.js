@@ -465,6 +465,64 @@ checkPageBuilderQuotesNothing();
 
 const suites = [
   {
+    // Chrome caps a toolbar popup at 600px and cuts the rest. This one reached 606 on an
+    // ordinary work item tab and 761 with every block showing, so Settings — the one control
+    // worth reaching from any state — was the part below the line, and macOS overlay
+    // scrollbars meant nothing on screen said there was a below.
+    name: "popup · taller than the window Chrome gives it",
+    page: {
+      name: "pop-tall",
+      ...POPUP,
+      seed: seedOf(),
+      local: { peRecent: [
+        { key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", at: 700 },
+        { key: "ENG-9", url: "https://linear.app/acme/issue/ENG-9", name: "Linear", at: 600 },
+        { key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 500 },
+        { key: "DU-61", url: "https://gprxh.atlassian.net/browse/DU-61", name: "Jira", at: 400 },
+        { key: "GH-1234", url: "https://github.com/gaerae/enhancer-for-plane/issues/1234", name: "GitHub", at: 300 },
+        { key: "TRASHSWD-17", url: "https://gprxh.atlassian.net/browse/TRASHSWD-17", name: "Jira", at: 200 }
+      ] }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const scroll = () => document.getElementById("popScroll");
+      const foot = () => document.querySelector(".pop-foot");
+      check("the document stays inside Chrome's 600px", () => {
+        const h = document.documentElement.scrollHeight;
+        ok(h <= 600, "the popup is " + h + "px and Chrome will cut " + (h - 600) + " of it");
+        return h + "px";
+      });
+      // The state that makes all of this necessary. If a seed stops overflowing, the checks
+      // below start passing for the wrong reason.
+      check("this content really is taller than the box", () => {
+        ok(scroll().scrollHeight > scroll().clientHeight + 4,
+           "content " + scroll().scrollHeight + " fits in " + scroll().clientHeight);
+      });
+      check("the scrollbar takes real space rather than fading out of sight", () => {
+        const gutter = scroll().offsetWidth - scroll().clientWidth;
+        ok(gutter >= 6, "gutter is " + gutter + "px — an overlay scrollbar is invisible at rest");
+      });
+      check("the way out is outside the part that scrolls", () => {
+        ok(!scroll().contains(document.getElementById("openOptions")), "Settings is inside the scroll box");
+        ok(!scroll().contains(document.getElementById("tplCount")), "so is the template count");
+        const before = foot().getBoundingClientRect().top;
+        scroll().scrollTop = scroll().scrollHeight;
+        eq(foot().getBoundingClientRect().top, before, "the footer moved when the middle scrolled");
+      });
+      check("and scrolling reaches the last thing in the middle", () => {
+        scroll().scrollTop = scroll().scrollHeight;
+        const last = [...scroll().children].filter((n) => !n.hidden).pop();
+        const r = last.getBoundingClientRect();
+        const box = scroll().getBoundingClientRect();
+        ok(r.bottom <= box.bottom + 1 && r.top >= box.top - 1, "the last block is still out of view");
+      });
+      // The other half of the same mistake: a short popup padded out to the cap.
+      check("the header and the footer are not what scrolled", () => {
+        const head = document.querySelector(".pop-head").getBoundingClientRect();
+        ok(head.top >= 0 && head.bottom <= scroll().getBoundingClientRect().top + 1, "the header is in the scroll flow");
+      });`
+  },
+  {
     // The case the two earlier attempts at "this selector expires" both missed. Ordinary
     // Plane markup carries Tailwind and nothing else, so every candidate is durable, one
     // heading renders, and a mark that appears only on generated rows appears nowhere. It
@@ -1532,7 +1590,7 @@ const suites = [
     page: { name: "pop-active", ...POPUP, seed: seedOf() },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve the site");
-      const visible = () => [...document.querySelectorAll(".pop > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none");
+      const visible = () => [...document.querySelectorAll(".pop > *, .pop-scroll > *, .pop-foot > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none" && e.className.indexOf("pop-scroll") === -1 && e.className.indexOf("pop-foot") === -1);
       check("the jump block leads, with its own label and divider", () => {
         const block = document.getElementById("jumpBlock");
         ok(!block.hidden, "shown when a quick link exists");
@@ -1576,6 +1634,18 @@ const suites = [
         ok(t.indexOf("plane.example.com") === -1, "naming the host made a global switch look per-site");
       });
       check("jumping still works with the extension off", () => ok(!document.getElementById("jumpBlock").hidden));
+      // The other half of bounding the popup: a short one has to stay short. A window padded
+      // out to the cap with empty space, and a scrollbar on a box with nothing to scroll, are
+      // the same bug seen from the other side.
+      check("a short popup is short, with no scrollbar on it", () => {
+        const h = document.documentElement.scrollHeight;
+        // 469 measured. The number that matters is the cap: height:588 instead of
+        // max-height:588 would put this at 588 with 119px of nothing under the footer.
+        ok(h < 520, "the popup is " + h + "px with almost nothing in it");
+        const scroll = document.getElementById("popScroll");
+        eq(scroll.offsetWidth - scroll.clientWidth, 0, "a scrollbar on a box that does not overflow");
+        return h + "px";
+      });
       check("no site action is offered while it is off", () => {
         for (const id of ["addDomain", "pickEl", "rescan", "focusWrap"]) ok(document.getElementById(id).hidden, id);
       });`
@@ -2071,7 +2141,7 @@ const suites = [
         eq(getComputedStyle(block).display, "none");
       });
       check("the popup above the switch is then just the header", () => {
-        const first = [...document.querySelectorAll(".pop > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none")[1];
+        const first = [...document.querySelectorAll(".pop-scroll > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none")[0];
         eq(first.className.split(" ")[0], "pop-toggle");
       });`
   },

@@ -6,6 +6,10 @@
   --border: #e5e7eb;
   --text: #1f2937;
   --muted: #6b7280;
+  /* The popup's own background, named because the scroll fades have to be painted in it —
+     a fade to white over a dark popup is a white bar. --edge is the shadow under them. */
+  --surface: #ffffff;
+  --edge: rgba(0, 0, 0, 0.16);
 }
 * {
   box-sizing: border-box;
@@ -31,9 +35,59 @@ body {
   word-break: keep-all;
   overflow-wrap: break-word;
 }
+/* Chrome caps a toolbar popup at 600px tall and simply cuts what does not fit. Measured on
+   2026-08-08: an ordinary work item tab came to 606px and every block showing came to 761px,
+   so the Settings button — the only control worth reaching from every state — was the part
+   below the line. And macOS hides overlay scrollbars at rest, so nothing on screen said there
+   was a below.
+   The fix is a column: header and footer pinned, the middle scrolling inside a bounded box.
+   max-height rather than height, so a short popup stays short — an empty 588px window is the
+   other half of the same mistake. 588 leaves Chrome's cap a pixel of room either way. */
 .pop {
+  display: flex;
+  flex-direction: column;
+  max-height: 588px;
   width: 100%;
   padding: 14px;
+}
+/* min-height:0 is what actually lets this scroll: a flex item's default min-height is its
+   content, so without it the box grows past the cap instead of overflowing inside it. */
+.pop-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Two pairs of gradients, the standard trick. The `local` pair is painted in the content's
+     coordinate space and scrolls away; the `scroll` pair stays put. Where the content has
+     scrolled, the opaque cover slides off and the shadow underneath shows — so a shadow
+     appears at exactly the edge that has more behind it, and nowhere else. No script, and
+     nothing to keep in sync with the scroll position. */
+  background:
+    linear-gradient(var(--surface) 30%, transparent) top / 100% 16px no-repeat local,
+    linear-gradient(transparent, var(--surface) 70%) bottom / 100% 16px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--edge), transparent) top / 100% 7px no-repeat
+      scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--edge), transparent) bottom / 100% 7px
+      no-repeat scroll;
+}
+/* An overlay scrollbar is invisible until you already know to scroll. Styling it at all opts
+   this box out of overlay mode in Chrome, so the track takes real space and is visible the
+   whole time the box overflows — which is the only moment it should be. */
+.pop-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.pop-scroll::-webkit-scrollbar-thumb {
+  background: #d3d6db;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+}
+.pop-scroll::-webkit-scrollbar-thumb:hover {
+  background: #b6bac1;
+}
+.pop-foot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 4px;
 }
 .pop-head {
   display: flex;
@@ -325,9 +379,17 @@ input:checked + .switch::after {
     --border: #2c3238;
     --text: #e5e7eb;
     --muted: #9aa4b2;
+    --surface: #1b1f24;
+    --edge: rgba(0, 0, 0, 0.55);
   }
   body {
     background: #1b1f24;
+  }
+  .pop-scroll::-webkit-scrollbar-thumb {
+    background: #3f4650;
+  }
+  .pop-scroll::-webkit-scrollbar-thumb:hover {
+    background: #545c67;
   }
   .pop-badge {
     background: #262b31;

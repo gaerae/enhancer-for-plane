@@ -380,6 +380,17 @@ lies:
   Add new shipped files there too — `check-source.js` walks what the extension actually
   loads (manifest entries, page `<script>`/`<link>`, the worker's injection lists) and
   fails if the zip would miss any of it, so you will hear about it before a release does.
+- **The popup has a hard 600px ceiling and Chrome enforces it by cutting.** It is also 260px
+  wide, so almost everything wraps and a block you add costs more height than it looks like it
+  will — measured 2026-08-08, an ordinary work item tab came to 606px. Nothing warns you: the
+  window is simply shorter than the page, and macOS hides overlay scrollbars at rest, so the
+  part below the line is not merely out of view but unadvertised. `popup.html` is therefore a
+  flex column — `.pop-head`, a scrolling `#popScroll`, and a pinned `.pop-foot` — with
+  `max-height` (never `height`, or a two-line popup becomes a 588px one). Put anything new
+  inside `#popScroll` unless it must always be reachable, and keep the footer to the way out.
+  The harness asserts the document stays under 600, that the scroll box overflows in the tall
+  seed, that its scrollbar takes real space rather than overlaying, and that the footer does
+  not move when the middle scrolls.
 - **Korean needs `word-break: keep-all`.** CSS breaks CJK at any character, which is right
   for Chinese and Japanese and wrong for Korean: every description on the settings page was
   splitting an 어절 down the middle ("폭 조 / 정 규칙"). Both `options.css` and `popup.css` set
