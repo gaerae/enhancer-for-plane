@@ -75,54 +75,56 @@
   <div class="brand"></div>
   <h1 data-t="head"></h1>
   <p class="lede" data-t="lede"></p>
-  <div class="pill">issue PROJ-142<span class="dot">·</span>Enter</div>
+  <div class="pill"><span data-t="pill"></span><span class="dot">·</span>Enter</div>
 </div>
 
 <div class="win">
   <div class="bar">
     <div class="omni">
       <span class="kw">issue</span>
-      <span class="typed">PROJ-142</span>
       <span class="caret"></span>
     </div>
   </div>
   <div class="sugg">
     <div class="row on">
-      <span class="go">→</span><span class="sname" data-t="s1"></span>
+      <span class="go">↺</span><span class="sname" data-t="s1"></span>
       <span class="surl">plane.example.com/acme/browse/PROJ-142</span>
     </div>
     <div class="row">
-      <span class="go">→</span><span class="sname" data-t="s2"></span>
-      <span class="surl">jira.acme.com/browse/PROJ-142</span>
+      <span class="go">↺</span><span class="sname" data-t="s2"></span>
+      <span class="surl">jira.acme.com/browse/OPS-214</span>
     </div>
     <div class="row">
-      <span class="go">→</span><span class="sname" data-t="s3"></span>
-      <span class="surl">linear.app/acme/issue/PROJ-142</span>
+      <span class="go">↺</span><span class="sname" data-t="s3"></span>
+      <span class="surl">linear.app/acme/issue/ENG-77</span>
     </div>
   </div>
 </div>
 
 <script>
   // A promo tile is read in a glance, so it carries the two features the name leads with
-  // and nothing else. The suggestion wording is omniboxOpen, as in the captures.
+  // and nothing else. The rows are omniboxRecent, as in capture 1 — a marquee that
+  // quotes a string the extension does not say is an advertisement for a different product.
   window.T = {
     en: {
-      head: "Type the key.<br />You are there.",
+      head: "You do not have to<br />remember the key.",
       lede:
-        "Quick open and issue templates for Plane (makeplane) — " +
-        "and for Jira and Linear alongside it.",
-      s1: "Open PROJ-142 in Plane",
-      s2: "Open PROJ-142 in Jira",
-      s3: "Open PROJ-142 in Linear"
+        "Quick open, issue templates and focus mode for Plane (makeplane) — " +
+        "and quick open works on Jira and Linear alongside it.",
+      pill: "issue checkout fails",
+      s1: "Recent · PROJ-142 · Plane",
+      s2: "Recent · OPS-214 · Jira",
+      s3: "Recent · ENG-77 · Linear"
     },
     ko: {
-      head: "키만 입력하면<br />바로 그 항목.",
+      head: "키를 외우고<br />있지 않아도 됩니다.",
       lede:
-        "Plane(makeplane)용 바로 열기와 이슈 템플릿 — " +
-        "Jira와 Linear에서도 그대로 동작합니다.",
-      s1: "Plane에서 PROJ-142 열기",
-      s2: "Jira에서 PROJ-142 열기",
-      s3: "Linear에서 PROJ-142 열기"
+        "Plane(makeplane)용 바로 열기·이슈 템플릿·집중 모드 — " +
+        "바로 열기는 Jira와 Linear에서도 그대로 동작합니다.",
+      pill: "issue 결제 실패",
+      s1: "최근 · PROJ-142 · Plane",
+      s2: "최근 · OPS-214 · Jira",
+      s3: "최근 · ENG-77 · Linear"
     }
   };
 </script>
