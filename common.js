@@ -1142,22 +1142,30 @@ function peSaveSyncCache(cache) {
 // Where a work item lives, as a link someone else can open. Returns "" when the page
 // cannot tell us — the caller then leaves {{item.url}} standing as its own token.
 //
-// Two cases, and the difference is worth keeping in view:
+// Three cases, tried in this order, and the difference is worth keeping in view:
 //
-//   observed  — the address bar already IS the item's page, /{workspace}/browse/{KEY}.
-//               Nothing to work out; the query string is dropped because it carries view
-//               state, not the item.
-//   assembled — a peek panel opened over a list keeps the *list's* URL, and the panel
+//   observed  — the address bar already IS the item's page. Nothing to work out; the query
+//               string is dropped because it carries view state, not the item. This is the
+//               case on Plane's /{workspace}/browse/{KEY} and on Linear's
+//               /{workspace}/issue/{KEY}/{slug} alike, which is why the check asks the
+//               quick links rather than looking for the word "browse".
+//   configured — a peek panel opened over a list keeps the *list's* URL, and the panel
 //               contains no link to the item at all (checked: its only anchor points at
-//               Plane's docs). So the link is composed from two things the page does
-//               give us: the workspace slug, which is the first path segment on every
-//               Plane page, and the key.
+//               Plane's docs). So the link is composed from the user's own quick link for
+//               that key — the same grammar that opens it from the address bar, read
+//               forwards this time. Only a link landing on the origin we are already on is
+//               used: a key routed to a different tracker is a link to somewhere else, and
+//               copying that while reading this page would be a quiet lie.
+//   assembled — no quick link covers it, so fall back to Plane's canonical short link,
+//               /{workspace}/browse/{KEY}, composed from the first path segment and the
+//               key. Quick open ships empty, so this is what everyone who has not
+//               configured one still gets, unchanged.
 //
-// Assembly rests on Plane's canonical short link being /{workspace}/browse/{KEY} —
-// verified by opening the /projects/{uuid}/issues/{uuid} form and watching Plane
-// redirect to exactly that. It is the one place here that would still "work" if Plane
-// changed its URL scheme, and quietly copy a dead link, so it is the line to re-check
-// against a new Plane version.
+// That last case is the one that rests on Plane's URL scheme — verified by opening the
+// /projects/{uuid}/issues/{uuid} form and watching Plane redirect to exactly that. It used
+// to be the only case, and the line to re-check against a new Plane version. It is now the
+// fallback, and a user who has configured Quick open never reaches it: their own grammar
+// answers first, and a grammar they wrote is one they can fix.
 // The key an item's own page carries in its path, or "" for anything else — a list route with a
 // peek panel over it has none. Two callers: peItemUrl, to notice it is already looking at the
 // item, and the content script, to tell this item's key from another one shown beside it.
@@ -1174,13 +1182,25 @@ function peKeyFromPath(pathname) {
   }
 }
 
-function peItemUrl(origin, pathname, key) {
+function peItemUrl(origin, pathname, key, links) {
   if (!origin || !key) return "";
   const seg = String(pathname || "")
     .split("/")
     .filter(Boolean);
-  // Same page, same item → hand back what the user is looking at.
+  // Same page, same item → hand back what the user is looking at. Asked two ways, because
+  // the quick links only answer for someone who configured them and peKeyFromPath answers
+  // for every Plane install whether they did or not.
   if (peKeyFromPath(pathname) === key) return origin + pathname;
+  if (peKeyFromUrl(links, origin + pathname) === key) return origin + pathname;
+  // Configured: the user's own grammar, read forwards. Same origin only.
+  const routed = peExpandQuickLink(peRouteQuickLink(links, key), key);
+  if (peIsHttpUrl(routed)) {
+    try {
+      if (new URL(routed).origin === origin) return routed;
+    } catch (_) {
+      /* an unparseable url is not a link we will hand anyone */
+    }
+  }
   if (!seg.length) return "";
   return origin + "/" + seg[0] + "/browse/" + key;
 }
@@ -1267,6 +1287,103 @@ function peExpandQuickLink(link, key) {
     });
   }
   return url + enc(parts.key);
+}
+
+// Read a key back OUT of a URL, using the same quick links that put keys into one.
+//
+// This is the whole of what makes Copy reference portable. A quick link already states the
+// user's URL grammar for their tracker — "https://linear.app/acme/issue/{{key}}" — and a
+// grammar reads in both directions. So the list that answers "where does GAE-2 live" also
+// answers "which item is this page", with no second thing to configure and nothing new to
+// couple to. It is also what retires the one piece of Plane's URL scheme this file used to
+// hardcode; see peItemUrl.
+//
+// Turning a template into a matcher: literals are escaped, each {{key}} / {{key.proj}} /
+// {{key.num}} becomes one path segment, and a template with no token at all is a base the
+// key is appended to (the same three cases peExpandQuickLink writes). Trailing path,
+// query and hash are allowed after the match, because a real address carries them —
+// Linear redirects /issue/GAE-2 to /issue/GAE-2/connect-your-tools, and Plane's browse
+// links end in a slash. Verified against both on 2026-08-08.
+function peMatchQuickLink(template, url) {
+  const t = String(template == null ? "" : template);
+  const u = String(url == null ? "" : url);
+  if (!t || !u) return "";
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // What a key may run up to. "&" is in there for the query case: a greedy segment would
+  // swallow "ENG-42&view=grid" out of "?item=ENG-42&view=grid" and then fail the shape check,
+  // so a perfectly good template would answer nothing. No key can contain any of these.
+  const SEG = "([^/?#&]+)";
+  const TAIL = "(?:[/?#&].*)?$";
+  const order = [];
+  let body = "";
+  let last = 0;
+  const re = peQuickTokenRe();
+  let m;
+  while ((m = re.exec(t))) {
+    body += esc(t.slice(last, m.index)) + SEG;
+    order.push(m[1] ? String(m[1]).toLowerCase() : "key");
+    last = m.index + m[0].length;
+  }
+  if (!order.length) {
+    body = esc(t) + SEG;
+    order.push("key");
+  } else {
+    body += esc(t.slice(last));
+  }
+  let hit;
+  try {
+    hit = new RegExp("^" + body + TAIL, "i").exec(u);
+  } catch (_) {
+    return ""; // a template that will not compile matches nothing, it does not throw
+  }
+  if (!hit) return "";
+  const parts = {};
+  order.forEach((name, i) => {
+    let v = hit[i + 1] || "";
+    try {
+      v = decodeURIComponent(v);
+    } catch (_) {
+      /* keep it raw rather than lose it */
+    }
+    parts[name] = v;
+  });
+  const key = (parts.key || (parts.proj && parts.num ? parts.proj + "-" + parts.num : "")).trim();
+  // The shape check is not politeness — it is what stops a template from claiming a page it
+  // has no business claiming. Without it "…/issue/{{key}}" would answer "settings" for
+  // /issue/settings, and Copy reference would hand over a reference to a word.
+  return PE_ITEM_KEY_RE.test(key) ? key : "";
+}
+
+// The key this URL names, according to the user's quick links, or "". The most specific
+// template wins — "…/acme/browse/{{key}}" beats "…/{{key}}" — because a shorter template is
+// a prefix of the longer one's world and would otherwise answer first by accident.
+function peKeyFromUrl(links, url) {
+  const usable = (Array.isArray(links) ? links : [])
+    .filter((l) => l && typeof l === "object" && l.enabled !== false && l.url)
+    .sort((a, b) => String(b.url).length - String(a.url).length);
+  for (const l of usable) {
+    const key = peMatchQuickLink(l.url, url);
+    if (key) return key;
+  }
+  return "";
+}
+
+// The work item title out of a page title, or "".
+//
+// Measured 2026-08-08: Plane and Linear both write "{KEY} {title}" — "GAERA-6 5. Use Cycles
+// to time box tasks 🗓️" and "GAE-2 Connect your tools". That is the only shape accepted,
+// and only when the key is the one we already established from the URL. Anything else
+// returns "" rather than a guess: an unresolved {{item.title}} stays visible on the
+// clipboard and the toast names it, which is the contract every other missing field
+// follows — a wrong title looks right and is pasted.
+function peTitleFromDocTitle(docTitle, key) {
+  const t = String(docTitle == null ? "" : docTitle).trim();
+  const k = String(key == null ? "" : key).trim();
+  if (!t || !k || t.length <= k.length) return "";
+  if (t.slice(0, k.length).toLowerCase() !== k.toLowerCase()) return "";
+  const rest = t.slice(k.length);
+  if (!/^\s/.test(rest)) return ""; // "GAE-21 …" must not answer for the key "GAE-2"
+  return rest.trim();
 }
 
 // Only ever navigate to an http(s) address from a quick link. A stored url is the user's

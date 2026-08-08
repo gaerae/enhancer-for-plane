@@ -1060,6 +1060,75 @@ const suites = [
       });`
   },
   {
+    // Copy reference where there is no header to hang a button off — another tracker, or a
+    // Plane that moved the title field. The page deliberately carries none of the item-header
+    // markup, so findKeyEl has nothing and the whole feature rests on the URL reader.
+    //
+    // The quick link is built at runtime from location.href because these pages are file://
+    // URLs whose path is a temp directory, and a query is the only part of one that pushState
+    // will let a null-origin document change. That is a harness constraint, not a statement
+    // about which grammar matters — the real Plane and Linear path shapes are asserted
+    // exhaustively in tools/test.js. What only a browser can answer is here: does the
+    // shortcut open a menu with no button to open it from, and is that menu on screen.
+    name: "content · copy reference with no header",
+    page: {
+      name: "ct-copy-url",
+      plane: `<div id="not-a-work-item">a tracker whose header we have no anchor in</div>`,
+      seed: seedOf({ allDomains: true, copyFormats: [{ id: "c1", name: "Chat", format: "{{item.key}} · {{item.title}}" }] })
+    },
+    body: `
+      const altC = () => document.dispatchEvent(
+        new KeyboardEvent("keydown", { code: "KeyC", key: "c", altKey: true, bubbles: true, cancelable: true })
+      );
+      const menu = () => document.getElementById("pe-tmpl-menu");
+      const shown = () => { const m = menu(); return !!m && m.style.display === "block"; };
+      const toasts = () => [...document.querySelectorAll(".pe-toast")].map((t) => t.textContent);
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await sleep(300);
+
+      // Before anything is configured. The old behaviour here was to return in silence.
+      altC();
+      await sleep(100);
+      check("with nothing to go on, the shortcut says so instead of doing nothing", () => {
+        ok(!shown(), "no menu");
+        eq(toasts().length, 1, "one toast: " + toasts().join(" | "));
+        eq(toasts()[0], peMsg("msgCopyNoItem"));
+      });
+
+      // Now give it the user's grammar for this page, through the same storage event a Save
+      // would fire — the content script has to pick it up without a reload.
+      const base = location.href.split("?")[0];
+      history.pushState({}, "", "?item=GAE-2");
+      document.title = "GAE-2 Connect your tools";
+      const grown = JSON.parse(JSON.stringify(window.__SEED));
+      grown.peSettings.quickLinks = [{ id: "q", enabled: true, prefix: "", url: base + "?item={{key}}" }];
+      window.__SEED = grown;
+      window.__onChanged({ peSettings: { newValue: grown.peSettings } }, "sync");
+      await sleep(300); // the re-read is a promise chain with no observable of its own
+
+      altC();
+      await waitFor(() => shown(), "the menu to open with no button to open it from");
+      check("the shortcut alone opens the copy menu", () => {
+        eq(document.querySelectorAll(".pe-copy-ref-btn").length, 0, "and there is genuinely no button on this page");
+        eq(menu().querySelectorAll(".pe-menu-item").length, 1, "one format");
+      });
+      check("the preview is filled from the address bar and the page title", () => {
+        eq(menu().querySelector(".pe-menu-item-preview").textContent, "GAE-2 · Connect your tools");
+      });
+      // A menu positioned off screen is a menu that did not open, and nothing else here
+      // would notice: display is "block" either way.
+      check("and it is somewhere the reader can see it", () => {
+        const r = menu().getBoundingClientRect();
+        ok(r.width > 0 && r.height > 0, "it has a size");
+        ok(r.top >= 0 && r.left >= 0, "top-left on screen: " + Math.round(r.top) + "," + Math.round(r.left));
+        ok(r.bottom <= window.innerHeight + 1, "bottom on screen: " + Math.round(r.bottom));
+        ok(r.right <= window.innerWidth + 1, "right on screen: " + Math.round(r.right));
+      });
+      altC();
+      await sleep(100);
+      check("pressing it again closes the menu", () => ok(!shown()));`
+  },
+  {
     // The other half of rule health: the settings page can only show what the content script
     // measured, and only a browser can say whether it measured the right thing. The rules are
     // chosen to be the two cases side by side — one that matches the synthetic Plane page and

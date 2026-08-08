@@ -87,10 +87,21 @@ Plane server**, applied only on the domains you enable.
    - Works both on a work item's own page and in the **panel a list opens**, which has
      the same header. On its own page the link is simply the address bar. The panel
      keeps the *list's* URL and holds no link to the item at all, so there the link is
-     composed as `/{workspace}/browse/{KEY}` — Plane's own canonical short link, which
-     the `/projects/{uuid}/issues/{uuid}` form redirects to. That composition is the one
-     thing here that would break silently against a future Plane, and it is commented as
-     such in the source.
+     composed — from your own Quick open link for that key, or, if you have not
+     configured one, from `/{workspace}/browse/{KEY}`, Plane's canonical short link which
+     the `/projects/{uuid}/issues/{uuid}` form redirects to.
+   - **It also works on Jira and Linear** — anywhere you gave Quick open a link. That link
+     already states your URL grammar (`https://linear.app/acme/issue/{{key}}`), and a
+     grammar reads backwards as well as forwards, so the same list that opens a key from
+     the address bar can say which item the page you are on *is*. The title comes from the
+     page title, which Plane and Linear both write as `{KEY} {title}`. No second thing to
+     configure, and no selector that a redesign can move.
+     - There the shortcut is the only way in: the button needs a work item header to sit
+       beside, and a header is a Plane shape — guessing at another tracker's markup is the
+       coupling this extension is built without. Settings ▸ **Shortcuts** says where
+       `Alt/⌥+C` works, which is what that page is for.
+     - Plane's header is still read first, and not as a preference: the peek panel is an
+       item the address bar knows nothing about. Where both can answer they agree.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
 

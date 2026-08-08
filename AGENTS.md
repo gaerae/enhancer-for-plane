@@ -78,6 +78,20 @@ no-op instead of a fight when the markup moves. Same conclusion for "just mirror
 Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
 to implement, not theirs to be observed.
 
+**A config the user already wrote is a grammar, and a grammar reads both ways.** Copy
+reference became portable without a single new setting because a Quick open link
+(`https://linear.app/acme/issue/{{key}}`) is not just a way to build a URL from a key — read
+backwards it says which item a URL names. Before reaching for a new field, a new selector, or
+a new site adapter, look at what the user has already told us and ask whether it answers the
+question from the other end. It is less to configure, less to keep in sync, and the failure
+mode is one the user can fix, because they wrote the thing that failed.
+
+Two limits found by measuring rather than reasoning, both still true: Plane's peek panel is an
+item the address bar and the page title know nothing about (both name the *list*), so a URL
+reader cannot replace the DOM one, only stand behind it. And a template must validate what it
+captured — `PE_ITEM_KEY_RE` — or `…/issue/{{key}}` cheerfully answers "settings" for
+`/issue/settings`.
+
 **Degrading to a no-op is right, and it is not free — say when it happens.** "A rule that
 stops matching is a no-op rather than a broken feature" is what lets this extension survive a
 Plane release, and the cost is that a dead rule and an unused one look identical. Two focus

@@ -1063,24 +1063,50 @@ test("vars: a value is never re-scanned for markup or dates", () => {
 
 /* ---------- copy reference ---------- */
 
-// readItemRef reads the page; here the page is a stub. The key element is passed in (the
-// DOM search that finds it is exercised in a browser, not here), so only the address bar
-// and the title field need standing in.
-function loadReadItemRef(href, titleValue, peItemUrl) {
+// The three readers read the page; here the page is a stub. The key element is passed in
+// (the DOM search that finds it is exercised in a browser, not here), so only the address
+// bar, the title field and document.title need standing in. findKeyEl is a parameter for
+// the same reason: what it does is a browser question, and what readItem does with its
+// answer is this one.
+//
+// The slice runs from `quickLinks` to makeCopyButton because that is the whole cluster —
+// extend it, not around it, if a fourth reader appears.
+function loadItemReaders({ href, titleValue = null, docTitle = "", links = [], keyEl = null }) {
+  const ctx = loadCommon();
   const src = read("content.js");
-  const body = src.slice(src.indexOf("function readItemRef(keyEl)"), src.indexOf("function makeCopyButton()"));
+  const from = src.indexOf("const quickLinks = () =>");
+  const to = src.indexOf("function makeCopyButton()");
+  if (from === -1 || from >= to) throw new Error("content.js no longer holds the item readers where this expects them");
   const u = new URL(href);
   const location = { pathname: u.pathname, origin: u.origin, href };
   const document = {
+    title: docTitle,
     querySelector: (s) => (s === "#title-input" && titleValue !== null ? { value: titleValue } : null)
   };
-  const fn = new Function(
+  return new Function(
     "location",
     "document",
+    "settings",
+    "findKeyEl",
     "peItemUrl",
-    body + "\nreturn readItemRef;"
-  )(location, document, peItemUrl);
-  return (keyText) => fn(keyText === null ? null : { textContent: keyText });
+    "peKeyFromUrl",
+    "peTitleFromDocTitle",
+    src.slice(from, to) + "\nreturn { readItemRef, readItemFromUrl, readItem };"
+  )(
+    location,
+    document,
+    { quickLinks: links },
+    () => (keyEl === null ? null : { textContent: keyEl }),
+    ctx.peItemUrl,
+    ctx.peKeyFromUrl,
+    ctx.peTitleFromDocTitle
+  );
+}
+
+// The old shape, kept because several tests only care about the header path.
+function loadReadItemRef(href, titleValue) {
+  const r = loadItemReaders({ href, titleValue });
+  return (keyText) => r.readItemRef(keyText === null ? null : { textContent: keyText });
 }
 
 test("copy: a format is copied exactly as written", () => {
@@ -1585,15 +1611,173 @@ test("copy: a peek panel over a list composes the link from the workspace slug",
   eq(peItemUrl("https://p.test", "/acme/x", ""), "", "no key");
 });
 
+/* ---------- copy reference: the URL grammar, read backwards ---------- */
+
+// Every URL below was taken from a real workspace on 2026-08-08 — app.plane.so/gaerae and
+// linear.app/gaerae — including the shapes that make this awkward: Plane's trailing slash
+// and Linear's slug after the key.
+const PLANE_LINK = { id: "q1", enabled: true, prefix: "", url: "https://app.plane.so/gaerae/browse/{{key}}" };
+const LINEAR_LINK = { id: "q2", enabled: true, prefix: "GAE-", url: "https://linear.app/gaerae/issue/{{key}}" };
+
+test("quick: a template reads backwards as well as forwards", () => {
+  const { peMatchQuickLink, peExpandQuickLink } = loadCommon();
+  // Forwards then backwards has to be the identity, or the two directions are different
+  // grammars wearing one config.
+  for (const link of [PLANE_LINK, LINEAR_LINK]) {
+    const key = link === LINEAR_LINK ? "GAE-2" : "GAERA-6";
+    eq(peMatchQuickLink(link.url, peExpandQuickLink(link, key)), key, link.url);
+  }
+  eq(peMatchQuickLink(PLANE_LINK.url, "https://app.plane.so/gaerae/browse/GAERA-6/"), "GAERA-6", "Plane's trailing slash");
+  eq(
+    peMatchQuickLink(LINEAR_LINK.url, "https://linear.app/gaerae/issue/GAE-2/connect-your-tools"),
+    "GAE-2",
+    "Linear's slug after the key"
+  );
+  eq(peMatchQuickLink(PLANE_LINK.url, "https://app.plane.so/gaerae/browse/GAERA-6?tab=x#c"), "GAERA-6", "query and hash");
+});
+
+test("quick: a template only claims a URL it actually describes", () => {
+  const { peMatchQuickLink } = loadCommon();
+  const no = (url, why) => eq(peMatchQuickLink(PLANE_LINK.url, url), "", why);
+  no("https://app.plane.so/gaerae/projects/abc/issues/", "a list route — this is the peek case, and it must NOT answer");
+  no("https://app.plane.so/other/browse/GAERA-6", "a different workspace");
+  no("https://evil.test/gaerae/browse/GAERA-6", "a different host");
+  no("https://app.plane.so/gaerae/browse/", "nothing where the key goes");
+  // The shape check earning its place: without it the segment "settings" would be returned
+  // as a key and copied into a reference that points at a word.
+  no("https://app.plane.so/gaerae/browse/settings", "a segment that is not a key");
+  no("https://app.plane.so/gaerae/browse/GAERA-06", "a zero-padded number is not a key");
+  eq(peMatchQuickLink("", "https://x/y"), "", "no template");
+  eq(peMatchQuickLink(PLANE_LINK.url, ""), "", "no url");
+});
+
+test("quick: the other two template shapes read backwards too", () => {
+  const { peMatchQuickLink } = loadCommon();
+  eq(
+    peMatchQuickLink("https://jira.test/browse/{{key.proj}}-{{key.num}}", "https://jira.test/browse/ENG-42"),
+    "ENG-42",
+    "the split form is rejoined"
+  );
+  // A url with no token gets the key appended, so backwards it is "whatever follows the base".
+  eq(peMatchQuickLink("https://t.test/i/", "https://t.test/i/ENG-42"), "ENG-42", "no token at all");
+  // Regex metacharacters in a user's own URL must be literal, not syntax. A "." that matched
+  // any character would let one tracker's template answer for another's host.
+  eq(peMatchQuickLink("https://a.test/x/{{key}}", "https://axtest/x/K-1"), "", "the dot is a dot");
+});
+
+test("quick: the most specific template wins, and a disabled one does not answer", () => {
+  const ctx = loadCommon();
+  const loose = { id: "q0", enabled: true, url: "https://app.plane.so/gaerae/{{key}}" };
+  const url = "https://app.plane.so/gaerae/browse/GAERA-6";
+  eq(ctx.peKeyFromUrl([loose, PLANE_LINK], url), "GAERA-6", "the longer template answers, whatever the order");
+  eq(ctx.peKeyFromUrl([PLANE_LINK, loose], url), "GAERA-6");
+  eq(ctx.peKeyFromUrl([Object.assign({}, PLANE_LINK, { enabled: false })], url), "", "a disabled link is not a grammar");
+  eq(ctx.peKeyFromUrl([], url), "", "no links configured — the URL path simply has no answer");
+  eq(ctx.peKeyFromUrl(null, url), "", "and no list at all is not a crash");
+});
+
+test("copy: a page title gives up its title only when it starts with this key", () => {
+  const { peTitleFromDocTitle } = loadCommon();
+  // Both measured, 2026-08-08.
+  eq(peTitleFromDocTitle("GAERA-6 5. Use Cycles to time box tasks 🗓️", "GAERA-6"), "5. Use Cycles to time box tasks 🗓️");
+  eq(peTitleFromDocTitle("GAE-2 Connect your tools", "GAE-2"), "Connect your tools");
+  // A prefix that is not the whole key would hand back a title with a digit glued to it.
+  eq(peTitleFromDocTitle("GAE-21 Something else", "GAE-2"), "", "GAE-21 is not GAE-2");
+  eq(peTitleFromDocTitle("gaerae - 작업 항목", "GAERA-6"), "", "a list route's title is not an item title");
+  eq(peTitleFromDocTitle("Connect your tools · Linear", "GAE-2"), "", "a shape we do not know is not guessed at");
+  eq(peTitleFromDocTitle("GAERA-6", "GAERA-6"), "", "the key alone carries no title");
+  eq(peTitleFromDocTitle("", "K-1"), "");
+  eq(peTitleFromDocTitle("K-1 x", ""), "");
+});
+
+test("copy: the URL reader gets all three fields with no DOM at all", () => {
+  const r = loadItemReaders({
+    href: "https://linear.app/gaerae/issue/GAE-2/connect-your-tools",
+    titleValue: null, // Linear has no #title-input; that is the point
+    docTitle: "GAE-2 Connect your tools",
+    links: [PLANE_LINK, LINEAR_LINK]
+  });
+  eq(r.readItemRef(null), null, "the header path has nothing to work with");
+  const ref = r.readItemFromUrl();
+  eq(ref.key, "GAE-2");
+  eq(ref.title, "Connect your tools");
+  eq(ref.url, "https://linear.app/gaerae/issue/GAE-2/connect-your-tools", "the address bar, slug and all");
+  eq(loadItemReaders({ href: "https://linear.app/gaerae/team/GAE/all", links: [LINEAR_LINK] }).readItemFromUrl(), null,
+    "a list route names no item");
+  // The address is matched whole, so a grammar may put the key in the query. Nothing ships
+  // like that, but a template is the user's to write and a matcher that quietly never
+  // answered for one shape would be a rule nobody documented.
+  const q = loadItemReaders({
+    href: "https://t.test/board?item=ENG-42&view=grid",
+    docTitle: "ENG-42 Ship the thing",
+    links: [{ id: "q", enabled: true, url: "https://t.test/board?item={{key}}" }]
+  });
+  eq(q.readItemFromUrl().key, "ENG-42", "a key in the query string");
+  eq(q.readItemFromUrl().title, "Ship the thing");
+  // And a query the template does not mention is still just trailing noise.
+  eq(
+    loadItemReaders({ href: "https://app.plane.so/gaerae/browse/GAERA-6?tab=comments", links: [PLANE_LINK] })
+      .readItemFromUrl().url,
+    "https://app.plane.so/gaerae/browse/GAERA-6",
+    "the query carries view state, not the item, so it is not copied"
+  );
+});
+
+test("copy: the header wins where both can answer, and the URL covers where it cannot", () => {
+  const both = loadItemReaders({
+    href: "https://app.plane.so/gaerae/browse/GAERA-6/",
+    titleValue: "The title the user is editing",
+    docTitle: "GAERA-6 The title Plane last rendered",
+    links: [PLANE_LINK],
+    keyEl: "GAERA-6"
+  });
+  eq(both.readItem().title, "The title the user is editing", "the live field beats the page title");
+  // Plane's peek panel: the address bar names the list, so only the header knows the item.
+  // This is why the DOM path cannot be retired, however portable the URL one is.
+  const peek = loadItemReaders({
+    href: "https://app.plane.so/gaerae/projects/abc/issues/",
+    titleValue: "2. Invite your team 🤜🤛",
+    docTitle: "gaerae - 작업 항목",
+    links: [PLANE_LINK],
+    keyEl: "GAERA-2"
+  });
+  eq(peek.readItemFromUrl(), null, "the URL cannot see into a peek panel");
+  eq(peek.readItem().key, "GAERA-2", "the header can");
+  eq(peek.readItem().url, "https://app.plane.so/gaerae/browse/GAERA-2", "composed from the user's own quick link");
+  eq(loadItemReaders({ href: "https://x.test/nothing/here", links: [PLANE_LINK] }).readItem(), null, "neither → nothing");
+});
+
+test("copy: a link routed to another tracker is never copied off this page", () => {
+  const { peItemUrl } = loadCommon();
+  // On Plane, reading a peek panel, with a quick link that sends GAE- keys to Linear. The
+  // page is Plane's; handing over a linear.app address for something read here would be a
+  // reference to a different item that happens to share a key.
+  eq(
+    peItemUrl("https://app.plane.so", "/gaerae/projects/abc/issues/", "GAE-2", [PLANE_LINK, LINEAR_LINK]),
+    "https://app.plane.so/gaerae/browse/GAE-2",
+    "the same-origin fallback, not Linear"
+  );
+});
+
+test("copy: with no quick links configured, nothing about Plane changed", () => {
+  const { peItemUrl } = loadCommon();
+  // Quick open ships empty, so this is the path most installs are still on. Every one of
+  // these is a line from the pre-existing suite, re-asserted with the new argument absent.
+  eq(peItemUrl("https://p.test", "/data/projects/86965b22/issues/", "DATA-5"), "https://p.test/data/browse/DATA-5");
+  eq(peItemUrl("https://p.test", "/acme/browse/K-1", "K-1"), "https://p.test/acme/browse/K-1");
+  eq(peItemUrl("https://p.test", "/acme/browse/K-1", "K-2"), "https://p.test/acme/browse/K-2");
+  eq(peItemUrl("https://p.test", "/", "K-1"), "");
+});
+
 test("copy: the item is whatever key the header shows", () => {
   const { peItemUrl } = loadCommon();
-  const onList = loadReadItemRef("https://p.test/data/projects/abc/issues/", "  Visualize your work  ", peItemUrl);
+  const onList = loadReadItemRef("https://p.test/data/projects/abc/issues/", "  Visualize your work  ");
   eq(onList(null), null, "no key on screen → nothing to copy");
   const ref = onList("DATA-5");
   eq(ref.key, "DATA-5");
   eq(ref.title, "Visualize your work", "trimmed");
   eq(ref.url, "https://p.test/data/browse/DATA-5");
-  const own = loadReadItemRef("https://p.test/acme/browse/K-1?tab=comments", "Fix login", peItemUrl)("K-1");
+  const own = loadReadItemRef("https://p.test/acme/browse/K-1?tab=comments", "Fix login")("K-1");
   eq(own.url, "https://p.test/acme/browse/K-1", "the query carries view state, not the item");
 });
 
@@ -1606,7 +1790,7 @@ test("copy: a peek-panel ref is a detached snapshot, usable after the DOM is gon
   // reference, so peExpandCopyFormat can render it with the page already torn down.
   const ctx = loadCommon();
   // Read the ref while the "panel" is up (list route, so the url is assembled from the slug).
-  const read = loadReadItemRef("https://p.test/data/projects/abc/issues/", "Visualize your work", ctx.peItemUrl);
+  const read = loadReadItemRef("https://p.test/data/projects/abc/issues/", "Visualize your work");
   const snapshot = read("DATA-5");
   // Now the panel is gone. peExpandCopyFormat is pure — it never touches the document — so a
   // copy that runs off `snapshot` still produces the full reference. If a future change makes
@@ -1633,14 +1817,14 @@ test("copy: a numeric project identifier is a key like any other", () => {
   ok(!ctx.__ITEM_KEY_RE.test("2026-07"), "a zero-padded year-month is not a key");
   ok(!ctx.__ITEM_KEY_RE.test("DATA-05"), "a work item sequence never has a leading zero");
   ok(!ctx.__ITEM_KEY_RE.test("Fix login"), "nor is prose");
-  const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시", ctx.peItemUrl)("42-7");
+  const ref = loadReadItemRef("https://p.test/acme/browse/42-7", "한국어 제목 예시")("42-7");
   eq(ref.key, "42-7");
   eq(ref.title, "한국어 제목 예시");
 });
 
 test("copy: no title field on the page means the token stays, not an empty string", () => {
   const ctx = loadCommon();
-  const ref = loadReadItemRef("https://p.test/acme/browse/K-9", null, ctx.peItemUrl)("K-9");
+  const ref = loadReadItemRef("https://p.test/acme/browse/K-9", null)("K-9");
   eq(ref.title, "");
   eq(ctx.peExpandCopyFormat("{{item.key}} {{item.title}}", ref), "K-9 {{item.title}}");
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
