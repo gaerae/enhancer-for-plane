@@ -53,15 +53,24 @@ Every issue tracker leaves the same gaps: no reusable issue templates for the ti
 This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
 Works on Plane Cloud and on self-hosted Plane alike — the built-in rules carry both generations of Plane's markup, and each release is checked against a live instance of each, because the two do not write the same page.
 
-✨ WHAT YOU GET
+✨ WHAT YOU GET — at a glance
+⚡ Quick open — reach a work item from its key, in the address bar
+📝 Issue templates — fill a title and body in one click
+📋 Copy reference — hand an item to chat, a PR or a branch name
+📐 Width & style rules — read every name in full
+🧘 Focus mode — put the side panels away
+🎯 Element picker — build a rule without DevTools
+🔄 Template sync — one set of templates for the whole team
+Every one of them is off, empty or inert until you ask for it.
 
 ⚡ Go straight to a work item — quick open
 Type "issue" in the address bar — Chrome's omnibox — then a space and a key like PROJ-142, and Enter opens it.
 The same box is on the toolbar popup, so a ticket is one keystroke away wherever you are.
-Each target is a base link you set, with {{key}} where the key belongs — so it works for Plane, and for Jira and Linear alongside it.
-The key's prefix picks the target: point ENG- at Linear and leave everything else on Plane.
+Setting one up is one paste: copy the address of any work item you have open, and the link falls out of it — search address included, nothing left to fill in.
+Plane, Jira, Linear, GitHub and GitLab are recognised by name; any other tracker is read from wherever the key sits in its address.
+Keep several and the key's prefix picks between them: point ENG- at Linear and leave everything else on Plane.
 The keys you opened last come back in the address bar, so you do not have to remember one.
-Type words instead of a key and it searches; find a key in someone else's message, select it and right-click to open it.
+Type words instead of a key and it searches instead; find a key in someone else's message, select it and right-click to open it.
 It only opens a URL, so it asks for no site access at all and works on any tab.
 
 📝 Fill a work item in one click — issue templates (title + body)
@@ -95,7 +104,8 @@ It applies to that tab, survives a reload there, and is never synced to your oth
 
 🎯 Build rules without DevTools — visual element picker
 Click "Pick element" in the popup, then click anything on the Plane page.
-You get candidate selectors with match counts (width classes first); the rule lands in Settings ready for a value.
+You get candidate selectors ordered by what will still work next month — a handle a person wrote comes first, and anything the build generated is marked "may change" in words, not just in colour.
+Each row says how many elements it matches, and the rule lands in Settings ready for a value.
 
 🔄 One set of templates for the whole team — template sync
 Point everyone at one JSON file — your intranet, a Git host, any URL — and the whole team pulls the same templates.
@@ -103,8 +113,9 @@ It refreshes on the schedule you choose or on demand.
 Off by default: it fetches only the URL you add, reads from a local cache so inserting works offline, and synced templates stay read-only so no one's edits get overwritten.
 New to it? "Try our example" fills in a live feed so you can watch it work.
 
-🏠 Built for self-hosted Plane
-Add your instance's domain (e.g. plane.your-company.com).
+🏠 Your instance, wherever it runs
+Add the domain you use — plane.your-company.com, or app.plane.so.
+Self-hosted is where this started, and Plane Cloud is checked against a live instance every release, because the two do not draw the same page.
 It ships with no site access — enabling a domain asks Chrome for that one site — runs only where you allow it, and stays completely inert everywhere else.
 Wildcards (*.example.com) supported.
 
@@ -121,9 +132,10 @@ The one request this extension can make is downloading the team-template file fr
 See the privacy policy for details.
 
 🚀 GET STARTED
-1. Open your self-hosted Plane instance.
+1. Open your Plane instance — self-hosted or Plane Cloud.
 2. Click the toolbar icon and "Enable on this site" (grant access when Chrome prompts).
-3. Open Settings to add templates, copy formats, and width rules.
+3. In Settings, paste the address of any work item you have open: that one paste sets up opening, searching and copying at once.
+4. Add templates and width rules whenever you want them. Everything else is optional.
 
 Open source. Feedback and issues welcome.
 
@@ -229,14 +241,22 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
 Plane Cloud와 자체 호스팅 Plane 모두에서 동작합니다 — 기본 규칙이 두 세대의 마크업을 모두 담고 있고, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다. 둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
 
-✨ 무엇을 제공하나
+✨ 무엇을 제공하나 — 한눈에
+⚡ 바로 열기 — 주소창에서 키로 작업 항목에 닿기
+📝 이슈 템플릿 — 제목과 본문을 한 번에 채우기
+📋 참조 복사 — 메신저·PR·브랜치명으로 항목 넘기기
+📐 폭·스타일 규칙 — 잘린 이름을 온전히 보기
+🧘 집중 모드 — 측면 패널 치우기
+🎯 요소 피커 — DevTools 없이 규칙 만들기
+🔄 템플릿 동기화 — 팀 전체가 한 벌의 템플릿을
+전부 요청하기 전까지는 꺼져 있거나, 비어 있거나, 아무 일도 하지 않습니다.
 
 ⚡ 키만 입력해 작업 항목 열기 — 바로 열기
 주소창(Chrome 옴니박스)에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다.
 같은 입력칸이 툴바 팝업에도 있어, 어디에 있든 티켓 하나가 키 입력 한 번 거리입니다.
-대상마다 기본 링크를 하나씩 정하고 키가 들어갈 자리에 {{key}}를 넣습니다.
-그래서 Plane은 물론 Jira와 Linear에서도 그대로 동작합니다.
-키의 접두사가 대상을 고르므로, ENG-는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.
+설정은 붙여넣기 한 번입니다. 열어 둔 작업 항목의 주소를 복사해 붙여넣으면 링크가 그대로 나옵니다 — 검색 주소까지, 채워 넣을 빈칸 없이.
+Plane·Jira·Linear·GitHub·GitLab은 이름으로 알아보고, 그 밖의 트래커는 주소에서 키가 놓인 자리로 읽습니다.
+여러 개를 두면 키의 접두사가 골라 줍니다. ENG-는 Linear로 보내고 나머지는 Plane에 두는 식입니다.
 최근에 연 항목이 주소창에 다시 나와, 키를 외우고 있지 않아도 됩니다.
 키 대신 낱말을 입력하면 검색으로 가고, 남의 메시지 속 키는 드래그한 뒤 우클릭으로 엽니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
@@ -274,7 +294,8 @@ Plane은 작업 항목 전용 페이지에서 속성을 오른쪽에 고정해 �
 
 🎯 DevTools 없이 규칙 만들기 — 비주얼 요소 피커
 팝업에서 "요소 선택 → 규칙 추가"를 누르고 Plane 화면의 요소를 클릭하세요.
-매칭 개수와 함께 후보 선택자가 뜨고(폭 관련 클래스 우선), 규칙은 값만 넣으면 되는 상태로 설정에 담깁니다.
+후보 선택자는 "다음 달에도 살아 있을까" 순서로 뜹니다 — 사람이 붙인 이름이 먼저, 빌드가 만든 것은 "곧 바뀜"이라고 색이 아니라 말로 적힙니다.
+줄마다 몇 개와 매칭되는지 함께 보여 주고, 규칙은 값만 넣으면 되는 상태로 설정에 담깁니다.
 
 🔄 팀 전체가 한 벌의 템플릿을 — 팀 템플릿 동기화
 JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키면 팀 전체가 같은 템플릿을 씁니다.
@@ -282,8 +303,9 @@ JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키�
 기본은 꺼져 있습니다: 직접 등록한 URL만 받아 오고, 로컬 캐시에서 읽어 오프라인에서도 삽입되며, 동기화된 템플릿은 읽기 전용이라 누구의 편집도 덮이지 않습니다.
 처음이라면 "예시 사용해 보기"가 살아 있는 피드를 채워 넣어 바로 확인할 수 있습니다.
 
-🏠 자체 호스팅 Plane 전용
-자신의 인스턴스 도메인(예: plane.your-company.com)을 추가하세요.
+🏠 쓰는 곳이 어디든
+쓰는 도메인을 추가하세요 — plane.your-company.com도, app.plane.so도 됩니다.
+자체 호스팅에서 출발했고, Plane Cloud는 릴리스마다 실제 인스턴스에서 확인합니다. 둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
 설치 시 사이트 접근 권한이 없고 — 도메인을 켜면 Chrome이 그 사이트 하나를 묻습니다 — 허용한 곳에서만 동작하며 그 외에는 완전히 비활성입니다.
 와일드카드(*.example.com)도 지원합니다.
 
@@ -300,9 +322,10 @@ JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키�
 자세한 내용은 개인정보 처리방침을 참고하세요.
 
 🚀 시작하기
-1. 자체 호스팅 Plane 인스턴스를 엽니다.
+1. 쓰는 Plane을 엽니다 — 자체 호스팅이든 Plane Cloud든.
 2. 툴바 아이콘을 눌러 "이 사이트에서 사용"을 클릭합니다(Chrome 프롬프트에서 접근 허용).
-3. 설정에서 템플릿, 복사 형식, 스타일 규칙을 추가합니다.
+3. 설정에서 열어 둔 작업 항목의 주소를 붙여넣으세요. 이 붙여넣기 한 번으로 열기·검색·복사가 한꺼번에 준비됩니다.
+4. 템플릿과 폭 규칙은 필요할 때 추가하면 됩니다. 나머지는 전부 선택 사항입니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
 
