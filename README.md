@@ -96,6 +96,11 @@ Plane server**, applied only on the domains you enable.
      the address bar can say which item the page you are on *is*. The title comes from the
      page title, which Plane and Linear both write as `{KEY} {title}`. No second thing to
      configure, and no selector that a redesign can move.
+     - The link is the **canonical form your template describes**, not the address bar.
+       Linear's address is `/issue/GAE-1/get-familiar-with-linear`, but `/issue/GAE-1` is
+       what it redirects *from* — so the slug is the part no reader needs and every paste
+       carries, and a title that isn't Latin makes it longer, not shorter. Plane has no
+       slug, so nothing changes there.
      - There the shortcut is the only way in: the button needs a work item header to sit
        beside, and a header is a Plane shape — guessing at another tracker's markup is the
        coupling this extension is built without. Settings ▸ **Shortcuts** says where

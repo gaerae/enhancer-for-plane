@@ -35,6 +35,12 @@ Schema 7 → 8.
   Linear both write as `{KEY} {title}`. No new setting, no new selector, nothing that a
   redesign can move.
 
+  The link copied is the canonical form your template describes, not the address bar.
+  Linear's address is `/issue/GAE-1/get-familiar-with-linear`, but `/issue/GAE-1` is what it
+  redirects *from* — so the slug is the part no reader needs and every paste carries, and a
+  title that is not Latin makes it longer rather than shorter. Plane has no slug, so nothing
+  changes there.
+
   On Plane nothing changes: the header is still read first, because it is the only thing
   that can see into the panel a list opens — measured, the address bar and the page title
   both still name the *list* while a peek is open. Where there is no header to anchor on,

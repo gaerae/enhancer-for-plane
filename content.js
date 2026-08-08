@@ -550,12 +550,15 @@
     // allowed to put the key anywhere in it — "?item={{key}}" is as legitimate a grammar as
     // a path segment, and matching a trimmed URL would silently never answer for one.
     // peItemUrl decides separately what to *copy*, where the query is view state and goes.
-    const key = peKeyFromUrl(quickLinks(), location.href);
-    if (!key) return null;
+    const m = peMatchItemUrl(quickLinks(), location.href);
+    if (!m) return null;
     return {
-      key,
-      title: peTitleFromDocTitle(document.title, key),
-      url: peItemUrl(location.origin, location.pathname, key, quickLinks())
+      key: m.key,
+      title: peTitleFromDocTitle(document.title, m.key),
+      // The template's own form, not the address bar — see peCanonicalItemUrl. The match is
+      // already in hand, so this composes from the grammar that recognised the page rather
+      // than asking peItemUrl to work it out a second time.
+      url: peCanonicalItemUrl(m)
     };
   }
 

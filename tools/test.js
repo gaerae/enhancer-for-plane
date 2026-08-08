@@ -1090,6 +1090,8 @@ function loadItemReaders({ href, titleValue = null, docTitle = "", links = [], k
     "findKeyEl",
     "peItemUrl",
     "peKeyFromUrl",
+    "peMatchItemUrl",
+    "peCanonicalItemUrl",
     "peTitleFromDocTitle",
     src.slice(from, to) + "\nreturn { readItemRef, readItemFromUrl, readItem };"
   )(
@@ -1099,6 +1101,8 @@ function loadItemReaders({ href, titleValue = null, docTitle = "", links = [], k
     () => (keyEl === null ? null : { textContent: keyEl }),
     ctx.peItemUrl,
     ctx.peKeyFromUrl,
+    ctx.peMatchItemUrl,
+    ctx.peCanonicalItemUrl,
     ctx.peTitleFromDocTitle
   );
 }
@@ -1701,7 +1705,9 @@ test("copy: the URL reader gets all three fields with no DOM at all", () => {
   const ref = r.readItemFromUrl();
   eq(ref.key, "GAE-2");
   eq(ref.title, "Connect your tools");
-  eq(ref.url, "https://linear.app/gaerae/issue/GAE-2/connect-your-tools", "the address bar, slug and all");
+  // Not the address bar: Linear redirects /issue/GAE-2 TO the slug form, so the slug is the
+  // part nobody needs and every paste carries.
+  eq(ref.url, "https://linear.app/gaerae/issue/GAE-2", "the canonical form, without the slug");
   eq(loadItemReaders({ href: "https://linear.app/gaerae/team/GAE/all", links: [LINEAR_LINK] }).readItemFromUrl(), null,
     "a list route names no item");
   // The address is matched whole, so a grammar may put the key in the query. Nothing ships
@@ -1745,6 +1751,35 @@ test("copy: the header wins where both can answer, and the URL covers where it c
   eq(peek.readItem().key, "GAERA-2", "the header can");
   eq(peek.readItem().url, "https://app.plane.so/gaerae/browse/GAERA-2", "composed from the user's own quick link");
   eq(loadItemReaders({ href: "https://x.test/nothing/here", links: [PLANE_LINK] }).readItem(), null, "neither → nothing");
+});
+
+// The reason the slug goes, stated as the thing that would otherwise happen. A title that is
+// not Latin does not slug to something shorter — it slugs to something longer, and a chat
+// message carries all of it for no reader's benefit.
+test("copy: the decoration after the key is dropped, however long it is", () => {
+  const ctx = loadCommon();
+  const long =
+    "https://linear.app/gaerae/issue/GAE-2/" +
+    encodeURIComponent("사이클로 작업을 시간 단위로 묶어서 관리하는 방법 정리");
+  const r = loadItemReaders({ href: long, docTitle: "GAE-2 사이클로 작업을 시간 단위로 묶어서 관리하는 방법 정리", links: [LINEAR_LINK] });
+  const ref = r.readItemFromUrl();
+  eq(ref.url, "https://linear.app/gaerae/issue/GAE-2", "83 characters of slug, gone");
+  eq(ref.title, "사이클로 작업을 시간 단위로 묶어서 관리하는 방법 정리", "and the title is still the title, unencoded");
+  ok(ref.url.length < long.length / 2, "the link is less than half what the address bar says");
+  // Plane has no slug to drop, so its own page is untouched by any of this.
+  eq(
+    loadItemReaders({ href: "https://app.plane.so/gaerae/browse/GAERA-6/", links: [PLANE_LINK] }).readItemFromUrl().url,
+    "https://app.plane.so/gaerae/browse/GAERA-6"
+  );
+  // A template that matched is the one that composes, even when prefix routing would send
+  // this key somewhere else entirely. The page in front of the reader decides.
+  const decoy = { id: "z", enabled: true, prefix: "GAE-", url: "https://elsewhere.test/t/{{key}}" };
+  eq(
+    loadItemReaders({ href: "https://linear.app/gaerae/issue/GAE-2/slug", links: [decoy, LINEAR_LINK] }).readItemFromUrl().url,
+    "https://linear.app/gaerae/issue/GAE-2",
+    "composed by the template that recognised this page, not by the prefix rule"
+  );
+  eq(ctx.peCanonicalItemUrl(null), "", "nothing matched, nothing composed");
 });
 
 test("copy: a link routed to another tracker is never copied off this page", () => {

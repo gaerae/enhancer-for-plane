@@ -1144,11 +1144,12 @@ function peSaveSyncCache(cache) {
 //
 // Three cases, tried in this order, and the difference is worth keeping in view:
 //
-//   observed  — the address bar already IS the item's page. Nothing to work out; the query
-//               string is dropped because it carries view state, not the item. This is the
-//               case on Plane's /{workspace}/browse/{KEY} and on Linear's
-//               /{workspace}/issue/{KEY}/{slug} alike, which is why the check asks the
-//               quick links rather than looking for the word "browse".
+//   observed  — the address bar already IS the item's page. On Plane that address is the
+//               answer. Elsewhere it is only the starting point: the link handed over is
+//               the canonical form the user's own template describes, so Linear's
+//               /issue/GAE-1/get-familiar-with-linear is copied as /issue/GAE-1 — the URL
+//               it redirects from, without a slug nobody reads. Either way the query
+//               string is dropped, because it carries view state and not the item.
 //   configured — a peek panel opened over a list keeps the *list's* URL, and the panel
 //               contains no link to the item at all (checked: its only anchor points at
 //               Plane's docs). So the link is composed from the user's own quick link for
@@ -1191,7 +1192,8 @@ function peItemUrl(origin, pathname, key, links) {
   // the quick links only answer for someone who configured them and peKeyFromPath answers
   // for every Plane install whether they did or not.
   if (peKeyFromPath(pathname) === key) return origin + pathname;
-  if (peKeyFromUrl(links, origin + pathname) === key) return origin + pathname;
+  const here = peMatchItemUrl(links, origin + pathname);
+  if (here && here.key === key) return peCanonicalItemUrl(here);
   // Configured: the user's own grammar, read forwards. Same origin only.
   const routed = peExpandQuickLink(peRouteQuickLink(links, key), key);
   if (peIsHttpUrl(routed)) {
@@ -1354,18 +1356,44 @@ function peMatchQuickLink(template, url) {
   return PE_ITEM_KEY_RE.test(key) ? key : "";
 }
 
-// The key this URL names, according to the user's quick links, or "". The most specific
-// template wins — "…/acme/browse/{{key}}" beats "…/{{key}}" — because a shorter template is
-// a prefix of the longer one's world and would otherwise answer first by accident.
-function peKeyFromUrl(links, url) {
+// The item this URL names, as { key, link }, or null. The link comes back with the key
+// because the template that recognised the page is also the one that should compose a link
+// TO it — see peCanonicalItemUrl. The most specific template wins ("…/acme/browse/{{key}}"
+// beats "…/{{key}}"), because a shorter template is a prefix of the longer one's world and
+// would otherwise answer first by accident.
+function peMatchItemUrl(links, url) {
   const usable = (Array.isArray(links) ? links : [])
     .filter((l) => l && typeof l === "object" && l.enabled !== false && l.url)
     .sort((a, b) => String(b.url).length - String(a.url).length);
   for (const l of usable) {
     const key = peMatchQuickLink(l.url, url);
-    if (key) return key;
+    if (key) return { key, link: l };
   }
-  return "";
+  return null;
+}
+
+// The key this URL names, or "".
+function peKeyFromUrl(links, url) {
+  const m = peMatchItemUrl(links, url);
+  return m ? m.key : "";
+}
+
+// The link to copy for an item recognised from its own address: the canonical form the
+// user's template describes, not the address bar.
+//
+// The two differ, and the difference is not cosmetic. Linear's address is
+// /issue/GAE-1/get-familiar-with-linear, but /issue/GAE-1 is what it redirects FROM — so the
+// slug is the part a reader never needs and a paste always carries. The template says which
+// part is the item; everything after it is decoration this happens to be standing on.
+// Titles that are not Latin make it worse rather than different, which is the whole reason
+// this is not left as "whatever the address bar says".
+//
+// Composed with the link that MATCHED, not the one prefix-routing would pick: those can
+// differ (a "GAE-" rule pointing at another tracker) and the page in front of the reader is
+// the authority on which grammar applies to it.
+function peCanonicalItemUrl(match) {
+  if (!match || !match.link) return "";
+  return peExpandQuickLink(match.link, match.key);
 }
 
 // The work item title out of a page title, or "".
