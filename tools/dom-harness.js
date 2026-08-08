@@ -194,21 +194,27 @@ const report = () => { const el = document.createElement("pre"); el.id = "pe-res
 function buildPage({ name, html, css, js, seed, local, dark, lang, body }) {
   let src = fs.readFileSync(path.join(ROOT, html), "utf8");
   const cssPath = dark ? darkCss(css) : path.join(ROOT, css);
-  src = src.replace(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
+  // Every insertion goes through a replacer function, never a replacement string. A string
+  // replacement reads $&, $1 and $' as instructions, and the things being inserted here are
+  // an entire message catalogue and an entire test body — authored text, full of $ signs.
+  // One "$NAME$'s" in a catalogue entry expanded $' into the rest of the file and truncated
+  // the page mid-string; every suite on it then failed for reasons that pointed elsewhere.
+  const put = (re, text) => (src = src.replace(re, () => text));
+  put(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
   for (const f of ["common.js", js]) {
-    src = src.replace(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
+    put(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
   }
   // The stub has to define `chrome` before the page's own scripts run.
-  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
+  put(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
   // Transitions off. Virtual time advances timers but not the compositor clock that drives
   // a CSS transition, so a colour read after a toggle came back mid-interpolation — the
   // toggle knob measured 1.1:1 here while a real browser settled at 9.5:1. Asserting the
   // final computed value is both what matters and the only thing that can be deterministic.
-  src = src.replace(
+  put(
     "</head>",
     "<style>*, *::before, *::after { transition: none !important; animation: none !important; }</style>\n</head>"
   );
-  src = src.replace(
+  put(
     "</body>",
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n</body>`
   );
@@ -438,6 +444,24 @@ const midWordBreaks = (root) => {
   }
   return bad;
 };`;
+
+// The page builder is a text substitution, and everything it substitutes in is authored text
+// — an entire catalogue, an entire suite body. If any of it reaches String.replace as a
+// replacement string, "$&", "$1" and "$'" are read as instructions. One catalogue entry
+// containing "$NAME$'s" expanded $' into the rest of the file, truncating the page mid-string;
+// 32 assertions on 6 pages then failed with messages pointing at tabs and preview text.
+// Cheaper to assert the builder is immune than to diagnose that twice.
+function checkPageBuilderQuotesNothing() {
+  const src = fs.readFileSync(path.join(__dirname, "dom-harness.js"), "utf8");
+  const fn = src.slice(src.indexOf("function buildPage("), src.indexOf("function buildPlanePage("));
+  // The one legitimate src.replace is `put`, whose replacement is a function.
+  const bad = fn.split("\n").filter((l) => l.indexOf("src.replace(") > -1 && l.indexOf("() =>") === -1);
+  if (bad.length) {
+    hardError = "buildPage substitutes with a replacement string: " + bad[0].trim();
+    console.log(`  ERROR ${hardError}`);
+  }
+}
+checkPageBuilderQuotesNothing();
 
 const suites = [
   {
@@ -749,6 +773,157 @@ const suites = [
         const line = parseFloat(getComputedStyle(box).lineHeight);
         ok(box.getBoundingClientRect().height > line * 2.2, "the preview did not break into lines");
         eq(getComputedStyle(box).whiteSpace, "pre-line");
+      });`
+  },
+  {
+    // Paste beats a list of five, and the list of five is what the chooser was. Everything
+    // here is a question about the assembled page: whether the box reports what it read
+    // before anything is committed, whether refusing looks like refusing, and where the caret
+    // ends up in each of the three outcomes.
+    name: "options · quick link from a pasted address",
+    page: { name: "opt-quick-paste", ...OPTIONS, seed: seedOf({ quickLinks: [] }) },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      const box = document.getElementById("quickExamples");
+      const open = () => { if (box.hidden) document.getElementById("addQuickLink").click(); };
+      const type = (v) => {
+        const i = document.getElementById("quickPasteUrl");
+        i.value = v;
+        i.dispatchEvent(new Event("input", { bubbles: true }));
+        return i;
+      };
+      const go = () => document.querySelector(".qlk-paste-go");
+      const hint = () => document.querySelector(".qlk-paste-hint");
+      const rows = () => [...document.querySelectorAll("#quickList .cpy-item")];
+      open();
+
+      check("the panel explains the two kinds of brace before anything else does", () => {
+        const legend = box.querySelector(".qlk-ex-legend");
+        ok(legend, "no legend");
+        ok(legend.textContent.indexOf("⟨") > -1 && legend.textContent.indexOf("{{key}}") > -1, legend.textContent);
+      });
+      // Picking a row fills two fields. Showing one of them is how a search URL nobody chose
+      // ends up in the settings.
+      check("every example row shows the search address it will also fill", () => {
+        const rowFor = (name) => [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === name);
+        const searchOf = (name) => { const s = rowFor(name).querySelector(".qlk-ex-search"); return s ? s.textContent : ""; };
+        ok(searchOf("Jira").indexOf("jql=text ~") > -1, "Jira: " + searchOf("Jira"));
+        ok(searchOf("GitHub").indexOf("{{q}}") > -1, "GitHub: " + searchOf("GitHub"));
+        eq(searchOf("Linear"), "", "Linear has none, and an empty line would imply one is missing");
+      });
+      check("the box starts inert and says nothing", () => {
+        ok(go().disabled, "the button is live before anything was pasted");
+        eq(hint().textContent, "");
+      });
+      check("a known tracker is named back, and the search address is promised", () => {
+        type("https://gprxh.atlassian.net/browse/DU-61");
+        ok(!go().disabled, "the button did not come alive");
+        eq(hint().textContent, peMsg("optQuickPasteKnown", ["Jira"]));
+        ok(!hint().classList.contains("bad"));
+      });
+      check("an address with no key in it is refused, and looks refused", () => {
+        type("https://linear.app/gaerae/settings/members");
+        ok(go().disabled, "a template would have been built from a settings page");
+        eq(hint().textContent, peMsg("optQuickPasteUnread"));
+        ok(hint().classList.contains("bad"), "and it reads as ordinary body text");
+        const c = contrast(getComputedStyle(hint()).color, bg(document.querySelector(".qlk-examples")));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      check("Enter is the same as the button", () => {
+        const i = type("https://gprxh.atlassian.net/browse/DU-61");
+        i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      });
+      await waitFor(() => rows().length === 1, "the row to be added");
+      check("what it built needs no typing at all", () => {
+        const r = rows()[0];
+        eq(r.querySelector(".qlk-name").value, "Jira");
+        eq(r.querySelector(".qlk-url").value, "https://gprxh.atlassian.net/browse/{{key}}");
+        ok(r.querySelector(".qlk-search").value.indexOf("gprxh.atlassian.net") > -1, r.querySelector(".qlk-search").value);
+        eq(peFirstBlank(r.querySelector(".qlk-url").value), null, "a blank was left in a URL read from a real address");
+        ok(box.hidden, "and the chooser closed behind it");
+      });
+      check("the preview agrees that it is a working link", () => {
+        const p = document.querySelectorAll("#quickList .qlk-preview")[0].textContent;
+        ok(p.indexOf("https://gprxh.atlassian.net/browse/PROJ-123") > -1, p);
+      });
+
+      // The tracker nobody listed, which is the case the example list cannot serve at all.
+      open();
+      type("https://redmine.example.org/issues/45231");
+      check("an unlisted numbered tracker is built, and says which part is left to you", () => {
+        eq(hint().textContent, peMsg("optQuickPasteGuessNumbered", ["redmine.example.org"]));
+        ok(!go().disabled);
+      });
+      go().click();
+      await waitFor(() => rows().length === 2, "the second row");
+      check("and the caret goes to the prefix, which is the decision it could not make", () => {
+        const r = rows()[1];
+        eq(r.querySelector(".qlk-url").value, "https://redmine.example.org/issues/{{key.num}}");
+        eq(r.querySelector(".qlk-name").value, "redmine.example.org");
+        eq(r.querySelector(".qlk-search").value, "");
+        eq(document.activeElement, r.querySelector(".qlk-prefix"), "the caret is somewhere else");
+      });`
+  },
+  {
+    // Tab walking the blanks. Only a browser has a selection to move, and the failure worth
+    // guarding is the one where Tab stops being Tab — a field the keyboard cannot leave is
+    // worse than the two-blank example it was added for.
+    name: "options · tabbing between the blanks",
+    page: { name: "opt-quick-tab", ...OPTIONS, seed: seedOf({ quickLinks: [] }) },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      document.getElementById("addQuickLink").click();
+      const box = document.getElementById("quickExamples");
+      // GitHub is the two-blank shape: ⟨owner⟩ and ⟨repo⟩ in the URL, and both again in the
+      // search URL. Four blanks over two fields is most of the work the chooser was meant to
+      // save, and all of it was being done by dragging over text.
+      [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === "GitHub").click();
+      await waitFor(() => document.querySelectorAll("#quickList .cpy-item").length === 1, "the row");
+      const row = () => document.querySelectorAll("#quickList .cpy-item")[0];
+      const url = () => row().querySelector(".qlk-url");
+      const search = () => row().querySelector(".qlk-search");
+      const sel = (f) => f.value.slice(f.selectionStart, f.selectionEnd);
+      const tab = (f, shift) => f.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: !!shift, bubbles: true, cancelable: true }));
+      const OWNER = "⟨" + peMsg("optQuickPartOwner") + "⟩";
+      const REPO = "⟨" + peMsg("optQuickPartRepo") + "⟩";
+
+      check("it opens on the first blank", () => {
+        eq(document.activeElement, url());
+        eq(sel(url()), OWNER);
+      });
+      check("Tab goes to the next blank rather than the next field", () => {
+        tab(url());
+        eq(document.activeElement, url(), "focus left the field");
+        eq(sel(url()), REPO);
+      });
+      check("Shift+Tab goes back to the previous one", () => {
+        tab(url(), true);
+        eq(sel(url()), OWNER);
+      });
+      check("past the last blank it crosses into the search field, on its first blank", () => {
+        tab(url());
+        tab(url());
+        eq(document.activeElement, search(), "it stayed in the URL field");
+        eq(sel(search()), OWNER);
+      });
+      check("and once nothing is left, Tab is Tab again", () => {
+        tab(search());
+        eq(sel(search()), REPO, "the second one in the search URL");
+        const e = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+        search().dispatchEvent(e);
+        ok(!e.defaultPrevented, "the last blank trapped the caret in the box");
+      });
+      // Typing over a blank removes it, which is the whole point — the walk has to shorten as
+      // the row gets filled rather than sending the caret back to text that is now real.
+      check("a filled-in blank is no longer walked to", () => {
+        const u = url();
+        u.focus();
+        const at = peFirstBlank(u.value);
+        u.setSelectionRange(at[0], at[1]);
+        u.setRangeText("gaerae", at[0], at[1], "end");
+        u.dispatchEvent(new Event("input", { bubbles: true }));
+        tab(u);
+        eq(sel(u), REPO, "it went back to the part that is now a real owner");
       });`
   },
   {

@@ -92,6 +92,25 @@ Schema 7 → 8.
   example that quietly underdelivers reads as the extension being broken. GitHub and GitLab
   number their issues rather than keying them, so those two arrive with a prefix and spend it:
   you type `GH-1234` and `{{key.num}}` puts `1234` in the URL.
+- **Or paste an address and skip the choosing.** A list of five still asks you to recite your
+  tracker's URL shape from memory, and reads as "these five are supported" — the opposite of
+  what a generic quick link is for. So the chooser opens with a box: paste any work item's
+  address and the template falls out of it. A known shape is recognised and **both** URLs are
+  filled from it, search included, with nothing left to type —
+  `https://gprxh.atlassian.net/browse/DU-61` becomes the Jira pair for *your* site. A tracker
+  nobody listed still works: the last key-shaped segment of the path becomes the token and
+  everything after it is dropped, so `https://redmine.example.org/issues/45231` yields
+  `…/issues/{{key.num}}` and asks you for the one thing it cannot know — a prefix to type
+  before the number. An address with nothing key-shaped in it is refused and says so, because
+  a template built from a settings page opens the wrong address forever and nothing later can
+  notice.
+
+  Three smaller things in the same panel. Each row now shows the **search** address it will
+  also fill, since picking a row was filling two fields and showing one. A line at the top
+  says which braces are which — `⟨…⟩` is yours, `{{key}}` is ours — which until now you had to
+  work out. And **Tab walks the remaining blanks** before it goes anywhere else, across both
+  URL fields; GitHub's shape leaves four, and the other three were being dragged over by hand.
+  Once none are left, Tab is Tab again.
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
@@ -140,6 +159,13 @@ Schema 7 → 8.
   1.4 and Cloud, plus a decoy for each. A page that carries one generation cannot notice
   when the other stops matching; that is the whole failure above. Reverting either half of
   the selector now fails three assertions.
+- **The harness builds its pages with replacer functions, never replacement strings.** It
+  substitutes a whole message catalogue and a whole suite body into each page, and
+  `String.replace` reads `$&`, `` $` ``, `$'` and `$1` in a replacement *string* as
+  instructions. A catalogue entry containing `$NAME$'s` expanded `$'` into the rest of the
+  file and truncated the page mid-string; 32 assertions across 6 pages then failed with
+  messages about tab state and preview text, none of which was wrong. A guard now asserts
+  `buildPage` has no string substitutions left in it.
 - **The harness's `chrome.storage.local` is now readable and writable**, so the rule-health
   record can be seeded for the settings page and read back after the content script writes
   it. A stub that swallowed the write could not tell the feature working from the silence it

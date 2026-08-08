@@ -1497,6 +1497,94 @@ test("quick: the caret is sent to the first thing left to replace", () => {
   eq(ctx.peFirstBlank(""), null);
 });
 
+test("quick: Tab walks the blanks and then stops being Tab", () => {
+  const ctx = loadCommon();
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  const first = ctx.peNextBlank(url, 0);
+  eq(url.slice(first[0], first[1]), "⟨host⟩");
+  const second = ctx.peNextBlank(url, first[1]);
+  eq(url.slice(second[0], second[1]), "⟨workspace⟩");
+  // The one that matters: past the last blank there is nothing, so Tab has to go back to
+  // moving between fields rather than trapping the caret in the box.
+  eq(ctx.peNextBlank(url, second[1]), null);
+  // Shift+Tab reads from where the selection starts, so standing on a blank goes to the one
+  // before it rather than reselecting the blank the caret is already in.
+  const back = ctx.pePrevBlank(url, second[0]);
+  eq(url.slice(back[0], back[1]), "⟨host⟩");
+  eq(url.slice(...ctx.pePrevBlank(url, url.length)), "⟨workspace⟩", "from the end, the last one");
+  eq(ctx.pePrevBlank(url, first[0]), null, "and standing on the first, nothing");
+  eq(ctx.pePrevBlank(url, 0), null);
+});
+
+test("quick: a pasted address becomes the template it came from", () => {
+  const ctx = loadCommon();
+  // Every one of these was opened in a browser during verification; they are the addresses
+  // as the address bar actually shows them, tail and all.
+  const jira = ctx.peQuickFromUrl("https://gprxh.atlassian.net/browse/DU-61");
+  eq(jira.name, "Jira");
+  eq(jira.url, "https://gprxh.atlassian.net/browse/{{key}}");
+  eq(jira.searchUrl, 'https://gprxh.atlassian.net/issues/?jql=text ~ "{{q}}"',
+    "the half a reader is least likely to know is the half this fills");
+  eq(ctx.peFirstBlank(jira.url), null, "and nothing is left to type");
+
+  // Linear appends a title slug. It is decoration — the bare key navigates, which is why the
+  // example does not carry one, and reading one back must not either.
+  const lin = ctx.peQuickFromUrl("https://linear.app/gaerae/issue/GAE-1/some-title-here");
+  eq(lin.url, "https://linear.app/gaerae/issue/{{key}}");
+  eq(lin.searchUrl, "", "Linear has no URL-addressable search and we do not invent one");
+
+  const gh = ctx.peQuickFromUrl("https://github.com/gaerae/enhancer-for-plane/issues/7");
+  eq(gh.url, "https://github.com/gaerae/enhancer-for-plane/issues/{{key.num}}");
+  eq(gh.prefix, "GH-", "a numbered tracker arrives with the prefix that makes it routable");
+  const gl = ctx.peQuickFromUrl("https://gitlab.com/gitlab-org/gitlab/-/issues/1234");
+  eq(gl.url, "https://gitlab.com/gitlab-org/gitlab/-/issues/{{key.num}}");
+
+  // Self-hosted Plane, on plain http. The scheme is not part of the shape, and refusing to
+  // read it would be pedantry with a cost.
+  const plane = ctx.peQuickFromUrl("http://plane.hectoai.co.kr/hecto/browse/HEC-12/");
+  eq(plane.name, "Plane");
+  eq(plane.url, "http://plane.hectoai.co.kr/hecto/browse/{{key}}");
+  eq(plane.searchUrl, "http://plane.hectoai.co.kr/hecto/search/?q={{q}}");
+  eq(ctx.peQuickFromUrl("https://app.plane.so/gaerae/browse/GAE-3").url,
+    "https://app.plane.so/gaerae/browse/{{key}}", "and https stays https");
+});
+
+test("quick: a tracker nobody listed still yields a template", () => {
+  const ctx = loadCommon();
+  // The whole reason paste beats a list of five: five reads as "these five are supported".
+  const redmine = ctx.peQuickFromUrl("https://redmine.example.org/issues/45231");
+  eq(redmine.from, "guess");
+  eq(redmine.url, "https://redmine.example.org/issues/{{key.num}}");
+  eq(redmine.name, "redmine.example.org", "the host is the only name we honestly have");
+  eq(redmine.kind, "num");
+  eq(redmine.prefix, "", "which letters stand for someone's tracker is theirs to choose");
+  eq(redmine.searchUrl, "", "and a search address is not derivable from an item address");
+
+  const keyed = ctx.peQuickFromUrl("https://tracker.example.com/w/acme/item/ACME-99?tab=activity");
+  eq(keyed.url, "https://tracker.example.com/w/acme/item/{{key}}",
+    "the query string is not part of the shape either");
+  eq(keyed.kind, "key");
+
+  // A key-shaped segment beats a numeric one wherever it sits, because a bare number needs a
+  // prefix spent on it and a key does not.
+  eq(ctx.peQuickFromUrl("https://t.example/p/12/ENG-7").url, "https://t.example/p/12/{{key}}");
+});
+
+test("quick: an address with nothing key-shaped in it is refused, not guessed at", () => {
+  const ctx = loadCommon();
+  // Refusing is the point. A template built from a page that is not a work item is wrong in
+  // a way nothing downstream can notice — it just opens the wrong address forever.
+  eq(ctx.peQuickFromUrl("https://linear.app/gaerae/settings/members"), null);
+  eq(ctx.peQuickFromUrl("https://app.plane.so/gaerae/projects/"), null);
+  eq(ctx.peQuickFromUrl("not a url at all"), null);
+  eq(ctx.peQuickFromUrl("javascript:alert(1)"), null, "only http and https are addresses here");
+  eq(ctx.peQuickFromUrl(""), null);
+  eq(ctx.peQuickFromUrl("   "), null);
+  // An example someone pasted back out of the settings page, blanks and all. Reading it as a
+  // real address would produce a link to a host literally named "⟨host⟩".
+  eq(ctx.peQuickFromUrl("https://⟨host⟩/⟨workspace⟩/browse/PROJ-1"), null);
+});
+
 test("quick: an API address is recognised as one", () => {
   const { peLooksLikeApiUrl } = loadCommon();
   ok(peLooksLikeApiUrl("https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true"));

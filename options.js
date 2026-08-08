@@ -459,30 +459,120 @@
       .filter((d) => d && d.indexOf("*") === -1)
       .slice(0, 4);
 
-  function addQuickLinkFrom(example, host) {
-    const labels = quickPartLabels();
-    const known = host ? { host } : null;
+  function pushQuickLink(link) {
     state.quickLinks.push({
       id: uid("qlk"),
-      name: example ? example.name : "",
-      prefix: example ? example.prefix || "" : "",
-      url: example ? peQuickExample(example.url, labels, known) : "",
-      searchUrl: example ? peQuickExample(example.searchUrl, labels, known) : "",
+      name: link.name || "",
+      prefix: link.prefix || "",
+      url: link.url || "",
+      searchUrl: link.searchUrl || "",
       enabled: true
     });
     el.quickExamples.hidden = true;
     renderQuickLinks();
     // Put the caret on the first thing left to replace, selected, so the next keystroke
-    // overwrites it. With nothing left — every blank filled from a known host — fall back to
-    // the name, which is the field a second target actually needs.
+    // overwrites it. With nothing left, send it to whichever field still needs a decision:
+    // a numbered tracker needs a prefix to spend, and everything else needs a name.
     const rows = el.quickList.querySelectorAll(".cpy-item");
     const row = rows[rows.length - 1];
-    const urlEl = row && row.querySelector(".qlk-url");
+    if (!row) return;
+    const urlEl = row.querySelector(".qlk-url");
     const at = urlEl ? peFirstBlank(urlEl.value) : null;
     if (urlEl && at) {
       urlEl.focus();
       urlEl.setSelectionRange(at[0], at[1]);
-    } else focusLast(".qlk-name");
+      return;
+    }
+    if (link.kind === "num" && !link.prefix) {
+      const p = row.querySelector(".qlk-prefix");
+      if (p) {
+        p.focus();
+        return;
+      }
+    }
+    focusLast(".qlk-name");
+  }
+
+  function addQuickLinkFrom(example, host) {
+    const labels = quickPartLabels();
+    const known = host ? { host } : null;
+    pushQuickLink({
+      name: example ? example.name : "",
+      prefix: example ? example.prefix || "" : "",
+      url: example ? peQuickExample(example.url, labels, known) : "",
+      searchUrl: example ? peQuickExample(example.searchUrl, labels, known) : ""
+    });
+  }
+
+  // What the paste box says about what it just read. Literal peMsg calls in an if-chain, the
+  // same reason as everywhere else: check-i18n reads the key out of the call site.
+  function quickPasteHint(derived) {
+    if (!derived) return { text: peMsg("optQuickPasteUnread"), bad: true };
+    if (derived.from === "guess" && derived.kind === "num")
+      return { text: peMsg("optQuickPasteGuessNumbered", [derived.name]), bad: false };
+    if (derived.from === "guess") return { text: peMsg("optQuickPasteGuess", [derived.name]), bad: false };
+    if (derived.searchUrl) return { text: peMsg("optQuickPasteKnown", [derived.name]), bad: false };
+    return { text: peMsg("optQuickPasteKnownNoSearch", [derived.name]), bad: false };
+  }
+
+  // Paste an address, get the template. The example list can only cover trackers we thought
+  // of; the reader already has theirs open, and their address bar knows the shape better than
+  // any list of five does.
+  function buildQuickPaste(box) {
+    const wrap = document.createElement("div");
+    wrap.className = "qlk-paste";
+    const label = document.createElement("label");
+    label.className = "qlk-paste-label";
+    label.setAttribute("for", "quickPasteUrl");
+    label.textContent = peMsg("optQuickPasteLabel");
+    const line = document.createElement("div");
+    line.className = "qlk-paste-line";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "quickPasteUrl";
+    input.className = "qlk-paste-url";
+    input.placeholder = peMsg("optQuickPastePlaceholder");
+    input.spellcheck = false;
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "btn qlk-paste-go";
+    go.textContent = peMsg("optQuickPasteGo");
+    go.disabled = true;
+    const hint = document.createElement("div");
+    hint.className = "qlk-paste-hint";
+
+    let derived = null;
+    const reread = () => {
+      const raw = input.value.trim();
+      derived = raw ? peQuickFromUrl(raw) : null;
+      go.disabled = !derived;
+      if (!raw) {
+        hint.textContent = "";
+        hint.classList.remove("bad");
+        return;
+      }
+      const h = quickPasteHint(derived);
+      hint.textContent = h.text;
+      hint.classList.toggle("bad", h.bad);
+    };
+    const submit = () => {
+      if (!derived) return;
+      pushQuickLink(derived);
+    };
+    input.addEventListener("input", reread);
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      submit();
+    });
+    go.addEventListener("click", submit);
+
+    line.appendChild(input);
+    line.appendChild(go);
+    wrap.appendChild(label);
+    wrap.appendChild(line);
+    wrap.appendChild(hint);
+    box.appendChild(wrap);
   }
 
   function toggleQuickExamples() {
@@ -499,7 +589,7 @@
       h.textContent = title;
       box.appendChild(h);
     };
-    const row = (label, url, note, onPick) => {
+    const row = (label, url, searchUrl, note, onPick) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "qlk-ex";
@@ -511,6 +601,14 @@
       u.textContent = url;
       b.appendChild(n);
       b.appendChild(u);
+      // Picking a row fills two addresses, and the panel was showing one. Nobody should have
+      // to discover the second one after the fact, least of all in a field they did not type.
+      if (searchUrl) {
+        const s = document.createElement("span");
+        s.className = "qlk-ex-url qlk-ex-search";
+        s.textContent = peMsg("optQuickExampleSearchLine", [searchUrl]);
+        b.appendChild(s);
+      }
       if (note) {
         const s = document.createElement("span");
         s.className = "qlk-ex-note";
@@ -521,19 +619,39 @@
       box.appendChild(b);
     };
 
+    buildQuickPaste(box);
+    // ⟨…⟩ and {{…}} look alike and mean opposite things: one is a blank for the reader, one
+    // is a token the extension expands. Nothing on the panel said so.
+    const legend = document.createElement("div");
+    legend.className = "qlk-ex-legend";
+    legend.textContent = peMsg("optQuickExamplesLegend");
+    box.appendChild(legend);
+
     const plane = PE_QUICK_EXAMPLES.filter((e) => e.id === "plane")[0];
     const hosts = quickKnownHosts();
     if (plane && hosts.length) {
       section(peMsg("optQuickExamplesFromSites"));
       hosts.forEach((h) =>
-        row(h, peQuickExample(plane.url, labels, { host: h }), "", () => addQuickLinkFrom(plane, h))
+        row(
+          h,
+          peQuickExample(plane.url, labels, { host: h }),
+          peQuickExample(plane.searchUrl, labels, { host: h }),
+          quickNote(plane.note),
+          () => addQuickLinkFrom(plane, h)
+        )
       );
     }
     section(peMsg("optQuickExamplesFromScratch"));
     PE_QUICK_EXAMPLES.forEach((e) =>
-      row(e.name, peQuickExample(e.url, labels), quickNote(e.note), () => addQuickLinkFrom(e, ""))
+      row(
+        e.name,
+        peQuickExample(e.url, labels),
+        peQuickExample(e.searchUrl, labels),
+        quickNote(e.note),
+        () => addQuickLinkFrom(e, "")
+      )
     );
-    row(peMsg("optQuickExamplesBlank"), "", "", () => addQuickLinkFrom(null, ""));
+    row(peMsg("optQuickExamplesBlank"), "", "", "", () => addQuickLinkFrom(null, ""));
     box.hidden = false;
   }
 
@@ -589,6 +707,33 @@
         state.quickLinks.splice(idx, 1);
         renderQuickLinks();
       });
+
+      // Tab walks the remaining ⟨blanks⟩ before it goes anywhere else. An example arrives with
+      // the first one selected and the rest were left to be found and dragged over by hand,
+      // which on GitHub's two-blank shape is most of the work the chooser was meant to save.
+      // Once a field has none left, Tab is Tab again — a box you cannot leave with the
+      // keyboard is worse than the problem this solves, so the fallthrough is the default.
+      const walk = (field, next) => {
+        field.addEventListener("keydown", (e) => {
+          if (e.key !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
+          const at = e.shiftKey
+            ? pePrevBlank(field.value, field.selectionStart)
+            : peNextBlank(field.value, field.selectionEnd);
+          if (at) {
+            e.preventDefault();
+            field.setSelectionRange(at[0], at[1]);
+            return;
+          }
+          if (e.shiftKey || !next) return;
+          const on = peFirstBlank(next.value);
+          if (!on) return;
+          e.preventDefault();
+          next.focus();
+          next.setSelectionRange(on[0], on[1]);
+        });
+      };
+      walk(url, search);
+      walk(search, null);
 
       paint();
       el.quickList.appendChild(node);

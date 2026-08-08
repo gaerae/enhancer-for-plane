@@ -915,6 +915,51 @@
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
   },
+  "optQuickPasteLabel": {
+    "message": "Paste an address from your tracker",
+    "description": "Label over the paste box at the top of the quick-link chooser. The examples can only cover trackers we thought of; the reader already has theirs open."
+  },
+  "optQuickPastePlaceholder": {
+    "message": "https://\u2026/browse/PROJ-123",
+    "description": "Placeholder in the paste box. An address shaped like the ones it reads, rather than a sentence."
+  },
+  "optQuickPasteGo": {
+    "message": "Create",
+    "description": "Button beside the paste box."
+  },
+  "optQuickPasteKnown": {
+    "message": "Read as $NAME$. The search address is filled in too.",
+    "description": "Shown when a pasted address matched one of the known shapes, so nothing is left to type.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteKnownNoSearch": {
+    "message": "Read as $NAME$, which has no address you can search from.",
+    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL \u2014 Linear.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteGuess": {
+    "message": "Not a tracker we know — built from where the key sits in $NAME$'s address. No search address.",
+    "description": "Shown when no known shape matched but a key-shaped path segment was found. Says plainly which part is a guess.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteGuessNumbered": {
+    "message": "Not a tracker we know, and its items are numbered ($NAME$) — choose a prefix to type before the number, like RM-1234.",
+    "description": "The numbered variant of optQuickPasteGuess. A bare number is not a key, so this one leaves the prefix field to fill.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteUnread": {
+    "message": "No item key found in that address. Open a work item and copy its address, or pick an example below.",
+    "description": "Shown when the pasted text yields nothing. Refusing matters: a template built from a page that is not a work item opens the wrong address forever, silently."
+  },
+  "optQuickExamplesLegend": {
+    "message": "\u27e8\u2026\u27e9 is yours to fill in. {{key}} is filled in by the extension.",
+    "description": "One line at the top of the chooser. The two look alike and mean opposite things, and nothing said so."
+  },
+  "optQuickExampleSearchLine": {
+    "message": "Search: $URL$",
+    "description": "The second address on a chooser row. Picking a row fills two fields and the panel was showing one.",
+    "placeholders": { "url": { "content": "$1" } }
+  },
   "optQuickExamplesFromSites": {
     "message": "From a site you already added",
     "description": "Heading over rows built from the user's own active domains — the host is filled in, so only the workspace is left to type."

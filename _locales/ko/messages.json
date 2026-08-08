@@ -912,6 +912,51 @@
   "optQuickEmpty": {
     "message": "아직 링크가 없습니다. “링크 추가”를 누르세요."
   },
+  "optQuickPasteLabel": {
+    "message": "\uc0ac\uc6a9 \uc911\uc778 \ud2b8\ub798\ucee4\uc758 \uc8fc\uc18c\ub97c \ubd99\uc5ec\ub123\uc73c\uc138\uc694",
+    "description": "Label over the paste box at the top of the quick-link chooser. The examples can only cover trackers we thought of; the reader already has theirs open."
+  },
+  "optQuickPastePlaceholder": {
+    "message": "https://\u2026/browse/PROJ-123",
+    "description": "Placeholder in the paste box. An address shaped like the ones it reads, rather than a sentence."
+  },
+  "optQuickPasteGo": {
+    "message": "\ub9cc\ub4e4\uae30",
+    "description": "Button beside the paste box."
+  },
+  "optQuickPasteKnown": {
+    "message": "$NAME$ \uc8fc\uc18c\ub85c \uc77d\uc5c8\uc2b5\ub2c8\ub2e4. \uac80\uc0c9 \uc8fc\uc18c\uae4c\uc9c0 \ucc44\uc6c1\ub2c8\ub2e4.",
+    "description": "Shown when a pasted address matched one of the known shapes, so nothing is left to type.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteKnownNoSearch": {
+    "message": "$NAME$ \uc8fc\uc18c\ub85c \uc77d\uc5c8\uc2b5\ub2c8\ub2e4. \uc774 \ud2b8\ub798\ucee4\ub294 \uc8fc\uc18c\ub85c \uac80\uc0c9\ud560 \ubc29\ubc95\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
+    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL \u2014 Linear.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteGuess": {
+    "message": "알려진 트래커가 아니라, 주소에서 키가 놓인 자리로 만들었습니다 ($NAME$). 검색 주소는 비어 둡니다.",
+    "description": "Shown when no known shape matched but a key-shaped path segment was found. Says plainly which part is a guess.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteGuessNumbered": {
+    "message": "알려진 트래커가 아니고 항목이 번호로만 되어 있습니다 ($NAME$) — 번호 앞에 붙일 접두사를 정하세요. 예: RM-1234",
+    "description": "The numbered variant of optQuickPasteGuess. A bare number is not a key, so this one leaves the prefix field to fill.",
+    "placeholders": { "name": { "content": "$1" } }
+  },
+  "optQuickPasteUnread": {
+    "message": "\uc8fc\uc18c\uc5d0\uc11c \ud56d\ubaa9 \ud0a4\ub97c \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \uc791\uc5c5 \ud56d\ubaa9\uc744 \uc5f4\uc5b4 \uadf8 \uc8fc\uc18c\ub97c \ubcf5\uc0ac\ud558\uac70\ub098, \uc544\ub798 \uc608\uc2dc\ub97c \uace0\ub974\uc138\uc694.",
+    "description": "Shown when the pasted text yields nothing. Refusing matters: a template built from a page that is not a work item opens the wrong address forever, silently."
+  },
+  "optQuickExamplesLegend": {
+    "message": "\u27e8\u2026\u27e9\ub294 \uc9c1\uc811 \ucc44\uc6b0\uace0, {{key}}\ub294 \ud655\uc7a5\uc774 \ucc44\uc6c1\ub2c8\ub2e4.",
+    "description": "One line at the top of the chooser. The two look alike and mean opposite things, and nothing said so."
+  },
+  "optQuickExampleSearchLine": {
+    "message": "\uac80\uc0c9: $URL$",
+    "description": "The second address on a chooser row. Picking a row fills two fields and the panel was showing one.",
+    "placeholders": { "url": { "content": "$1" } }
+  },
   "optQuickExamplesFromSites": {
     "message": "이미 추가한 사이트에서",
     "description": "Heading over rows built from the user's own active domains — the host is filled in, so only the workspace is left to type."

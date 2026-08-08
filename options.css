@@ -677,6 +677,54 @@ input:checked + .switch.sm::after {
   font-weight: 700;
   color: var(--muted);
 }
+/* Paste an address instead of recognising your tracker in a list of five. It sits above the
+   examples, not among them, because it is the path that works for a tracker nobody listed. */
+.qlk-paste {
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.qlk-paste-label {
+  display: block;
+  padding: 3px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.qlk-paste-line {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.qlk-paste-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.qlk-paste-go {
+  flex: 0 0 auto;
+}
+/* What it made of what you pasted, before you commit to it. The refusal is the case that
+   matters: a template built from a page that is not a work item is wrong forever, quietly. */
+.qlk-paste-hint {
+  padding: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+.qlk-paste-hint:empty {
+  display: none;
+}
+.qlk-paste-hint.bad {
+  color: #b45309;
+}
+/* ⟨…⟩ and {{…}} look alike and mean opposite things. */
+.qlk-ex-legend {
+  padding: 6px 8px 2px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
 .qlk-ex {
   display: grid;
   /* Wide enough for a host name, which is what the first section's rows are named after —
@@ -707,6 +755,11 @@ input:checked + .switch.sm::after {
   font-size: 11.5px;
   color: var(--muted-2);
   overflow-wrap: anywhere;
+}
+/* The second address a row fills. In the same column as the first, one line down, so the two
+   read as a pair rather than as two entries. */
+.qlk-ex-search {
+  grid-column: 2;
 }
 /* What this tracker will not do — Plane's search that does not search, Linear having none.
    Under the URL rather than beside it: it qualifies the thing above it. */

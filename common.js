@@ -1530,15 +1530,197 @@ function peQuickExample(template, labels, known) {
   });
 }
 
-// Where the caret should land: the first blank still unfilled, as [start, end]. Returns null
-// when there is nothing left to replace, which is the case worth distinguishing — a filled-in
-// example should not send the caret somewhere arbitrary.
-function peFirstBlank(url) {
+// The next blank at or after `from`, as [start, end]. Returns null when there is none left,
+// which is the case worth distinguishing — a filled-in example should not send the caret
+// somewhere arbitrary, and Tab should go back to being Tab.
+function peNextBlank(url, from) {
   const s = String(url == null ? "" : url);
-  const i = s.indexOf("⟨");
+  const at = Math.max(0, Number(from) || 0);
+  const i = s.indexOf("⟨", at);
   if (i === -1) return null;
   const j = s.indexOf("⟩", i);
   return j === -1 ? null : [i, j + 1];
+}
+
+// The last blank that ends at or before `before`. Shift+Tab's half of walking the blanks.
+function pePrevBlank(url, before) {
+  const s = String(url == null ? "" : url);
+  const at = Math.max(0, Number(before) || 0);
+  const i = s.lastIndexOf("⟨", Math.max(0, at - 1));
+  if (i === -1) return null;
+  const j = s.indexOf("⟩", i);
+  return j === -1 || j + 1 > at ? null : [i, j + 1];
+}
+
+// Where the caret should land when a row is first created.
+function peFirstBlank(url) {
+  return peNextBlank(url, 0);
+}
+
+/* ---- reading an address backwards into a quick link ---- */
+
+// The examples answer "what does a tracker's address look like" — but the reader already has
+// one open, and reciting its shape from memory is the hard part. So the shapes are read in
+// the other direction too: paste any work item's address and the template falls out of it.
+//
+// This covers the case the example list quietly cannot: a tracker we have never heard of.
+// The five examples are five, and a list of five reads as "these five are supported", which
+// is the opposite of what a generic quick link is for.
+
+// A template's blanks and key tokens as one regex. {{key}} tokens come first so the {…}
+// alternative cannot bite off the inner braces of a {{…}}.
+const peQuickShapeRe = () => /\{\{\s*key(?:\.(proj|num))?\s*\}\}|\{([a-z]+)\}/gi;
+
+// Fill a template's {part} blanks from a map. A part with no value is left as written, so a
+// caller that mismatched the map gets a visible {owner} rather than a silently broken URL.
+function peQuickFill(template, parts) {
+  const p = parts && typeof parts === "object" ? parts : {};
+  return String(template == null ? "" : template).replace(/\{([a-z]+)\}/g, (whole, part) => {
+    if (PE_QUICK_PARTS.indexOf(part) === -1) return whole; // {{key}} survives, as everywhere
+    return p[part] ? String(p[part]) : whole;
+  });
+}
+
+// Read a URL against one example's shape. Returns the captured {part} values, or null.
+// The key group is shape-checked: without it "linear.app/x/issue/settings" reads as a work
+// item, and a template built from that is wrong in a way nothing downstream can notice.
+function peQuickMatchExample(template, url) {
+  const t = String(template == null ? "" : template);
+  const u = String(url == null ? "" : url).trim();
+  if (!t || !u) return null;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A path segment. Narrower than peMatchQuickLink's SEG in one way (no "&" case to worry
+  // about — an example's blanks are all in the host or the path) and that is all it needs.
+  const SEG = "([^/?#]+)";
+  const TAIL = "(?:[/?#].*)?$";
+  const order = [];
+  let body = "";
+  let last = 0;
+  const re = peQuickShapeRe();
+  let m;
+  while ((m = re.exec(t))) {
+    body += esc(t.slice(last, m.index));
+    if (m[2] != null) {
+      if (PE_QUICK_PARTS.indexOf(m[2]) === -1) body += esc(m[0]);
+      else {
+        body += SEG;
+        order.push({ part: m[2] });
+      }
+    } else {
+      const which = (m[1] || "").toLowerCase();
+      body += which === "num" ? "(\\d+)" : SEG;
+      order.push({ key: which || "key" });
+    }
+    last = m.index + m[0].length;
+  }
+  body += esc(t.slice(last));
+  // The scheme is not part of the shape. A self-hosted Plane on plain http is the same
+  // template as one on https, and refusing to read it would be pedantry with a cost.
+  body = body.replace(/^https:\/\//i, "https?://");
+  let hit;
+  try {
+    hit = new RegExp("^" + body + TAIL, "i").exec(u);
+  } catch (_) {
+    return null;
+  }
+  if (!hit) return null;
+  const parts = {};
+  for (let i = 0; i < order.length; i++) {
+    const v = String(hit[i + 1] || "");
+    if (!v) return null;
+    if (order[i].key) {
+      if (order[i].key === "num" ? !/^\d+$/.test(v) : !PE_ITEM_KEY_RE.test(v)) return null;
+      continue;
+    }
+    if (v.indexOf("⟨") > -1 || v.indexOf("{") > -1) return null; // an unfilled example, not a URL
+    parts[order[i].part] = v;
+  }
+  return parts;
+}
+
+// Build a quick link out of a URL nobody recognised. The address still says where the key
+// goes — that is the one thing every tracker's item URL has in common — so the last
+// key-shaped segment becomes the token and everything after it is dropped, because a title
+// slug is decoration and Linear proved a bare key is enough to navigate.
+function peQuickGuessFromUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  let u;
+  try {
+    u = new URL(raw);
+  } catch (_) {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const segs = u.pathname.split("/");
+  let at = -1;
+  let kind = "";
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if (PE_ITEM_KEY_RE.test(segs[i])) {
+      at = i;
+      kind = "key";
+      break;
+    }
+  }
+  if (at === -1) {
+    for (let i = segs.length - 1; i >= 0; i--) {
+      if (/^\d+$/.test(segs[i])) {
+        at = i;
+        kind = "num";
+        break;
+      }
+    }
+  }
+  if (at === -1) return null;
+  segs[at] = kind === "key" ? "{{key}}" : "{{key.num}}";
+  return {
+    id: "",
+    name: u.hostname,
+    // A bare number is not a key by PE_ITEM_KEY_RE, so a numbered tracker needs a prefix to
+    // spend — the same bargain GitHub and GitLab make. We will not invent one: which letters
+    // stand for someone's tracker is theirs to choose, and a wrong guess sitting in the field
+    // looks like an answer.
+    prefix: "",
+    url: u.origin + segs.slice(0, at + 1).join("/"),
+    searchUrl: "",
+    note: "",
+    from: "guess",
+    kind: kind
+  };
+}
+
+// Paste an address, get a quick link. Tries the known shapes first — a hit there fills the
+// search address too, which is the half a reader is least likely to know — and falls back to
+// reading the key's position out of the path.
+function peQuickFromUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  if (!raw) return null;
+  // A template pasted back out of the settings page is not an address. Worth its own guard
+  // rather than relying on the shape checks: `new URL` punycodes "⟨host⟩" into the perfectly
+  // valid hostname "xn--host-fg5bk", so the guess path would build a link to a host that
+  // does not exist and say nothing was wrong.
+  if (/[⟨⟩{}]/.test(raw)) return null;
+  // A literal host is evidence; {host} is a wildcard that would happily read someone else's
+  // address if it were tried first. Order the examples so the specific ones go first.
+  const byHost = PE_QUICK_EXAMPLES.slice().sort(
+    (a, b) => (a.url.indexOf("{host}") > -1 ? 1 : 0) - (b.url.indexOf("{host}") > -1 ? 1 : 0)
+  );
+  for (const ex of byHost) {
+    const parts = peQuickMatchExample(ex.url, raw);
+    if (!parts) continue;
+    const http = /^http:\/\//i.test(raw);
+    const scheme = (s) => (http ? s.replace(/^https:\/\//i, "http://") : s);
+    return {
+      id: ex.id,
+      name: ex.name,
+      prefix: ex.prefix || "",
+      url: scheme(peQuickFill(ex.url, parts)),
+      searchUrl: scheme(peQuickFill(ex.searchUrl, parts)),
+      note: ex.note || "",
+      from: "example",
+      kind: ex.url.indexOf("{{key.num}}") > -1 ? "num" : "key"
+    };
+  }
+  return peQuickGuessFromUrl(raw);
 }
 
 // A quick link's search address, if it has one. Same idea as `url` and the same token

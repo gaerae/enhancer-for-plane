@@ -52,6 +52,12 @@ changed anything a user sees, drive it:
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
   value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
   `tools/test.js`; the DOM timing is only provable in a browser.
+- **Anything the harness substitutes into a page** — a catalogue, a suite body, a path —
+  goes in through `put()`, whose replacement is a function. A replacement *string* reads
+  `$&`, `` $` ``, `$'` and `$1` as instructions, and all of this is authored prose. One
+  catalogue entry reading `$NAME$'s` expanded `$'` into the rest of the file and truncated
+  the page mid-string; 32 assertions across 6 pages then failed with messages about tabs and
+  preview text. A guard at the top of the suite list asserts `buildPage` stays immune.
 - **The real extension**: load unpacked, then **reload the extension AND the tab**.
   A reloaded extension does not replace content scripts already running in open tabs,
   and `window.__peLoaded` blocks re-injection — so you will be testing old code and
