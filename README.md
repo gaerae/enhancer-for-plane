@@ -9,7 +9,8 @@
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
 open-source **project management, issues & wiki** tool and a self-hosted
-alternative to Jira. It fills the gaps every issue tracker leaves — reusable
+alternative to Jira — on **Plane Cloud and self-hosted alike**. It fills the gaps
+every issue tracker leaves — reusable
 **issue templates** for the tickets you file over and over, **quick open** to reach
 a ticket from its key, a one-click **copy reference**, and a **focus mode** that
 puts the side panels away — directly in the Plane UI, with **no changes to your
@@ -19,6 +20,31 @@ Plane server**, applied only on the domains you enable.
 > (And no — nothing to do with airplanes.)
 
 ![Typing a work item key in the address bar opens it — for Plane, Jira or Linear](store-assets/screenshot-1-open.png)
+
+## What it does, and where you use it
+
+| | Where you reach it | What it needs first |
+|---|---|---|
+| **Open an item by key** | Address bar: `issue` ␣ `PROJ-123` · toolbar popup · right-click a key in any text | one Quick open link |
+| **Come back to a recent one** | Same two places — they appear the moment you type the keyword | nothing, it fills itself |
+| **Search instead of opening** | Address bar: `issue` ␣ `login bug` | a search URL on that link |
+| **Copy a reference** | The button beside the item's key · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd> · the popup | nothing, three formats ship |
+| **Insert a title + body** | "Template" button in the description toolbar · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> | one template |
+| **Share templates with a team** | Settings ▸ Templates ▸ Template sync | one JSON URL |
+| **Hide the side panels** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> · the toggle beside the key · the popup | nothing, presets ship |
+| **Widen a truncated name** | Settings ▸ Appearance · or the element picker in the popup | nothing, presets ship |
+
+**Your first five minutes**
+
+1. Install, open your Plane tab, click the toolbar icon → **Enable on this site**.
+   Chrome asks once for that one site. Nothing runs anywhere else.
+2. Settings ▸ **Work items** ▸ **＋ Add quick link** → paste the address of any work
+   item you have open. That one paste sets up opening, searching and copying.
+3. Try it: type `issue` and a space in the address bar. Everything else on this page
+   is optional.
+
+Everything is off, empty, or inert until you do something — the extension ships with
+no active domain, no host access, and no quick-open links.
 
 ## Features
 
@@ -332,10 +358,12 @@ or the active-domains list in Settings — enabling a domain prompts Chrome for
 one-time access to that one site. It stays completely inert on every other site.
 
 The two draw the same screens with different classes, which matters only for the
-presets that name one: the focus-mode selectors carry both shapes, and the width
-presets are written for self-hosted Plane's classes. Anything a preset misses is one
-selector edit, or one click of the element picker, away — that is what the generic
-rule engine is for.
+presets that name one. Every preset that has needed a second shape now carries both,
+and each is checked against a live instance of each generation before release —
+because a rule that matches nothing is a no-op, which is indistinguishable from a
+rule you switched off, which is how one of them stayed broken for a release.
+Anything a preset misses is one selector edit, or one click of the element picker,
+away — that is what the generic rule engine is for.
 
 ## Install
 

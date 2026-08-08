@@ -51,6 +51,7 @@ English
 
 Every issue tracker leaves the same gaps: no reusable issue templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it, no way to put the side panels away and read.
 This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
+Works on Plane Cloud and on self-hosted Plane alike — the built-in rules carry both generations of Plane's markup, and each release is checked against a live instance of each, because the two do not write the same page.
 
 ✨ WHAT YOU GET
 
@@ -131,20 +132,26 @@ An independent, unofficial add-on: not affiliated with or endorsed by Plane, and
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and opening a work item from its key via a user-configured link — on the Plane instances the user chooses.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and reaching a work item from its key via a user-configured link — on the Plane instances the user chooses. Reaching a work item covers the several places a key can be typed or found: the address bar, the toolbar popup, the list of keys the user opened most recently, and a key selected in text on any page. All of them build a URL from the same user-configured link and navigate to it.
 
 ---
 
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, and team-template source URLs) so they persist across sessions and sync via Chrome. Also caches the team templates downloaded from the user's own source URL in storage.local, so the template picker reads from disk instead of the network. No other data is stored, and nothing is sent to the developer.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds three device-only caches: the team templates downloaded from the user's own source URL, so the picker reads from disk instead of the network; the last few work item keys the user opened, so the address bar can offer them again; and a per-rule tally of how often each style rule has matched anything, so Settings can say when a rule has stopped working. None of it is sent to the developer, and the device-only items are deliberately kept out of Chrome Sync — recent work items are not something to push to a user's other machines.
 
 alarms
   Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
 
 activeTab
-  When the user clicks the toolbar icon, the popup reads the current tab's hostname to show whether Plane enhancements are active there and to offer "Enable on this site." It also messages the current tab to start the element picker. Access is limited to the tab the user explicitly invoked the extension on.
+  When the user clicks the toolbar icon, the popup reads the current tab's address and title. The address gives the hostname, which is what tells the user whether enhancements are active on this site and offers "Enable on this site"; the address and title together are also what "Copy reference" builds its string from when the tab is a work item, which is why this path needs no content script and works on any tracker the user has configured a link for. The popup also messages the current tab to start the element picker. Both values are used in that moment and are not stored or transmitted. Access is limited to the tab the user explicitly invoked the extension on, and only for as long as that invocation lasts.
+
+contextMenus
+  Adds one right-click item, "Open work item from selection", shown only when text is selected. A key rarely arrives on its own — it arrives inside a sentence, in a chat message or a pull request title — so this is the same navigation the address bar offers, reached from where the key actually is. Chrome passes the extension the selected text and nothing else: the page is never read, no script is injected, and the extension has no access to the page the selection came from. The selected text is matched against a key pattern and, if it contains one, used to build a URL from the user's own configured link. It is not stored.
+
+omnibox (manifest key, not a permission)
+  Registers the keyword "issue" in the address bar. The extension receives what the user types only AFTER they have typed that keyword and a space — Chrome sends nothing before the keyword is active, and nothing from any other omnibox input. What is typed is matched against a key pattern to build a URL from the user's configured link, or, when it is not shaped like a key, put into the user's configured search URL for that tracker. Either way it is turned into an address in the browser and navigated to. Nothing is sent to the developer or to any search service the user has not configured.
 
 scripting
   Registers/injects the content script (style rules + template button) on the specific origins the user grants. No script is registered until the user enables a domain.
@@ -167,6 +174,12 @@ Remote code
 • Does your extension collect or use user data? → Only "Website content" is read locally to apply styling on matched Plane pages; it is NOT collected, transmitted, or stored off-device.
 • Personally identifiable information — NO
 • Health, financial, authentication, personal communications, location, web history, user activity — NO
+  On "web history", which is worth being able to answer out loud rather than just ticking:
+  the extension keeps the last few work item keys and URLs the user opened through it, in
+  storage.local on that device. Chrome's policy defines collection as transmitting data off
+  the user's device, and nothing here leaves it — there is no server to send it to, it is
+  excluded from Chrome Sync on purpose, and "Restore defaults" clears it. So NO is correct,
+  and PRIVACY.md says the same thing in the same words.
 • I do NOT sell or transfer user data to third parties (except approved cases) — attest
 • I do NOT use or transfer user data for purposes unrelated to the item's single purpose — attest
 • I do NOT use or transfer user data to determine creditworthiness / lending — attest
@@ -212,6 +225,7 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 
 어느 이슈 트래커든 비어 있는 곳은 같습니다 — 반복해 등록하는 티켓에 쓸 이슈 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 다시 타이핑하지 않고 메신저로 넘길 방법이 없고, 측면 패널을 치워 본문만 볼 방법이 없습니다.
 그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든, Plane 서버는 전혀 건드리지 않습니다.
+Plane Cloud와 자체 호스팅 Plane 모두에서 동작합니다 — 기본 규칙이 두 세대의 마크업을 모두 담고 있고, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다. 둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
 
 ✨ 무엇을 제공하나
 
