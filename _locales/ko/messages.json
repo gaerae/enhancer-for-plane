@@ -448,8 +448,13 @@
   "msgSyncFinished": {
     "message": "동기화를 마쳤습니다."
   },
+  "msgKeptDomains": {
+    "message": "저장했습니다 — 이 페이지를 열어둔 사이 다른 곳에서 켠 $SITES$도 함께 유지했습니다.",
+    "description": "Shown instead of \"Saved\" when the save carried across a domain enabled from the popup or another tab that this page had never displayed. Worth its own message: the alternative was that site quietly going dark, with nothing to connect it to this save.",
+    "placeholders": { "sites": { "content": "$1" } }
+  },
   "msgResetConfirm": {
-    "message": "모든 설정을 기본값으로 되돌립니다. 계속할까요?"
+    "message": "모든 설정을 기본값으로 되돌립니다. 실행 중인 사이트 목록도 함께 비워집니다.\n저장을 누르기 전까지는 아무것도 바뀌지 않습니다. 저장하면 해당 사이트에 대한 Chrome 접근 권한도 함께 반납되므로, 다시 켜려면 승인을 새로 받아야 합니다.\n계속할까요?"
   },
   "msgResetDone": {
     "message": "기본값을 복원했습니다. “저장”을 눌러 적용하세요."

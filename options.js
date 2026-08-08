@@ -9,6 +9,12 @@
   // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
   let ruleHealth = {};
   let dirty = false; // whether the user has edited the form
+  // The active domains as they stood the last time this page took its state FROM storage.
+  // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
+  // it is updated even when a foreign change is refused because the form is dirty. This is
+  // the list the user has actually had in front of them, which is the only list they can be
+  // said to have an opinion about. See mergeForeignDomains.
+  let knownDomains = [];
   // Ignore the storage changes our own save triggers. It has to span the whole save, not
   // absorb a single event: one save writes the settings and — when the template shards
   // shrink — prunes the ones it no longer needs, which is a second storage operation and
@@ -1093,6 +1099,7 @@
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
+          knownDomains = (s.domains || []).slice();
           render();
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
@@ -1265,6 +1272,32 @@
     }
   }
 
+  // A site enabled somewhere else while this page was open must survive this page's save.
+  //
+  // The popup's "Enable on this site" appends a domain and saves. If this form is dirty when
+  // that lands, the change is announced but deliberately not adopted — taking it would throw
+  // away what the user is typing. So this page still holds a list without that domain, and
+  // saving would write it back AND hand the origin's permission back to Chrome, turning off
+  // a site the user switched on a moment ago. The warning it prints says something changed;
+  // it does not say saving will undo it, and "save your work" is the natural next move.
+  //
+  // A domain in storage that this page has never had on screen is one the user cannot have
+  // meant to remove, so it is carried into the save rather than dropped. Deliberate removal
+  // still works: a domain that WAS on screen is in knownDomains, so deleting it and saving
+  // removes it, and Restore defaults still clears the list it just showed you.
+  async function mergeForeignDomains() {
+    let stored = null;
+    try {
+      stored = await peGetSettings();
+    } catch (_) {
+      return []; // cannot read storage: save what we have rather than refusing
+    }
+    const mine = state.domains || [];
+    const added = (stored.domains || []).filter((d) => knownDomains.indexOf(d) === -1 && mine.indexOf(d) === -1);
+    if (added.length) state.domains = mine.concat(added);
+    return added;
+  }
+
   async function syncHostPermissions() {
     const desired = desiredOrigins();
     if (desired.length) {
@@ -1350,13 +1383,17 @@
           ? [...new Set(s.hiddenGroups.map((x) => peClampStr(String(x), PE_SYNC_LIMITS.maxFieldLen)))]
           : []
       }));
+    // Before the permission pass, because that is what would hand the origin back.
+    const kept = await mergeForeignDomains();
     const permOk = await syncHostPermissions();
     try {
       savingSelf = true;
       await peSaveSettings(state);
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
+      knownDomains = (state.domains || []).slice();
       render();
-      flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
+      if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
+      else flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
         try {
@@ -1504,6 +1541,7 @@
   Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth()]).then(([s, c, h]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
+    knownDomains = (s.domains || []).slice();
     syncCache = c;
     ruleHealth = h;
     render();

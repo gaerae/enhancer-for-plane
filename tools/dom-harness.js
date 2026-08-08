@@ -110,14 +110,17 @@ function __msg(key, subs) {
 window.__SEED = ${JSON.stringify(seed)};
 window.__LOCAL = ${JSON.stringify(local || {})};
 window.__localWrites = 0;
+window.__written = [];
 window.__opened = null;
 window.__closed = false;
 window.chrome = {
   i18n: { getMessage: (k, s) => __msg(k, s), getUILanguage: () => "${lang || "en"}" },
   storage: {
+    // Writes are kept, for the same reason local's are: a save that carries a domain across
+    // from another surface is only provable by reading back what was actually written.
     sync: {
       get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__SEED))),
-      set: (o, cb) => cb && cb(),
+      set: (o, cb) => { window.__written.push(JSON.parse(JSON.stringify(o))); cb && cb(); },
       remove: (k, cb) => cb && cb()
     },
     // Readable and writable, unlike sync: the rule-health record is the one piece of state
@@ -140,10 +143,14 @@ window.chrome = {
     // content script, so a page that hosts content.js has to be able to knock on it.
     onMessage: { addListener: (f) => { window.__onMessage = f; } }
   },
+  // Promise-aware as well as callback-aware, because options.js awaits these: a
+  // callback-only stub resolves to undefined, which reads as "refused" and sent every save
+  // down the no-permission branch.
   permissions: {
     contains: (o, cb) => (cb ? cb(true) : Promise.resolve(true)),
-    request: (o, cb) => cb && cb(true),
-    getAll: (cb) => cb({ origins: [] }),
+    request: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
+    getAll: (cb) => { const v = { origins: [] }; cb && cb(v); return Promise.resolve(v); },
+    remove: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
     onRemoved: { addListener: () => {} }
   },
@@ -587,6 +594,73 @@ const suites = [
           const l = r.querySelector(".pe-pick-life");
           ok(l.scrollWidth <= l.clientWidth + 1, "the verdict is clipped: " + l.scrollWidth + " > " + l.clientWidth);
         }
+      });`
+  },
+  {
+    // Restore defaults empties the domain list, and saving after it hands every host
+    // permission back to Chrome — which is what actually happened here: the extension went
+    // dark on a site that was working, and nothing on screen connected the two. The confirm
+    // is the only moment to say so, because after it the cost is one click away and looks
+    // like an ordinary Save.
+    name: "options · restore defaults says what it costs",
+    page: { name: "opt-reset", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      check("the confirm names the sites, the Save, and the re-approval", () => {
+        const t = peMsg("msgResetConfirm");
+        for (const want of ["Save", "access"]) ok(t.indexOf(want) > -1, want + " missing from: " + t);
+        ok(t.split(String.fromCharCode(10)).length >= 2, "one long line for three separate facts");
+      });
+      // Reset is in-memory until Save — which is exactly why the confirm has to mention Save.
+      check("it empties the list on screen but writes nothing yet", () => {
+        const before = window.__localWrites;
+        window.confirm = () => true;
+        document.getElementById("reset").click();
+        eq(document.getElementById("domains").value.trim(), "", "the textarea still lists a site");
+        eq(window.__localWrites, before, "reset wrote to storage before Save");
+      });`
+  },
+  {
+    // A site switched on from the popup while this page sits open with unsaved edits. The
+    // page refuses to adopt the change (correctly — it would discard what is being typed),
+    // so its own list has never held that domain, and saving used to write the old list AND
+    // revoke the origin. The site went dark, right after the user turned it on.
+    name: "options · a save keeps a site enabled elsewhere",
+    page: { name: "opt-foreign", ...OPTIONS, seed: seedOf({ domains: ["plane.example.com"] }) },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="sites"]').click();
+      // Make the form dirty first, so the storage change below is announced and NOT adopted.
+      const rules = document.querySelector('#tabs .tab[data-tab="appearance"]');
+      document.getElementById("domains").dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(50);
+
+      // The popup's write: same shape as peSaveSettings, landing while this page is dirty.
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.domains = ["plane.example.com", "app.plane.so"];
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(300);
+
+      check("the page says so and keeps the edit rather than adopting", () => {
+        eq(document.getElementById("domains").value.indexOf("app.plane.so"), -1,
+           "it adopted the change and threw away the edit");
+      });
+      // Clear the "changed elsewhere" flash first — it is still on screen and non-empty,
+      // so waiting for "any status" would match it and check before the save has run.
+      document.getElementById("status").textContent = "";
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await waitFor(() => (document.getElementById("status").textContent || "").length > 0, "the save to report");
+      check("the site enabled elsewhere survives the save", () => {
+        const written = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(written, "nothing was saved");
+        ok((written.domains || []).indexOf("app.plane.so") > -1,
+           "saved domains: " + JSON.stringify(written.domains));
+        ok((written.domains || []).indexOf("plane.example.com") > -1, "and the original is still there");
+      });
+      check("and the save says it did that, rather than just Saved", () => {
+        eq(document.getElementById("status").textContent, peMsg("msgKeptDomains", ["app.plane.so"]));
       });`
   },
   {

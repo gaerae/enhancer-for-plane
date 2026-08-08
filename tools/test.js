@@ -2490,7 +2490,12 @@ test("i18n: a message with a line break is only used where a break renders", () 
         const attr = new RegExp(`data-i18n-(?!html)[a-z-]+="${key}"`).exec(src);
         if (attr) bad.push(`${loc}/${key} → ${file} ${attr[0]}`);
       }
-      if (new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
+      // A native dialog is the one script sink that DOES render a break — confirm() lays out
+      // "\n" as a new line, which is why the reset warning is allowed three of them for its
+      // three separate facts. Toasts and the status line still are not, so this is matched on
+      // the call itself rather than waved through for every script use.
+      const inDialog = new RegExp(`(?:confirm|alert)\\(\\s*peMsg\\("${key}"`).test(scripts);
+      if (!inDialog && new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
       // And where it IS rendered, the element has to be one the stylesheet keeps breaks in.
       const uses = [];
       for (const src of Object.values(pages)) {
@@ -2498,7 +2503,7 @@ test("i18n: a message with a line break is only used where a break renders", () 
           uses.push(m[0]);
         }
       }
-      if (!uses.length) bad.push(`${loc}/${key} → rendered nowhere`);
+      if (!uses.length && !inDialog) bad.push(`${loc}/${key} → rendered nowhere`);
       for (const use of uses) {
         if (!PRE_LINE.some((cls) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(use))) {
           bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);

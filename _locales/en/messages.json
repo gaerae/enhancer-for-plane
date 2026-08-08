@@ -451,8 +451,13 @@
   "msgSyncFinished": {
     "message": "Sync finished."
   },
+  "msgKeptDomains": {
+    "message": "Saved — and kept $SITES$, which was switched on elsewhere while this page was open.",
+    "description": "Shown instead of \"Saved\" when the save carried across a domain enabled from the popup or another tab that this page had never displayed. Worth its own message: the alternative was that site quietly going dark, with nothing to connect it to this save.",
+    "placeholders": { "sites": { "content": "$1" } }
+  },
   "msgResetConfirm": {
-    "message": "Reset all settings to defaults. Continue?"
+    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
   },
   "msgResetDone": {
     "message": "Restored defaults. Click “Save” to apply."

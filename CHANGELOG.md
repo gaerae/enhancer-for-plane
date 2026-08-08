@@ -51,6 +51,21 @@ Schema 7 → 8.
   release. The checks now hold both generations on one page, including the near misses:
   `.shrink-0.bg-surface-1` without the `.z-[5]` also catches an unrelated chip on Cloud's
   cycles route, and hiding it would be focus mode reaching outside the page it is for.
+- **"Restore defaults" now says that it also hands back site access.** It empties the domain
+  list, and the next Save gives Chrome back the host permission for every site on it — so the
+  extension goes dark everywhere and nothing on screen connects that to the button you
+  pressed a minute ago. Found the hard way: a reset here took a working self-hosted instance
+  offline and it read as a bug in the extension. The confirm now says three things — the site
+  list empties, nothing happens until Save, and switching a site back on means approving it
+  again.
+- **A site switched on somewhere else is no longer un-switched by saving Settings.** Enable a
+  site from the popup while the Settings page sits open with unsaved edits, and the page
+  correctly refuses to adopt the change — it would throw away what you are typing. But its
+  own list had never held that domain, so saving wrote the old list and revoked the origin:
+  the site you had just turned on went dark. A domain that this page has never had on screen
+  is one you cannot have meant to remove, so the save carries it across and says so. Removing
+  a domain you *can* see still removes it, and Restore defaults still clears the list it just
+  showed you.
 - **The template button never appeared on Plane Cloud.** The biggest thing this extension
   does, missing on one of the two places it runs, for a release. It anchors on the
   description toolbar's attach button, found by walking up from the editor, and the walk
