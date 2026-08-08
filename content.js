@@ -1449,9 +1449,12 @@
       "tag+classes": peMsg("pickKindTagClasses"),
       auto: peMsg("pickKindPath")
     };
-    // Two groups under two headings, because a heading is the one thing that makes a
-    // ranking legible: without it, a dimmed row reads as the normal colour and the order
-    // reads as no order at all.
+    // Two groups under two headings — but a heading only separates when there are two of
+    // them, and on ordinary Plane markup there are not. Measured on a body element carrying
+    // nothing but Tailwind: four candidates, all durable, one heading, nothing to compare it
+    // against. Both earlier attempts at saying "this one expires" (a dimmed row, then an
+    // amber badge) were invisible for the same reason — they render only on a row that never
+    // appeared. So the verdict goes on every row, where it has a neighbour to differ from.
     let group = null;
     cands.forEach((c) => {
       const want = c.generated ? "expiring" : "durable";
@@ -1473,11 +1476,18 @@
       const k = document.createElement("span");
       k.className = "pe-pick-kind";
       k.textContent = KIND_LABEL[c.kind] || "";
+      const life = document.createElement("span");
+      life.className = "pe-pick-life" + (c.generated ? " expiring" : " lasting");
+      // Two literal calls again, for the same reason as the headings above: check-i18n reads
+      // the key out of the call site, so a key inside an expression is a key nothing verifies.
+      if (c.generated) life.textContent = peMsg("pickLifeChanges");
+      else life.textContent = peMsg("pickLifeLasts");
       const n = document.createElement("span");
       n.className = "pe-pick-count";
       n.textContent = peMsg("pickMatches", [String(c.count)]);
       it.appendChild(s);
       it.appendChild(k);
+      it.appendChild(life);
       it.appendChild(n);
       if (c.generated) it.classList.add("generated");
       it.addEventListener("click", (ev) => {

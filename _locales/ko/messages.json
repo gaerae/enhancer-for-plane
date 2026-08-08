@@ -647,6 +647,14 @@
     "message": "추천 — 사람이 붙인 이름",
     "description": "Heading over the first group of picker candidates. The ranking is invisible without it: a reader cannot see an order, and the dimmed rows below read as the normal colour."
   },
+  "pickLifeLasts": {
+    "message": "오래 감",
+    "description": "Per-row verdict on a picker candidate whose handle a person wrote. On every row, not only the bad ones: a mark that shows up only on the exception says nothing on a list with no exception, which is most lists here."
+  },
+  "pickLifeChanges": {
+    "message": "곧 바뀜",
+    "description": "Per-row verdict on a picker candidate whose handle the build generated. Pairs with pickLifeLasts — the two chips differ in word and in colour so either one is readable alone."
+  },
   "pickGroupExpiring": {
     "message": "곧 바뀔 수 있음 — 빌드가 만든 이름",
     "description": "Heading over the demoted picker candidates: hashes, uuids, counters. Still pickable — this is a guess about someone else's markup."

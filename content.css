@@ -212,6 +212,27 @@
 #pe-pick-menu .pe-pick-item.generated .pe-pick-sel {
   color: #6b7280;
 }
+/* The verdict, on every row rather than only the bad ones. A mark that appears only on the
+   exception is unreadable on a list that has no exception — which is the common case here,
+   and is how two earlier versions of this managed to say nothing at all. Two chips that
+   differ in word and in colour give the eye something to compare on any list. */
+#pe-pick-menu .pe-pick-life {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+}
+#pe-pick-menu .pe-pick-life.lasting {
+  color: #15803d;
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+#pe-pick-menu .pe-pick-life.expiring {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
 @media (prefers-color-scheme: dark) {
   #pe-pick-menu {
     background: #1b1f24;
@@ -231,6 +252,17 @@
   #pe-pick-menu .pe-pick-group,
   #pe-pick-menu .pe-pick-kind {
     color: #9aa4b2;
+  }
+  /* Both washes are near-white blocks on a dark menu; tint the dark surface instead. */
+  #pe-pick-menu .pe-pick-life.lasting {
+    color: #6ee7a8;
+    background: #12241a;
+    border-color: #1f4531;
+  }
+  #pe-pick-menu .pe-pick-life.expiring {
+    color: #fbbf24;
+    background: #241d10;
+    border-color: #4d3a17;
   }
 }
 

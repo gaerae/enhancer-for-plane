@@ -441,6 +441,53 @@ const midWordBreaks = (root) => {
 
 const suites = [
   {
+    // The case the two earlier attempts at "this selector expires" both missed. Ordinary
+    // Plane markup carries Tailwind and nothing else, so every candidate is durable, one
+    // heading renders, and a mark that appears only on generated rows appears nowhere. It
+    // was reported exactly that way twice: "is it shown in words? am I not finding it?"
+    name: "content · picker on ordinary markup",
+    page: {
+      name: "ct-picker-plain",
+      plane: `
+        <div class="overflow-y-auto px-9 py-5"><span class="text-sm font-medium">Real Plane body</span></div>
+        <div class="px-9 py-5">a sibling sharing two of the three classes</div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await sleep(200);
+      await new Promise((r) => window.__onMessage({ type: "pe-start-picker" }, {}, r));
+      document.querySelector(".overflow-y-auto").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitFor(() => document.getElementById("pe-pick-menu"), "the candidate list");
+      const rows = () => [...document.querySelectorAll("#pe-pick-menu .pe-pick-item")];
+      check("this page really is the one-group case", () => {
+        const heads = [...document.querySelectorAll("#pe-pick-menu .pe-pick-group")].map((g) => g.textContent);
+        eq(heads, [peMsg("pickGroupDurable")], "a second group would make the check meaningless");
+        ok(rows().length >= 3, "only " + rows().length + " candidates");
+      });
+      check("every row still says how long it lasts", () => {
+        for (const r of rows()) {
+          const l = r.querySelector(".pe-pick-life");
+          ok(l, "no verdict on " + r.querySelector(".pe-pick-sel").textContent);
+          eq(l.textContent, peMsg("pickLifeLasts"), r.querySelector(".pe-pick-sel").textContent);
+        }
+      });
+      check("the verdict is legible and is not the same grey as the row furniture", () => {
+        const l = rows()[0].querySelector(".pe-pick-life");
+        const c = contrast(getComputedStyle(l).color, bg(l));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+        const kind = getComputedStyle(rows()[0].querySelector(".pe-pick-kind")).color;
+        ok(getComputedStyle(l).color !== kind, "the verdict is the same colour as the kind label");
+      });
+      check("the extra chip did not squeeze a row into wrapping", () => {
+        for (const r of rows()) {
+          ok(r.offsetHeight < 44, r.querySelector(".pe-pick-sel").textContent + " is " + r.offsetHeight + "px tall");
+          const l = r.querySelector(".pe-pick-life");
+          ok(l.scrollWidth <= l.clientWidth + 1, "the verdict is clipped: " + l.scrollWidth + " > " + l.clientWidth);
+        }
+      });`
+  },
+  {
     name: "options · tabs",
     page: { name: "opt-tabs", ...OPTIONS, seed: seedOf() },
     body: `
@@ -1424,6 +1471,18 @@ const suites = [
         eq(kindOf("[data-view-id]"), peMsg("pickKindData"));
         eq(kindOf(".max-w-40"), peMsg("pickKindClass"));
         eq(kindOf('[id^="editor-container"]'), peMsg("pickKindIdPrefix"));
+      });
+      check("the two verdicts differ in word and in colour, side by side", () => {
+        const of = (sel) => rows().find((r) => r.querySelector(".pe-pick-sel").textContent === sel).querySelector(".pe-pick-life");
+        const good = of(".max-w-40");
+        const bad = of(".sx-3nfvp2");
+        eq(good.textContent, peMsg("pickLifeLasts"));
+        eq(bad.textContent, peMsg("pickLifeChanges"));
+        ok(getComputedStyle(good).color !== getComputedStyle(bad).color, "same colour");
+        for (const l of [good, bad]) {
+          const c = contrast(getComputedStyle(l).color, bg(l));
+          ok(c >= 4.5, l.textContent + ": contrast " + c.toFixed(2));
+        }
       });
       check("the hashes sit under the second heading, not scattered", () => {
         const marked = rows().filter((r) => r.classList.contains("generated"));
