@@ -32,7 +32,7 @@ Schema 7 → 8.
 
   `:has(input)` is what keeps this a *search* dropdown rather than every popover — a plain
   menu has no search box. Two things it deliberately does not catch, both checked with them
-  open: the create-work-item modal, and the ⌘K command palette, which is `[role="dialog"]` at
+  open: the create-work-item modal, and the ⌘+K command palette, which is `[role="dialog"]` at
   the full window width and sits outside the portal entirely.
 
   **Why nothing caught it:** the browser checks seeded a synthetic `.max-w-40` rule, so no

@@ -2442,6 +2442,10 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
     "README.md",
     "README.ko.md",
     "store-assets/STORE_LISTING.md"
+    // Deliberately not CHANGELOG.md or AGENTS.md. Both quote wrong spellings on purpose —
+    // "was written as ⌥⇧F in eleven places", "⌥C = ç" — and a check that cannot tell a
+    // shortcut from a story about one would push those toward being written inaccurately.
+    // The files listed above are the ones a reader consults to decide which keys to press.
   ];
   // A modifier symbol butting straight into the next key: ⌥⇧, ⌥T, ⌘⇧K. A trailing space, a
   // "+", a bracket or Hangul after it is prose, not a chain.

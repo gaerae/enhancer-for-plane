@@ -138,8 +138,10 @@ source's cached templates.
 ## Your control
 
 You can view, edit, export, or delete all stored settings at any time from the
-extension's Settings page ("Restore defaults" clears them, including sync sources
-and their cached templates). There are two exports, and they carry different
+extension's Settings page. "Restore defaults" clears them, including sync sources
+and their cached templates — and because it also empties the list of sites, saving
+after it hands Chrome's access to those sites back as well, so switching one on
+again means approving it again. The confirmation says so before you commit to it. There are two exports, and they carry different
 things. "Export JSON" is a backup: it includes your domains, source URLs and
 variable values in plain text, so keep it to yourself. "Export my templates as a
 feed" is meant to be handed to teammates, and carries your templates and nothing

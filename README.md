@@ -380,10 +380,22 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 4. Click the toolbar icon → **Settings · Manage templates** to adjust domains,
    widths, and templates.
 
-## Verified live (self-hosted Plane instance)
+## Verified live (on both generations)
+
+Each release is driven by hand on a self-hosted Plane 1.4 instance **and** on Plane
+Cloud, because the two do not write the same page and a rule that matches nothing
+fails silently. Measured 2026-08-09 unless noted.
 
 - Injecting CSS on `.max-w-40` changes max-width from 160px to the configured
-  value — confirmed applied.
+  value — confirmed applied. On Cloud it matches 35 elements on the work item list
+  and none on the item page, which is the normal shape of a healthy rule.
+- The **template button** appears beside the description toolbar's attach button on
+  both — the anchor is found by walking up from the editor, and Cloud puts that
+  button two levels further out than 1.4 did (10 vs within 8), which is why it was
+  missing there for a release. One button per item, and never on the comment box.
+- **Copy reference** resolves key, title and URL from the real page on both.
+- The **search dropdown** preset matches Headless UI on 1.4 and Base UI on Cloud;
+  the ⌘+K command palette and the create-work-item modal are deliberately not caught.
 - The focus-mode presets hide the properties panel and the left navigation, and the
   description column takes the space back — confirmed on both self-hosted Plane 1.4
   and Plane Cloud (2026-08-08: on Cloud the body column went 1056px → 1658px, and the

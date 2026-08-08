@@ -52,6 +52,22 @@ changed anything a user sees, drive it:
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
   value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
   `tools/test.js`; the DOM timing is only provable in a browser.
+- **Anything anchored by walking the DOM needs a measured number with a floor AND a lid.**
+  The template button finds its toolbar by climbing from the editor, and the climb had a bare
+  `8` in it — enough for self-hosted 1.4, two short of Plane Cloud, so the extension's biggest
+  feature simply never appeared there. Raising it until Cloud worked would have gone past the
+  comment box's own attach button at 14 and put a template button on a box with no title to
+  fill. Measure both generations, write both numbers in the comment, and pick a value between
+  them; then make the harness fail at each end, or the next person will "fix" it by making the
+  number bigger.
+- **Settings can hand back a host permission, and only the Settings page knows it.** `saveAll`
+  revokes every granted origin that is not in the list it is about to write. That is deliberate
+  — an origin we do not run on should not stay granted — but it makes two ordinary actions
+  destructive in a way nothing else in the extension is: **Restore defaults** empties the list,
+  so the next Save turns the extension off on every site; and a save from a stale form drops a
+  domain another surface just added. The first is answered by saying so in the confirm, the
+  second by carrying across domains this page has never displayed (`knownDomains`). If you add
+  a third way to write settings, work out which of those two it is before shipping it.
 - **One schema number per released version.** `PE_SCHEMA` describes what is in somebody's
   storage, so it only needs to move when storage on a machine somewhere differs from what the
   code expects. While a release is unreleased, its number has not reached anyone — a second
