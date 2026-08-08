@@ -1066,9 +1066,9 @@
     "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
   },
   "omniboxRecent": {
-    "message": "Recent · $KEY$ · $TITLE$",
+    "message": "Recent · $KEY$ · $NAME$",
     "description": "Omnibox row for a key opened before. The leading word is the only thing that distinguishes these from Chrome's own history rows: the omnibox API offers no per-row icon, so a label is all there is.",
-    "placeholders": { "key": { "content": "$1" }, "title": { "content": "$2" } }
+    "placeholders": { "key": { "content": "$1" }, "name": { "content": "$2" } }
   },
   "omniboxHint": {
     "message": "Type a work item key to open it, or words to search"

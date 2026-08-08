@@ -78,11 +78,13 @@ Send a work item to a chat message, a pull request, or a branch name without ret
 The button beside its ID (or Alt/⌥+C) copies it in the format you pick — plain text, a Markdown link, a branch name — and every format is a row you can edit into your own.
 The preview in Settings is exactly what lands on the clipboard.
 Works from the item's own page and from the preview panel a list opens, so you never leave the list.
+Also from the toolbar popup whenever the tab you are on is a work item — that path reads the tab, not the page, so it works on any tracker you have a link for.
 
 📐 Read every name in full — width & style rules
 Plane cuts long names off in lists and dropdowns until you can't tell items apart.
 One "selector → property → value" rule forces any width (320px, 30rem) and names show completely.
 It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
+And Settings tells you when a rule has stopped matching anything, so a Plane redesign shows up as one line to fix instead of a feature that quietly went away.
 
 🧘 Just the description — focus mode
 Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation so the work item's body is what is left.
@@ -254,11 +256,13 @@ Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
 번호 옆 버튼(또는 Alt/⌥+C)이 원하는 형식으로 복사합니다 — 일반 텍스트, 마크다운 링크, 브랜치명 — 그리고 모든 형식은 직접 고쳐 쓸 수 있는 줄입니다.
 설정의 미리보기가 곧 클립보드에 담길 내용입니다.
 항목 자신의 화면에서도, 목록에서 열리는 미리보기 패널에서도 동작하므로 목록을 벗어날 필요가 없습니다.
+지금 탭이 작업 항목이면 툴바 팝업에서도 됩니다. 이 경로는 페이지가 아니라 탭을 읽기 때문에, 링크를 등록해 둔 트래커라면 어디서든 동작합니다.
 
 📐 이름을 온전히 보기 — 스타일 규칙
 Plane은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 구분하기 어렵게 만듭니다.
 "선택자 → 속성 → 값" 규칙 하나로 원하는 폭(320px, 30rem)을 지정하면 이름이 온전히 보입니다.
 범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
+그리고 규칙이 아무것도 찾지 못하게 되면 설정이 알려 줍니다. Plane이 개편돼도 기능이 조용히 사라지는 대신 고칠 줄 하나로 드러납니다.
 
 🧘 본문만 남기기 — 집중 모드
 Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
