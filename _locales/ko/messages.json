@@ -887,7 +887,7 @@
     "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다.\n키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.\n접두사가 빈 대상이 기본값입니다.\n툴바 팝업에서도 됩니다."
   },
   "optQuickTokens": {
-    "message": "URL에서 키가 들어갈 자리에 <code>{{key}}</code>를 넣으세요 — <code>{{key.proj}}</code>와 <code>{{key.num}}</code>는 키를 둘로 나눈 조각입니다.\n<code>{{key}}</code>가 없는 URL은 끝에 키가 덧붙습니다.\n각 행 아래 줄은 예시 키가 도착할 위치를 보여 줍니다."
+    "message": "URL에서 키가 들어갈 자리에 <code>{{key}}</code>를 넣으세요. <code>{{key.proj}}</code>와 <code>{{key.num}}</code>는 키를 둘로 나눈 조각입니다.\n<code>{{key}}</code>가 없는 URL은 끝에 키가 덧붙습니다.\n둘째 줄은 선택입니다. <code>{{q}}</code>가 들어간 검색 주소를 넣으면 키 대신 낱말을 입력했을 때 그곳에서 검색합니다. Plane은 <code>/{워크스페이스}/search/?q={{q}}</code>이며, 그 뒤의 <code>/api/</code> 주소가 아니라 화면 주소입니다.\n각 행 아래 줄이 예시 키와 예시 검색어가 어디로 가는지 보여 줍니다."
   },
   "optQuickEmpty": {
     "message": "아직 링크가 없습니다. “링크 추가”를 누르세요."
@@ -903,8 +903,12 @@
     "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
   "optQuickSearchPh": {
-    "message": "검색 주소 (선택): https://…/search?q={{q}}",
+    "message": "검색 주소 (선택): https://…/search/?q={{q}}",
     "description": "Placeholder for the second URL on a quick link row. {{q}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
+  },
+  "optQuickApiHint": {
+    "message": "API 주소로 보입니다. 그대로 열면 JSON이 나옵니다. 화면 주소가 필요할 텐데, 예를 들면 https://…/search/?q={{q}} 형태입니다",
+    "description": "Hint under a quick link row, not a refusal: an /api/ path can be what someone means. The example is Plane's real search page, verified on app.plane.so."
   },
   "optQuickSearchPreview": {
     "message": "“$Q$” → $URL$",
@@ -953,8 +957,8 @@
     "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
   },
   "omniboxRecent": {
-    "message": "$KEY$ · $TITLE$",
-    "description": "Omnibox row for a key opened before. Layout only: the key, a separator, the target name it was opened in.",
+    "message": "최근 · $KEY$ · $TITLE$",
+    "description": "Omnibox row for a key opened before. The leading word is the only thing that distinguishes these from Chrome's own history rows: the omnibox API offers no per-row icon, so a label is all there is.",
     "placeholders": { "key": { "content": "$1" }, "title": { "content": "$2" } }
   },
   "omniboxHint": {

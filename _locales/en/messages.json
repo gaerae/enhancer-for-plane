@@ -890,7 +890,7 @@
     "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too."
   },
   "optQuickTokens": {
-    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe line under each row shows where a sample key would land."
+    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe second line is optional: give it a search URL with <code>{{q}}</code> and typing words instead of a key searches there — Plane's is <code>/{workspace}/search/?q={{q}}</code>, the page, not the <code>/api/</code> address behind it.\nThe lines under each row show where a sample key and a sample phrase would land."
   },
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
@@ -906,8 +906,12 @@
     "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
   "optQuickSearchPh": {
-    "message": "search URL (optional): https://…/search?q={{q}}",
+    "message": "search URL (optional): https://…/search/?q={{q}}",
     "description": "Placeholder for the second URL on a quick link row. {{q}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
+  },
+  "optQuickApiHint": {
+    "message": "This looks like an API address — opening it shows raw JSON. You probably want the page, e.g. https://…/search/?q={{q}}",
+    "description": "Hint under a quick link row, not a refusal: an /api/ path can be what someone means. The example is Plane's real search page, verified on app.plane.so."
   },
   "optQuickSearchPreview": {
     "message": "“$Q$” → $URL$",
@@ -956,8 +960,8 @@
     "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
   },
   "omniboxRecent": {
-    "message": "$KEY$ · $TITLE$",
-    "description": "Omnibox row for a key opened before. Layout only: the key, a separator, the target name it was opened in.",
+    "message": "Recent · $KEY$ · $TITLE$",
+    "description": "Omnibox row for a key opened before. The leading word is the only thing that distinguishes these from Chrome's own history rows: the omnibox API offers no per-row icon, so a label is all there is.",
     "placeholders": { "key": { "content": "$1" }, "title": { "content": "$2" } }
   },
   "omniboxHint": {

@@ -66,6 +66,19 @@ Schema 7 → 8.
   left out of it — a rule nobody applies has nothing to answer for.
 
 ### Improved
+- **The popup can no longer be widened by its own contents.** Chrome sizes a toolbar popup to
+  the document, so a long work item title or format name could make it open far wider than it
+  should — measured at 1132px against a 260px design. The width is now a property of the
+  popup rather than a result of what is in it.
+- **A quick link says when its URL looks like an API address.** Plane's search *page* is
+  `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
+  pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
+  loads, it returns 200 — so the row where it is typed is the only place to say anything. A
+  hint, not a refusal.
+- **Omnibox rows say what they are.** Recents were indistinguishable from Chrome's own
+  history, and the omnibox API has no way to put an icon on a row, so they are now labelled
+  `Recent ·` (the other rows already name their action). The only icon Chrome offers an
+  extension here is the one in the address bar, once the keyword is active.
 - **The element picker now offers stable selectors first, and marks the ones that expire.**
   It ranked on one axis — "is this a Tailwind width class" — which says nothing about the
   question that decides whether a rule survives: did a person write this handle, or did a

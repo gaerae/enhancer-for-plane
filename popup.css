@@ -10,7 +10,18 @@
 * {
   box-sizing: border-box;
 }
+/* Chrome sizes a toolbar popup to its DOCUMENT, not to whatever element you fixed a width
+   on — so any descendant that overflows widens the window instead of being clipped by it,
+   and the window is what the reader notices. .pop being 260px only bounds .pop.
+   Pinning html and body is what makes the width a property of the popup rather than a
+   result of its contents; overflow-x is the backstop for a child that overflows anyway,
+   which is a clipped line rather than a window that jumps size between openings. */
+html {
+  width: 260px;
+}
 body {
+  width: 260px;
+  overflow-x: hidden;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
@@ -21,7 +32,7 @@ body {
   overflow-wrap: break-word;
 }
 .pop {
-  width: 260px;
+  width: 100%;
   padding: 14px;
 }
 .pop-head {

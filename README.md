@@ -44,6 +44,14 @@ Plane server**, applied only on the domains you enable.
      search. Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is
      not — so there is no prefix or mode to remember. Give a target a **search URL** with
      `{{q}}` in Settings; a target without one simply does not answer a search.
+     - Plane's is `https://your-plane/{workspace}/search/?q={{q}}` — the search *page*, which
+       comes up with the box pre-filled. Not the `/api/…/search/?search=…` address behind it:
+       that is the request the app makes and opening it shows raw JSON. Settings says so if
+       what you paste looks like an API path.
+   - **The recent list and the search row are the extension's, not Chrome's history** — the
+     omnibox API has no way to put an icon on a row, so recents are labelled `Recent ·` and
+     the rest name what they will do (`Open PROJ-123 in Plane`). The only icon Chrome shows
+     is the extension's own, in the address bar, once the keyword is active.
    - **A key in someone else's text.** A key almost never arrives as a key — it arrives in a
      Slack message or a PR title, "blocked by PROJ-123 until Friday". Select it and
      right-click → **Open work item from selection**. Chrome hands over the selected text;

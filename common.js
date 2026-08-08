@@ -1630,6 +1630,23 @@ function peRecentMatches(list, text) {
     .filter((r) => !q || String(r.key).toLowerCase().indexOf(q) === 0);
 }
 
+// Does this look like an API endpoint rather than a page a person should land on?
+//
+// Opening one is not an error the code can detect — it is a URL, it loads, it returns 200 —
+// so the only place it can be caught is where it is typed. This happened: a Plane search URL
+// was filled in as `/api/workspaces/{ws}/search/?search={{q}}&workspace_search=true`, which
+// is the request the app makes, and opening it shows raw JSON. The page a person wants is
+// `/{ws}/search/?q={{q}}` (verified on app.plane.so, 2026-08-08: the search box comes up
+// pre-filled from that query).
+//
+// A hint, never a refusal: an /api/ path can be exactly what someone means to open, and this
+// function has no way to know. It says what it noticed and leaves the decision alone.
+function peLooksLikeApiUrl(url) {
+  const u = String(url == null ? "" : url).trim();
+  if (!u) return false;
+  return /^https?:\/\/[^/]+(\/[^?#]*)?\/api(\/|$)/i.test(u) || /[?&]format=json\b/i.test(u);
+}
+
 // Only ever navigate to an http(s) address from a quick link. A stored url is the user's
 // own, but this keeps a javascript:/data: value (from a hand-edited import) from being
 // opened as if it were a link.

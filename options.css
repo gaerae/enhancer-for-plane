@@ -648,13 +648,27 @@ input:checked + .switch.sm::after {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-.cpy-preview.has-unknown {
+.cpy-preview.has-unknown,
+.cpy-preview.warn {
   color: #b45309;
+}
+/* A quick link row previews the open URL and, when it has one, the search URL — and may add
+   a hint under both. Three lines joined with newlines, so the box has to keep them. */
+.qlk-preview {
+  white-space: pre-line;
 }
 
 /* quick jump rows reuse .cpy-item / .copy-list; only the field widths differ */
 .qlk-fields {
   flex-wrap: wrap;
+}
+/* Two URLs on one row means it has to wrap, and the delete button was landing on a third
+   line by itself, reading as a stray control rather than this row's. CSS order puts it back
+   on the first line without moving it in the DOM, so the tab order still runs through the
+   fields it belongs to and reaches the destructive button last. */
+.qlk-del {
+  order: 1;
+  margin-left: auto;
 }
 .qlk-name {
   flex: 0 0 130px;
@@ -666,7 +680,15 @@ input:checked + .switch.sm::after {
   font-size: 12px;
 }
 .qlk-url {
-  flex: 1 1 220px;
+  order: 2;
+  flex: 1 1 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.qlk-search {
+  order: 3;
+  flex: 1 1 100%;
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;

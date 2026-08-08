@@ -587,6 +587,68 @@ const suites = [
       });`
   },
   {
+    // The quick link row is where a wrong URL is caught or not caught at all: an API address
+    // loads, returns 200 and shows JSON, so no later surface can tell. Both previews and the
+    // hint have to be on screen at the same time, which is a layout question as much as a
+    // logic one — three lines joined with newlines in a box that has to keep them.
+    name: "options · quick link previews",
+    page: {
+      name: "opt-quick",
+      ...OPTIONS,
+      seed: seedOf({
+        quickLinks: [
+          { id: "ok", name: "Plane", prefix: "", enabled: true,
+            url: "https://plane.hectoai.co.kr/hecto/browse/{{key}}",
+            searchUrl: "https://plane.hectoai.co.kr/hecto/search/?q={{q}}" },
+          { id: "api", name: "Wrong", prefix: "X-", enabled: true,
+            url: "https://plane.hectoai.co.kr/hecto/browse/{{key}}",
+            searchUrl: "https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true" }
+        ]
+      })
+    },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      await waitFor(() => document.querySelectorAll("#quickList .qlk-preview").length === 2, "the rows");
+      const prev = (i) => document.querySelectorAll("#quickList .qlk-preview")[i];
+      check("a good row previews both destinations", () => {
+        const t = prev(0).textContent;
+        ok(t.indexOf("PROJ-123") > -1 && t.indexOf("/browse/PROJ-123") > -1, "the key: " + t);
+        ok(t.indexOf("login%20bug") > -1, "and the phrase, encoded: " + t);
+        ok(!prev(0).classList.contains("warn"), "with nothing to warn about");
+      });
+      check("an API address is called out where it was typed", () => {
+        ok(prev(1).classList.contains("warn"), "the row is marked");
+        ok(prev(1).textContent.indexOf("JSON") > -1, "and says what will happen: " + prev(1).textContent);
+      });
+      // Two URLs force the row to wrap, and the delete button was ending up on a line of its
+      // own — which reads as a control belonging to nothing.
+      check("the delete button stays on the row's first line", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[0];
+        const box = (sel) => row.querySelector(sel).getBoundingClientRect();
+        // Overlap, not an exact top: the button is shorter than an input and sits centred
+        // against it, so equal tops would be asserting a coincidence.
+        const overlaps = (a, b) => a.top < b.bottom && b.top < a.bottom;
+        ok(overlaps(box(".qlk-del"), box(".qlk-name")), "the ✕ is on the name field's line");
+        ok(box(".qlk-url").top >= box(".qlk-name").bottom, "and the URLs are on their own lines");
+        ok(box(".qlk-search").top >= box(".qlk-url").bottom, "one each");
+      });
+      // The tab order must still run through the fields in the order they are read, with the
+      // destructive button last: CSS order moves the button visually and must not move that.
+      check("moving it did not move it in the tab order", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[0];
+        const focusable = [...row.querySelectorAll("input, button")];
+        eq(focusable[focusable.length - 1].className.indexOf("qlk-del") > -1, true, "delete is reached last");
+      });
+      // Joined with newlines, so the stylesheet has to keep them — otherwise the hint runs
+      // onto the end of the preview and reads as part of the URL.
+      check("the lines are lines", () => {
+        const box = prev(1);
+        const line = parseFloat(getComputedStyle(box).lineHeight);
+        ok(box.getBoundingClientRect().height > line * 2.2, "the preview did not break into lines");
+        eq(getComputedStyle(box).whiteSpace, "pre-line");
+      });`
+  },
+  {
     // Rule health is the answer to "a preset that stops matching is invisible", so the thing
     // to prove is that it is actually visible — which is a question about rendered rows, not
     // about the pure functions tools/test.js already covers. The seed is the Plane Cloud bug
@@ -1111,6 +1173,54 @@ const suites = [
       check("clicking one copies, and reports where the heading was", () => {
         eq(copied, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7", "what reached the clipboard");
         eq(document.getElementById("copyLabel").textContent, peMsg("msgCopied"));
+      });
+      // Chrome sizes the popup to the DOCUMENT, not to .pop — so a child that overflows
+      // .pop widens the window rather than being clipped by it, and the existing check on
+      // .pop cannot see that. Everything added here is user-supplied and unbounded: a work
+      // item title, a format name, a key.
+      check("hostile content cannot widen the popup", () => {
+        document.getElementById("copyItem").textContent =
+          "PROJ-7 " + "a work item title nobody thought to keep short ".repeat(4);
+        const b = document.createElement("button");
+        b.className = "pop-btn ghost pop-copy-fmt";
+        b.textContent = "a copy format name the user typed and never shortened";
+        document.getElementById("copyFormats").appendChild(b);
+        const chip = document.querySelector(".pop-recent-item");
+        chip.querySelector(".pop-recent-key").textContent = "VERYLONGKEY-123456";
+        // Two measurements, and both matter. "wants" is the document's preferred width,
+        // which is the size Chrome gives a toolbar popup — with this content it is over a
+        // thousand pixels, because a nowrap title only ellipsises once something constrains
+        // it. "is" is what the stylesheet actually renders. The gap between them is the
+        // whole point: the width has to be a property of the popup, not of its contents.
+        document.body.style.width = "max-content";
+        const wants = Math.round(document.body.getBoundingClientRect().width);
+        document.body.style.width = "";
+        const is = Math.round(document.body.getBoundingClientRect().width);
+        eq(is, 260, "the popup is pinned");
+        // Measured on <body>, not on documentElement: in a harness tab the latter reports the
+        // tab's viewport width and would pass or fail for reasons that have nothing to do
+        // with the popup.
+        ok(document.body.scrollWidth <= 261, "content escapes the body: " + document.body.scrollWidth);
+        return wants + "px wanted, " + is + "px rendered";
+      });
+      // Every block at once, which is a state no single suite otherwise produces — and the
+      // one most likely to be on screen when someone reports the popup opening wide.
+      check("no combination of blocks widens it either", () => {
+        for (const id of ["permNotice", "addDomain", "focusWrap", "pickEl", "rescan", "jumpBlock", "copyBlock", "recentList"]) {
+          const e = document.getElementById(id);
+          if (e) e.hidden = false;
+        }
+        const sel = document.getElementById("jumpTarget");
+        sel.hidden = false;
+        sel.innerHTML = "";
+        // An unnamed quick link shows its whole URL as the option text.
+        for (const t of ["Auto", "https://plane.hectoai.co.kr/hecto/browse/{{key}}"]) {
+          const o = document.createElement("option");
+          o.textContent = t;
+          sel.appendChild(o);
+        }
+        eq(Math.round(document.body.getBoundingClientRect().width), 260, "with everything shown");
+        ok(document.body.scrollWidth <= 261, "content escapes the body: " + document.body.scrollWidth);
       });
       check("clicking a recent chip opens it", () => {
         chips()[1].click();

@@ -456,6 +456,11 @@
         const lines = [];
         if (u) lines.push(peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]));
         if (s) lines.push(peMsg("optQuickSearchPreview", [PE_QUICK_SEARCH_SAMPLE, s]));
+        // An API path loads fine and returns JSON, so nothing downstream can tell it went
+        // wrong — this is the only moment anyone is looking at the URL.
+        const api = [q2.url, q2.searchUrl].some(peLooksLikeApiUrl);
+        if (api) lines.push(peMsg("optQuickApiHint"));
+        preview.classList.toggle("warn", api);
         preview.textContent = lines.join("\n");
       };
 

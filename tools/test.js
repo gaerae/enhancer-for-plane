@@ -1398,6 +1398,25 @@ test("tab: a search result is not an item, so it is never remembered as one", ()
   eq(ctx.peMatchItemUrl([Q_PLANE], ctx.peExpandSearchLink(Q_PLANE, "login bug")), null);
 });
 
+// The URL that prompted this: the request Plane's own app makes, filled in as if it were
+// the search page. It loads, returns 200, and shows JSON — so nothing downstream can tell
+// it went wrong, and the row where it is typed is the only place to say anything.
+test("quick: an API address is recognised as one", () => {
+  const { peLooksLikeApiUrl } = loadCommon();
+  ok(peLooksLikeApiUrl("https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true"));
+  ok(peLooksLikeApiUrl("https://t.test/api"), "a bare /api");
+  ok(peLooksLikeApiUrl("https://t.test/v2/api/things"), "not only at the root");
+  ok(peLooksLikeApiUrl("https://t.test/x?format=json"), "or an explicit json format");
+  // The page a person actually wants — verified on app.plane.so, 2026-08-08.
+  ok(!peLooksLikeApiUrl("https://plane.hectoai.co.kr/hecto/search/?q={{q}}"));
+  ok(!peLooksLikeApiUrl("https://app.plane.so/gaerae/browse/{{key}}"));
+  ok(!peLooksLikeApiUrl("https://linear.app/gaerae/issue/{{key}}"));
+  // Words that merely contain "api" are not paths that lead to one.
+  ok(!peLooksLikeApiUrl("https://rapids.test/browse/{{key}}"), "a host with api inside it");
+  ok(!peLooksLikeApiUrl("https://t.test/apiary/{{key}}"), "a path segment that starts with api");
+  ok(!peLooksLikeApiUrl(""));
+});
+
 test("quick: searchUrl survives an import and is optional", () => {
   const ctx = loadCommon();
   const out = ctx.peSanitizeSettings({
