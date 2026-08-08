@@ -43,6 +43,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
   "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
   "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
+  "\n;globalThis.__V8_DROPDOWN_SELECTOR = PE_V8_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
@@ -60,7 +62,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__MAX_QUICK = PE_MAX_QUICK_LINKS;" +
   "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
   "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;" +
-  "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;";
+  "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;" +
+  "\n;globalThis.__EXAMPLE_FEED_URLS = PE_EXAMPLE_FEED_URLS;";
 
 function loadCommon() {
   const ctx = { console, URL, Date, TextEncoder };
@@ -1273,7 +1276,7 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 8, "PE_SCHEMA is 8");
+  eq(ctx.__SCHEMA, 9, "PE_SCHEMA is 9");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
@@ -2175,6 +2178,60 @@ test("focus: a v6 install lands on the current selectors in one pass", () => {
   });
 });
 
+// The same rot, one release later and one rule over. Plane Cloud moved its property
+// dropdowns from Headless UI to Base UI; self-hosted 1.4 has not, so this is a union rather
+// than a replacement. Measured 2026-08-08 with the module dropdown open on both instances.
+test("dropdown: v9 repoints the search dropdown preset onto both generations", () => {
+  const ctx = loadCommon();
+  const was = ctx.__V8_DROPDOWN_SELECTOR;
+  const now = ctx.PE_DROPDOWN_SELECTOR;
+  ok(now !== was, "the selector actually changed");
+  ok(now.indexOf(was) === 0, "Plane 1.4's shape still leads, as with the focus selectors");
+  ok(now.indexOf("data-base-ui-portal") > -1, "and Cloud's shape is in it: " + now);
+  // :has(input) is what keeps this to a *search* dropdown. Without it the rule is "every
+  // popover", which is a different feature and a worse one.
+  ok(now.indexOf(":has(input)") > -1, "the search box is part of what identifies it");
+
+  const out = ctx.peMigrate({
+    schema: 8,
+    rules: [
+      { id: "rule-combobox-dropdown", enabled: true, selector: was, property: "width", value: "320px" },
+      { id: "rule-module-name", enabled: true, selector: ".max-w-40", property: "max-width", value: "320px" }
+    ]
+  });
+  eq(out.rules.find((r) => r.id === "rule-combobox-dropdown").selector, now, "repointed");
+  eq(out.rules.find((r) => r.id === "rule-module-name").selector, ".max-w-40",
+    "the rule that never broke is untouched");
+  eq(out.rules.length, 2, "and nothing was appended");
+});
+
+test("dropdown: v9 leaves an edited selector, and a deleted preset, alone", () => {
+  const ctx = loadCommon();
+  const mine = '[data-base-ui-portal] [role="dialog"]';
+  const out = ctx.peMigrate({
+    schema: 8,
+    rules: [{ id: "rule-combobox-dropdown", selector: mine, property: "width", value: "400px" }]
+  });
+  eq(out.rules[0].selector, mine, "someone who already worked it out keeps their fix");
+  eq(ctx.peMigrate({ schema: 8, rules: [] }).rules.length, 0, "and a deleted preset stays deleted");
+});
+
+// The two places that ship this preset must agree, or half the users get the dead selector.
+// PE_DEFAULTS is a fresh install; the widths→rules step at v6 is everyone who came through
+// the old settings shape, and it builds its own copy of the rule.
+test("dropdown: every place that ships the preset ships the same selector", () => {
+  const ctx = loadCommon();
+  const fresh = ctx.__DEFAULTS.rules.find((r) => r.id === "rule-combobox-dropdown");
+  ok(fresh, "the preset is in the defaults");
+  eq(fresh.selector, ctx.PE_DROPDOWN_SELECTOR);
+  // The widths step runs for pre-schema data only, so this is the shape a v1 install has.
+  const upgraded = ctx.peMigrate({
+    widths: { dropdown: { enabled: true, px: 320 }, moduleName: { enabled: true, px: 320 } }
+  }).rules.find((r) => r.id === "rule-combobox-dropdown");
+  ok(upgraded, "and in what a widths-era install is migrated into");
+  eq(upgraded.selector, ctx.PE_DROPDOWN_SELECTOR, "which must not be the dead one");
+});
+
 // Two places ship the same presets — PE_DEFAULTS for a new install, peMigrate for everyone
 // else — and a preset added to one of them alone would reach half the users.
 test("focus: a fresh install and an upgraded one get the same presets", () => {
@@ -2325,21 +2382,51 @@ test("copy: no title field on the page means the token stays, not an empty strin
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
 });
 
-test("example feed: the button's URL points at the file that actually ships", () => {
+test("example feed: every URL the button can use points at a file that ships", () => {
   const ctx = loadCommon();
-  const url = ctx.__EXAMPLE_FEED_URL;
+  const urls = ctx.__EXAMPLE_FEED_URLS;
+  eq(urls.length, 2, "English and Korean");
   // A dead example is worse than none — it teaches a first-time user that sync is broken.
-  // The URL must be a real https address Save will accept, and its path must be the file
-  // present in the repo, so renaming or removing that file breaks this test loudly.
-  ok(/^https:\/\//.test(url), "https");
-  ok(ctx.peOriginPatternForUrl(url), "Save can turn it into a host permission");
-  const path = new URL(url).pathname;
-  ok(path.endsWith("/examples/team-templates.json"), "path is the example file");
-  const shipped = read("examples/team-templates.json");
-  const feed = JSON.parse(shipped);
-  // And it has to be a feed the normalizer accepts, or the example would sync to nothing.
-  const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
-  ok(out.templates.length > 0, "the shipped file parses into templates");
+  // Each URL must be a real https address Save will accept, its path must be a file present
+  // in the repo, and the file must parse into templates. Renaming one breaks this loudly.
+  for (const url of urls) {
+    ok(/^https:\/\//.test(url), "https: " + url);
+    ok(ctx.peOriginPatternForUrl(url), "Save can turn it into a host permission: " + url);
+    const path = new URL(url).pathname;
+    ok(/\/examples\/team-templates(-ko)?\.json$/.test(path), "path is an example file: " + path);
+    const feed = JSON.parse(read(path.replace(/^.*\/examples\//, "examples/")));
+    const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
+    ok(out.templates.length > 0, "parses into templates: " + path);
+  }
+  ok(urls.indexOf(ctx.__EXAMPLE_FEED_URL) > -1, "the English one is in the list");
+});
+
+// The Korean pack shipped alongside the English one and the button handed everybody English,
+// so a Korean reader's first look at sync was a picker in a language they had not chosen.
+test("example feed: the language the reader chose picks the file", () => {
+  const ctx = loadCommon();
+  const ko = ctx.peExampleFeedUrl("ko");
+  ok(ko.endsWith("team-templates-ko.json"), ko);
+  // Chrome reports ko, ko-KR, and on some builds a script subtag — all of them are Korean.
+  for (const l of ["ko", "ko-KR", "KO-kr", "ko-Kore-KR"]) eq(ctx.peExampleFeedUrl(l), ko, l);
+  // Everything else gets English, including the cases with no answer at all. There is no
+  // third file, so there is no third thing to return.
+  for (const l of ["en", "en-US", "ja", "kok", "", null]) {
+    eq(ctx.peExampleFeedUrl(l), ctx.__EXAMPLE_FEED_URL, JSON.stringify(l));
+  }
+  // "kok" is Konkani, not Korean, and a bare startsWith("ko") would have handed it the
+  // Korean pack — which is why the test names it.
+});
+
+// The two packs are one feed in two languages, so a template missing from one is a template
+// half the readers never see.
+test("example feed: the two packs are the same collection", () => {
+  const en = JSON.parse(read("examples/team-templates.json"));
+  const ko = JSON.parse(read("examples/team-templates-ko.json"));
+  eq(ko.templates.length, en.templates.length, "same number of templates");
+  eq(new Set(ko.templates.map((t) => t.group)).size, new Set(en.templates.map((t) => t.group)).size,
+    "and the same number of groups");
+  ok(ko.name !== en.name, "each names itself in its own language");
 });
 
 // Alt+Shift+F was written for macOS as "⌥⇧F" in eleven places while Windows kept its plus

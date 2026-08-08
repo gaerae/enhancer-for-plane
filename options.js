@@ -89,7 +89,7 @@
     },
     dropdown: {
       labelKey: "optPresetDropdown",
-      selector: '[id^="headlessui-combobox-options"] > div',
+      selector: PE_DROPDOWN_SELECTOR,
       property: "width",
       value: "320px"
     },
@@ -985,8 +985,11 @@
         flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
         return;
       }
-      // Adding it twice would fetch one file under two headers and show it twice.
-      if ((sync.sources || []).some((s) => (s.url || "").trim() === PE_EXAMPLE_FEED_URL)) {
+      // Adding it twice would fetch one file under two headers and show it twice. Both
+      // languages count as "the example": someone who switches Chrome's language should not
+      // end up subscribed to two copies of the same 26 templates.
+      const already = (s) => PE_EXAMPLE_FEED_URLS.indexOf((s.url || "").trim()) > -1;
+      if ((sync.sources || []).some(already)) {
         flash(peMsg("msgExampleExists"), true);
         return;
       }
@@ -996,7 +999,7 @@
       sync.enabled = true;
       sync.sources.push({
         id: uid("src"),
-        url: PE_EXAMPLE_FEED_URL,
+        url: peExampleFeedUrl(),
         name: "",
         intervalMinutes: 360,
         enabled: true,

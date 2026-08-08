@@ -365,6 +365,26 @@ const PLANE = `
 <div class="overflow-y-auto px-8 py-5" id="probe-body-decoy">neither generation's body column</div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
 <div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
+<!-- The search dropdown, in both generations, exactly as each renders it with the module
+     picker open. Plane 1.4 (self-hosted) uses Headless UI; Cloud has moved to Base UI, and
+     the shipped preset went on selecting only the first for a release. Measured 2026-08-08.
+     The two decoys under them are the whole reason the Cloud half is :has(input): a popover
+     with no search box, and the command palette, which is role="dialog" at window width and
+     lives outside the portal. Widening either is this preset reaching past its own name. -->
+<div id="headlessui-combobox-options-:r6j:" class="absolute w-48 rounded-md border">
+  <div id="probe-dropdown-14"><input placeholder="Search" /><div>Data Unit</div></div>
+</div>
+<div id=":ra0:" data-base-ui-portal>
+  <div role="presentation" class="z-40">
+    <div role="dialog" class="rounded-md border border-subtle bg-surface-1 p-1 shadow-overlay-200" id="probe-dropdown-cloud">
+      <div class="flex flex-col gap-1"><div class="relative"><input id="base-ui-:ra2:" placeholder="Search modules..." /></div></div>
+    </div>
+  </div>
+  <div role="dialog" class="rounded-md border border-subtle bg-surface-1 p-1 shadow-overlay-200" id="probe-dropdown-decoy">
+    <div class="flex flex-col gap-1">a menu with no search box</div>
+  </div>
+</div>
+<div role="dialog" class="relative z-50" id="probe-palette"><input placeholder="Type a command or search..." /></div>
 <div id="probe-header">
   <!-- An item with a parent, which is where the buttons were landing on the wrong key. Plane
        renders both keys from one component: the parent's inside a link to the parent and inert,
@@ -1338,6 +1358,21 @@ const suites = [
       check("the interface is in Korean", () => {
         eq(document.querySelector(".master-label").textContent, "확장 프로그램 사용");
       });
+      // The Korean pack shipped alongside the English one and the button handed everybody
+      // English, so a Korean reader's first look at sync was 26 templates in a language they
+      // had not chosen. Only a real page can answer this: it depends on what the UI language
+      // resolves to at click time, not on what the constant says.
+      check("try-the-example subscribes to the Korean pack", () => {
+        document.querySelector('#tabs .tab[data-tab="templates"]').click();
+        document.getElementById("addExample").click();
+        const urls = [...document.querySelectorAll("#sourceList .src-url")].map((i) => i.value);
+        eq(urls.length, 1, "one source: " + urls.join(" | "));
+        ok(urls[0].endsWith("/examples/team-templates-ko.json"), urls[0]);
+      });
+      check("and pressing it again does not subscribe to the English one as well", () => {
+        document.getElementById("addExample").click();
+        eq(document.querySelectorAll("#sourceList .src-url").length, 1, "a second copy of one feed");
+      });
       check("the master switch label stays on one line", () => {
         const el = document.querySelector(".master-label");
         const oneLine = parseFloat(getComputedStyle(el).fontSize) * 2; // generous ceiling
@@ -1856,7 +1891,21 @@ const suites = [
     // because a file:// page has no hostname to match; schema 6 because that is how the
     // presets reach an existing install, and this asserts what they do once they arrive.
     name: "content · focus mode",
-    page: { name: "ct-focus", plane: PLANE, seed: seedOf({ allDomains: true, schema: 6 }) },
+    // Seeded as the OLDEST install there is — pre-schema `widths`, no rules — so every
+    // preset on the page is the one peMigrate builds, not one hand-copied into this file.
+    // That is the gap this suite had: it seeded a synthetic `.max-w-40` rule, so no shipped
+    // preset was ever driven in a browser and the dropdown selector could die unnoticed.
+    // JSON.stringify drops the undefined keys, which is what puts peMigrate at version 1.
+    page: {
+      name: "ct-focus",
+      plane: PLANE,
+      seed: seedOf({
+        allDomains: true,
+        schema: undefined,
+        rules: undefined,
+        widths: { moduleName: { enabled: true, px: 320 }, dropdown: { enabled: true, px: 320 } }
+      })
+    },
     body: `
       const props = document.getElementById("probe-props");
       const propsCloud = document.getElementById("probe-props-cloud");
@@ -1872,6 +1921,24 @@ const suites = [
       const toasts = () => [...document.querySelectorAll(".pe-toast")].map((t) => t.textContent);
 
       await waitFor(() => getComputedStyle(width).maxWidth === "320px", "the always-on rules to be injected");
+      // The search dropdown preset, which went a release matching nothing on Plane Cloud
+      // after Plane moved these popovers from Headless UI to Base UI. Both generations are
+      // on this page now, so a selector that covers one and not the other fails here rather
+      // than in somebody's browser. The seed is schema 6, so this also proves the migration
+      // arrives at a selector that works, not merely at a different string.
+      check("the search dropdown is widened in both generations of the markup", () => {
+        for (const id of ["probe-dropdown-14", "probe-dropdown-cloud"]) {
+          eq(getComputedStyle(document.getElementById(id)).width, "320px", id);
+        }
+      });
+      check("and nothing else with a dialog role is", () => {
+        // :has(input) is doing this work. Without it the rule is "every popover", and the
+        // command palette — full window width, outside the portal — would be squeezed to 320.
+        for (const id of ["probe-dropdown-decoy", "probe-palette"]) {
+          ok(getComputedStyle(document.getElementById(id)).width !== "320px",
+             id + " was caught by the dropdown rule");
+        }
+      });
       check("nothing is hidden until it is asked for", () => {
         ok(shown(props), "the properties panel is where Plane put it");
         ok(shown(propsCloud), "and so is Cloud's");

@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 8;
+const PE_SCHEMA = 9;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -158,6 +158,34 @@ const PE_LOCAL_QUOTA_BYTES = 10485760;
 // share one string; tools/test.js checks it points at the file that actually ships.
 const PE_EXAMPLE_FEED_URL =
   "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates.json";
+// The same 26 templates in Korean, which ship alongside and were reaching nobody: the button
+// handed every reader the English file, so a Korean user's first look at sync was a picker
+// full of a language they had not chosen. The rest of the extension is translated; this was
+// the one surface still speaking only English.
+//
+// Picked from the UI language, not the page, the workspace, or the browser's Accept-Language:
+// the UI language is what the reader already told Chrome they want to read, and it is the
+// same source every other string here comes from. Anything that is not Korean gets English —
+// there is no third file, so no third answer to give.
+const PE_EXAMPLE_FEED_URL_KO =
+  "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates-ko.json";
+
+// Both URLs, so "you already added the example" recognises the other language's file too —
+// otherwise switching Chrome's language turns one source into two copies of one feed.
+const PE_EXAMPLE_FEED_URLS = [PE_EXAMPLE_FEED_URL, PE_EXAMPLE_FEED_URL_KO];
+
+function peExampleFeedUrl(lang) {
+  let l = lang;
+  if (l == null) {
+    try {
+      l = chrome.i18n.getUILanguage();
+    } catch (_) {
+      l = "";
+    }
+  }
+  // Prefix, not equality: Chrome reports ko, ko-KR, and on some builds ko-Kore-KR.
+  return /^ko\b/i.test(String(l || "")) ? PE_EXAMPLE_FEED_URL_KO : PE_EXAMPLE_FEED_URL;
+}
 
 // Count caps for an imported settings file: a bound on the work done for a file that is
 // hostile or simply corrupt, not a statement of how many templates a user may keep.
@@ -218,13 +246,33 @@ const PE_IMPORT_LIMITS = {
 const PE_FOCUS_PROPS_SELECTOR = ".fixed.right-0.border-l.min-w-\\[300px\\], .z-\\[5\\].shrink-0.bg-surface-1";
 const PE_FOCUS_WIDTH_SELECTOR = ".overflow-y-auto.px-9.py-5, .overflow-y-auto.px-8.py-6";
 
-// What v7 shipped for those two, kept only so the migration can tell an untouched preset
-// from one the user edited. Never widen this into "any selector we ever shipped" — a value
-// here is a licence to overwrite what is in somebody's storage.
+// The same story a second time, and the same fix. Plane Cloud has moved its property
+// dropdowns from Headless UI to Base UI; self-hosted 1.4 has not. Measured 2026-08-08 with
+// the module dropdown open on each:
+//
+//   plane.hectoai.co.kr (1.4)   [id^="headlessui-combobox-options"]  → 1, id ends `-:r6j:`
+//                               [data-base-ui-portal]                 → 0
+//   app.plane.so (Cloud)        [id^="headlessui-combobox-options"]  → 0
+//                               [data-base-ui-portal] [role=dialog]:has(input) → 1
+//
+// So the union, Plane 1.4 first, as with the focus selectors above.
+//
+// `:has(input)` is what keeps this a *search* dropdown rather than every popover: a plain
+// menu has no input. Two things it deliberately does not catch, both checked while open —
+// the create-work-item modal, and the ⌘K command palette, which is `[role="dialog"]` at the
+// full window width and sits outside the portal entirely. Widening either would be this
+// preset reaching well past what its name promises.
+const PE_DROPDOWN_SELECTOR =
+  '[id^="headlessui-combobox-options"] > div, [data-base-ui-portal] [role="dialog"]:has(input)';
+
+// What earlier versions shipped, kept only so a migration can tell an untouched preset from
+// one the user edited. Never widen this into "any selector we ever shipped" — a value here
+// is a licence to overwrite what is in somebody's storage.
 const PE_V7_FOCUS_SELECTORS = {
   "rule-focus-item-properties": ".fixed.right-0.border-l.min-w-\\[300px\\]",
   "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"
 };
+const PE_V8_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
 
 function peFocusPresetRules() {
   return [
@@ -523,7 +571,7 @@ const PE_DEFAULTS = {
       id: "rule-combobox-dropdown",
       enabled: true,
       label: peMsg("optPresetDropdown") || "Module search dropdown width",
-      selector: '[id^="headlessui-combobox-options"] > div',
+      selector: PE_DROPDOWN_SELECTOR,
       property: "width",
       value: "320px" // Plane default 192px (w-48) → widened to 320px
     },
@@ -710,7 +758,7 @@ function peMigrate(raw) {
         id: "rule-combobox-dropdown",
         enabled: w.dropdown.enabled !== false,
         label: peMsg("optPresetDropdown") || "Module search dropdown width",
-        selector: '[id^="headlessui-combobox-options"] > div',
+        selector: PE_DROPDOWN_SELECTOR,
         property: "width",
         value: (w.dropdown.px || 320) + "px"
       });
@@ -732,6 +780,16 @@ function peMigrate(raw) {
       if (!r || typeof r !== "object") return;
       const was = PE_V7_FOCUS_SELECTORS[r.id];
       if (was && r.selector === was) r.selector = shipped[r.id];
+    });
+  }
+  if (from < 9) {
+    // Same shape as the v8 focus repoint, and the same guard: only a selector that is
+    // character-for-character what v8 shipped gets moved. Anyone who edited theirs — to
+    // point at a different dropdown, or because they had already worked around this — keeps
+    // exactly what they typed. A preset they deleted stays deleted.
+    (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
+      if (!r || typeof r !== "object" || r.id !== "rule-combobox-dropdown") return;
+      if (r.selector === PE_V8_DROPDOWN_SELECTOR) r.selector = PE_DROPDOWN_SELECTOR;
     });
   }
   raw.schema = PE_SCHEMA;

@@ -52,6 +52,13 @@ changed anything a user sees, drive it:
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
   value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
   `tools/test.js`; the DOM timing is only provable in a browser.
+- **A shipped preset has to be driven from a real migration, not from a hand-written seed.**
+  `seedOf` carries a synthetic `.max-w-40` rule, and for a long time that meant no shipped
+  preset except the focus ones was ever applied in a browser — which is how the search
+  dropdown selector died on Plane Cloud for a release while every check stayed green. The
+  `ct-focus` page now seeds pre-schema `widths` with no rules, so `peMigrate` builds the
+  presets the page is measured against. If you add a preset, put its markup on `PLANE` and
+  let the seed reach it the same way.
 - **Anything the harness substitutes into a page** — a catalogue, a suite body, a path —
   goes in through `put()`, whose replacement is a function. A replacement *string* reads
   `$&`, `` $` ``, `$'` and `$1` as instructions, and all of this is authored prose. One

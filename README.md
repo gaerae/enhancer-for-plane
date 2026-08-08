@@ -230,7 +230,10 @@ Plane server**, applied only on the domains you enable.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
      a source looks like? Click "Try our example"** — it fills in this repo's own
-     `examples/team-templates.json`, so one Save shows the whole flow working.
+     26-template pack, so one Save shows the whole flow working. It picks the file by your
+     Chrome UI language, so a Korean reader gets `team-templates-ko.json` rather than a
+     picker full of English; either counts as "already added", so switching language cannot
+     leave you subscribed to two copies of one feed.
    - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
      `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
      independently with its own interval and on/off switch.

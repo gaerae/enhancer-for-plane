@@ -12,9 +12,33 @@ first read, never rewritten by hand.
 
 ## v1.8.0 — 2026-08-08
 
-Schema 7 → 8.
+Schema 7 → 9.
 
 ### Fixed
+- **The search dropdown preset had stopped matching on Plane Cloud too.** Same rot as the
+  focus presets below, one rule over, and reported as "this rule still says it never
+  matched" — which it was right to say. Plane Cloud has moved its property dropdowns from
+  Headless UI to Base UI; self-hosted 1.4 has not. Measured 2026-08-08 with the module picker
+  open on each:
+
+  | | `[id^="headlessui-combobox-options"]` | `[data-base-ui-portal] [role="dialog"]:has(input)` |
+  |---|---|---|
+  | self-hosted 1.4 | 1 | 0 |
+  | Plane Cloud | 0 | 1 |
+
+  So the selector is a union of both, Plane 1.4 first, and installs still carrying exactly
+  what v8 shipped are repointed on first read. A selector you edited is left alone.
+
+  `:has(input)` is what keeps this a *search* dropdown rather than every popover — a plain
+  menu has no search box. Two things it deliberately does not catch, both checked with them
+  open: the create-work-item modal, and the ⌘K command palette, which is `[role="dialog"]` at
+  the full window width and sits outside the portal entirely.
+
+  **Why nothing caught it:** the browser checks seeded a synthetic `.max-w-40` rule, so no
+  shipped preset except the focus ones was ever driven in a browser. That page now starts
+  from the oldest install there is — pre-schema `widths`, no rules — so every preset on it is
+  one `peMigrate` built, and both dropdown generations are in the markup with the two decoys
+  beside them.
 - **Focus mode did almost nothing on Plane Cloud.** Two of its three presets were written
   against self-hosted Plane 1.4, and Cloud writes both elements with completely different
   classes — so the properties panel and the reading width matched zero elements there and
@@ -131,12 +155,22 @@ Schema 7 → 8.
   shadow appears at whichever edge has content behind it — two pairs of CSS gradients, one
   scrolling with the content and one fixed, so there is no scroll position for a script to keep
   in sync. A short popup stays short: `max-height`, not `height`.
+- **"Try our example" gives a Korean reader the Korean pack.** Both packs have shipped since
+  v1.6 and the button handed everybody the English file, so a Korean user's first look at
+  sync was 26 templates in a language they had not chosen — the one surface left speaking
+  only English. The UI language picks the file, matched as a prefix so `ko`, `ko-KR` and
+  `ko-Kore-KR` all count and Konkani (`kok`) does not. Either file counts as "you already
+  added the example", so switching Chrome's language cannot leave you subscribed to two
+  copies of one feed.
 - **Shortcuts says why the address-bar keyword is not a setting.** `issue` looks like one,
   because Chrome lists it under Search engines → Extensions — but an extension declares its
   keyword in its manifest and there is no API to change it, and that row's own menu offers
-  only Manage and Deactivate (checked on Chrome 151, not assumed). So the tab says so, and
-  points at Chrome's Site search on the same page for anyone who wants a shorter one, with
-  what that costs: one fixed address, no prefix routing, no recents, no search fallback.
+  only Manage and Deactivate (checked on Chrome 151, not assumed). Nor can there be a second
+  one to sit beside it: `"keyword": ["issue", "pi"]` is refused at load with *Type is
+  invalid. Expected string, found list*, and `"issue pi"` is accepted but registers as the
+  single keyword `issuepi`. One extension, one word. So the tab says so, and points at
+  Chrome's Site search on the same page for anyone who wants a shorter one, with what that
+  costs: one fixed address, no prefix routing, no recents, no search fallback.
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
