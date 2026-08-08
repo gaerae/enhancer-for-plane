@@ -104,11 +104,17 @@ Schema 7 → 8.
   popup rather than a result of what is in it.
 - **Rule health no longer accuses a rule that watches something transient.** It sampled once
   per route, so a rule pointing at a dropdown, a menu or a modal was never looked at while
-  its target existed — the shipped "search dropdown width" preset selects
-  `[id^="headlessui-combobox-options"] > div`, measured on Plane Cloud as 0 matches closed
-  and 1 open, and Settings was calling it dead. A second sampling now runs shortly after a
-  click, when transient UI is up, and records **hits only**: it can promote a rule to
-  working and can never move one toward "never matched".
+  its target existed. The shipped "search dropdown width" preset is the example: on
+  self-hosted 1.4 its selector matches 0 elements with the module picker closed and 1 with it
+  open, so every routine sample missed it and Settings called a working preset dead. A second
+  sampling now runs shortly after a click, when transient UI is up, and records **hits
+  only**: it can promote a rule to working and can never move one toward "never matched".
+
+  This was first written up as "and that is why the dropdown preset looks dead on Plane
+  Cloud", which was wrong — on Cloud the old selector matched nothing whether the dropdown
+  was open or not, because Plane had changed the markup. Two faults with one symptom; see the
+  Fixed entry above for the other. The sampling fix stands on its own and is why the
+  self-hosted case reports correctly.
 - **Adding a quick link starts from an example, not an empty box.** The empty box is where a
   wrong URL got typed, and none of those mistakes are detectable afterwards. The Add button
   now offers starting points: one row per site you have already added, with the host filled

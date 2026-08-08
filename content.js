@@ -123,11 +123,16 @@
   // A second sampling, taken after a click and counting hits only.
   //
   // The route-change sample assumes a rule points at something the page is already showing.
-  // Plenty do not: the shipped "search dropdown width" rule selects
-  // `[id^="headlessui-combobox-options"] > div`, which exists only while a dropdown is OPEN.
-  // Measured on Plane Cloud 2026-08-08 — closed: 0 matches, open: 1 — so every routine
-  // sample missed it and the settings page eventually called a working preset dead. Any rule
-  // aimed at a menu, a modal or a tooltip has the same shape.
+  // Plenty do not: the shipped "search dropdown width" rule selects a popover that exists
+  // only while the dropdown is OPEN. Measured on self-hosted Plane 1.4, 2026-08-08 — closed:
+  // 0 matches, open: 1 — so every routine sample missed it and the settings page eventually
+  // called a working preset dead. Any rule aimed at a menu, a modal or a tooltip is the same
+  // shape.
+  //
+  // The instance matters, and getting it wrong cost a round trip: the same preset was ALSO
+  // reported dead on Plane Cloud, and this was assumed to be the same cause. It was not —
+  // there the selector matched nothing open or closed, because Cloud had moved these
+  // popovers to a different library. Two faults, one symptom. See PE_DROPDOWN_SELECTOR.
   //
   // Hits only, and that is what makes it safe: a click is when transient UI is on screen, so
   // this can rescue a rule, but it can never accuse one. Sampling more often would otherwise
