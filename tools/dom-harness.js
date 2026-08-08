@@ -1084,6 +1084,25 @@ const suites = [
         eq(btns[0].textContent, "Chat");
         eq(btns[0].title, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7");
       });
+      // Three formats ship by default and five are allowed. The seed above has one, which is
+      // why this stacked full-width in the real extension while the harness stayed green —
+      // .pop-btn sets width:100% and the override was losing on source order. Add formats
+      // here rather than trusting the single-row case.
+      check("several formats share rows instead of stacking", () => {
+        const box = document.getElementById("copyFormats");
+        for (const name of ["Markdown", "Branch"]) {
+          const b = document.createElement("button");
+          b.className = "pop-btn ghost pop-copy-fmt";
+          b.textContent = name;
+          box.appendChild(b);
+        }
+        const btns = [...box.querySelectorAll(".pop-copy-fmt")];
+        const tops = new Set(btns.map((b) => Math.round(b.getBoundingClientRect().top)));
+        ok(tops.size < btns.length, "each button is on its own line: " + btns.length + " buttons, " + tops.size + " rows");
+        for (const b of btns) {
+          ok(b.getBoundingClientRect().width < box.getBoundingClientRect().width, b.textContent + " is full width");
+        }
+      });
       let copied = null;
       navigator.clipboard.writeText = (t) => { copied = t; return Promise.resolve(); };
       document.querySelector(".pop-copy-fmt").click();

@@ -196,12 +196,18 @@ input:checked + .switch::after {
   flex-wrap: wrap;
   gap: 5px;
 }
-.pop-copy-fmt {
+/* Chips in a wrapping row, not the full-width stack .pop-btn gives everything else. Three
+   formats ship by default and five are allowed; stacked, that is most of a 260px popup and
+   it pushes the site status and Settings below the fold. Declared after .pop-btn so the
+   width override actually wins — the same rule sitting above it lost, silently, and only
+   the real extension showed it because the harness seed had one format. */
+.pop-copy-formats .pop-copy-fmt {
   width: auto;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   margin: 0;
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 12px;
+  font-weight: 500;
 }
 @media (prefers-color-scheme: dark) {
   .pop-jump-key,
