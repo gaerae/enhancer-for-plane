@@ -583,7 +583,9 @@ const PE_DEFAULTS = {
   // Quick open targets — see PE_MAX_QUICK_LINKS. Ships empty like `domains`: a target's
   // url carries the user's own host and workspace ("https://plane.acme.com/team/browse/
   // {{key}}"), so a shipped preset would only open a broken address. The Settings section
-  // shows the shape and the omnibox keyword. Each: { id, name, prefix, url, enabled }.
+  // shows the shape and the omnibox keyword.
+  // Each: { id, name, prefix, url, searchUrl, enabled } — searchUrl is optional and carries
+  // {{q}}, so the same target answers "PROJ-123" and "the login bug" without a mode switch.
   quickLinks: [],
 
   // Template sync — pull shared templates from one or more URLs. Config only
@@ -820,6 +822,9 @@ function peSanitizeSettings(raw) {
       name: str(q.name, L.maxFieldLen),
       prefix: str(q.prefix, L.maxFieldLen),
       url: str(q.url, L.maxFieldLen).trim(),
+      // Optional. A target without one simply does not answer a search, which is what a
+      // tracker whose search URL the user has not filled in should do.
+      searchUrl: str(q.searchUrl, L.maxFieldLen).trim(),
       enabled: bool(q.enabled, true)
     }))
     // A quick link with no url opens nothing; a name or prefix on its own is not a target.
@@ -1226,6 +1231,35 @@ function peSourceDisplayName(src, entry) {
 // Read the rule-health record (chrome.storage.local). Absent is the normal state on a
 // fresh install and reads as "nothing known yet", which is what peRuleHealthState says
 // about an id it does not find.
+// Read/write the recently-opened list (chrome.storage.local).
+function peGetRecent() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(PE_RECENT_KEY, (res) => {
+        const r = res && res[PE_RECENT_KEY];
+        resolve(Array.isArray(r) ? r : []);
+      });
+    } catch (_) {
+      resolve([]);
+    }
+  });
+}
+
+function peSaveRecent(list) {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.set({ [PE_RECENT_KEY]: list }, () => {
+        // A convenience list. A failed write costs one remembered jump, and there is nothing
+        // the reader could do about it, so it is swallowed rather than surfaced.
+        void (chrome.runtime && chrome.runtime.lastError);
+        resolve();
+      });
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
 function peGetRuleHealth() {
   return new Promise((resolve) => {
     try {
@@ -1411,6 +1445,189 @@ function peExpandQuickLink(link, key) {
     });
   }
   return url + enc(parts.key);
+}
+
+// A quick link's search address, if it has one. Same idea as `url` and the same token
+// rules, with {{q}} where the words go — "https://app.plane.so/acme/search?q={{q}}". This
+// is what lets one target answer both "open PROJ-123" and "find the login bug": the omnibox
+// picks by shape (see peLooksLikeKey), so there is no syntax for the user to remember.
+const peSearchTokenRe = () => /\{\{\s*q\s*\}\}/gi;
+
+function peExpandSearchLink(link, query) {
+  const url = link && link.searchUrl ? String(link.searchUrl).trim() : "";
+  const q = String(query == null ? "" : query).trim();
+  if (!url || !q) return "";
+  const enc = encodeURIComponent(q);
+  if (peSearchTokenRe().test(url)) return url.replace(peSearchTokenRe(), enc);
+  return url + enc;
+}
+
+// Is what the user typed a key, or words to search for? The whole disambiguation, and it is
+// deliberately the same test the rest of the extension uses for a key — a thing that looks
+// like PROJ-123 is one, and anything else is a phrase. No prefix, no mode switch, nothing to
+// learn: the two cases cannot be confused because a key has no spaces and a phrase is not
+// <identifier>-<number>.
+function peLooksLikeKey(text) {
+  return PE_ITEM_KEY_RE.test(String(text == null ? "" : text).trim());
+}
+
+// The first work item key in a lump of text, or "". For the context menu: what gets selected
+// on a page is "blocked by PROJ-123 until Friday", not a bare key, and asking the reader to
+// select exactly the key would make the feature slower than typing it.
+//
+// Scanned by token rather than by a loose global regex so the same shape rule decides here
+// as everywhere else. Punctuation around a key is stripped (a trailing full stop, brackets
+// in a PR title) but the key itself is never guessed at.
+function peKeyFromText(text) {
+  const words = String(text == null ? "" : text).split(/[\s,;"'`()[\]{}<>]+/);
+  for (const w of words) {
+    const t = w.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "");
+    if (!peLooksLikeKey(t)) continue;
+    // A year-month gets past the key shape whenever the month is not zero-padded — "2026-10"
+    // is a valid key for a project whose identifier is "2026". PE_ITEM_KEY_RE lets it
+    // through on purpose (Plane does not hand out four-digit-year identifiers, so the cost
+    // there is theoretical), but this function reads prose, and prose is full of dates.
+    // Here the odds invert: "shipped 2026-10" is common and a project called 2026 is not.
+    if (/^(19|20)\d{2}-(1[0-2]|[1-9])$/.test(t)) continue;
+    return t;
+  }
+  return "";
+}
+
+// A quick link read backwards: which item, if any, does this URL name?
+//
+// The same template that builds a URL from a key describes which part of a URL IS the key,
+// so this needs nothing configured that Quick open has not already asked for. Its callers
+// are the popup and the service worker — never a content script. That distinction is the
+// point: this reads a tab's address and title, which every tab has, rather than a page's
+// markup, which is a different shape in every product.
+//
+// Literals are escaped, each {{key}} / {{key.proj}} / {{key.num}} becomes one segment, and a
+// template with no token at all is a base the key is appended to — the same three cases
+// peExpandQuickLink writes. Trailing path, query and hash are allowed after the match,
+// because a real address carries them: Linear redirects /issue/GAE-2 to
+// /issue/GAE-2/connect-your-tools and Plane's browse links end in a slash (both measured
+// 2026-08-08).
+function peMatchQuickLink(template, url) {
+  const t = String(template == null ? "" : template);
+  const u = String(url == null ? "" : url);
+  if (!t || !u) return "";
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // What a key may run up to. "&" is in there for a template that puts the key in the query:
+  // a greedy segment would swallow "ENG-42&view=grid" and then fail the shape check, so a
+  // perfectly good template would answer nothing. No key can contain any of these.
+  const SEG = "([^/?#&]+)";
+  const TAIL = "(?:[/?#&].*)?$";
+  const order = [];
+  let body = "";
+  let last = 0;
+  const re = peQuickTokenRe();
+  let m;
+  while ((m = re.exec(t))) {
+    body += esc(t.slice(last, m.index)) + SEG;
+    order.push(m[1] ? String(m[1]).toLowerCase() : "key");
+    last = m.index + m[0].length;
+  }
+  if (!order.length) {
+    body = esc(t) + SEG;
+    order.push("key");
+  } else {
+    body += esc(t.slice(last));
+  }
+  let hit;
+  try {
+    hit = new RegExp("^" + body + TAIL, "i").exec(u);
+  } catch (_) {
+    return ""; // a template that will not compile matches nothing, it does not throw
+  }
+  if (!hit) return "";
+  const parts = {};
+  order.forEach((name, i) => {
+    let v = hit[i + 1] || "";
+    try {
+      v = decodeURIComponent(v);
+    } catch (_) {
+      /* keep it raw rather than lose it */
+    }
+    parts[name] = v;
+  });
+  const key = (parts.key || (parts.proj && parts.num ? parts.proj + "-" + parts.num : "")).trim();
+  // The shape check is not politeness — it is what stops a template from claiming a page it
+  // has no business claiming. Without it "…/browse/{{key}}" answers "settings" for
+  // /browse/settings, and the popup offers to copy a reference to a word.
+  return peLooksLikeKey(key) ? key : "";
+}
+
+// The item this URL names as { key, link }, or null. The link comes back with the key
+// because the template that recognised the page is also the one that should compose a link
+// to it. The most specific template wins — "…/acme/browse/{{key}}" beats "…/{{key}}" —
+// because a shorter template is a prefix of the longer one's world and would otherwise
+// answer first by accident.
+function peMatchItemUrl(links, url) {
+  const usable = (Array.isArray(links) ? links : [])
+    .filter((l) => l && typeof l === "object" && l.enabled !== false && l.url)
+    .sort((a, b) => String(b.url).length - String(a.url).length);
+  for (const l of usable) {
+    const key = peMatchQuickLink(l.url, url);
+    if (key) return { key, link: l };
+  }
+  return null;
+}
+
+// The work item title out of a tab title, or "".
+//
+// Measured 2026-08-08: Plane and Linear both write "{KEY} {title}" — "GAERA-6 5. Use Cycles
+// to time box tasks 🗓️" and "GAE-2 Connect your tools". That is the only shape accepted, and
+// only when the key is the one already established from the URL. Anything else returns ""
+// rather than a guess: an unresolved {{item.title}} stays visible and is reported, which is
+// the contract every other missing field follows — a wrong title looks right and gets pasted.
+function peTitleFromDocTitle(docTitle, key) {
+  const t = String(docTitle == null ? "" : docTitle).trim();
+  const k = String(key == null ? "" : key).trim();
+  if (!t || !k || t.length <= k.length) return "";
+  if (t.slice(0, k.length).toLowerCase() !== k.toLowerCase()) return "";
+  const rest = t.slice(k.length);
+  if (!/^\s/.test(rest)) return ""; // "GAE-21 …" must not answer for the key "GAE-2"
+  return rest.trim();
+}
+
+/* ================================================================== */
+/* Recently opened items                                               */
+/* ================================================================== */
+//
+// Quick open's one real barrier is that you have to already know the key. Everything else
+// about it is friction-free — no permission, no content script, works on any tab — so the
+// thing worth adding is not more power but a memory: the keys you opened last, offered back
+// to you in the same place you would have typed them.
+//
+// Per device (chrome.storage.local), because it is a record of what this browser did and
+// syncing it would put one machine's browsing in another's address bar. Capped small: this
+// is a shortlist you scan, not a history you search.
+const PE_RECENT_KEY = "peRecent";
+const PE_MAX_RECENT = 12;
+
+// Newest first, one entry per key, capped. An entry is { key, url, name, at } — `name` is
+// the quick link's, so a list spanning two trackers says which is which.
+function peRecentAdd(list, entry, now) {
+  const e = entry && typeof entry === "object" ? entry : {};
+  const key = String(e.key == null ? "" : e.key).trim();
+  const url = String(e.url == null ? "" : e.url).trim();
+  if (!key || !url) return Array.isArray(list) ? list.slice(0, PE_MAX_RECENT) : [];
+  const at = typeof now === "number" && isFinite(now) ? now : 0;
+  const kept = (Array.isArray(list) ? list : []).filter(
+    (r) => r && typeof r === "object" && String(r.key).toLowerCase() !== key.toLowerCase()
+  );
+  return [{ key, url, name: String(e.name == null ? "" : e.name), at }].concat(kept).slice(0, PE_MAX_RECENT);
+}
+
+// The recents worth offering for what has been typed so far. An empty box offers all of
+// them; anything else filters by prefix on the key, which is how you would narrow it by hand
+// — the key is what you half-remember. Order is preserved, so it stays newest-first.
+function peRecentMatches(list, text) {
+  const q = String(text == null ? "" : text).trim().toLowerCase();
+  return (Array.isArray(list) ? list : [])
+    .filter((r) => r && typeof r === "object" && r.key && r.url)
+    .filter((r) => !q || String(r.key).toLowerCase().indexOf(q) === 0);
 }
 
 // Only ever navigate to an http(s) address from a quick link. A stored url is the user's

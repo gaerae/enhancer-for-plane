@@ -96,6 +96,24 @@ largest Tailwind prefix on a Plane Cloud work item: `text` at 33). And every tig
 be re-run against both real pages, because the patterns that catch more also catch `h-screen`
 and `bg-white`: the version before last flagged both, for want of one lookahead.
 
+**Prefer a feature that needs a URL over one that needs a screen.** The features here fall
+into three bands, and it is worth knowing which one you are adding to. Quick open depends on
+a URL grammar the user wrote: a Plane release cannot break it. Style rules and focus mode
+depend on CSS selectors: a release makes them no-ops, which is survivable and now reported.
+Copy reference and the templates depend on DOM anchors — `#title-input`, the key button, the
+button wrapping a file input — and a release makes those *vanish*. That third band is where
+the extension is genuinely fragile, and stretching it across products (a second tracker's
+header, a second tracker's toolbar) multiplies the fragility rather than sharing it: it was
+tried for Copy reference and reverted, because the result was a feature half-present in one
+place and whole in another, with two behaviours to explain and keep working.
+
+So: when a capability could be built either way, build the URL one. Copy reference in the
+popup reads a tab's address and title — every tab has both — and is simply absent when it
+cannot tell what it is looking at; the in-page button stays because it is the only thing that
+can see into Plane's peek panel, where the address bar names the list. Two paths are worth it
+when each is doing something the other cannot; they are not worth it to reach one more
+product.
+
 **Degrading to a no-op is right, and it is not free — say when it happens.** "A rule that
 stops matching is a no-op rather than a broken feature" is what lets this extension survive a
 Plane release, and the cost is that a dead rule and an unused one look identical. Two focus

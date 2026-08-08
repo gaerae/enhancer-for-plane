@@ -523,6 +523,10 @@
     "message": " — 한도에 근접했습니다",
     "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
+  "popCopyLabel": {
+    "message": "참조 복사",
+    "description": "Heading of the popup's copy block. Doubles as the result line — after a click it is replaced by \"Copied.\" or the missing-field warning, because the popup has no room for a toast."
+  },
   "popEnabled": {
     "message": "확장 프로그램 사용"
   },
@@ -847,6 +851,16 @@
   "optKeysFocusWhere": {
     "message": "확장이 동작하는 곳이면 어디서나, 입력 중에도"
   },
+  "optKeysCtx": {
+    "message": "선택한 텍스트에서 작업 항목 열기"
+  },
+  "optKeysRightClick": {
+    "message": "우클릭",
+    "description": "Fills both the Windows and macOS columns of the shortcuts table for the context menu entry — the gesture is the same on both, and leaving a column empty read as unsupported."
+  },
+  "optKeysCtxWhere": {
+    "message": "아무 페이지에서나, 키가 포함된 텍스트를 선택한 뒤"
+  },
   "optKeysJump": {
     "message": "키로 작업 항목 열기"
   },
@@ -888,6 +902,15 @@
     "message": "https://…/browse/{{key}}",
     "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
+  "optQuickSearchPh": {
+    "message": "검색 주소 (선택): https://…/search?q={{q}}",
+    "description": "Placeholder for the second URL on a quick link row. {{q}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
+  },
+  "optQuickSearchPreview": {
+    "message": "“$Q$” → $URL$",
+    "description": "Layout only — a phrase, an arrow, the URL it lands on. No words to translate.",
+    "placeholders": { "q": { "content": "$1" }, "url": { "content": "$2" } }
+  },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "description": "Layout only — a key, an arrow, the URL it lands on. No words to translate.",
@@ -912,7 +935,7 @@
     "message": "작업 항목으로 이동"
   },
   "popJumpPh": {
-    "message": "이슈 키…"
+    "message": "키 또는 검색어…"
   },
   "popJumpGo": {
     "message": "열기"
@@ -920,8 +943,22 @@
   "popJumpAuto": {
     "message": "자동"
   },
+  "ctxOpenSelection": {
+    "message": "선택한 텍스트에서 작업 항목 열기",
+    "description": "Right-click menu entry, shown only when text is selected. It reads the key out of whatever was selected, so the wording says \"from selection\" rather than naming a key it cannot know yet."
+  },
+  "omniboxSearch": {
+    "message": "$NAME$에서 “$Q$” 검색",
+    "description": "Omnibox row when what was typed is words rather than a key.",
+    "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
+  },
+  "omniboxRecent": {
+    "message": "$KEY$ · $TITLE$",
+    "description": "Omnibox row for a key opened before. Layout only: the key, a separator, the target name it was opened in.",
+    "placeholders": { "key": { "content": "$1" }, "title": { "content": "$2" } }
+  },
   "omniboxHint": {
-    "message": "작업 항목 키를 입력하면 바로 엽니다"
+    "message": "작업 항목 키를 입력하면 열고, 여러 낱말을 입력하면 검색합니다"
   },
   "omniboxNoTarget": {
     "message": "설정된 링크 없음 — Enter로 설정 열기"

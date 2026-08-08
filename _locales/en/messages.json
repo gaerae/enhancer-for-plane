@@ -526,6 +526,10 @@
     "message": " — approaching the limit",
     "description": "Appended to msgStorageUsed. Leading space deliberate."
   },
+  "popCopyLabel": {
+    "message": "Copy reference",
+    "description": "Heading of the popup's copy block. Doubles as the result line — after a click it is replaced by \"Copied.\" or the missing-field warning, because the popup has no room for a toast."
+  },
   "popEnabled": {
     "message": "Extension enabled"
   },
@@ -850,6 +854,16 @@
   "optKeysFocusWhere": {
     "message": "Anywhere the extension runs, including while you are typing"
   },
+  "optKeysCtx": {
+    "message": "Open a work item from selected text"
+  },
+  "optKeysRightClick": {
+    "message": "Right-click",
+    "description": "Fills both the Windows and macOS columns of the shortcuts table for the context menu entry — the gesture is the same on both, and leaving a column empty read as unsupported."
+  },
+  "optKeysCtxWhere": {
+    "message": "Any page, once you have selected text containing a key"
+  },
   "optKeysJump": {
     "message": "Open a work item by key"
   },
@@ -891,6 +905,15 @@
     "message": "https://…/browse/{{key}}",
     "description": "Placeholder text. {{key}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
   },
+  "optQuickSearchPh": {
+    "message": "search URL (optional): https://…/search?q={{q}}",
+    "description": "Placeholder for the second URL on a quick link row. {{q}} is a token the expander looks for; the ellipsis stands in for a host. Do not translate either."
+  },
+  "optQuickSearchPreview": {
+    "message": "“$Q$” → $URL$",
+    "description": "Layout only — a phrase, an arrow, the URL it lands on. No words to translate.",
+    "placeholders": { "q": { "content": "$1" }, "url": { "content": "$2" } }
+  },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
     "description": "Layout only — a key, an arrow, the URL it lands on. No words to translate.",
@@ -915,7 +938,7 @@
     "message": "Go to work item"
   },
   "popJumpPh": {
-    "message": "Issue key…"
+    "message": "Key, or search…"
   },
   "popJumpGo": {
     "message": "Open"
@@ -923,8 +946,22 @@
   "popJumpAuto": {
     "message": "Auto"
   },
+  "ctxOpenSelection": {
+    "message": "Open work item from selection",
+    "description": "Right-click menu entry, shown only when text is selected. It reads the key out of whatever was selected, so the wording says \"from selection\" rather than naming a key it cannot know yet."
+  },
+  "omniboxSearch": {
+    "message": "Search $NAME$ for “$Q$”",
+    "description": "Omnibox row when what was typed is words rather than a key.",
+    "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
+  },
+  "omniboxRecent": {
+    "message": "$KEY$ · $TITLE$",
+    "description": "Omnibox row for a key opened before. Layout only: the key, a separator, the target name it was opened in.",
+    "placeholders": { "key": { "content": "$1" }, "title": { "content": "$2" } }
+  },
   "omniboxHint": {
-    "message": "Type a work item key to open it"
+    "message": "Type a work item key to open it, or words to search"
   },
   "omniboxNoTarget": {
     "message": "No quick link set — Enter opens Settings"

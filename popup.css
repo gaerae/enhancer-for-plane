@@ -138,10 +138,78 @@ input:checked + .switch::after {
 .pop-jump-go:hover {
   background: var(--accent-hover);
 }
+/* The keys you opened last, as chips under the jump box. A row you scan, not a list you
+   read — so they wrap and stay small, and six is the most that can appear. */
+.pop-recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.pop-recent[hidden] {
+  display: none;
+}
+.pop-recent-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.pop-recent-item:hover {
+  border-color: var(--accent);
+}
+.pop-recent-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+/* The target's name, for a list spanning two trackers. Truncated rather than wrapped: it is
+   the disambiguator, not the label. */
+.pop-recent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pop-copy-block[hidden] {
+  display: none;
+}
+/* Which item is about to be copied. One line: the popup is 300px and a wrapped title would
+   push the buttons below the fold. */
+.pop-copy-item {
+  margin: -2px 0 7px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pop-copy-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pop-copy-fmt {
+  width: auto;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
 @media (prefers-color-scheme: dark) {
   .pop-jump-key,
   .pop-jump-target {
     background: #262b31;
+  }
+  .pop-recent-item:hover {
+    border-color: var(--accent);
   }
 }
 .pop-status {

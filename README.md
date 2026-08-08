@@ -35,6 +35,19 @@ Plane server**, applied only on the domains you enable.
    - It **opens a URL and nothing more** — no host permission, no content script — so it
      works on any tab, including ones where the rest of the extension never runs. Ships with
      no targets; add yours in Settings, where each row previews where a sample key lands.
+   - **The keys you opened last come back to you.** The one real barrier here was having to
+     already know the key; the address bar now offers your recent jumps the moment the
+     keyword is on screen, and narrows them as you type. The same list is in the popup.
+     Twelve entries, per device (`chrome.storage.local`) — waking up on another machine to
+     someone else's browsing in your address bar is not a feature.
+   - **Words search instead of opening.** Type `issue login bug` and it goes to the tracker's
+     search. Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is
+     not — so there is no prefix or mode to remember. Give a target a **search URL** with
+     `{{q}}` in Settings; a target without one simply does not answer a search.
+   - **A key in someone else's text.** A key almost never arrives as a key — it arrives in a
+     Slack message or a PR title, "blocked by PROJ-123 until Friday". Select it and
+     right-click → **Open work item from selection**. Chrome hands over the selected text;
+     the page itself is never read.
 2. **📝 Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
@@ -84,6 +97,12 @@ Plane server**, applied only on the domains you enable.
    - A value the page does not give us **stays visible as its token** rather than
      turning into an empty string, and the toast names it — you find out before you
      paste, not after.
+   - **Also in the toolbar popup**, when the tab you are on is a work item. That path reads
+     the tab's address and title and nothing else — no injection, no page access — so it
+     works wherever Quick open has a link, and when the tab is not a work item the block is
+     simply absent. It is the low-dependency half of the in-page button, not a replacement:
+     it cannot see into the panel a list opens, because there the address bar and the title
+     both still name the list.
    - Works both on a work item's own page and in the **panel a list opens**, which has
      the same header. On its own page the link is simply the address bar. The panel
      keeps the *list's* URL and holds no link to the item at all, so there the link is
@@ -402,6 +421,9 @@ a missing browser is a failure rather than a quiet pass. Contributor rules live 
 - `activeTab` — when you click the toolbar icon, the popup reads the current
   tab's hostname to show status and offer "Enable on this site," and messages the
   tab to start the element picker. Limited to the tab you invoked it on.
+- `contextMenus` — adds one right-click entry, shown only when text is selected, that reads
+  a work item key out of the selection and opens it. Chrome hands over the selected text; the
+  page itself is never read, and the entry appears on no other kind of click.
 - `scripting` — registers/injects the content script on the specific origins you
   grant (see below).
 - **Optional host permissions, requested per site.** The extension ships with

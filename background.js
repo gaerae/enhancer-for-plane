@@ -436,17 +436,70 @@ const PE_ACTION_TITLE = (() => {
   }
 })();
 
+/* ------------------------------------------------------------------ */
+/* Open a key from selected text                                       */
+/* ------------------------------------------------------------------ */
+//
+// A key almost never arrives as a key. It arrives inside a Slack message, a PR title, a
+// commit body — "blocked by PROJ-123 until Friday" — and the way out of that today is to
+// select it, copy it, open the omnibox, type the keyword, paste. This is the same jump with
+// the reading step removed, and it costs nothing the extension did not already have: no host
+// permission, no content script, no page access. `contexts: ["selection"]` means Chrome
+// hands over the selected text; we never look at the page.
+const PE_CTX_ID = "pe-open-key";
+
+function ensureContextMenu() {
+  if (!chrome.contextMenus) return;
+  // Rebuilt rather than updated: onInstalled and onStartup both run this, and creating an id
+  // that already exists is an error Chrome reports through lastError.
+  chrome.contextMenus.removeAll(() => {
+    void (chrome.runtime && chrome.runtime.lastError);
+    chrome.contextMenus.create(
+      {
+        id: PE_CTX_ID,
+        title: peMsg("ctxOpenSelection") || "Open work item from selection",
+        contexts: ["selection"]
+      },
+      () => void (chrome.runtime && chrome.runtime.lastError)
+    );
+  });
+}
+
+if (chrome.contextMenus) {
+  chrome.contextMenus.onClicked.addListener((info) => {
+    if (!info || info.menuItemId !== PE_CTX_ID) return;
+    const key = peKeyFromText(info.selectionText);
+    if (!key) return; // no key in what was selected — a menu entry that does nothing is the
+    // honest outcome here, because the alternative is opening something the reader did not
+    // point at. The item only appears on a selection, so this is not a dead end they can sit in.
+    peGetSettings().then((settings) => {
+      const link = peRouteQuickLink(peEnabledQuickLinks(settings), key);
+      const url = link ? peExpandQuickLink(link, key) : "";
+      if (!peIsHttpUrl(url)) {
+        chrome.runtime.openOptionsPage();
+        return;
+      }
+      // A new tab, always: the selection is on a page the reader was reading, and replacing
+      // it with the work item would lose their place.
+      chrome.tabs.create({ url });
+      peRememberOpened(key, url, link);
+    });
+  });
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   reconcile();
   ensureSyncAlarm();
   syncSources(true);
   refreshBadge();
+  ensureContextMenu();
 });
 chrome.runtime.onStartup.addListener(() => {
   reconcile();
   ensureSyncAlarm();
   syncSources(false);
   refreshBadge();
+  ensureContextMenu();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -486,6 +539,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "pe-open-options") {
     chrome.runtime.openOptionsPage();
+    return;
+  }
+  // The popup asking us to remember a jump it is about to make. It has to be us: the popup
+  // calls window.close() in the same breath, and a storage write left pending in a context
+  // that is being torn down is a write that may never land. No reply — the caller is gone.
+  if (msg && msg.type === "pe-remember-open") {
+    peRememberOpened(msg.key, msg.url, { name: msg.name });
     return;
   }
   if (msg && msg.type === "pe-sync-now") {
@@ -563,6 +623,15 @@ function peOpenUrl(url, disposition) {
   }
 }
 
+// Remember a jump, so the omnibox can offer it back. Fire-and-forget: a jump that opened is
+// the outcome the reader wanted, and a failed bookkeeping write must not be allowed to look
+// like a failed jump.
+function peRememberOpened(key, url, link) {
+  peGetRecent()
+    .then((list) => peSaveRecent(peRecentAdd(list, { key, url, name: (link && link.name) || "" }, Date.now())))
+    .catch(() => {});
+}
+
 function peEnabledQuickLinks(settings) {
   return (settings.quickLinks || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
 }
@@ -574,10 +643,26 @@ if (chrome.omnibox) {
     });
   omniReset();
 
+  // A row for a key opened before. `content` is the resolved URL, which is what
+  // onInputEntered opens verbatim — so a recent row costs no lookup when it is picked.
+  const recentRows = (recent, text) =>
+    peRecentMatches(recent, text)
+      .filter((r) => peIsHttpUrl(r.url))
+      .map((r) => ({
+        content: r.url,
+        description:
+          peOmniEscape(peMsg("omniboxRecent", [r.key, r.name || ""]) || r.key) +
+          " <url>" +
+          peOmniEscape(r.url) +
+          "</url>"
+      }));
+
   chrome.omnibox.onInputChanged.addListener((text, suggest) => {
     const key = (text || "").trim();
-    peGetSettings().then((settings) => {
+    Promise.all([peGetSettings(), peGetRecent()]).then(([settings, recent]) => {
       const links = peEnabledQuickLinks(settings);
+      // Nothing typed yet: the keyword is on screen and the cursor is waiting, which is
+      // exactly the moment the reader is trying to remember a key. Offer the last few.
       if (!key || !links.length) {
         chrome.omnibox.setDefaultSuggestion({
           description: peOmniEscape(
@@ -586,7 +671,37 @@ if (chrome.omnibox) {
               : peMsg("omniboxNoTarget") || "No quick link set — Enter opens Settings"
           )
         });
-        suggest([]);
+        suggest(links.length ? recentRows(recent, "") : []);
+        return;
+      }
+      // Words, not a key — the one disambiguation, and it is made by shape so there is no
+      // syntax to learn. Only targets that were given a search URL can answer.
+      if (!peLooksLikeKey(key)) {
+        const searchable = links.filter((l) => peIsHttpUrl(peExpandSearchLink(l, key)));
+        const first = searchable[0];
+        chrome.omnibox.setDefaultSuggestion({
+          description: first
+            ? peOmniEscape(peMsg("omniboxSearch", [first.name || "", key]) || "Search for " + key) +
+              " <url>" +
+              peOmniEscape(peExpandSearchLink(first, key)) +
+              "</url>"
+            : peOmniEscape(peMsg("omniboxHint") || "Type a work item key to open it")
+        });
+        suggest(
+          searchable
+            .slice(1)
+            .map((l) => ({
+              content: peExpandSearchLink(l, key),
+              description:
+                peOmniEscape(peMsg("omniboxSearch", [l.name || "", key]) || "Search for " + key) +
+                " <url>" +
+                peOmniEscape(peExpandSearchLink(l, key)) +
+                "</url>"
+            }))
+            // A half-typed key is still words to this branch, so the recents that start with
+            // it belong here too — it is the same list the reader was narrowing.
+            .concat(recentRows(recent, key))
+        );
         return;
       }
       const chosen = peRouteQuickLink(links, key);
@@ -625,14 +740,35 @@ if (chrome.omnibox) {
     // A picked suggestion arrives as its already-resolved URL — open it verbatim.
     if (peIsHttpUrl(entered)) {
       peOpenUrl(entered, disposition);
+      // Which item that was is a question the quick links can answer, so a row picked from
+      // the list counts as a jump too — including a recent one, which moves back to the top.
+      // A search result URL matches no template and is simply not remembered, which is
+      // right: a phrase is not an item.
+      peGetSettings().then((settings) => {
+        const m = peMatchItemUrl(peEnabledQuickLinks(settings), entered);
+        if (m) peRememberOpened(m.key, entered, m.link);
+      });
       omniReset();
       return;
     }
     peGetSettings().then((settings) => {
-      const chosen = peRouteQuickLink(peEnabledQuickLinks(settings), entered);
+      const links = peEnabledQuickLinks(settings);
+      // Words rather than a key: the same shape test the suggestions used, so plain Enter
+      // lands where the row above it said it would.
+      if (!peLooksLikeKey(entered)) {
+        const first = links.filter((l) => peIsHttpUrl(peExpandSearchLink(l, entered)))[0];
+        const surl = first ? peExpandSearchLink(first, entered) : "";
+        if (peIsHttpUrl(surl)) peOpenUrl(surl, disposition);
+        else chrome.runtime.openOptionsPage(); // no target can search — go and give one a search URL
+        omniReset();
+        return;
+      }
+      const chosen = peRouteQuickLink(links, entered);
       const url = chosen ? peExpandQuickLink(chosen, entered) : "";
-      if (peIsHttpUrl(url)) peOpenUrl(url, disposition);
-      else chrome.runtime.openOptionsPage(); // nothing configured, or a bad url — send them to set one
+      if (peIsHttpUrl(url)) {
+        peOpenUrl(url, disposition);
+        peRememberOpened(entered, url, chosen);
+      } else chrome.runtime.openOptionsPage(); // nothing configured, or a bad url — send them to set one
       omniReset();
     });
   });

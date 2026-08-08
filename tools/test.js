@@ -45,6 +45,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
+  "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
   "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
   "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
@@ -162,7 +163,7 @@ function chromeItemBytes(key, value) {
 
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
-  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [] };
+  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [], recent: [], opened: [] };
   const ctx = {
     console,
     URL,
@@ -194,7 +195,16 @@ function loadWorker({ settings, respond, granted = true }) {
       vm.runInContext(COMMON, ctx);
     },
     chrome: {
-      runtime: { onInstalled: noop, onStartup: noop, onMessage: noop, lastError: null, openOptionsPage() {} },
+      runtime: {
+        // Captured, not discarded: the context menu is created from here, so a test that
+        // wants to assert the menu exists has to be able to fire the event that makes it —
+        // otherwise it is asserting a function it called itself, not the wiring.
+        onInstalled: { addListener: (f) => (state.onInstalled = f) },
+        onStartup: noop,
+        onMessage: { addListener: (f) => (state.onWorkerMessage = f) },
+        lastError: null,
+        openOptionsPage() { state.openedOptions = true; }
+      },
       alarms: { onAlarm: noop, get: async () => null, create: async () => {}, clear: async () => {} },
       permissions: {
         onAdded: noop,
@@ -209,7 +219,19 @@ function loadWorker({ settings, respond, granted = true }) {
         remove: async () => {}
       },
       scripting: { unregisterContentScripts: async () => {}, registerContentScripts: async () => {} },
-      tabs: { query: async () => [] },
+      // Enough of the omnibox to drive it: the listeners are captured so a test can type,
+      // and what was suggested or set as the default row is recorded rather than shown.
+      omnibox: {
+        setDefaultSuggestion: (s2) => (state.omniDefault = s2 && s2.description),
+        onInputChanged: { addListener: (f) => (state.onInput = f) },
+        onInputEntered: { addListener: (f) => (state.onEnter = f) }
+      },
+      contextMenus: {
+        removeAll: (cb) => cb && cb(),
+        create: (o, cb) => { state.menu = o; cb && cb(); },
+        onClicked: { addListener: (f) => (state.onMenu = f) }
+      },
+      tabs: { query: async () => [], create: (o) => state.opened.push(o.url), update: () => {} },
       storage: {
         // Hand back a copy, exactly as chrome.storage does — it structured-clones on
         // read, so a caller can never mutate stored state by writing to what it read.
@@ -218,8 +240,15 @@ function loadWorker({ settings, respond, granted = true }) {
         // aliasing. What hid that bug was that no test drove the in-flight window.)
         sync: { get: (k, cb) => cb({ peSettings: clone(state.settings) }) },
         local: {
-          get: (k, cb) => cb({ peSyncCache: clone(state.cache) }),
+          get: (k, cb) => cb({ peSyncCache: clone(state.cache), peRecent: clone(state.recent || []) }),
           set: (o, cb) => {
+            // The recents list is its own item and its own concern — it must not land in
+            // `writes`, which exists to count sync-cache writes.
+            if (o && "peRecent" in o) {
+              state.recent = clone(o.peRecent);
+              cb();
+              return;
+            }
             // `failSaves` stands in for the quota being full: chrome reports it through
             // lastError, which peSaveSyncCache turns into a rejection.
             if (state.failSaves) {
@@ -1249,6 +1278,236 @@ test("quick: the schema is stamped and a v5 user gains an empty quickLinks list"
   ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
   eq(merged.quickLinks.length, 0, "and it is empty by default");
   eq(ctx.peMigrate({ schema: 5 }).schema, ctx.__SCHEMA, "stamp advances to PE_SCHEMA");
+});
+
+/* ---------------- search, recents, selection, and reading a tab ---------------- */
+
+// Real templates from real workspaces, 2026-08-08.
+const Q_PLANE = { id: "q1", name: "Plane", enabled: true, prefix: "", url: "https://app.plane.so/gaerae/browse/{{key}}", searchUrl: "https://app.plane.so/gaerae/search?q={{q}}" };
+const Q_LINEAR = { id: "q2", name: "Linear", enabled: true, prefix: "GAE-", url: "https://linear.app/gaerae/issue/{{key}}" };
+
+// The whole disambiguation between "open this" and "find this". It has to be decidable
+// without a mode, a prefix, or a setting — otherwise the omnibox grows a syntax.
+test("search: a key is a key and everything else is a phrase", () => {
+  const { peLooksLikeKey } = loadCommon();
+  ok(peLooksLikeKey("PROJ-123"));
+  ok(peLooksLikeKey("42-7"), "a numeric project identifier is still a key");
+  ok(peLooksLikeKey("  GAE-1  "), "trimmed");
+  ok(!peLooksLikeKey("login bug"), "two words");
+  ok(!peLooksLikeKey("GAE"), "half a key is not one — it is a prefix you are still typing");
+  ok(!peLooksLikeKey("PROJ-0"), "no zero sequence");
+  ok(!peLooksLikeKey("2026-07"), "a zero-padded month is not a key");
+  ok(!peLooksLikeKey(""));
+  ok(!peLooksLikeKey(null));
+});
+
+test("search: a phrase is expanded into the target's search URL", () => {
+  const { peExpandSearchLink } = loadCommon();
+  eq(peExpandSearchLink(Q_PLANE, "login bug"), "https://app.plane.so/gaerae/search?q=login%20bug");
+  eq(peExpandSearchLink(Q_PLANE, "  로그인 오류  "), "https://app.plane.so/gaerae/search?q=" + encodeURIComponent("로그인 오류"), "trimmed and encoded");
+  // A base with no token gets the phrase appended, the same rule peExpandQuickLink follows.
+  eq(peExpandSearchLink({ searchUrl: "https://t.test/s/" }, "x y"), "https://t.test/s/x%20y");
+  eq(peExpandSearchLink(Q_LINEAR, "login bug"), "", "a target with no search URL does not answer");
+  eq(peExpandSearchLink(Q_PLANE, "   "), "", "and neither does an empty phrase");
+  eq(peExpandSearchLink(null, "x"), "");
+});
+
+// The context menu's whole job. What gets selected on a page is a sentence, not a key.
+test("selection: the key is found inside whatever was selected", () => {
+  const { peKeyFromText } = loadCommon();
+  eq(peKeyFromText("blocked by PROJ-123 until Friday"), "PROJ-123");
+  eq(peKeyFromText("PROJ-123"), "PROJ-123");
+  eq(peKeyFromText("see (PROJ-123)."), "PROJ-123", "punctuation around it is not part of it");
+  eq(peKeyFromText("fix: GAE-2, GAE-3"), "GAE-2", "the first one wins");
+  eq(peKeyFromText("배포 전에 DATA-5 확인"), "DATA-5", "and the surrounding text need not be English");
+  eq(peKeyFromText("nothing to see here"), "");
+  // Prose is full of dates. The key shape alone lets "2026-10" through (it is a valid key
+  // for a project called 2026), which is a fair trade everywhere except here.
+  eq(peKeyFromText("released 2026-07 and 2026-10"), "", "neither form of a year-month");
+  eq(peKeyFromText("shipped in 1999-9"), "", "including a two-digit-year-looking one");
+  eq(peKeyFromText("2026-13 is not a month"), "2026-13", "and a 13th month is a key again");
+  eq(peKeyFromText(""), "");
+  eq(peKeyFromText(null), "");
+});
+
+test("recent: newest first, one row per key, capped", () => {
+  const ctx = loadCommon();
+  let list = [];
+  list = ctx.peRecentAdd(list, { key: "A-1", url: "https://t/A-1", name: "Plane" }, 10);
+  list = ctx.peRecentAdd(list, { key: "B-2", url: "https://t/B-2", name: "Plane" }, 20);
+  eq(list.map((r) => r.key), ["B-2", "A-1"], "newest first");
+  // Opening something again moves it up rather than appearing twice — the list is a
+  // shortlist of what you work on, not a log of what you clicked.
+  list = ctx.peRecentAdd(list, { key: "A-1", url: "https://t/A-1", name: "Plane" }, 30);
+  eq(list.map((r) => r.key), ["A-1", "B-2"]);
+  eq(list.length, 2, "and not twice");
+  eq(list[0].at, 30, "with the newer time");
+  for (let i = 0; i < ctx.__MAX_RECENT * 2; i++) list = ctx.peRecentAdd(list, { key: "K-" + (i + 1), url: "https://t/x" }, i);
+  eq(list.length, ctx.__MAX_RECENT, "capped");
+  // Junk in must not become a row the reader can click into nowhere.
+  eq(ctx.peRecentAdd([], { key: "", url: "https://t/x" }, 1), [], "no key");
+  eq(ctx.peRecentAdd([], { key: "A-1", url: "" }, 1), [], "no url");
+  eq(ctx.peRecentAdd(null, null, null), []);
+});
+
+test("recent: an empty box offers everything, and typing narrows it", () => {
+  const ctx = loadCommon();
+  const list = [
+    { key: "GAE-9", url: "https://t/1" },
+    { key: "DATA-5", url: "https://t/2" },
+    { key: "GAE-1", url: "https://t/3" },
+    { key: "bad", url: "" }
+  ];
+  eq(ctx.peRecentMatches(list, "").map((r) => r.key), ["GAE-9", "DATA-5", "GAE-1"], "order kept, junk dropped");
+  eq(ctx.peRecentMatches(list, "GAE").map((r) => r.key), ["GAE-9", "GAE-1"], "prefix on the key");
+  eq(ctx.peRecentMatches(list, "gae-1").map((r) => r.key), ["GAE-1"], "case does not matter");
+  eq(ctx.peRecentMatches(list, "zz"), [], "no match");
+  eq(ctx.peRecentMatches(null, ""), []);
+});
+
+// What the popup's copy block reads. No DOM anywhere in this: a tab has a URL and a title,
+// and that is the whole input.
+test("tab: the popup can name the item from a URL and a title alone", () => {
+  const ctx = loadCommon();
+  const links = [Q_PLANE, Q_LINEAR];
+  const m = ctx.peMatchItemUrl(links, "https://linear.app/gaerae/issue/GAE-2/connect-your-tools");
+  eq(m.key, "GAE-2");
+  eq(ctx.peTitleFromDocTitle("GAE-2 Connect your tools", m.key), "Connect your tools");
+  // The canonical form the template describes, not the address bar — Linear redirects
+  // /issue/GAE-2 to the slug form, so the slug is length nobody reads.
+  eq(ctx.peExpandQuickLink(m.link, m.key), "https://linear.app/gaerae/issue/GAE-2");
+  // Plane's own page, where both halves agree and there is no slug to drop.
+  const p = ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/GAERA-6/");
+  eq(p.key, "GAERA-6");
+  eq(ctx.peTitleFromDocTitle("GAERA-6 5. Use Cycles to time box tasks 🗓️", p.key), "5. Use Cycles to time box tasks 🗓️");
+  // A list route names no item, so the popup shows nothing rather than guessing. Measured:
+  // Plane's peek panel keeps the list's URL AND the list's title, so this is also why the
+  // popup cannot see into a peek — and why the in-page button still has a job.
+  eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/projects/abc/issues/"), null);
+  eq(ctx.peTitleFromDocTitle("gaerae - 작업 항목", "GAERA-2"), "");
+  // A template must validate what it captured or it claims pages it has no business claiming.
+  eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/settings"), null);
+  eq(ctx.peMatchItemUrl([], "https://app.plane.so/gaerae/browse/GAERA-6"), null, "nothing configured, nothing claimed");
+});
+
+test("tab: a search result is not an item, so it is never remembered as one", () => {
+  const ctx = loadCommon();
+  // The omnibox records what it opened by asking the links which item a URL names. A search
+  // URL matches no template, so a phrase cannot end up in the recents list pretending to be
+  // a key — which is the one way that list could fill with rows that open nothing.
+  eq(ctx.peMatchItemUrl([Q_PLANE], ctx.peExpandSearchLink(Q_PLANE, "login bug")), null);
+});
+
+test("quick: searchUrl survives an import and is optional", () => {
+  const ctx = loadCommon();
+  const out = ctx.peSanitizeSettings({
+    quickLinks: [
+      { id: "a", url: "https://t/{{key}}", searchUrl: "  https://t/s?q={{q}}  " },
+      { id: "b", url: "https://t2/{{key}}" },
+      { id: "c", url: "https://t3/{{key}}", searchUrl: 42 }
+    ]
+  });
+  eq(out.quickLinks[0].searchUrl, "https://t/s?q={{q}}", "trimmed");
+  eq(out.quickLinks[1].searchUrl, "", "absent is empty, not undefined");
+  eq(out.quickLinks[2].searchUrl, "", "and a non-string is not a URL");
+});
+
+/* ---------------- the omnibox and the context menu, driven ---------------- */
+
+// The pure pieces above decide what a key is and where a phrase goes. These drive the
+// worker that wires them together, because the wiring is where the two can disagree — a
+// suggestion row that says one thing and Enter that does another is the failure nobody
+// notices until they are already on the wrong page.
+function loadOmnibox(over) {
+  const settings = Object.assign({ schema: 8, quickLinks: [Q_PLANE, Q_LINEAR] }, over || {});
+  const w = loadWorker({ settings, respond: async () => jsonResponse(feed([])) });
+  return w;
+}
+const typed = (w, text) => new Promise((r) => w.ctx.state ? r() : r()).then(() => new Promise((res) => {
+  w.state.onInput(text, (rows) => res(rows));
+}));
+
+test("omnibox: a key routes, and the row says where Enter will land", async () => {
+  const w = loadOmnibox();
+  const rows = await typed(w, "GAERA-6");
+  ok(w.state.omniDefault.indexOf("https://app.plane.so/gaerae/browse/GAERA-6") > -1, w.state.omniDefault);
+  // The other target is offered as its resolved URL, which is what onInputEntered opens.
+  ok(rows.some((r) => r.content === "https://linear.app/gaerae/issue/GAERA-6"), JSON.stringify(rows));
+});
+
+test("omnibox: words go to search, and only targets that can search answer", async () => {
+  const w = loadOmnibox();
+  const rows = await typed(w, "login bug");
+  ok(w.state.omniDefault.indexOf("search?q=login%20bug") > -1, w.state.omniDefault);
+  // Linear has no searchUrl in this seed, so it must not offer a row it cannot honour.
+  ok(!rows.some((r) => String(r.content).indexOf("linear.app") > -1), JSON.stringify(rows));
+});
+
+test("omnibox: an empty box offers what you opened last", async () => {
+  const w = loadOmnibox();
+  w.state.recent = [{ key: "GAERA-6", url: "https://app.plane.so/gaerae/browse/GAERA-6", name: "Plane", at: 1 }];
+  const rows = await typed(w, "");
+  eq(rows.length, 1, "the one recent");
+  eq(rows[0].content, "https://app.plane.so/gaerae/browse/GAERA-6");
+  ok(w.state.omniDefault.indexOf("Type a work item key") > -1, "and the hint still explains the box");
+});
+
+// A half-typed key is words to the shape test, which is exactly when the recents are worth
+// offering — it is the list the reader is narrowing.
+test("omnibox: a half-typed key narrows the recents", async () => {
+  const w = loadOmnibox();
+  w.state.recent = [
+    { key: "GAERA-6", url: "https://app.plane.so/gaerae/browse/GAERA-6", name: "Plane", at: 2 },
+    { key: "DATA-5", url: "https://app.plane.so/gaerae/browse/DATA-5", name: "Plane", at: 1 }
+  ];
+  const rows = await typed(w, "GAER");
+  const recents = rows.filter((r) => String(r.content).indexOf("/browse/") > -1);
+  eq(recents.length, 1, "only the one that starts with what was typed");
+  eq(recents[0].content, "https://app.plane.so/gaerae/browse/GAERA-6");
+});
+
+test("omnibox: opening a key remembers it; searching for a phrase does not", async () => {
+  const w = loadOmnibox();
+  await w.state.onEnter("GAERA-6", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "the jump was remembered");
+  eq(w.state.recent[0].name, "Plane", "with the target it went to");
+
+  await w.state.onEnter("login bug", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "a phrase is not an item and is not remembered");
+});
+
+test("omnibox: a picked row is remembered as the item it resolves to", async () => {
+  const w = loadOmnibox();
+  await w.state.onEnter("https://linear.app/gaerae/issue/GAE-2/connect-your-tools", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAE-2"], "the URL was read back into a key");
+  eq(w.state.recent[0].name, "Linear");
+});
+
+test("menu: a key is opened out of the middle of a selection", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled(); // the menu is built on install, which is the wiring under test
+  ok(w.state.menu && w.state.menu.contexts.indexOf("selection") > -1, "the entry is selection-only");
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "blocked by GAERA-6 until Friday" });
+  await tick();
+  await tick();
+  eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "opened in a new tab");
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "and remembered like any other jump");
+});
+
+test("menu: a selection with no key in it opens nothing", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "just some prose" });
+  await tick();
+  await tick();
+  eq(w.state.opened, [], "nothing was opened");
+  eq(w.state.recent, [], "and nothing remembered");
 });
 
 /* ---------------- the picker's candidate ranking ---------------- */

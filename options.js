@@ -423,6 +423,8 @@
   // A sample key for the row previews. "PROJ-123" splits cleanly into proj/num, so a URL
   // using {{key}}, {{key.proj}} or {{key.num}} all show something real.
   const PE_QUICK_SAMPLE = "PROJ-123";
+  // Two words, so the preview shows the encoding a real phrase gets.
+  const PE_QUICK_SEARCH_SAMPLE = "login bug";
 
   function renderQuickLinks() {
     if (!Array.isArray(state.quickLinks)) state.quickLinks = [];
@@ -435,24 +437,36 @@
       const name = node.querySelector(".qlk-name");
       const prefix = node.querySelector(".qlk-prefix");
       const url = node.querySelector(".qlk-url");
+      const search = node.querySelector(".qlk-search");
       const preview = node.querySelector(".qlk-preview");
       const del = node.querySelector(".qlk-del");
 
       name.value = q.name || "";
       prefix.value = q.prefix || "";
       url.value = q.url || "";
+      search.value = q.searchUrl || "";
 
       // Where a sample key would land — the same expander the omnibox runs, so the preview
-      // cannot drift from the real jump.
+      // cannot drift from the real jump. The search line is only shown once there is one to
+      // show: an empty second line under every row would suggest something is missing.
       const paint = () => {
-        const u = peExpandQuickLink(state.quickLinks[idx], PE_QUICK_SAMPLE);
-        preview.textContent = u ? peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]) : "";
+        const q2 = state.quickLinks[idx];
+        const u = peExpandQuickLink(q2, PE_QUICK_SAMPLE);
+        const s = peExpandSearchLink(q2, PE_QUICK_SEARCH_SAMPLE);
+        const lines = [];
+        if (u) lines.push(peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]));
+        if (s) lines.push(peMsg("optQuickSearchPreview", [PE_QUICK_SEARCH_SAMPLE, s]));
+        preview.textContent = lines.join("\n");
       };
 
       name.addEventListener("input", () => (state.quickLinks[idx].name = name.value));
       prefix.addEventListener("input", () => (state.quickLinks[idx].prefix = prefix.value));
       url.addEventListener("input", () => {
         state.quickLinks[idx].url = url.value;
+        paint();
+      });
+      search.addEventListener("input", () => {
+        state.quickLinks[idx].searchUrl = search.value;
         paint();
       });
       del.addEventListener("click", () => {
@@ -679,7 +693,7 @@
         flash(peMsg("msgQuickLimit", [String(PE_MAX_QUICK_LINKS)]), true);
         return;
       }
-      state.quickLinks.push({ id: uid("qlk"), name: "", prefix: "", url: "", enabled: true });
+      state.quickLinks.push({ id: uid("qlk"), name: "", prefix: "", url: "", searchUrl: "", enabled: true });
       renderQuickLinks();
       focusLast(".qlk-name");
     });

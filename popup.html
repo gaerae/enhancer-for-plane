@@ -23,6 +23,18 @@
           <select id="jumpTarget" class="pop-jump-target" hidden></select>
           <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
         </form>
+        <div class="pop-recent" id="recentList" hidden></div>
+        <hr class="pop-div" />
+      </div>
+
+      <!-- Copy reference, from the tab's own address and title. Nothing is injected and no
+           page is read, so this works on any tracker whose Quick open link is configured —
+           and when the tab is not a work item, the block is simply absent rather than a
+           button that cannot do anything. -->
+      <div class="pop-copy-block" id="copyBlock" hidden>
+        <div class="pop-label" id="copyLabel" data-i18n="popCopyLabel">Copy reference</div>
+        <div class="pop-copy-item" id="copyItem"></div>
+        <div class="pop-copy-formats" id="copyFormats"></div>
         <hr class="pop-div" />
       </div>
 

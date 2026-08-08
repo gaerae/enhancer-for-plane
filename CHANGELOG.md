@@ -28,6 +28,25 @@ Schema 7 → 8.
   cycles route, and hiding it would be focus mode reaching outside the page it is for.
 
 ### New
+- **Quick open remembers what you opened.** Its one real barrier was having to already know
+  the key. The address bar now offers your recent jumps the moment the keyword is on screen
+  and narrows them as you type; the same list is in the popup. Twelve entries, per device
+  (`chrome.storage.local`) and never synced — waking up on another machine to someone else's
+  browsing in your address bar is not a feature.
+- **Words search instead of opening.** `issue login bug` goes to the tracker's search.
+  Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is not — so
+  there is no prefix, no mode, nothing to remember. Give a target a **search URL** carrying
+  `{{q}}` in Settings; a target without one does not answer a search rather than guessing.
+- **Open a work item from selected text.** A key almost never arrives as a key — it arrives
+  in a Slack message or a PR title, "blocked by PROJ-123 until Friday". Select it and
+  right-click → **Open work item from selection**. Chrome hands over the selected text; the
+  page itself is never read, and the entry appears on no other kind of click. This adds the
+  `contextMenus` permission, which shows no install warning.
+- **Copy reference from the toolbar popup**, when the tab you are on is a work item. It reads
+  the tab's address and title and nothing else — no injection, no page access — so it works
+  wherever Quick open has a link, and the block is absent rather than inert when the tab is
+  not an item. It does not replace the in-page button: it cannot see into the panel a list
+  opens, because there the address bar and the title both still name the list.
 - **Settings now says whether each rule is actually doing anything.** A rule that matches
   nothing is a no-op by design — that is what keeps a Plane redesign from breaking the
   extension — but it made a rule that had *stopped* matching look exactly like one nobody

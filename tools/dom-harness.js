@@ -148,7 +148,10 @@ window.chrome = {
     onRemoved: { addListener: () => {} }
   },
   tabs: {
-    query: (o, cb) => cb([{ id: 1, url: "https://plane.example.com/acme/browse/PROJ-7" }]),
+    // A title as well as a URL, because that pair is the whole input to the popup's copy
+    // block — it reads a tab, never a page. The shape is the one Plane and Linear both
+    // write, measured 2026-08-08: "{KEY} {title}".
+    query: (o, cb) => cb([{ id: 1, url: "https://plane.example.com/acme/browse/PROJ-7", title: "PROJ-7 Fix the login redirect" }]),
     create: (o) => { window.__opened = o.url; },
     update: () => {},
     sendMessage: () => {}
@@ -166,7 +169,11 @@ window.close = () => { window.__closed = true; };
 const PREAMBLE = `
 const __out = [];
 window.addEventListener("error", (e) => __out.push({ name: "uncaught page error", pass: false, detail: String(e.message) }));
-const check = (name, fn) => { try { const d = fn(); __out.push({ name, pass: true, detail: d === undefined ? "" : String(d) }); } catch (e) { __out.push({ name, pass: false, detail: String(e && e.message || e) }); } };
+// A check body must be synchronous. An async one returns a Promise, this records a pass
+// before it settles, and every assertion inside it becomes decorative — the failure mode
+// being that the suite goes green having asserted nothing. Await outside the check and
+// assert on the result.
+const check = (name, fn) => { try { const d = fn(); if (d && typeof d.then === "function") throw new Error("check body is async — await outside it and assert on the result"); __out.push({ name, pass: true, detail: d === undefined ? "" : String(d) }); } catch (e) { __out.push({ name, pass: false, detail: String(e && e.message || e) }); } };
 const eq = (a, b, what) => { if (String(a) !== String(b)) throw new Error((what || "value") + ": " + JSON.stringify(a) + " !== " + JSON.stringify(b)); return a; };
 const ok = (c, what) => { if (!c) throw new Error(what || "expected true"); return true; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -538,9 +545,15 @@ const suites = [
       const rows = () => [...document.querySelectorAll("#panel-keys .keys tbody tr")];
       check("every shortcut the extension answers to is listed", () => {
         const keys = rows().map((r) => [...r.querySelectorAll("td")].slice(1, 3).map((td) => td.textContent.replace(/\\s+/g, " ").trim()));
-        eq(rows().length, 4, "rows");
+        eq(rows().length, 5, "rows");
         const win = keys.map((k) => k[0]).join(" | ");
-        for (const combo of ["Alt+T", "Alt+C", "Alt+Shift+F", "issue"]) ok(win.indexOf(combo) > -1, combo + " missing from: " + win);
+        // The context menu earns a row for the same reason the omnibox keyword does: it is a
+        // way in that answers a gesture, and this table is the one place they are all
+        // written down. Its "key" is a right-click, which is why the check is on the text of
+        // the column rather than on a modifier combination.
+        for (const combo of ["Alt+T", "Alt+C", "Alt+Shift+F", "issue", peMsg("optKeysRightClick")]) {
+          ok(win.indexOf(combo) > -1, combo + " missing from: " + win);
+        }
       });
       check("each row gives the macOS keys too, and neither column wraps", () => {
         for (const r of rows()) {
@@ -1007,6 +1020,107 @@ const suites = [
       check("dark: the toggle knob is visible when off", () => { const r = knobVsTrack(); ok(r >= 3, "contrast " + r.toFixed(2)); return r.toFixed(2); });`
   },
   {
+    // Recents and the copy block: the two things the popup can do from a tab alone. Neither
+    // injects anything or reads a page, which is what lets them work on a tracker the rest
+    // of the extension never runs on — the stub tab is a Plane URL only because QUICK's
+    // first target is.
+    name: "popup · recents and copy from the tab",
+    page: {
+      name: "pop-tab",
+      ...POPUP,
+      seed: seedOf(),
+      local: {
+        peRecent: [
+          { key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", at: 300 },
+          { key: "ENG-9", url: "https://linear.app/acme/issue/ENG-9", name: "Linear", at: 200 },
+          { key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 100 }
+        ]
+      }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const chips = () => [...document.querySelectorAll("#recentList .pop-recent-item")];
+
+      check("the keys opened last are offered under the jump box", () => {
+        ok(!document.getElementById("recentList").hidden, "the list is shown");
+        eq(chips().map((c) => c.querySelector(".pop-recent-key").textContent), ["PROJ-7", "ENG-9", "PROJ-1"], "newest first");
+        // A list spanning two trackers has to say which is which, or two keys that look
+        // alike are indistinguishable.
+        eq(chips()[1].querySelector(".pop-recent-name").textContent, "Linear");
+      });
+      // The placeholder had to say two things once the box took phrases as well as keys, and
+      // the first wording it grew ("Issue key, or words to search…") was cut off mid-word at
+      // this width. Nothing else would have caught it: a truncated placeholder is not an
+      // error, it is just a sentence you cannot read. Korean is measured in the pop-ko suite.
+      check("the jump placeholder fits the box it is in", () => {
+        const input = document.getElementById("jumpKey");
+        const probe = document.createElement("span");
+        const cs = getComputedStyle(input);
+        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+        probe.textContent = input.placeholder;
+        document.body.appendChild(probe);
+        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = probe.getBoundingClientRect().width;
+        probe.remove();
+        ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+      });
+      check("a chip fits its row rather than stretching it", () => {
+        const box = document.getElementById("recentList").getBoundingClientRect();
+        for (const c of chips()) {
+          const r = c.getBoundingClientRect();
+          ok(r.right <= box.right + 1, c.textContent + " overflows: " + Math.round(r.right) + " > " + Math.round(box.right));
+        }
+      });
+
+      check("the copy block names the item the tab is showing", () => {
+        ok(!document.getElementById("copyBlock").hidden, "shown");
+        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect", "key and title, from the tab alone");
+      });
+      // The reader has to be able to see what each button will put on the clipboard before
+      // they press it — the popup has no preview row, so the title attribute is it.
+      check("each format offers the text it would copy", () => {
+        const btns = [...document.querySelectorAll(".pop-copy-fmt")];
+        eq(btns.length, 1, "one format in this seed");
+        eq(btns[0].textContent, "Chat");
+        eq(btns[0].title, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7");
+      });
+      let copied = null;
+      navigator.clipboard.writeText = (t) => { copied = t; return Promise.resolve(); };
+      document.querySelector(".pop-copy-fmt").click();
+      await waitFor(() => copied !== null, "the clipboard write");
+      await sleep(20); // the label is set in the same promise chain, one tick later
+      check("clicking one copies, and reports where the heading was", () => {
+        eq(copied, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7", "what reached the clipboard");
+        eq(document.getElementById("copyLabel").textContent, peMsg("msgCopied"));
+      });
+      check("clicking a recent chip opens it", () => {
+        chips()[1].click();
+        eq(window.__opened, "https://linear.app/acme/issue/ENG-9");
+      });`
+  },
+  {
+    // A tab that is not a work item. The block has to be absent, not present and inert — a
+    // "Copy reference" heading over nothing is a bug report waiting to be filed.
+    name: "popup · a tab that is not an item",
+    page: {
+      name: "pop-tab-none",
+      ...POPUP,
+      seed: seedOf({ quickLinks: [{ id: "q", name: "Plane", prefix: "", url: "https://plane.example.com/acme/browse/{{key}}", enabled: true }] }),
+      local: { peRecent: [] }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      // The stub tab IS an item URL, so make it not one the only way that matters here: a
+      // link list that cannot recognise it. (peSanitizeSettings would drop a urlless link.)
+      check("nothing is claimed when no template matches", () => {
+        const m = peMatchItemUrl([{ id: "x", enabled: true, url: "https://elsewhere.test/i/{{key}}" }], "https://plane.example.com/acme/browse/PROJ-7");
+        eq(m, null);
+      });
+      check("an empty recents list shows no row at all", () => {
+        ok(document.getElementById("recentList").hidden, "hidden, not an empty box with a gap");
+      });`
+  },
+  {
     name: "popup · active site",
     page: { name: "pop-active", ...POPUP, seed: seedOf() },
     body: `
@@ -1446,6 +1560,23 @@ const suites = [
         const pop = document.querySelector(".pop");
         ok(pop.scrollWidth <= pop.clientWidth + 1,
            "content is " + pop.scrollWidth + "px inside a " + pop.clientWidth + "px popup");
+      });
+      // A placeholder does not wrap and is not caught by anything above: it is simply cut
+      // off, which reads as a shorter sentence rather than as a broken one. Korean is the
+      // case that matters, since it is measured wider per character than the English the
+      // wording was chosen against.
+      check("the Korean jump placeholder fits the box", () => {
+        const input = document.getElementById("jumpKey");
+        const probe = document.createElement("span");
+        const cs = getComputedStyle(input);
+        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+        probe.textContent = input.placeholder;
+        document.body.appendChild(probe);
+        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = probe.getBoundingClientRect().width;
+        probe.remove();
+        ok(need <= room, "needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+        return Math.ceil(need) + "/" + Math.floor(room) + "px";
       });`
   },
   {
