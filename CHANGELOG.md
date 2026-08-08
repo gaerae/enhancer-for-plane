@@ -10,6 +10,55 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.8.0 — 2026-08-08
+
+Schema 7 → 8.
+
+### Fixed
+- **Focus mode did almost nothing on Plane Cloud.** Two of its three presets were written
+  against self-hosted Plane 1.4, and Cloud writes both elements with completely different
+  classes — so the properties panel and the reading width matched zero elements there and
+  only the left navigation ever moved. Each of those two selectors now carries both shapes,
+  and installs that still have the shipped selector are repointed on first read. A selector
+  you edited yourself is left exactly as it is, and a preset you deleted stays deleted.
+
+  A rule that matches nothing is a no-op by design — which is why nobody noticed for a
+  release. The checks now hold both generations on one page, including the near misses:
+  `.shrink-0.bg-surface-1` without the `.z-[5]` also catches an unrelated chip on Cloud's
+  cycles route, and hiding it would be focus mode reaching outside the page it is for.
+
+### New
+- **Settings now says whether each rule is actually doing anything.** A rule that matches
+  nothing is a no-op by design — that is what keeps a Plane redesign from breaking the
+  extension — but it made a rule that had *stopped* matching look exactly like one nobody
+  switched on. Every rule row now reads either when it last applied, or that it has never
+  matched anything, and a line above the list counts the second kind.
+
+  Deliberately not a per-page verdict: measured on Plane Cloud, `.max-w-40` matches 35
+  elements on the work item list and none on the item page, the projects list, the labels
+  page or the states page. "No match here" is the normal case for a healthy rule, so a
+  warning that fires on it is noise, and noise is what people switch off. What is recorded
+  is whether a selector has **ever** matched, and when it last did — a redesign then shows
+  up as one stale date beside rules that all read today. A rule needs 20 checks with no
+  match before the page will say it has never worked, because a rule written for one route
+  honestly misses on every other one.
+
+  The record is per device (`chrome.storage.local`), never synced, and disabled rules are
+  left out of it — a rule nobody applies has nothing to answer for.
+
+### Internal
+- **`tools/dom-harness.js`'s synthetic Plane page carries two generations of the markup**,
+  1.4 and Cloud, plus a decoy for each. A page that carries one generation cannot notice
+  when the other stops matching; that is the whole failure above. Reverting either half of
+  the selector now fails three assertions.
+- **The harness's `chrome.storage.local` is now readable and writable**, so the rule-health
+  record can be seeded for the settings page and read back after the content script writes
+  it. A stub that swallowed the write could not tell the feature working from the silence it
+  was built to end. Its virtual-time budget grew with it: 5000ms was less than one
+  measurement delay, so a suite proving "nothing for 2.5s, then this" had no room to run.
+
+---
+
 ## v1.7.0 — 2026-08-06
 
 Schema 6 → 7.

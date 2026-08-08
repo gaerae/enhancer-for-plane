@@ -78,6 +78,24 @@ no-op instead of a fight when the markup moves. Same conclusion for "just mirror
 Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
 to implement, not theirs to be observed.
 
+**Degrading to a no-op is right, and it is not free — say when it happens.** "A rule that
+stops matching is a no-op rather than a broken feature" is what lets this extension survive a
+Plane release, and the cost is that a dead rule and an unused one look identical. Two focus
+presets sat matching nothing on Plane Cloud for a whole release because of it. The answer is
+not to make failure loud in the page — the whole point is that it does not break anything —
+but to record what was observed and show it where the thing is configured. Anything else that
+degrades quietly (a selector, an anchor, a token that cannot be resolved) owes the reader the
+same: not an error, a fact about whether it did anything.
+
+What that must not become is a per-page verdict. Measured on Plane Cloud: `.max-w-40` matches
+35 elements on the work item list and zero on the item page, the projects list, the labels
+page and the states page. A healthy rule matches nothing on most routes, so "no match here" is
+the normal case and a check that fires on it is noise — and noise is what gets switched off,
+which costs more than the silence it replaced. Record whether it has **ever** matched, and
+when it last did; let the reader compare one stale date against a column of today's. Any
+threshold has to sit above what normal use produces (`PE_RULE_HEALTH_MIN_CHECKS` is 20 for
+exactly that reason), and a rule the user disabled is not evidence of anything.
+
 **A feature reachable only from the popup exists for whoever already knows it exists.** Focus
 mode shipped its first draft with a shortcut and a popup switch, which is two places nobody
 looks while reading a work item. The affordance belongs where the reader's eyes already are, on
@@ -235,6 +253,24 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   "title slug": Korean and emoji titles slug to the empty string, so the feature would
   have worked for English titles and quietly produced `feature/proj-123-` for everyone
   else. Read the key from the URL, which Plane already guarantees.
+- **A preset that stops matching is a feature that stops existing, silently.** "A rule that
+  no longer matches is a no-op rather than a broken feature" is the right design and it has a
+  cost: two of the three focus presets matched zero elements on Plane Cloud for a whole
+  release, and a no-op looks exactly like a preset nobody switched on. Nothing failed, because
+  every check ran against a synthetic page carrying self-hosted Plane 1.4's markup — the one
+  generation the presets were written from. A harness page that models one generation cannot
+  notice when the other rots, so `buildPlanePage` now carries both, plus the near misses each
+  selector must *not* catch: focus mode is global CSS, and `.shrink-0.bg-surface-1` without the
+  `.z-[5]` also matches an unrelated chip on Cloud's cycles route. Any preset that names a
+  vendor class needs a probe per generation, and reverting either half has to fail.
+- **A migration may rewrite what the user already has, but only what it recognises.** Every
+  migration before v8 was additive; v8 repoints two preset selectors that are already in
+  storage. What makes that safe is `PE_V7_FOCUS_SELECTORS` — a rule is repointed only while its
+  selector is character-for-character what the previous version shipped. Anyone who edited
+  theirs (including anyone who worked Cloud's selector out by hand before we did) keeps it, and
+  a preset the user deleted is not resurrected, because the step appends nothing. Never widen
+  that table into "any selector we ever shipped": a value in it is a licence to overwrite
+  somebody's storage.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

@@ -91,7 +91,7 @@ function darkCss(name) {
 
 // The chrome API surface these pages actually touch — no more than that, so an
 // implementation cannot pass here by calling something production does not have.
-function stub(seed, lang) {
+function stub(seed, lang, local) {
   return `<script>
 const __CAT = ${CATALOGUES[lang] || CATALOGUES.en};
 function __msg(key, subs) {
@@ -108,6 +108,8 @@ function __msg(key, subs) {
   return m;
 }
 window.__SEED = ${JSON.stringify(seed)};
+window.__LOCAL = ${JSON.stringify(local || {})};
+window.__localWrites = 0;
 window.__opened = null;
 window.__closed = false;
 window.chrome = {
@@ -118,7 +120,15 @@ window.chrome = {
       set: (o, cb) => cb && cb(),
       remove: (k, cb) => cb && cb()
     },
-    local: { get: (k, cb) => cb({}), set: (o, cb) => cb && cb() },
+    // Readable and writable, unlike sync: the rule-health record is the one piece of state
+    // the content script both writes and the settings page reads back, so a stub that
+    // swallowed the write could not tell a working feature from a silent one. Writes are
+    // kept so an assertion can read what was actually stored, and counted so "it wrote
+    // once per route" is provable rather than assumed.
+    local: {
+      get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__LOCAL))),
+      set: (o, cb) => { Object.assign(window.__LOCAL, JSON.parse(JSON.stringify(o))); window.__localWrites++; cb && cb(); }
+    },
     onChanged: { addListener: (f) => { window.__onChanged = f; } }
   },
   runtime: {
@@ -160,8 +170,11 @@ const check = (name, fn) => { try { const d = fn(); __out.push({ name, pass: tru
 const eq = (a, b, what) => { if (String(a) !== String(b)) throw new Error((what || "value") + ": " + JSON.stringify(a) + " !== " + JSON.stringify(b)); return a; };
 const ok = (c, what) => { if (!c) throw new Error(what || "expected true"); return true; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 8 virtual seconds. It polls in virtual time, so the ceiling costs nothing when the
+// condition is met early and only decides how long a genuine failure waits before saying so
+// — and 2s was under a single rule-health delay, which made a slow answer look like no answer.
 const waitFor = async (cond, label) => {
-  for (let i = 0; i < 100; i++) { if (cond()) return true; await sleep(20); }
+  for (let i = 0; i < 400; i++) { if (cond()) return true; await sleep(20); }
   throw new Error("timed out waiting for " + (label || "condition"));
 };
 const rgb = (s) => (String(s).match(/\\d+/g) || []).slice(0, 3).map(Number);
@@ -171,7 +184,7 @@ const bg = (sel) => getComputedStyle(typeof sel === "string" ? document.querySel
 const report = () => { const el = document.createElement("pre"); el.id = "pe-results"; el.textContent = JSON.stringify(__out); document.body.appendChild(el); };
 `;
 
-function buildPage({ name, html, css, js, seed, dark, lang, body }) {
+function buildPage({ name, html, css, js, seed, local, dark, lang, body }) {
   let src = fs.readFileSync(path.join(ROOT, html), "utf8");
   const cssPath = dark ? darkCss(css) : path.join(ROOT, css);
   src = src.replace(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
@@ -179,7 +192,7 @@ function buildPage({ name, html, css, js, seed, dark, lang, body }) {
     src = src.replace(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
   }
   // The stub has to define `chrome` before the page's own scripts run.
-  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
+  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
   // Transitions off. Virtual time advances timers but not the compositor clock that drives
   // a CSS transition, so a colour read after a toggle came back mid-interpolation — the
   // toggle knob measured 1.1:1 here while a real browser settled at 9.5:1. Asserting the
@@ -206,12 +219,12 @@ function buildPage({ name, html, css, js, seed, dark, lang, body }) {
 // it is null the content script reports "not active" for the same reason it does on a site
 // the user never enabled. A suite that opened on an inactive site could not tell those apart,
 // so the negative case is asserted here, after the positive one has proved settings arrived.
-function buildPlanePage({ name, seed, lang, plane, body }) {
+function buildPlanePage({ name, seed, local, lang, plane, body }) {
   const src =
     `<!doctype html>\n<html lang="en"><head><meta charset="utf-8" />\n` +
     `<link rel="stylesheet" href="${fileUrl(path.join(ROOT, "content.css"))}" />\n` +
     `<style>*, *::before, *::after { transition: none !important; animation: none !important; }</style>\n` +
-    `</head><body>\n${plane}\n${stub(seed, lang)}\n` +
+    `</head><body>\n${plane}\n${stub(seed, lang, local)}\n` +
     `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>\n` +
     `<script src="${fileUrl(path.join(ROOT, "content.js"))}"></script>\n` +
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n` +
@@ -244,7 +257,11 @@ function run(chrome, page, hash) {
         ...(process.env.PE_CHROME_PROFILE ? [`--user-data-dir=${process.env.PE_CHROME_PROFILE}-${++launch}`] : []),
         "--dump-dom",
         // Virtual time: timers fire as fast as the page allows, deterministically.
-        "--virtual-time-budget=5000",
+        // Virtual milliseconds, not real ones, so this is a bound on what a page may wait
+        // for rather than on how long the run takes. It was 5000, which was under the
+        // rule-health delay alone — a suite that has to prove "nothing happened for 2.5s,
+        // then this did" needs several of those windows back to back.
+        "--virtual-time-budget=20000",
         url
       ],
       {
@@ -310,14 +327,28 @@ const seedOf = (over) => ({ peSettings: settings(over) });
 const OPTIONS = { html: "options.html", css: "options.css", js: "options.js" };
 const POPUP = { html: "popup.html", css: "popup.css", js: "popup.js" };
 
-// The classes and the id are copied from Plane 1.4's own markup — the properties panel is a
+// The classes and the id are copied from Plane's own markup — the properties panel is a
 // flex sibling of the description column, the left navigation carries an id. The widths are
 // here so a hidden panel has something to give its space back to.
+//
+// Two generations sit on this one page on purpose. Plane 1.4 (self-hosted) and Plane Cloud
+// write the properties panel and the body column with completely different classes, and no
+// install ever sees both — which is exactly why a page that carried only one of them let
+// the Cloud half rot unnoticed through a release. A single page proves the shipped selector
+// list matches both, and it costs one extra element per pair. Measured against Cloud on
+// 2026-08-08; the ones marked "decoy" are the near misses that a looser selector would
+// wrongly catch, and they must stay visible while focus mode is on.
 const PLANE = `
 <div class="flex h-full w-full overflow-hidden" style="width: 1200px">
   <div class="h-full w-full space-y-6 overflow-y-auto px-9 py-5" id="probe-body">description</div>
   <div class="fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-1/4" id="probe-props">properties</div>
 </div>
+<div class="relative flex h-full w-full overflow-hidden" style="width: 1200px">
+  <div class="h-full flex-1 min-w-0 overflow-y-auto px-8 py-6" id="probe-body-cloud">description (cloud)</div>
+  <div class="relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1 motion-safe:transition-[width,min-width]" id="probe-props-cloud">properties (cloud)</div>
+</div>
+<div class="shrink-0 bg-surface-1" id="probe-props-decoy">a cycles-route chip that .shrink-0.bg-surface-1 alone would have hidden</div>
+<div class="overflow-y-auto px-8 py-5" id="probe-body-decoy">neither generation's body column</div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
 <div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
 <div id="probe-header">
@@ -543,6 +574,88 @@ const suites = [
       });`
   },
   {
+    // Rule health is the answer to "a preset that stops matching is invisible", so the thing
+    // to prove is that it is actually visible — which is a question about rendered rows, not
+    // about the pure functions tools/test.js already covers. The seed is the Plane Cloud bug
+    // as the storage would have recorded it: one rule working, two never matching.
+    name: "options · rule health",
+    page: {
+      name: "opt-health",
+      ...OPTIONS,
+      seed: seedOf({
+        rules: [
+          { id: "r-live", enabled: true, label: "Working", selector: ".max-w-40", property: "max-width", value: "320px" },
+          { id: "r-dead", enabled: true, label: "Dead", selector: ".gone", property: "display", value: "none" },
+          { id: "r-new", enabled: true, label: "Just added", selector: ".fresh", property: "display", value: "none" },
+          { id: "r-off", enabled: false, label: "Switched off", selector: ".nope", property: "display", value: "none" }
+        ]
+      }),
+      local: {
+        peRuleHealth: {
+          "r-live": { checks: 40, hits: 12, at: 1754600000000 },
+          "r-dead": { checks: 40, hits: 0, at: 0 },
+          "r-new": { checks: 2, hits: 0, at: 0 },
+          "r-off": { checks: 40, hits: 0, at: 0 }
+        }
+      }
+    },
+    body: `
+      const rows = () => [...document.querySelectorAll("#ruleList .rule-item")];
+      const healthOf = (i) => rows()[i].querySelector(".rule-health");
+      const summary = document.getElementById("ruleHealthSummary");
+      await waitFor(() => rows().length === 4, "the rules to render");
+      // The rules live behind a tab, and nothing inside a hidden panel can take focus — so
+      // the "does not disturb the row" check below would pass on a page where focus never
+      // landed anywhere. Open the tab the way a reader does.
+      document.querySelector('#tabs .tab[data-tab="appearance"]').click();
+      await waitFor(() => !document.getElementById("panel-appearance").hidden, "the rules panel");
+
+      check("a rule that has matched says when it last did, and does not shout", () => {
+        const h = healthOf(0);
+        ok(!h.hidden, "the badge is shown");
+        ok(!h.classList.contains("cold"), "in the quiet style");
+        ok(h.textContent.indexOf("2025") > -1 || /\\d{4}-\\d{2}-\\d{2}/.test(h.textContent), "a date: " + h.textContent);
+      });
+      check("a rule that has never matched says so, in the warning style", () => {
+        const h = healthOf(1);
+        ok(!h.hidden, "shown");
+        ok(h.classList.contains("cold"), "and marked as the thing to look at");
+        eq(h.textContent, peMsg("optRuleHealthCold"));
+      });
+      // The state that keeps this from becoming noise: too little evidence, so no claim.
+      check("a rule nobody has measured yet says nothing at all", () => {
+        const h = healthOf(2);
+        ok(h.hidden, "no badge");
+        eq(h.textContent, "", "and no text hiding behind the attribute");
+      });
+      check("a switched-off rule is not accused of anything", () => {
+        ok(healthOf(3).hidden, "no badge on a rule that is not being applied");
+      });
+      // The count is what carries this to someone not reading row by row — which is exactly
+      // how two dead presets went unnoticed for a release.
+      check("the summary counts only the enabled rules that never matched", () => {
+        ok(!summary.hidden, "the summary is shown");
+        ok(summary.textContent.indexOf("1") > -1, "one rule: " + summary.textContent);
+        ok(summary.textContent.indexOf("Plane") > -1, "and it says what to suspect");
+      });
+      check("the warning is legible against the card it sits on", () => {
+        const c = contrast(getComputedStyle(summary).color, bg(summary));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      // Arriving mid-edit is the normal case: a Plane tab writes this every time it changes
+      // route. Rebuilding the rows would take the caret out of the field being typed in.
+      const sel = rows()[1].querySelector(".rule-selector");
+      sel.focus();
+      sel.setSelectionRange(2, 2);
+      window.__onChanged({ peRuleHealth: { newValue: { "r-dead": { checks: 41, hits: 1, at: 1754600000000 } } } }, "local");
+      await waitFor(() => !healthOf(1).classList.contains("cold"), "the badge to update in place");
+      check("a record arriving while the user types does not disturb the row", () => {
+        ok(document.activeElement === sel, "focus left the selector field for " + document.activeElement.tagName + "." + document.activeElement.className);
+        eq(sel.selectionStart, 2, "and so did the caret");
+        ok(summary.hidden, "the summary went away with the last cold rule");
+      });`
+  },
+  {
     // Seeded as a pre-focus install, so the v6 → v7 migration runs for real and the presets
     // arrive through the same path a user's upgrade takes. tools/test.js proves the append;
     // only a browser can say the rows render, the switches land the right way round, and the
@@ -580,17 +693,44 @@ const suites = [
         ok(text.indexOf("chrome://extensions/shortcuts") > -1, "and so is the way to change it");
         ok(document.querySelectorAll("#panel-appearance kbd").length >= 6, "and they are marked up as keys");
       });
-      // The one thing no data test can check: whether a class Plane writes as
-      // min-w-[300px] is matched by the escaping we ship for it.
+      // The one thing no data test can check: whether a class Plane writes as min-w-[300px]
+      // or z-[5] is matched by the escaping we ship for it. Both generations are probed from
+      // the one selector, and the near misses are probed too — a selector list is as easy to
+      // widen by accident as to narrow, and .shrink-0.bg-surface-1 without the .z-[5] really
+      // does catch an unrelated chip on Plane Cloud's cycles route.
       check("every preset selector is one the browser can read", () => {
         peFocusPresetRules().forEach((r) => document.querySelector(r.selector));
-        const probe = document.createElement("div");
-        probe.className = "fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle";
-        document.body.appendChild(probe);
-        const sel = peFocusPresetRules().find((r) => r.id === "rule-focus-item-properties").selector;
-        eq(document.querySelectorAll(sel).length, 1, "the properties panel selector matches exactly one probe");
-        ok(document.querySelector(sel) === probe, "and it is the element carrying Plane's classes");
-        probe.remove();
+        const add = (cls) => {
+          const el = document.createElement("div");
+          el.className = cls;
+          document.body.appendChild(el);
+          return el;
+        };
+        const cases = [
+          {
+            id: "rule-focus-item-properties",
+            hit: [
+              "fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle",
+              "relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1 motion-safe:transition-[width,min-width]"
+            ],
+            miss: ["shrink-0 bg-surface-1", "fixed right-0 border-l", "z-[5] overflow-hidden bg-surface-1"]
+          },
+          {
+            id: "rule-focus-reading-width",
+            hit: ["h-full w-full space-y-6 overflow-y-auto px-9 py-5", "h-full flex-1 min-w-0 overflow-y-auto px-8 py-6"],
+            miss: ["overflow-y-auto px-8 py-5", "overflow-y-auto px-6 py-6"]
+          }
+        ];
+        for (const c of cases) {
+          const sel = peFocusPresetRules().find((r) => r.id === c.id).selector;
+          const hits = c.hit.map(add);
+          const misses = c.miss.map(add);
+          const got = [...document.querySelectorAll(sel)];
+          eq(got.length, hits.length, c.id + ": one match per generation, and no more");
+          hits.forEach((el, i) => ok(got.indexOf(el) > -1, c.id + ": shape " + i + " is matched"));
+          misses.forEach((el, i) => ok(got.indexOf(el) === -1, c.id + ": near miss " + i + " was caught"));
+          hits.concat(misses).forEach((el) => el.remove());
+        }
       });
       // padding-inline carries a max() with a percentage in it. An invalid value is not an
       // error anywhere — the declaration is simply dropped and the column stays full width,
@@ -920,6 +1060,63 @@ const suites = [
       });`
   },
   {
+    // The other half of rule health: the settings page can only show what the content script
+    // measured, and only a browser can say whether it measured the right thing. The rules are
+    // chosen to be the two cases side by side — one that matches the synthetic Plane page and
+    // one that matches nothing on it.
+    name: "content · rule health",
+    page: {
+      name: "ct-health",
+      plane: PLANE,
+      seed: seedOf({
+        allDomains: true,
+        rules: [
+          { id: "r-live", enabled: true, selector: "#main-sidebar", property: "display", value: "none" },
+          { id: "r-dead", enabled: true, selector: ".not-on-this-page", property: "display", value: "none" },
+          { id: "r-off", enabled: false, selector: "#probe-props", property: "display", value: "none" },
+          { id: "r-broken", enabled: true, selector: "((", property: "display", value: "none" }
+        ]
+      })
+    },
+    body: `
+      const health = () => (window.__LOCAL.peRuleHealth || {});
+      await waitFor(() => Object.keys(health()).length > 0, "the first measurement to be written");
+
+      check("what matched and what did not are both recorded", () => {
+        eq(health()["r-live"].hits, 1, "the rule that matches the page");
+        eq(health()["r-live"].checks, 1, "checked once");
+        ok(health()["r-live"].at > 0, "and stamped with when it worked");
+        eq(health()["r-dead"].hits, 0, "the rule that matches nothing");
+        eq(health()["r-dead"].checks, 1, "was still checked — that is the whole difference");
+        eq(health()["r-dead"].at, 0, "and has no time to report");
+      });
+      // Two rules that must never reach the record: one nobody applies, and one the browser
+      // cannot read. The second matters because "selector is nonsense" is already reported
+      // where it is typed, and counting it here would say the same thing in a worse place.
+      check("a disabled rule and an unreadable selector are not measured", () => {
+        ok(!("r-off" in health()), "disabled");
+        ok(!("r-broken" in health()), "unreadable");
+      });
+
+      // Once per route, not once per mutation burst — injectAll runs on every one of those,
+      // and a write per burst would be a storage write per keystroke on a busy page.
+      const writes = window.__localWrites;
+      for (let i = 0; i < 5; i++) {
+        document.body.appendChild(Object.assign(document.createElement("div"), { className: "ProseMirror" }));
+        await sleep(60);
+      }
+      await sleep(3000);
+      check("mutations alone do not re-measure", () => eq(window.__localWrites, writes, "extra writes"));
+
+      history.pushState({}, "", location.pathname + "?route=2");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => health()["r-live"].checks === 2, "the new route to be measured");
+      check("a route change is what triggers the next measurement", () => {
+        eq(health()["r-live"].hits, 2, "still matching");
+        eq(health()["r-dead"].checks, 2, "and still not");
+      });`
+  },
+  {
     // The feature end to end, in the script that performs it. allDomains rather than a host,
     // because a file:// page has no hostname to match; schema 6 because that is how the
     // presets reach an existing install, and this asserts what they do once they arrive.
@@ -927,8 +1124,11 @@ const suites = [
     page: { name: "ct-focus", plane: PLANE, seed: seedOf({ allDomains: true, schema: 6 }) },
     body: `
       const props = document.getElementById("probe-props");
+      const propsCloud = document.getElementById("probe-props-cloud");
+      const propsDecoy = document.getElementById("probe-props-decoy");
       const nav = document.getElementById("main-sidebar");
       const bodyCol = document.getElementById("probe-body");
+      const bodyColCloud = document.getElementById("probe-body-cloud");
       const width = document.getElementById("probe-width");
       const shown = (el) => getComputedStyle(el).display !== "none";
       const send = (msg) => new Promise((r) => window.__onMessage(msg, {}, r));
@@ -939,6 +1139,7 @@ const suites = [
       await waitFor(() => getComputedStyle(width).maxWidth === "320px", "the always-on rules to be injected");
       check("nothing is hidden until it is asked for", () => {
         ok(shown(props), "the properties panel is where Plane put it");
+        ok(shown(propsCloud), "and so is Cloud's");
         ok(shown(nav), "and so is the navigation");
         ok(!focusClass(), "no focus class on <html>");
         eq(stored(), null, "and nothing stored for this tab");
@@ -997,10 +1198,17 @@ const suites = [
         ok(!shown(props), "the properties panel went away");
         eq(stored(), "1", "the tab remembered");
       });
+      // The half that shipped broken. Both shapes come from one selector list, so a change
+      // that drops either end of it fails here rather than on somebody's Cloud workspace.
+      check("both generations of the panel answer to the one preset", () => {
+        ok(!shown(propsCloud), "Plane Cloud's properties panel went away too");
+        ok(shown(propsDecoy), "and the cycles-route chip beside it did not");
+      });
       document.querySelector(".pe-focus-btn").click();
       check("clicking it again brings the panels back", () => {
         eq(document.querySelector(".pe-focus-btn").getAttribute("aria-pressed"), "false");
         ok(shown(props), "properties panel back");
+        ok(shown(propsCloud), "Cloud's too");
       });
 
       const on = await send({ type: "pe-focus-toggle" });
@@ -1008,6 +1216,7 @@ const suites = [
         eq(on.ok, true, "the site is one we run on");
         eq(on.focus, true, "and it reports the new position");
         ok(!shown(props), "properties panel hidden");
+        ok(!shown(propsCloud), "Cloud's properties panel hidden");
         ok(!shown(nav), "navigation hidden");
         ok(focusClass(), "<html> carries the state a rule can hang off");
       });
@@ -1016,6 +1225,7 @@ const suites = [
       check("the rules that were already on stay on", () => eq(getComputedStyle(width).maxWidth, "320px"));
       check("a preset that ships switched off stays off", () => {
         eq(getComputedStyle(bodyCol).paddingLeft, "0px", "the reading-width rule is disabled, so it applies to nothing");
+        eq(getComputedStyle(bodyColCloud).paddingLeft, "0px", "on either generation's body column");
       });
       check("the way back is in the message, not only in the settings page", () => {
         const t = toasts().join(" | ");
@@ -1033,6 +1243,7 @@ const suites = [
       check("toggling back gives every panel its space", () => {
         eq(off.focus, false, "reported");
         ok(shown(props), "properties panel back");
+        ok(shown(propsCloud), "Cloud's too");
         ok(shown(nav), "navigation back");
         ok(!focusClass(), "class gone");
         eq(stored(), null, "and the tab is no longer remembering anything");

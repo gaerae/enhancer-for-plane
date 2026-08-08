@@ -5,6 +5,9 @@
   const $ = (id) => document.getElementById(id);
   let state = null;
   let syncCache = { bySource: {} }; // synced-template status/cache (chrome.storage.local)
+  // Whether each rule's selector has ever matched anything, as observed by the content
+  // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
+  let ruleHealth = {};
   let dirty = false; // whether the user has edited the form
   // Ignore the storage changes our own save triggers. It has to span the whole save, not
   // absorb a single event: one save writes the settings and — when the template shards
@@ -36,6 +39,7 @@
     domains: $("domains"),
     ruleList: $("ruleList"),
     ruleEmpty: $("ruleEmpty"),
+    ruleHealthSummary: $("ruleHealthSummary"),
     addRule: $("addRule"),
     ruleRow: $("ruleRow"),
     templateList: $("templateList"),
@@ -201,6 +205,7 @@
       const property = node.querySelector(".rule-property");
       const value = node.querySelector(".rule-value");
       const focus = node.querySelector(".rule-focus");
+      const health = node.querySelector(".rule-health");
       const del = node.querySelector(".rule-del");
 
       enabled.checked = rule.enabled !== false;
@@ -225,8 +230,51 @@
       });
 
       markSelector(selector);
+      renderRuleHealth(health, rule);
       el.ruleList.appendChild(node);
     });
+    renderRuleHealthSummary();
+  }
+
+  // What this rule's row says about whether it is doing anything. Silent unless there is
+  // something to report — an unmeasured rule (a fresh install, a rule added a minute ago)
+  // gets no badge at all, because "we do not know yet" is not worth a line of the page.
+  function renderRuleHealth(node, rule) {
+    if (!node) return;
+    // A switched-off rule is not being applied, so it has nothing to report and nothing to
+    // answer for — the same reason peRuleHealthColdCount skips it. Saying "never matched"
+    // beside a rule the user deliberately turned off reads as an accusation about a choice.
+    const entry = rule && rule.enabled !== false ? ruleHealth[rule.id] : null;
+    const st = peRuleHealthState(entry);
+    node.classList.toggle("cold", st === "cold");
+    if (st === "cold") {
+      node.textContent = peMsg("optRuleHealthCold");
+      node.hidden = false;
+    } else if (st === "ok") {
+      node.textContent = peMsg("optRuleHealthOk", [fmtTime(entry.at)]);
+      node.hidden = false;
+    } else {
+      node.textContent = "";
+      node.hidden = true;
+    }
+  }
+
+  // A health record arrives every time a Plane tab visits a new route, which can be while
+  // the user is typing a selector into one of these rows. So this updates the badges in
+  // place instead of calling renderRules — rebuilding the rows would take the caret out of
+  // the field mid-word, and a status line is not worth that.
+  function refreshRuleHealthBadges() {
+    const rules = (state && state.rules) || [];
+    [...el.ruleList.children].forEach((row, i) => renderRuleHealth(row.querySelector(".rule-health"), rules[i]));
+    renderRuleHealthSummary();
+  }
+
+  // The count is what turns a quiet row into something the reader notices — two dead
+  // presets read as two ordinary rows, but "2 of these rules" is a number you check.
+  function renderRuleHealthSummary() {
+    const n = peRuleHealthColdCount(ruleHealth, state && state.rules);
+    el.ruleHealthSummary.textContent = n ? peMsg("optRuleHealthWarn", [String(n)]) : "";
+    el.ruleHealthSummary.hidden = n === 0;
   }
 
   // visual feedback for selector validity
@@ -737,6 +785,13 @@
           renderSources();
           return;
         }
+        // A Plane tab just measured the rules. Badges only — see refreshRuleHealthBadges.
+        if (area === "local" && changes[PE_RULE_HEALTH_KEY]) {
+          const nv = changes[PE_RULE_HEALTH_KEY].newValue;
+          ruleHealth = nv && typeof nv === "object" ? nv : {};
+          refreshRuleHealthBadges();
+          return;
+        }
         if (!peSettingsChanged(changes, area)) return;
         if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
@@ -1167,10 +1222,11 @@
   }
 
   peApplyI18n(document);
-  Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
+  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth()]).then(([s, c, h]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     syncCache = c;
+    ruleHealth = h;
     render();
     bind();
     bindTabs();

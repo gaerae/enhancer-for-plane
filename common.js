@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 7;
+const PE_SCHEMA = 8;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -36,6 +36,40 @@ const PE_FIELD_SEP = String.fromCharCode(0);
 // for the sync quota. Shape: { bySource: { <sourceId>: { version, fetchedAt, status,
 // lastError, count, dropped, templates: [ … ] } } }.
 const PE_SYNC_CACHE_KEY = "peSyncCache";
+
+// Rule health — whether a rule's selector has ever actually matched anything.
+//
+// A rule that matches nothing is a no-op by design: that is what keeps a Plane redesign
+// from breaking the extension. The cost is that a rule which has *stopped* matching looks
+// exactly like one nobody switched on, and two focus presets sat dead on Plane Cloud for a
+// whole release because nothing ever said so. The extension knew the whole time —
+// `querySelectorAll(sel).length` is one call — nobody asked it.
+//
+// What is deliberately NOT recorded is a per-page verdict. Measured on Plane Cloud
+// (2026-08-08): `.max-w-40` matches 35 elements on the work item list and zero on the item
+// detail page, the projects list, the labels page and the states page. "No match on this
+// page" is the normal case for a healthy rule, so any check that fires on it is noise, and
+// noise is what gets switched off. Two facts survive that: whether the selector has EVER
+// matched, and when it last did.
+//
+// Per rule id: { checks, hits, at } — page checks, checks where it matched, and the time of
+// the last match. Per device, so chrome.storage.local (see "Store config and state
+// separately"); losing it costs a few page loads of re-observation and nothing else.
+const PE_RULE_HEALTH_KEY = "peRuleHealth";
+// How many checks before silence becomes a claim. A rule added for a page the user has not
+// opened yet has genuinely never matched, and saying so after one page load would be right
+// but useless.
+//
+// 20 rather than a handful, and the measurement above is why: `.max-w-40` is a healthy rule
+// that matches on one route in five, so somebody who spends a morning in work item detail
+// pages can rack up a long run of honest misses. A threshold they can reach by working
+// normally would put a warning on a rule that is fine, and a warning that cries wolf is
+// one people learn to scroll past — which would cost more than the silence it replaced.
+// Twenty consecutive routes with no match is still under a day for a genuinely dead rule.
+const PE_RULE_HEALTH_MIN_CHECKS = 20;
+// A bound on the record for a settings file that churns rule ids. Pruning to the current
+// rules is what normally keeps this small; this is the backstop for whatever that misses.
+const PE_RULE_HEALTH_MAX = 500;
 
 // Custom template variables are written {{var.name}}. The prefix is what makes them
 // safe: a user cannot shadow {{date}} or {{week}} by naming a variable "date", so there
@@ -145,26 +179,53 @@ const PE_IMPORT_LIMITS = {
 
 // Focus mode: the rules that only apply while it is on. Shipped as data, like every other
 // rule, so a Plane release that renames a class costs a selector edit and nothing else —
-// and so a rule that stops matching is a no-op rather than a broken feature. Measured
-// against Plane 1.4:
+// and so a rule that stops matching is a no-op rather than a broken feature. That last
+// property is exactly what made the first version of these presets rot in silence:
+// measured against Plane 1.4 (self-hosted), two of the three stopped matching anything on
+// Plane Cloud, and a no-op looks identical to a feature nobody turned on. Each selector is
+// now a list — Plane 1.4's shape, then Cloud's — because one install can only ever be on
+// one of them and a union costs nothing on the other. Measured 2026-08-08 against both:
 //
-//   * A work item's own page puts properties in a right-hand div carrying
-//     `fixed right-0 … min-w-[300px] border-l`, a flex sibling of the description column —
-//     hiding it lets that column take the whole width with no second rule. The peek
-//     panel's sidebar is a different element (`!w-[400px]`, neither `fixed` nor `right-0`),
-//     so this leaves the peek alone. That is what makes one global selector enough: rules
-//     are plain CSS and know nothing about routes.
-//   * The left navigation carries `id="main-sidebar"`, so there is no class to guess.
+//   * A work item's own page puts properties in a right-hand div, a flex sibling of the
+//     description column — hiding it lets that column take the whole width with no second
+//     rule. Plane 1.4 writes it `fixed right-0 … min-w-[300px] border-l`; Cloud writes it
+//     `relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1`. On Cloud, `.z-[5]` is
+//     what keeps the selector honest: `.shrink-0.bg-surface-1` alone also matches a 24x16
+//     element on the cycles route, and focus mode is global CSS, so a rule that overreaches
+//     hides things on pages that have no properties panel at all.
+//     Both shapes leave the peek panel alone, which is the point of matching on the panel
+//     rather than the route: rules are plain CSS and know nothing about routes. (1.4's peek
+//     sidebar is `!w-[400px]`, neither `fixed` nor `right-0`; on Cloud neither selector
+//     matches anything inside a peek.)
+//   * The left navigation carries `id="main-sidebar"` on both, so there is no class to guess.
+//     It is the one preset that never broke.
 //   * Reading width ships OFF. With both panels gone the description spans the entire
 //     window, which is worse to read rather than better — but it is a taste, so it is one
 //     checkbox away instead of on. `padding-inline` centres the column with a single
 //     property (`max-width` would need a second rule for the margins), and 2.25rem is the
-//     `px-9` Plane already applies there, so the value can only widen the gutter.
+//     `px-9` Plane 1.4 applies there, so the value can only widen the gutter. Cloud's column
+//     is `px-8` (2rem), so there the floor widens it by a quarter rem — still only widening,
+//     which is the direction that cannot make the page worse.
 //
 // Plane does hold a collapse state for that panel (`issue_detail_sidebar_collapsed` in
 // localStorage), but nothing in its UI reaches it, and on a work item's own page its own
 // resize effect forces it back to false above 768px. Driving Plane's state would mean
 // fighting that effect; CSS is the mechanism that stays.
+// The two selectors that had to grow a second shape, named because three places need the
+// same string: the presets below, the v7 → v8 migration that repoints installs already
+// carrying the old one, and the tests. Plane 1.4's shape comes first in each list, so the
+// order reads as the history it is.
+const PE_FOCUS_PROPS_SELECTOR = ".fixed.right-0.border-l.min-w-\\[300px\\], .z-\\[5\\].shrink-0.bg-surface-1";
+const PE_FOCUS_WIDTH_SELECTOR = ".overflow-y-auto.px-9.py-5, .overflow-y-auto.px-8.py-6";
+
+// What v7 shipped for those two, kept only so the migration can tell an untouched preset
+// from one the user edited. Never widen this into "any selector we ever shipped" — a value
+// here is a licence to overwrite what is in somebody's storage.
+const PE_V7_FOCUS_SELECTORS = {
+  "rule-focus-item-properties": ".fixed.right-0.border-l.min-w-\\[300px\\]",
+  "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"
+};
+
 function peFocusPresetRules() {
   return [
     {
@@ -172,7 +233,7 @@ function peFocusPresetRules() {
       enabled: true,
       focus: true,
       label: peMsg("optPresetFocusProps") || "Focus: hide the work item properties panel",
-      selector: ".fixed.right-0.border-l.min-w-\\[300px\\]",
+      selector: PE_FOCUS_PROPS_SELECTOR,
       property: "display",
       value: "none"
     },
@@ -190,7 +251,7 @@ function peFocusPresetRules() {
       enabled: false,
       focus: true,
       label: peMsg("optPresetFocusWidth") || "Focus: centre the body at a reading width",
-      selector: ".overflow-y-auto.px-9.py-5",
+      selector: PE_FOCUS_WIDTH_SELECTOR,
       property: "padding-inline",
       value: "max(2.25rem, (100% - 60rem) / 2)"
     }
@@ -223,6 +284,76 @@ function peBuildRuleCss(rules, isValidSelector) {
     (r.focus ? focus : always).push(`${sel} { ${prop}: ${val} !important; }`);
   });
   return { always: always.join("\n"), focus: focus.join("\n") };
+}
+
+// Fold one page's match counts into the stored record. `counts` is { ruleId: n } for the
+// rules that were checked — a rule missing from it was not checked (disabled, or the site
+// is not one we run on) and must not be counted as a miss, which is the difference between
+// "we looked and found nothing" and "we never looked".
+//
+// `now` is passed in rather than read here so the caller owns the clock and the tests do
+// not have to. Nothing is ever decremented: two tabs on different Plane routes both write,
+// and the honest merge of "35 here, 0 there" is one hit and two checks, in either order.
+function peRuleHealthUpdate(prev, counts, now) {
+  const out = Object.assign({}, prev && typeof prev === "object" ? prev : {});
+  const at = typeof now === "number" && isFinite(now) ? now : 0;
+  Object.keys(counts && typeof counts === "object" ? counts : {}).forEach((id) => {
+    const n = counts[id];
+    if (typeof n !== "number" || !isFinite(n) || n < 0) return;
+    const was = out[id] && typeof out[id] === "object" ? out[id] : {};
+    const checks = (typeof was.checks === "number" ? was.checks : 0) + 1;
+    const hits = (typeof was.hits === "number" ? was.hits : 0) + (n > 0 ? 1 : 0);
+    // The timestamp only moves forward, and only on a hit — it answers "when did this last
+    // work", which a miss has nothing to say about.
+    const prevAt = typeof was.at === "number" ? was.at : 0;
+    out[id] = { checks, hits, at: n > 0 ? Math.max(prevAt, at) : prevAt };
+  });
+  return out;
+}
+
+// Drop records for rules that no longer exist, and hard-cap what is left. Called on the
+// same write as the update: a deleted rule's history is not evidence about anything, and a
+// rule id that comes back is a new rule that happens to share a name.
+function peRuleHealthPrune(health, rules) {
+  const live = new Set(
+    (Array.isArray(rules) ? rules : []).map((r) => (r && typeof r === "object" ? r.id : null)).filter(Boolean)
+  );
+  const out = {};
+  let n = 0;
+  Object.keys(health && typeof health === "object" ? health : {}).forEach((id) => {
+    if (!live.has(id) || n >= PE_RULE_HEALTH_MAX) return;
+    out[id] = health[id];
+    n++;
+  });
+  return out;
+}
+
+// What a row may say about a rule. Three states, and the first is the important one:
+//   "unknown" — not looked at enough times to have an opinion. Says nothing.
+//   "ok"      — it has matched; `at` is when it last did. A redesign shows up here as a
+//               stale date beside rules that all read "just now", which is a comparison the
+//               reader makes better than a threshold would.
+//   "cold"    — checked enough times, never once matched. This is the shape of the Plane
+//               Cloud bug, and the one state worth a warning.
+// There is deliberately no "was working, stopped" state: it would need a threshold on
+// consecutive misses, and a rule for one route legitimately misses on every other one.
+function peRuleHealthState(entry) {
+  const e = entry && typeof entry === "object" ? entry : null;
+  const checks = e && typeof e.checks === "number" ? e.checks : 0;
+  const hits = e && typeof e.hits === "number" ? e.hits : 0;
+  if (hits > 0) return "ok";
+  if (checks >= PE_RULE_HEALTH_MIN_CHECKS) return "cold";
+  return "unknown";
+}
+
+// How many of these rules have been checked enough to say they have never matched. The
+// summary line above the rule list; the count is what turns one quiet row into something
+// the reader notices. Disabled rules are excluded — they are not being applied, so "it
+// never matched" is not news about them.
+function peRuleHealthColdCount(health, rules) {
+  return (Array.isArray(rules) ? rules : []).filter(
+    (r) => r && typeof r === "object" && r.enabled !== false && peRuleHealthState((health || {})[r.id]) === "cold"
+  ).length;
 }
 
 const PE_DEFAULTS = {
@@ -402,6 +533,13 @@ function peDeepMerge(def, cur) {
 //            This is not the resurrection trap: these ids did not exist before v7, so
 //            nothing the user deleted comes back, and once the stamp reaches 7 deleting
 //            them is final.
+//   v7 → v8: two of the focus presets stopped matching anything on Plane Cloud (see
+//            peFocusPresetRules), so their selectors grow a second shape. Unlike v6 → v7
+//            this rewrites a value already in the user's storage, which is only allowed
+//            because it is guarded: a rule is repointed ONLY while its selector is still
+//            character-for-character what v7 shipped. Anyone who edited theirs — including
+//            anyone who already worked out Cloud's selector by hand — keeps it. A rule the
+//            user deleted stays deleted; this appends nothing.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -440,6 +578,15 @@ function peMigrate(raw) {
       if (!have.has(r.id)) rules.push(r);
     });
     raw.rules = rules;
+  }
+  if (from < 8) {
+    const shipped = {};
+    peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+    (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
+      if (!r || typeof r !== "object") return;
+      const was = PE_V7_FOCUS_SELECTORS[r.id];
+      if (was && r.selector === was) r.selector = shipped[r.id];
+    });
   }
   raw.schema = PE_SCHEMA;
   return raw;
@@ -930,6 +1077,37 @@ function peSourceDisplayName(src, entry) {
   const remote = entry && typeof entry.remoteName === "string" ? entry.remoteName.trim() : "";
   if (remote) return remote;
   return peSourceLabel(src && src.url);
+}
+
+// Read the rule-health record (chrome.storage.local). Absent is the normal state on a
+// fresh install and reads as "nothing known yet", which is what peRuleHealthState says
+// about an id it does not find.
+function peGetRuleHealth() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(PE_RULE_HEALTH_KEY, (res) => {
+        const h = res && res[PE_RULE_HEALTH_KEY];
+        resolve(h && typeof h === "object" ? h : {});
+      });
+    } catch (_) {
+      resolve({});
+    }
+  });
+}
+
+function peSaveRuleHealth(health) {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.set({ [PE_RULE_HEALTH_KEY]: health }, () => {
+        // Advisory data. A write that fails costs a page's worth of observation, so it is
+        // swallowed rather than surfaced — there is nothing the reader could do about it.
+        void (chrome.runtime && chrome.runtime.lastError);
+        resolve();
+      });
+    } catch (_) {
+      resolve();
+    }
+  });
 }
 
 // Read/write the synced-template cache (chrome.storage.local).

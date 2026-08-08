@@ -109,6 +109,20 @@ Plane server**, applied only on the domains you enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
+   - **Each rule says whether it is actually doing anything.** A selector that matches
+     nothing is a no-op — that is what stops a Plane redesign from breaking the extension —
+     but it also made a rule that had *stopped* matching look exactly like one nobody turned
+     on. So every row reads either when it last applied, or that it has never matched
+     anything, and a line above the list counts the second kind.
+     - It is **not** a per-page verdict, on purpose. Measured on Plane Cloud, `.max-w-40`
+       matches 35 elements on the work item list and none on the item page, the projects
+       list, the labels page or the states page — "no match here" is the normal state of a
+       healthy rule, and a warning that fires on it is one you learn to ignore. What is
+       recorded is whether a selector has **ever** matched and when it last did, so a
+       redesign shows up as one stale date beside rules that all read today.
+     - A rule needs 20 checks with no match before the page will say it has never worked,
+       and disabled rules are left out entirely. The record is per device
+       (`chrome.storage.local`), never synced.
 5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
    is what is left. There is also a toggle beside the work item's key, next to Copy reference,
    and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
@@ -237,13 +251,20 @@ Working example: [`examples/team-templates.json`](examples/team-templates.json) 
 [`examples/team-templates-ko.json`](examples/team-templates-ko.json). Fork it, serve it
 from your own URL, and edit the templates to match how your team actually writes an issue.
 
-## Built for self-hosted Plane
+## Built for self-hosted Plane, and it works on Plane Cloud
 
-This extension targets **self-hosted Plane**. It ships with **no active domain and
-no host access**, so it does nothing until you add your instance (e.g.
-`plane.your-company.com`) via the popup's **Enable on this site** or the
-active-domains list in Settings — enabling a domain prompts Chrome for one-time
-access to that one site. It stays completely inert on every other site.
+This extension was written for **self-hosted Plane**, and the same build runs on
+**Plane Cloud** (`app.plane.so`). Either way it ships with **no active domain and no
+host access**, so it does nothing until you add your instance (e.g.
+`plane.your-company.com`, or `app.plane.so`) via the popup's **Enable on this site**
+or the active-domains list in Settings — enabling a domain prompts Chrome for
+one-time access to that one site. It stays completely inert on every other site.
+
+The two draw the same screens with different classes, which matters only for the
+presets that name one: the focus-mode selectors carry both shapes, and the width
+presets are written for self-hosted Plane's classes. Anything a preset misses is one
+selector edit, or one click of the element picker, away — that is what the generic
+rule engine is for.
 
 ## Install
 
@@ -264,6 +285,10 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 
 - Injecting CSS on `.max-w-40` changes max-width from 160px to the configured
   value — confirmed applied.
+- The focus-mode presets hide the properties panel and the left navigation, and the
+  description column takes the space back — confirmed on both self-hosted Plane 1.4
+  and Plane Cloud (2026-08-08: on Cloud the body column went 1056px → 1658px, and the
+  reading-width preset centred it at exactly `(1658 − 960) / 2` = 349px of gutter).
 - Values are inserted into React-controlled search inputs via a native setter +
   `input` event — confirmed.
 - The description editor is TipTap/ProseMirror (contenteditable) — confirmed, so

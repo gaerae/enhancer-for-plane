@@ -95,6 +95,56 @@
   }
 
   /* ================================================================== */
+  /* 1a. Rule health — did each selector actually match anything?         */
+  /* ================================================================== */
+  // The answer that was always one call away and never asked for. See peRuleHealthUpdate
+  // in common.js for why this records "has it ever matched" rather than a per-page verdict.
+  //
+  // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
+  // names has mounted, and a count taken at navigation time would score every route a miss.
+  // The check is therefore keyed on the URL (once per route, however many mutation bursts
+  // that route causes) and delayed past the mount.
+  let healthUrl = null;
+  let healthTimer = null;
+  const PE_HEALTH_DELAY = 2500;
+
+  function scheduleRuleHealth() {
+    if (!settings || !isActive()) return;
+    if (location.href === healthUrl) return; // already counted this route
+    healthUrl = location.href;
+    clearTimeout(healthTimer);
+    healthTimer = setTimeout(() => {
+      try {
+        recordRuleHealth();
+      } catch (_) {}
+    }, PE_HEALTH_DELAY);
+  }
+
+  function recordRuleHealth() {
+    if (!settings || !isActive()) return;
+    const rules = Array.isArray(settings.rules) ? settings.rules : [];
+    const counts = {};
+    rules.forEach((r) => {
+      // A disabled rule is not being applied, so counting it would be recording an
+      // observation about CSS nobody asked for. A selector the browser cannot read is
+      // already reported where it is typed, and is not this feature's news to break.
+      if (!r || typeof r !== "object" || !r.id || r.enabled === false) return;
+      const sel = String(r.selector == null ? "" : r.selector).trim();
+      if (!sel || !validSelector(sel)) return;
+      try {
+        counts[r.id] = document.querySelectorAll(sel).length;
+      } catch (_) {}
+    });
+    if (!Object.keys(counts).length) return;
+    // Read-modify-write, and two tabs on two routes can interleave. The lost update costs
+    // one observation — never a wrong claim, because nothing here is ever decremented and
+    // the only direction a lost write moves the reader is toward "we do not know yet".
+    peGetRuleHealth().then((prev) =>
+      peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
+    );
+  }
+
+  /* ================================================================== */
   /* 1b. Focus mode — the rules marked "focus only", on for this tab      */
   /* ================================================================== */
   // Focus mode is a moment, not a setting, so it is deliberately not in chrome.storage.sync:
@@ -618,6 +668,11 @@
     // needs nothing configured. It is offered wherever an item header is, which is the surface
     // it is about — and it stays out of a page that has no work item on it.
     ensureFocusButton();
+
+    // Last, and self-throttling: injectAll runs on every mutation burst, this runs once per
+    // route. Hanging it here rather than on a navigation event is what makes it work on an
+    // SPA that changes the URL without one.
+    scheduleRuleHealth();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -1562,6 +1617,10 @@
       // Read once per load, before the first applyStyles: on a settings change this
       // re-reads the same value, and nothing else in the browser writes that key.
       focusOn = readStoredFocus();
+      // Editing a rule is the one moment the reader is owed a fresh answer about it, and
+      // refresh() is what a settings change calls. Forget which route was counted so the
+      // edited selector is measured again on the page already in front of them.
+      healthUrl = null;
       applyFocusClass();
       applyStyles();
       announceFocusOnce();

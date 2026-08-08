@@ -97,6 +97,20 @@
   "optRuleFocusOnly": {
     "message": "집중 모드에서만 적용"
   },
+  "optRuleHealthOk": {
+    "message": "마지막 적용 $TIME$",
+    "description": "Beside a rule that is working. An absolute time, like the sync status uses — a redesign shows up as one stale date beside rules that all read today.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optRuleHealthCold": {
+    "message": "아직 아무 요소도 찾지 못했습니다",
+    "description": "Beside a rule whose selector has been checked several times without ever finding an element."
+  },
+  "optRuleHealthWarn": {
+    "message": "아직 아무 요소도 찾지 못한 규칙이 $COUNT$개 있습니다. Plane 마크업이 바뀌었을 수 있으니 셀렉터를 고치거나 요소를 다시 집어 보세요.",
+    "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "optRuleLabelPh": {
     "message": "설명 (예: 모듈 이름 폭)"
   },

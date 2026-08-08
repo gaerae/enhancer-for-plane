@@ -42,6 +42,9 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__DEFAULTS = PE_DEFAULTS;" +
   "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
   "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
+  "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
+  "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
+  "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
   "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
   "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
@@ -1239,13 +1242,127 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 7, "PE_SCHEMA is 7");
+  eq(ctx.__SCHEMA, 8, "PE_SCHEMA is 8");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
   ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
   eq(merged.quickLinks.length, 0, "and it is empty by default");
-  eq(ctx.peMigrate({ schema: 5 }).schema, 7, "stamp advances to PE_SCHEMA");
+  eq(ctx.peMigrate({ schema: 5 }).schema, ctx.__SCHEMA, "stamp advances to PE_SCHEMA");
+});
+
+/* ---------------- rule health ---------------- */
+
+// The measurement this is built on, taken on Plane Cloud 2026-08-08: `.max-w-40` matches 35
+// elements on the work item list and zero on the item page, the projects list, the labels
+// page and the states page. Every assertion below exists to keep a future "simplification"
+// from turning that healthy rule into a warning.
+test("health: a rule that matches on one route in five is healthy, not cold", () => {
+  const ctx = loadCommon();
+  const rules = [{ id: "r-width", enabled: true }];
+  let h = {};
+  // A morning of item detail pages before the user opens a list. The threshold has to sit
+  // above a run like this, or a rule that is working gets a warning for being route-specific.
+  for (let i = 0; i < ctx.__HEALTH_MIN - 1; i++) h = ctx.peRuleHealthUpdate(h, { "r-width": 0 }, 1000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "unknown", "a long run of honest misses says nothing yet");
+  h = ctx.peRuleHealthUpdate(h, { "r-width": 35 }, 2000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "ok", "and one hit settles it for good");
+  eq(h["r-width"].at, 2000, "the time of the hit");
+  // The point: no number of later misses can take that back, because a rule for one route
+  // misses on every other one and a warning that fires on that is a warning people switch off.
+  for (let i = 0; i < ctx.__HEALTH_MIN * 3; i++) h = ctx.peRuleHealthUpdate(h, { "r-width": 0 }, 3000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "ok", "still ok after three times the threshold in misses");
+  eq(h["r-width"].at, 2000, "and the timestamp still points at the last time it worked");
+  eq(ctx.peRuleHealthColdCount(h, rules), 0, "so nothing is reported");
+});
+
+test("health: silence until there is enough to say", () => {
+  const ctx = loadCommon();
+  let h = {};
+  eq(ctx.peRuleHealthState(undefined), "unknown", "a rule nobody has measured");
+  for (let i = 1; i < ctx.__HEALTH_MIN; i++) {
+    h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+    eq(ctx.peRuleHealthState(h.r), "unknown", "still quiet after " + i + " check(s)");
+  }
+  h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+  eq(ctx.peRuleHealthState(h.r), "cold", "and it speaks up on the " + ctx.__HEALTH_MIN + "th");
+});
+
+// This is the Plane Cloud bug, replayed: two presets that never match anything while the
+// third does. The count is the part that reaches the reader.
+test("health: the two dead presets are counted and the live one is not", () => {
+  const ctx = loadCommon();
+  const rules = ctx.peFocusPresetRules();
+  let h = {};
+  const dead = ["rule-focus-item-properties", "rule-focus-reading-width"];
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) {
+    const counts = {};
+    rules.forEach((r) => (counts[r.id] = dead.indexOf(r.id) > -1 ? 0 : 1));
+    h = ctx.peRuleHealthUpdate(h, counts, 100);
+  }
+  // enabled must be explicit: the third preset ships switched off, and a rule that is not
+  // applied is not evidence of anything.
+  const on = rules.map((r) => ({ id: r.id, enabled: true }));
+  eq(ctx.peRuleHealthColdCount(h, on), 2, "both dead presets are reported");
+  eq(ctx.peRuleHealthState(h["rule-focus-main-nav"]), "ok", "and the one that worked is not");
+});
+
+test("health: a disabled rule is never reported", () => {
+  const ctx = loadCommon();
+  let h = {};
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+  eq(ctx.peRuleHealthState(h.r), "cold", "the record still says what it saw");
+  eq(ctx.peRuleHealthColdCount(h, [{ id: "r", enabled: false }]), 0, "but a rule nobody applies is not news");
+  eq(ctx.peRuleHealthColdCount(h, [{ id: "r", enabled: true }]), 1, "and enabling it makes it news again");
+});
+
+// A rule that was not checked must not be scored a miss — the difference between "we looked
+// and found nothing" and "we never looked". Without this, opening one inactive tab would
+// march every rule toward a warning.
+test("health: only the rules in the report are counted", () => {
+  const ctx = loadCommon();
+  const h = ctx.peRuleHealthUpdate({ a: { checks: 3, hits: 1, at: 5 } }, { b: 0 }, 9);
+  eq(h.a, { checks: 3, hits: 1, at: 5 }, "the rule that was not measured is untouched");
+  eq(h.b, { checks: 1, hits: 0, at: 0 }, "and the one that was gets its first check");
+});
+
+test("health: two tabs interleaving cannot invent a hit or lose one", () => {
+  const ctx = loadCommon();
+  // Same starting point, two tabs, one hit and one miss — in either order the answer is
+  // the same, because nothing is ever decremented and `at` only moves forward on a hit.
+  const base = { r: { checks: 1, hits: 0, at: 0 } };
+  const a = ctx.peRuleHealthUpdate(ctx.peRuleHealthUpdate(base, { r: 4 }, 50), { r: 0 }, 60);
+  const b = ctx.peRuleHealthUpdate(ctx.peRuleHealthUpdate(base, { r: 0 }, 60), { r: 4 }, 50);
+  eq(a, b, "order does not change the record");
+  eq(a.r, { checks: 3, hits: 1, at: 50 }, "one hit, three checks, stamped when it matched");
+});
+
+test("health: junk counts are ignored rather than stored", () => {
+  const ctx = loadCommon();
+  const h = ctx.peRuleHealthUpdate({}, { a: -1, b: NaN, c: "3", d: null, e: 0 }, 7);
+  eq(Object.keys(h), ["e"], "only a real, non-negative count is a measurement");
+  eq(ctx.peRuleHealthUpdate(null, null, null), {}, "and no input at all is not a crash");
+});
+
+test("health: a deleted rule's history goes with it", () => {
+  const ctx = loadCommon();
+  const h = { keep: { checks: 9, hits: 9, at: 1 }, gone: { checks: 9, hits: 0, at: 0 } };
+  const out = ctx.peRuleHealthPrune(h, [{ id: "keep" }, { id: null }, "nope"]);
+  eq(Object.keys(out), ["keep"], "records follow the rules that exist");
+  // An id that comes back is a new rule that happens to reuse a name — it must not inherit
+  // a warning earned by whatever used to hold it.
+  eq(ctx.peRuleHealthState(ctx.peRuleHealthPrune(h, [{ id: "keep" }]).gone), "unknown");
+});
+
+test("health: the record cannot grow without bound", () => {
+  const ctx = loadCommon();
+  const many = {};
+  const rules = [];
+  for (let i = 0; i < ctx.__HEALTH_MAX + 50; i++) {
+    many["r" + i] = { checks: 1, hits: 1, at: 1 };
+    rules.push({ id: "r" + i });
+  }
+  eq(Object.keys(ctx.peRuleHealthPrune(many, rules)).length, ctx.__HEALTH_MAX, "capped");
 });
 
 /* ---------------- focus mode ---------------- */
@@ -1305,10 +1422,10 @@ test("focus: a v6 install gains the presets, and only once", () => {
   eq(out.rules[0], mine, "the user's rule keeps its place");
   const focus = out.rules.filter((r) => r.focus);
   eq(focus.length, ctx.peFocusPresetRules().length, "every preset arrived");
-  eq(out.schema, 7, "and the stamp moved, so this does not run again");
+  eq(out.schema, ctx.__SCHEMA, "and the stamp moved, so this does not run again");
   // A user who deletes a preset and saves must not get it back on the next read.
-  const again = ctx.peMigrate({ schema: 7, rules: [mine] });
-  eq(again.rules.length, 1, "a v7 object is left exactly as it is");
+  const again = ctx.peMigrate({ schema: ctx.__SCHEMA, rules: [mine] });
+  eq(again.rules.length, 1, "an object already at the current schema is left exactly as it is");
 });
 
 test("focus: an id already present is not appended twice", () => {
@@ -1320,6 +1437,63 @@ test("focus: an id already present is not appended twice", () => {
   eq(out.rules[0].value, "block", "and the edit survives");
   // Without this the test would also pass on a migration that appended nothing at all.
   eq(out.rules.length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
+});
+
+// v7 → v8 rewrites a selector that is already in the user's storage, which no earlier
+// migration has done. The guard is the whole feature: it repoints what v7 shipped and
+// nothing else. Measured against Plane Cloud on 2026-08-08 — the v7 selectors matched zero
+// elements there, and a preset that matches nothing is indistinguishable from one nobody
+// turned on, which is how this went unnoticed for a release.
+test("focus: v8 repoints the two presets that stopped matching Plane Cloud", () => {
+  const ctx = loadCommon();
+  const v7 = ctx.__V7_FOCUS_SELECTORS;
+  const shipped = {};
+  ctx.peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+  eq(Object.keys(v7).sort(), ["rule-focus-item-properties", "rule-focus-reading-width"]);
+  Object.keys(v7).forEach((id) => {
+    ok(shipped[id] !== v7[id], id + " actually changed");
+    ok(shipped[id].indexOf(v7[id]) === 0, id + " still leads with the Plane 1.4 shape");
+    ok(shipped[id].indexOf(",") > -1, id + " is a list, so both generations match");
+  });
+  // The nav preset never broke, and a migration that touched it would be reaching further
+  // than the bug it is here for.
+  const nav = "rule-focus-main-nav";
+  ok(!(nav in v7), nav + " is not in the repoint table");
+
+  const stored = Object.keys(v7).map((id) => ({ id, enabled: true, focus: true, selector: v7[id], property: "display", value: "none" }));
+  const out = ctx.peMigrate({ schema: 7, rules: stored.concat([{ id: nav, selector: "#main-sidebar", property: "display", value: "none" }]) });
+  Object.keys(v7).forEach((id) => {
+    eq(out.rules.find((r) => r.id === id).selector, shipped[id], id + " now carries both shapes");
+  });
+  eq(out.rules.find((r) => r.id === nav).selector, "#main-sidebar", "the nav preset is untouched");
+  eq(out.rules.length, 3, "and nothing was appended");
+});
+
+test("focus: v8 leaves a selector the user edited alone", () => {
+  const ctx = loadCommon();
+  const id = "rule-focus-item-properties";
+  // Someone who already worked Cloud's selector out by hand is the person this guard is for:
+  // overwriting them would undo a fix and look like the extension reverting their edit.
+  const mine = ".z-\\[5\\].shrink-0.bg-surface-1";
+  const out = ctx.peMigrate({ schema: 7, rules: [{ id, focus: true, selector: mine, property: "display", value: "none" }] });
+  eq(out.rules[0].selector, mine, "their selector survives the migration");
+  // And a preset the user deleted stays deleted — v8 repoints, it never appends.
+  const empty = ctx.peMigrate({ schema: 7, rules: [] });
+  eq(empty.rules.length, 0, "nothing comes back");
+});
+
+// A v6 install crosses both steps in one read. The v7 step appends the CURRENT presets, so
+// the v8 step must find nothing left to do — if it repointed them the append shipped stale
+// selectors, and this is the only place that would say so.
+test("focus: a v6 install lands on the current selectors in one pass", () => {
+  const ctx = loadCommon();
+  const out = ctx.peMigrate({ schema: 6, rules: [] });
+  const shipped = {};
+  ctx.peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+  out.rules.forEach((r) => eq(r.selector, shipped[r.id], r.id));
+  Object.keys(ctx.__V7_FOCUS_SELECTORS).forEach((id) => {
+    ok(out.rules.some((r) => r.id === id), id + " is there to have been checked");
+  });
 });
 
 // Two places ship the same presets — PE_DEFAULTS for a new install, peMigrate for everyone

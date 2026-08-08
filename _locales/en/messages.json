@@ -100,6 +100,20 @@
   "optRuleFocusOnly": {
     "message": "Only while focus mode is on"
   },
+  "optRuleHealthOk": {
+    "message": "Last applied $TIME$",
+    "description": "Beside a rule that is working. An absolute time, like the sync status uses — a redesign shows up as one stale date beside rules that all read today.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optRuleHealthCold": {
+    "message": "Has never matched anything yet",
+    "description": "Beside a rule whose selector has been checked several times without ever finding an element."
+  },
+  "optRuleHealthWarn": {
+    "message": "Never matched anything yet: $COUNT$ of these rules. Plane's markup may have changed — edit the selector, or pick the element again.",
+    "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
   },
