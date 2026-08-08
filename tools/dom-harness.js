@@ -610,6 +610,61 @@ const suites = [
     body: `
       document.querySelector('#tabs .tab[data-tab="items"]').click();
       await waitFor(() => document.querySelectorAll("#quickList .qlk-preview").length === 2, "the rows");
+
+      // The chooser exists because an empty row is where a wrong URL gets typed. What only a
+      // browser can answer is whether picking one lands the caret on the part that still
+      // needs replacing — a filled URL with the caret at position 0 is no better than a
+      // placeholder nobody reads.
+      const box = document.getElementById("quickExamples");
+      check("the add button opens a chooser rather than adding a row", () => {
+        const before = document.querySelectorAll("#quickList .cpy-item").length;
+        document.getElementById("addQuickLink").click();
+        ok(!box.hidden, "the chooser is shown");
+        eq(document.querySelectorAll("#quickList .cpy-item").length, before, "and nothing was added yet");
+      });
+      check("the sites already configured come first, with the host filled in", () => {
+        const heads = [...box.querySelectorAll(".qlk-ex-head")].map((h) => h.textContent);
+        eq(heads[0], peMsg("optQuickExamplesFromSites"));
+        const first = box.querySelector(".qlk-ex");
+        eq(first.querySelector(".qlk-ex-name").textContent, "plane.example.com", "the domain from Sites");
+        ok(first.querySelector(".qlk-ex-url").textContent.indexOf("https://plane.example.com/") === 0,
+           "with the host already right: " + first.querySelector(".qlk-ex-url").textContent);
+      });
+      check("every tracker is offered, and the two that disappoint say so", () => {
+        const names = [...box.querySelectorAll(".qlk-ex-name")].map((n) => n.textContent);
+        for (const t of ["Plane", "Jira", "Linear", "GitHub", "GitLab"]) ok(names.indexOf(t) > -1, t + " missing: " + names.join(", "));
+        ok(names.indexOf(peMsg("optQuickExamplesBlank")) > -1, "and the empty row is still reachable");
+        const noteFor = (name) => {
+          const row = [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === name);
+          const n = row.querySelector(".qlk-ex-note");
+          return n ? n.textContent : "";
+        };
+        eq(noteFor("Plane"), peMsg("optQuickExampleNotePlane"));
+        eq(noteFor("Linear"), peMsg("optQuickExampleNoteLinear"));
+        eq(noteFor("GitHub"), peMsg("optQuickExampleNoteNumbered"));
+        eq(noteFor("Jira"), "", "Jira's works, so it says nothing");
+      });
+      // Picking the Jira example: nothing about it is known in advance, so both halves are
+      // filled and the caret goes to ⟨site⟩.
+      [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === "Jira").click();
+      await waitFor(() => document.querySelectorAll("#quickList .cpy-item").length === 3, "the row to be added");
+      check("picking one fills both URLs and selects the first blank", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[2];
+        const url = row.querySelector(".qlk-url");
+        eq(row.querySelector(".qlk-name").value, "Jira");
+        ok(url.value.indexOf(".atlassian.net/browse/{{key}}") > -1, url.value);
+        ok(row.querySelector(".qlk-search").value.indexOf("jql=text ~") > -1, "and the search URL too");
+        eq(document.activeElement, url, "the caret is in the URL field");
+        eq(url.value.slice(url.selectionStart, url.selectionEnd), "⟨" + peMsg("optQuickPartSite") + "⟩",
+           "with the part to replace selected, so typing overwrites it");
+        ok(box.hidden, "and the chooser closed behind it");
+      });
+      // The preview under the new row has to say something a reader can act on rather than
+      // echoing the blanks back — this is the row they are about to edit.
+      check("the new row previews where its blanks would land", () => {
+        const p = document.querySelectorAll("#quickList .qlk-preview")[2];
+        ok(p.textContent.indexOf("PROJ-123") > -1, "the sample key: " + p.textContent);
+      });
       const prev = (i) => document.querySelectorAll("#quickList .qlk-preview")[i];
       check("a good row previews both destinations", () => {
         const t = prev(0).textContent;

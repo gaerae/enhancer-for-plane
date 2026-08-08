@@ -46,6 +46,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
+  "\n;globalThis.PE_QUICK_EXAMPLES = PE_QUICK_EXAMPLES;" +
+  "\n;globalThis.PE_QUICK_PARTS = PE_QUICK_PARTS;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
   "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
   "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
@@ -1415,6 +1417,86 @@ test("tab: a search result is not an item, so it is never remembered as one", ()
 // The URL that prompted this: the request Plane's own app makes, filled in as if it were
 // the search page. It loads, returns 200, and shows JSON — so nothing downstream can tell
 // it went wrong, and the row where it is typed is the only place to say anything.
+// The examples are the one place this project asserts something about five products at
+// once, so the rule is that each shape was opened in a browser. These hold the results of
+// that: the exact strings, and the two that measured worse than they look.
+test("quick: every example was measured, and says so where it disappoints", () => {
+  const ctx = loadCommon();
+  const by = {};
+  ctx.PE_QUICK_EXAMPLES.forEach((e) => (by[e.id] = e));
+  eq(Object.keys(by).sort(), ["github", "gitlab", "jira", "linear", "plane"]);
+  // Verified 2026-08-08 against real instances; the search halves were each checked with a
+  // nonsense query too, because a search that ignores its parameter looks identical to one
+  // that works.
+  eq(by.jira.searchUrl, 'https://{site}.atlassian.net/issues/?jql=text ~ "{{q}}"');
+  eq(by.github.searchUrl, "https://github.com/{owner}/{repo}/issues?q={{q}}");
+  eq(by.gitlab.searchUrl, "https://gitlab.com/{group}/{project}/-/issues/?search={{q}}");
+  // Plane's fills the box without running the search, and Linear has none. Both still
+  // appear, and both carry a note — an example that quietly underdelivers is worse than one
+  // that is absent, because the reader concludes the extension is broken.
+  eq(by.plane.note, "plane", "Plane's shortfall is written down");
+  eq(by.linear.note, "linear");
+  eq(by.linear.searchUrl, "", "and Linear offers no search URL at all");
+  // GitHub and GitLab number their issues, so a bare 1234 is not a key — they spend a prefix
+  // and take only the number.
+  for (const id of ["github", "gitlab"]) {
+    ok(by[id].prefix, id + " needs a prefix to be typeable");
+    ok(by[id].url.indexOf("{{key.num}}") > -1, id + " must use only the number");
+    eq(by[id].note, "numbered");
+  }
+  // Every blank in every example has to be one the labels know about, or a reader is shown
+  // ⟨project⟩ in English inside an otherwise Korean page.
+  const blanks = new Set();
+  ctx.PE_QUICK_EXAMPLES.forEach((e) =>
+    [e.url, e.searchUrl].forEach((u) => String(u).replace(/\{([a-z]+)\}/g, (_, p) => blanks.add(p)))
+  );
+  blanks.delete("key");
+  blanks.delete("q");
+  for (const b of blanks) ok(ctx.PE_QUICK_PARTS.indexOf(b) > -1, "unknown blank {" + b + "}");
+});
+
+test("quick: filling an example leaves the tokens alone and the blanks marked", () => {
+  const ctx = loadCommon();
+  const labels = { host: "호스트", workspace: "워크스페이스", site: "사이트" };
+  const plane = ctx.PE_QUICK_EXAMPLES.filter((e) => e.id === "plane")[0];
+  eq(
+    ctx.peQuickExample(plane.url, labels),
+    "https://⟨호스트⟩/⟨워크스페이스⟩/browse/{{key}}",
+    "blanks become the reader's words; {{key}} is ours and survives"
+  );
+  // A host already configured arrives filled in, which is the whole point of offering rows
+  // built from the sites the user has added.
+  eq(
+    ctx.peQuickExample(plane.url, labels, { host: "plane.hectoai.co.kr" }),
+    "https://plane.hectoai.co.kr/⟨워크스페이스⟩/browse/{{key}}"
+  );
+  // Jira's search carries raw quotes and a tilde — the expander encodes only the value, and
+  // that exact string was the one navigated to during verification.
+  const jira = ctx.PE_QUICK_EXAMPLES.filter((e) => e.id === "jira")[0];
+  eq(
+    ctx.peQuickExample(jira.searchUrl, labels, { site: "gprxh" }),
+    'https://gprxh.atlassian.net/issues/?jql=text ~ "{{q}}"'
+  );
+  eq(ctx.peExpandSearchLink({ searchUrl: ctx.peQuickExample(jira.searchUrl, labels, { site: "gprxh" }) }, "배포 검증"),
+    'https://gprxh.atlassian.net/issues/?jql=text ~ "' + encodeURIComponent("배포 검증") + '"',
+    "which is what actually went to the browser");
+  eq(ctx.peQuickExample("", labels), "");
+  eq(ctx.peQuickExample("https://x/{nonsense}", labels), "https://x/{nonsense}", "an unknown part is left as written");
+});
+
+test("quick: the caret is sent to the first thing left to replace", () => {
+  const ctx = loadCommon();
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  const at = ctx.peFirstBlank(url);
+  eq(url.slice(at[0], at[1]), "⟨host⟩", "the first blank, not the token");
+  eq(ctx.peFirstBlank("https://plane.test/⟨workspace⟩/browse/{{key}}").length, 2, "the next one when the host is known");
+  // Nothing left is a case worth distinguishing: the caret should not be sent somewhere
+  // arbitrary in a URL that is already complete.
+  eq(ctx.peFirstBlank("https://plane.test/acme/browse/{{key}}"), null);
+  eq(ctx.peFirstBlank("https://x/⟨unclosed"), null, "half a blank is not one");
+  eq(ctx.peFirstBlank(""), null);
+});
+
 test("quick: an API address is recognised as one", () => {
   const { peLooksLikeApiUrl } = loadCommon();
   ok(peLooksLikeApiUrl("https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true"));

@@ -35,6 +35,13 @@ Plane server**, applied only on the domains you enable.
    - It **opens a URL and nothing more** — no host permission, no content script — so it
      works on any tab, including ones where the rest of the extension never runs. Ships with
      no targets; add yours in Settings, where each row previews where a sample key lands.
+   - **Adding one starts from an example.** The Add button offers a row per site you have
+     already added (host filled in) and one per tracker — Plane, Jira, Linear, GitHub,
+     GitLab. Picking one fills both URLs and selects the part you still have to replace,
+     `⟨workspace⟩` or `⟨site⟩`, so the next keystroke overwrites it. Every shape was opened
+     in a browser and every search URL checked against a nonsense query too; the two that
+     underdeliver (Plane's search, Linear having none) say so on the row instead of being
+     left out.
    - **The keys you opened last come back to you.** The one real barrier here was having to
      already know the key; the address bar now offers your recent jumps the moment the
      keyword is on screen, and narrows them as you type. The same list is in the popup.

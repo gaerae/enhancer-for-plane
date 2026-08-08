@@ -907,6 +907,34 @@
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
   },
+  "optQuickExamplesFromSites": {
+    "message": "From a site you already added",
+    "description": "Heading over rows built from the user's own active domains — the host is filled in, so only the workspace is left to type."
+  },
+  "optQuickExamplesFromScratch": {
+    "message": "From an example",
+    "description": "Heading over the per-tracker starting points."
+  },
+  "optQuickExamplesBlank": {
+    "message": "Empty row",
+    "description": "The way out of the chooser for someone who wants to type the whole URL themselves."
+  },
+  "optQuickExampleNotePlane": {
+    "message": "Search opens the page with your words in the box, but does not run the search."
+  },
+  "optQuickExampleNoteLinear": {
+    "message": "No URL you can search from."
+  },
+  "optQuickExampleNoteNumbered": {
+    "message": "Issues are numbered, not keyed — type the prefix and the number, e.g. GH-1234."
+  },
+  "optQuickPartHost": { "message": "host" },
+  "optQuickPartWorkspace": { "message": "workspace" },
+  "optQuickPartSite": { "message": "site" },
+  "optQuickPartOwner": { "message": "owner" },
+  "optQuickPartRepo": { "message": "repo" },
+  "optQuickPartGroup": { "message": "group" },
+  "optQuickPartProject": { "message": "project" },
   "optQuickNamePh": {
     "message": "name (e.g. Jira)"
   },

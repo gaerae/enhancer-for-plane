@@ -904,6 +904,34 @@
   "optQuickEmpty": {
     "message": "아직 링크가 없습니다. “링크 추가”를 누르세요."
   },
+  "optQuickExamplesFromSites": {
+    "message": "이미 추가한 사이트에서",
+    "description": "Heading over rows built from the user's own active domains — the host is filled in, so only the workspace is left to type."
+  },
+  "optQuickExamplesFromScratch": {
+    "message": "예시에서",
+    "description": "Heading over the per-tracker starting points."
+  },
+  "optQuickExamplesBlank": {
+    "message": "빈 줄로 시작",
+    "description": "The way out of the chooser for someone who wants to type the whole URL themselves."
+  },
+  "optQuickExampleNotePlane": {
+    "message": "검색은 입력칸에 낱말을 채운 화면을 열 뿐, 검색을 실행하지는 않습니다."
+  },
+  "optQuickExampleNoteLinear": {
+    "message": "URL로 검색할 방법이 없습니다."
+  },
+  "optQuickExampleNoteNumbered": {
+    "message": "이슈에 키가 없고 번호만 있습니다. 접두사와 번호를 함께 입력하세요. 예: GH-1234"
+  },
+  "optQuickPartHost": { "message": "호스트" },
+  "optQuickPartWorkspace": { "message": "워크스페이스" },
+  "optQuickPartSite": { "message": "사이트" },
+  "optQuickPartOwner": { "message": "소유자" },
+  "optQuickPartRepo": { "message": "저장소" },
+  "optQuickPartGroup": { "message": "그룹" },
+  "optQuickPartProject": { "message": "프로젝트" },
   "optQuickNamePh": {
     "message": "이름 (예: Jira)"
   },

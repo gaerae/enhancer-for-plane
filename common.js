@@ -1447,6 +1447,100 @@ function peExpandQuickLink(link, key) {
   return url + enc(parts.key);
 }
 
+// Starting points for a quick link, so the first thing anyone sees is not an empty box.
+//
+// Every shape here was opened in a browser on 2026-08-08 and checked against a nonsense
+// query as well as a real one, because a search URL that quietly ignores its parameter and
+// shows the whole list looks identical to one that works. What was measured:
+//
+//   Jira    text ~ "배포 검증" → 4 results across two projects. Verified with the exact
+//           string the expander produces — the template's spaces and quotes raw, only the
+//           value percent-encoded — because that is what will actually be navigated to.
+//   GitHub  ?q= → filtered results; a nonsense word → the empty state.
+//   GitLab  ?search= → filtered results; a nonsense word → none. /-/issues/ redirects to
+//           /-/work_items and the parameter survives it.
+//   Plane   /{ws}/search/?q= → fills the search box but does NOT run the search; the page
+//           still says "Start typing to search". Kept, and labelled, because it still saves
+//           the retyping. See optQuickExampleNotePlane.
+//   Linear  no URL-addressable search found.
+//
+// GitHub and GitLab number their issues rather than keying them, and a bare "1234" is not a
+// key by PE_ITEM_KEY_RE — so those two carry a prefix and spend it: you type GH-1234 and
+// {{key.num}} puts 1234 in the URL. That is what the split tokens were always for.
+//
+// The parts a person has to replace are written {host}, {workspace} and so on; peQuickExample
+// swaps them for the reader's own language wrapped in ⟨⟩, which is deliberately not our
+// {{token}} syntax — one is a blank to fill, the other is a token the extension expands.
+const PE_QUICK_EXAMPLES = [
+  {
+    id: "plane",
+    name: "Plane",
+    prefix: "",
+    url: "https://{host}/{workspace}/browse/{{key}}",
+    searchUrl: "https://{host}/{workspace}/search/?q={{q}}",
+    note: "plane"
+  },
+  {
+    id: "jira",
+    name: "Jira",
+    prefix: "",
+    url: "https://{site}.atlassian.net/browse/{{key}}",
+    searchUrl: 'https://{site}.atlassian.net/issues/?jql=text ~ "{{q}}"'
+  },
+  {
+    id: "linear",
+    name: "Linear",
+    prefix: "",
+    url: "https://linear.app/{workspace}/issue/{{key}}",
+    searchUrl: "",
+    note: "linear"
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    prefix: "GH-",
+    url: "https://github.com/{owner}/{repo}/issues/{{key.num}}",
+    searchUrl: "https://github.com/{owner}/{repo}/issues?q={{q}}",
+    note: "numbered"
+  },
+  {
+    id: "gitlab",
+    name: "GitLab",
+    prefix: "GL-",
+    url: "https://gitlab.com/{group}/{project}/-/issues/{{key.num}}",
+    searchUrl: "https://gitlab.com/{group}/{project}/-/issues/?search={{q}}",
+    note: "numbered"
+  }
+];
+
+// The blanks an example leaves, in the order a reader meets them. Named here so the
+// catalogue, the filler and the tests cannot drift apart.
+const PE_QUICK_PARTS = ["host", "workspace", "site", "owner", "repo", "group", "project"];
+
+// Fill an example's blanks with the reader's own words. `labels` maps a part to its label;
+// `known` optionally supplies a real value for one — that is how a host the user has already
+// configured arrives pre-filled instead of as another blank to type.
+function peQuickExample(template, labels, known) {
+  const l = labels && typeof labels === "object" ? labels : {};
+  const k = known && typeof known === "object" ? known : {};
+  return String(template == null ? "" : template).replace(/\{([a-z]+)\}/g, (whole, part) => {
+    if (PE_QUICK_PARTS.indexOf(part) === -1) return whole; // not a blank — {{key}} survives
+    if (k[part]) return k[part];
+    return "⟨" + (l[part] || part) + "⟩";
+  });
+}
+
+// Where the caret should land: the first blank still unfilled, as [start, end]. Returns null
+// when there is nothing left to replace, which is the case worth distinguishing — a filled-in
+// example should not send the caret somewhere arbitrary.
+function peFirstBlank(url) {
+  const s = String(url == null ? "" : url);
+  const i = s.indexOf("⟨");
+  if (i === -1) return null;
+  const j = s.indexOf("⟩", i);
+  return j === -1 ? null : [i, j + 1];
+}
+
 // A quick link's search address, if it has one. Same idea as `url` and the same token
 // rules, with {{q}} where the words go — "https://app.plane.so/acme/search?q={{q}}". This
 // is what lets one target answer both "open PROJ-123" and "find the login bug": the omnibox

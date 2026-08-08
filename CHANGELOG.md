@@ -77,6 +77,21 @@ Schema 7 → 8.
   and 1 open, and Settings was calling it dead. A second sampling now runs shortly after a
   click, when transient UI is up, and records **hits only**: it can promote a rule to
   working and can never move one toward "never matched".
+- **Adding a quick link starts from an example, not an empty box.** The empty box is where a
+  wrong URL got typed, and none of those mistakes are detectable afterwards. The Add button
+  now offers starting points: one row per site you have already added, with the host filled
+  in, then Plane, Jira, Linear, GitHub and GitLab. Picking one fills both URLs and selects
+  the first part you still have to replace — `⟨workspace⟩`, `⟨site⟩` — so the next keystroke
+  overwrites it. An empty row is still one click away.
+
+  Every shape was opened in a browser on 2026-08-08, and every search URL was checked against
+  a nonsense query as well as a real one, because a search that ignores its parameter and
+  shows the whole list looks exactly like one that works. Jira, GitHub and GitLab return real
+  results. Plane fills its search box without running the search, and Linear has no
+  URL-addressable search at all — both say so on the row rather than being left out, since an
+  example that quietly underdelivers reads as the extension being broken. GitHub and GitLab
+  number their issues rather than keying them, so those two arrive with a prefix and spend it:
+  you type `GH-1234` and `{{key.num}}` puts `1234` in the URL.
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it

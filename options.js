@@ -64,6 +64,7 @@
     tabs: $("tabs"),
     quickList: $("quickList"),
     quickEmpty: $("quickEmpty"),
+    quickExamples: $("quickExamples"),
     addQuickLink: $("addQuickLink"),
     qlkRow: $("qlkRow"),
     save: $("save"),
@@ -426,6 +427,116 @@
   // Two words, so the preview shows the encoding a real phrase gets.
   const PE_QUICK_SEARCH_SAMPLE = "login bug";
 
+  // The words that stand in for the parts a reader has to replace. Read from the catalogue
+  // so a Korean reader gets ⟨워크스페이스⟩ rather than ⟨workspace⟩ — the blank is the one
+  // piece of a URL that is addressed to a person.
+  // Mapped with literal calls rather than peMsg(e.note): check-i18n reads the key out of the
+  // call site, and a key that only exists as a data value is a key nothing can verify.
+  function quickNote(id) {
+    if (id === "plane") return peMsg("optQuickExampleNotePlane");
+    if (id === "linear") return peMsg("optQuickExampleNoteLinear");
+    if (id === "numbered") return peMsg("optQuickExampleNoteNumbered");
+    return "";
+  }
+
+  const quickPartLabels = () => ({
+    host: peMsg("optQuickPartHost"),
+    workspace: peMsg("optQuickPartWorkspace"),
+    site: peMsg("optQuickPartSite"),
+    owner: peMsg("optQuickPartOwner"),
+    repo: peMsg("optQuickPartRepo"),
+    group: peMsg("optQuickPartGroup"),
+    project: peMsg("optQuickPartProject")
+  });
+
+  // A host we can fill in for the reader. Their active domains are the hosts this extension
+  // already runs on, which on a Plane install is the Plane host — so the Plane example can
+  // arrive with the only hard part already right. A wildcard is a pattern, not a host, and
+  // is no use here.
+  const quickKnownHosts = () =>
+    (state.domains || [])
+      .map((d) => String(d || "").trim())
+      .filter((d) => d && d.indexOf("*") === -1)
+      .slice(0, 4);
+
+  function addQuickLinkFrom(example, host) {
+    const labels = quickPartLabels();
+    const known = host ? { host } : null;
+    state.quickLinks.push({
+      id: uid("qlk"),
+      name: example ? example.name : "",
+      prefix: example ? example.prefix || "" : "",
+      url: example ? peQuickExample(example.url, labels, known) : "",
+      searchUrl: example ? peQuickExample(example.searchUrl, labels, known) : "",
+      enabled: true
+    });
+    el.quickExamples.hidden = true;
+    renderQuickLinks();
+    // Put the caret on the first thing left to replace, selected, so the next keystroke
+    // overwrites it. With nothing left — every blank filled from a known host — fall back to
+    // the name, which is the field a second target actually needs.
+    const rows = el.quickList.querySelectorAll(".cpy-item");
+    const row = rows[rows.length - 1];
+    const urlEl = row && row.querySelector(".qlk-url");
+    const at = urlEl ? peFirstBlank(urlEl.value) : null;
+    if (urlEl && at) {
+      urlEl.focus();
+      urlEl.setSelectionRange(at[0], at[1]);
+    } else focusLast(".qlk-name");
+  }
+
+  function toggleQuickExamples() {
+    const box = el.quickExamples;
+    if (!box.hidden) {
+      box.hidden = true;
+      return;
+    }
+    box.innerHTML = "";
+    const labels = quickPartLabels();
+    const section = (title) => {
+      const h = document.createElement("div");
+      h.className = "qlk-ex-head";
+      h.textContent = title;
+      box.appendChild(h);
+    };
+    const row = (label, url, note, onPick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "qlk-ex";
+      const n = document.createElement("span");
+      n.className = "qlk-ex-name";
+      n.textContent = label;
+      const u = document.createElement("span");
+      u.className = "qlk-ex-url";
+      u.textContent = url;
+      b.appendChild(n);
+      b.appendChild(u);
+      if (note) {
+        const s = document.createElement("span");
+        s.className = "qlk-ex-note";
+        s.textContent = note;
+        b.appendChild(s);
+      }
+      b.addEventListener("click", onPick);
+      box.appendChild(b);
+    };
+
+    const plane = PE_QUICK_EXAMPLES.filter((e) => e.id === "plane")[0];
+    const hosts = quickKnownHosts();
+    if (plane && hosts.length) {
+      section(peMsg("optQuickExamplesFromSites"));
+      hosts.forEach((h) =>
+        row(h, peQuickExample(plane.url, labels, { host: h }), "", () => addQuickLinkFrom(plane, h))
+      );
+    }
+    section(peMsg("optQuickExamplesFromScratch"));
+    PE_QUICK_EXAMPLES.forEach((e) =>
+      row(e.name, peQuickExample(e.url, labels), quickNote(e.note), () => addQuickLinkFrom(e, ""))
+    );
+    row(peMsg("optQuickExamplesBlank"), "", "", () => addQuickLinkFrom(null, ""));
+    box.hidden = false;
+  }
+
   function renderQuickLinks() {
     if (!Array.isArray(state.quickLinks)) state.quickLinks = [];
     el.quickList.innerHTML = "";
@@ -698,9 +809,10 @@
         flash(peMsg("msgQuickLimit", [String(PE_MAX_QUICK_LINKS)]), true);
         return;
       }
-      state.quickLinks.push({ id: uid("qlk"), name: "", prefix: "", url: "", searchUrl: "", enabled: true });
-      renderQuickLinks();
-      focusLast(".qlk-name");
+      // A chooser rather than an empty row. The empty row is still one click away — it is
+      // just no longer the only thing on offer, which is what made a wrong URL the easiest
+      // thing to produce here.
+      toggleQuickExamples();
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
