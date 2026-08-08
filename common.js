@@ -1576,19 +1576,30 @@ function peMatchItemUrl(links, url) {
 
 // The work item title out of a tab title, or "".
 //
-// Measured 2026-08-08: Plane and Linear both write "{KEY} {title}" — "GAERA-6 5. Use Cycles
-// to time box tasks 🗓️" and "GAE-2 Connect your tools". That is the only shape accepted, and
-// only when the key is the one already established from the URL. Anything else returns ""
-// rather than a guess: an unresolved {{item.title}} stays visible and is reported, which is
-// the contract every other missing field follows — a wrong title looks right and gets pasted.
+// Measured 2026-08-08, on three real workspaces:
+//   Plane   "GAERA-6 5. Use Cycles to time box tasks 🗓️"
+//   Linear  "GAE-2 Connect your tools"
+//   Jira    "[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira"
+// So the key leads, optionally in brackets. That is the whole shape accepted, and only when
+// the key is the one already established from the URL. Anything else returns "" rather than
+// a guess: an unresolved {{item.title}} stays visible and is reported, which is the contract
+// every other missing field follows — a wrong title looks right and gets pasted.
+//
+// What is deliberately NOT stripped is Jira's trailing " - Jira". Cutting a trailing
+// " - something" would be a guess about titles rather than about keys, and it would truncate
+// any title that genuinely ends that way. The suffix is visible in the popup before the copy
+// happens, which is the difference between noise the reader can see and a title quietly
+// losing its last three words.
 function peTitleFromDocTitle(docTitle, key) {
-  const t = String(docTitle == null ? "" : docTitle).trim();
+  let t = String(docTitle == null ? "" : docTitle).trim();
   const k = String(key == null ? "" : key).trim();
-  if (!t || !k || t.length <= k.length) return "";
-  if (t.slice(0, k.length).toLowerCase() !== k.toLowerCase()) return "";
-  const rest = t.slice(k.length);
-  if (!/^\s/.test(rest)) return ""; // "GAE-21 …" must not answer for the key "GAE-2"
-  return rest.trim();
+  if (!t || !k) return "";
+  // A bracketed key is the same key, written the way Jira writes it.
+  if (t.slice(0, k.length + 2).toLowerCase() === "[" + k.toLowerCase() + "]") t = t.slice(k.length + 2);
+  else if (t.slice(0, k.length).toLowerCase() === k.toLowerCase()) t = t.slice(k.length);
+  else return "";
+  if (!/^\s/.test(t)) return ""; // "GAE-21 …" must not answer for the key "GAE-2"
+  return t.trim();
 }
 
 /* ================================================================== */

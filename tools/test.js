@@ -1388,6 +1388,20 @@ test("tab: the popup can name the item from a URL and a title alone", () => {
   // A template must validate what it captured or it claims pages it has no business claiming.
   eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/settings"), null);
   eq(ctx.peMatchItemUrl([], "https://app.plane.so/gaerae/browse/GAERA-6"), null, "nothing configured, nothing claimed");
+
+  // Jira, measured on a real site 2026-08-08: the key leads but is bracketed, and the site
+  // name trails. Only the key part is ours to remove — cutting a trailing " - something"
+  // would be a guess about titles, and would truncate any title that ends that way.
+  const J = { id: "j", name: "Jira", enabled: true, prefix: "", url: "https://gprxh.atlassian.net/browse/{{key}}" };
+  const j = ctx.peMatchItemUrl([J], "https://gprxh.atlassian.net/browse/TRASHSWD-17");
+  eq(j.key, "TRASHSWD-17");
+  eq(
+    ctx.peTitleFromDocTitle("[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira", j.key),
+    "ArgoCD apps-of-apps 배포 패턴 확인 - Jira",
+    "the bracketed key goes, the site's own suffix stays"
+  );
+  eq(ctx.peTitleFromDocTitle("[GAE-2 Connect your tools", "GAE-2"), "", "an opening bracket with no closing one is not the shape");
+  eq(ctx.peTitleFromDocTitle("[GAE-21] Something", "GAE-2"), "", "and a bracketed longer key is still not this key");
 });
 
 test("tab: a search result is not an item, so it is never remembered as one", () => {
