@@ -28,31 +28,6 @@ Schema 7 → 8.
   cycles route, and hiding it would be focus mode reaching outside the page it is for.
 
 ### New
-- **Copy reference works on any tracker you gave Quick open a link for**, not just Plane.
-  A quick link already states your URL grammar — `https://linear.app/acme/issue/{{key}}` —
-  and a grammar reads both ways, so the list that opens a key from the address bar now also
-  answers "which item is this page". The title comes from the page title, which Plane and
-  Linear both write as `{KEY} {title}`. No new setting, no new selector, nothing that a
-  redesign can move.
-
-  The link copied is the canonical form your template describes, not the address bar.
-  Linear's address is `/issue/GAE-1/get-familiar-with-linear`, but `/issue/GAE-1` is what it
-  redirects *from* — so the slug is the part no reader needs and every paste carries, and a
-  title that is not Latin makes it longer rather than shorter. Plane has no slug, so nothing
-  changes there.
-
-  On Plane nothing changes: the header is still read first, because it is the only thing
-  that can see into the panel a list opens — measured, the address bar and the page title
-  both still name the *list* while a peek is open. Where there is no header to anchor on,
-  `Alt/⌥+C` is the way in and Settings ▸ Shortcuts says so; there is no button, because a
-  work item header is a Plane shape and guessing at another tracker's would be the coupling
-  this extension exists without.
-
-  Also retired: the hardcoded `/{workspace}/browse/{KEY}` that composed a peek panel's link.
-  It is now the fallback behind your own quick link, so anyone who has configured one is no
-  longer relying on a Plane URL scheme this project guessed at — and installs with Quick
-  open unconfigured behave exactly as before.
-- **`Alt/⌥+C` with nothing to copy now says so** instead of doing nothing at all.
 - **Settings now says whether each rule is actually doing anything.** A rule that matches
   nothing is a no-op by design — that is what keeps a Plane redesign from breaking the
   extension — but it made a rule that had *stopped* matching look exactly like one nobody

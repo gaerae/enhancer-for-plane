@@ -842,7 +842,7 @@
     "message": "Copy this work item's reference"
   },
   "optKeysCopyWhere": {
-    "message": "On a work item — its own page, or the panel a list opens. Also on any tracker you gave Quick open a link for, where the shortcut is the only way in. Not while you are typing."
+    "message": "On a work item — its own page, or the panel a list opens. Not while you are typing."
   },
   "optKeysFocus": {
     "message": "Turn focus mode on or off"

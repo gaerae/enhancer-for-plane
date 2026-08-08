@@ -522,8 +522,6 @@
     return null;
   }
 
-  const quickLinks = () => (settings && settings.quickLinks) || [];
-
   // The work item that key belongs to: its key, title and link.
   function readItemRef(keyEl) {
     if (!keyEl) return null;
@@ -533,42 +531,8 @@
     return {
       key,
       title: t && typeof t.value === "string" ? t.value.trim() : "",
-      url: peItemUrl(location.origin, location.pathname, key, quickLinks())
+      url: peItemUrl(location.origin, location.pathname, key)
     };
-  }
-
-  // The same three fields, read off the address bar and the page title instead of the DOM.
-  //
-  // This is what makes Copy reference work somewhere we have no header to anchor on. It asks
-  // the user's own quick links which item this URL names (see peKeyFromUrl) and takes the
-  // title from document.title, which Plane and Linear both write as "{KEY} {title}". No
-  // selector, no class, nothing to break in a redesign — a tracker either has a
-  // key-addressable URL, in which case the user has already told us its shape to use Quick
-  // open, or it does not.
-  function readItemFromUrl() {
-    // Matched against the whole address, query and hash included, because a template is
-    // allowed to put the key anywhere in it — "?item={{key}}" is as legitimate a grammar as
-    // a path segment, and matching a trimmed URL would silently never answer for one.
-    // peItemUrl decides separately what to *copy*, where the query is view state and goes.
-    const m = peMatchItemUrl(quickLinks(), location.href);
-    if (!m) return null;
-    return {
-      key: m.key,
-      title: peTitleFromDocTitle(document.title, m.key),
-      // The template's own form, not the address bar — see peCanonicalItemUrl. The match is
-      // already in hand, so this composes from the grammar that recognised the page rather
-      // than asking peItemUrl to work it out a second time.
-      url: peCanonicalItemUrl(m)
-    };
-  }
-
-  // Whichever way this page will tell us what it is about. The DOM first, and not as a
-  // matter of taste: Plane's peek panel is an item the address bar knows nothing about, so
-  // the URL path cannot see it at all. Where both work they agree, and where the header
-  // read fails — another tracker, a Plane release that moves the title field — the URL is
-  // still there.
-  function readItem() {
-    return readItemRef(findKeyEl()) || readItemFromUrl();
   }
 
   function makeCopyButton() {
@@ -912,7 +876,7 @@
     menu.innerHTML = "";
     // Snapshot the item now, while whatever opened the menu (button or Alt+C) guarantees
     // the panel is still up. copyReference uses this, not a fresh read at click time.
-    copyRef = readItem();
+    copyRef = readItemRef(findKeyEl());
     const ref = copyRef;
     const formats = (settings && settings.copyFormats) || [];
     const wrap = document.createElement("div");
@@ -946,22 +910,6 @@
     menu.appendChild(wrap);
     menu.appendChild(makeMenuFooter(peMsg("menuManageCopy")));
   }
-
-  // A stand-in for a button, for a menu summoned by the keyboard on a page where we found no
-  // header to hang one off. It is an object with the one method positionMenu asks for, so
-  // nothing downstream has to learn about a second kind of anchor — including the scroll and
-  // resize handler, which re-reads it and therefore keeps the menu put.
-  //
-  // Top-centre rather than under the cursor: the reader pressed a key, not clicked a thing,
-  // so there is no place they were pointing at, and the top of the window is both predictable
-  // and out of the way of the text they were reading.
-  const keyboardAnchor = {
-    getBoundingClientRect() {
-      const w = 300;
-      const left = Math.max(8, Math.round(window.innerWidth / 2 - w / 2));
-      return { left, right: left + w, top: 72, bottom: 72, width: w, height: 0 };
-    }
-  };
 
   function positionMenu(btn) {
     const br = btn.getBoundingClientRect();
@@ -1590,25 +1538,9 @@
         } catch (_) {}
         btn = document.querySelector(".pe-copy-ref-btn");
       }
-      // No button is not the same as no item. The button needs a work item header to sit
-      // beside, which is a Plane shape; the URL says which item this is on any tracker the
-      // user configured Quick open for. So fall back to a menu with no anchor rather than
-      // refusing — the shortcut is the whole feature there, and Settings ▸ Shortcuts is
-      // where it is written down.
-      const anchor = btn || (hasCopyFormats() && readItemFromUrl() ? keyboardAnchor : null);
-      if (!anchor) {
-        // Say why. A shortcut that does nothing is the same silence this extension has just
-        // finished apologising for elsewhere — and here it is one line to fix. Only when
-        // there is something to copy WITH: a user who deleted every copy format turned the
-        // feature off, and does not need telling about it on every stray Alt+C.
-        if (hasCopyFormats()) {
-          e.preventDefault();
-          toast(peMsg("msgCopyNoItem"));
-        }
-        return;
-      }
+      if (!btn) return;
       e.preventDefault();
-      toggleMenu(anchor, "copy");
+      toggleMenu(btn, "copy");
     }
   }
   function onScrollResize() {
