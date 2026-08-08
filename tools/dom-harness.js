@@ -1060,6 +1060,78 @@ const suites = [
       });`
   },
   {
+    // The picker's list, built from a real element. tools/test.js argues about the ranking;
+    // what only a browser can answer is which candidates get generated at all — the bug that
+    // started this was that attributes were never offered, so on a page whose classes are
+    // all hashes the list held nothing worth picking however far you scrolled.
+    //
+    // The target carries, on one element, every shape measured on 2026-08-08: a per-item
+    // uuid id (Plane Cloud), a data attribute with a uuid value and one with a real value
+    // (Linear), an aria-label (Linear), hashed classes (Linear) and Tailwind (Plane).
+    name: "content · picker candidates",
+    page: {
+      name: "ct-picker",
+      plane: `
+        <div id="editor-container-d833e58d-d489-433e-9551-c2ab0768068d"
+             data-view-id="8f14e45f-ceea-467a-9f36-dcd8ab4d3f21"
+             data-restore-scroll-view="issue-view"
+             aria-label="Issue description"
+             class="sx-3nfvp2 max-w-40 sx-16dsc37 truncate">pick me</div>
+        <div class="max-w-40">another element sharing the width class</div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await sleep(200);
+      await new Promise((r) => window.__onMessage({ type: "pe-start-picker" }, {}, r));
+      const target = document.querySelector('[aria-label="Issue description"]');
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitFor(() => document.getElementById("pe-pick-menu"), "the candidate list");
+      const rows = () => [...document.querySelectorAll("#pe-pick-menu .pe-pick-item")];
+      const sels = () => rows().map((r) => r.querySelector(".pe-pick-sel").textContent);
+
+      // The whole point of the change: these did not exist in the list before.
+      check("attribute candidates are offered at all", () => {
+        const s = sels();
+        ok(s.indexOf('[aria-label="Issue description"]') > -1, "aria-label: " + s.join(" | "));
+        ok(s.indexOf('[data-restore-scroll-view="issue-view"]') > -1, "a data attribute with its value");
+        ok(s.indexOf("[data-view-id]") > -1, "and one whose value is a uuid, offered by presence only");
+      });
+      check("a generated id also yields the prefix form the shipped preset writes by hand", () => {
+        ok(sels().indexOf('[id^="editor-container"]') > -1, sels().join(" | "));
+      });
+      check("the stable handles are what the list opens with", () => {
+        const s = sels();
+        ok(!rows()[0].classList.contains("generated"), "the first row is not one that expires: " + s[0]);
+        // The uuid id is the most precise selector on this element and the least durable, so
+        // "most precise first" is exactly the instinct being corrected here.
+        ok(s.indexOf('#editor-container-d833e58d-d489-433e-9551-c2ab0768068d') > 2, "the uuid id sank: " + s.join(" | "));
+        // A hashed class below the Tailwind one, which is below every attribute.
+        ok(s.indexOf(".max-w-40") < s.indexOf(".sx-3nfvp2"), "Tailwind above the hash");
+        ok(s.indexOf('[aria-label="Issue description"]') < s.indexOf(".max-w-40"), "attributes above Tailwind");
+      });
+      // Ranking moves it down a list the user is about to pick from anyway. Only the badge
+      // tells them the selector expires — nothing else on the row looks any different.
+      check("and the hashes are marked, not just demoted", () => {
+        const marked = rows().filter((r) => r.classList.contains("generated"));
+        const names = marked.map((r) => r.querySelector(".pe-pick-sel").textContent);
+        ok(names.indexOf(".sx-3nfvp2") > -1, "the hash is marked: " + names.join(" | "));
+        ok(names.indexOf(".max-w-40") === -1, "and Tailwind is not");
+        ok(names.indexOf('[aria-label="Issue description"]') === -1, "nor the aria-label");
+        const warn = marked[0].querySelector(".pe-pick-warn");
+        ok(warn && warn.textContent === peMsg("pickGenerated"), "with a badge that says why");
+      });
+      check("the badge is legible where it sits", () => {
+        const warn = document.querySelector("#pe-pick-menu .pe-pick-warn");
+        const c = contrast(getComputedStyle(warn).color, bg(warn));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      check("the counts are still real", () => {
+        const row = rows().find((r) => r.querySelector(".pe-pick-sel").textContent === ".max-w-40");
+        eq(row.querySelector(".pe-pick-count").textContent, peMsg("pickMatches", ["2"]), "two elements carry it");
+      });`
+    },
+  {
     // Copy reference where there is no header to hang a button off — another tracker, or a
     // Plane that moved the title field. The page deliberately carries none of the item-header
     // markup, so findKeyEl has nothing and the whole feature rests on the URL reader.

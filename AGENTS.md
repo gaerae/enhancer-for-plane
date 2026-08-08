@@ -78,6 +78,24 @@ no-op instead of a fight when the markup moves. Same conclusion for "just mirror
 Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
 to implement, not theirs to be observed.
 
+**The most precise selector is the least durable one, and the picker must not recommend by
+precision.** A uuid id matches exactly the element under the cursor and dies with the next
+render; `.max-w-40` matches thirty things and outlives the release. The picker ranked on "is
+this a Tailwind width class", which is a statement about the feature's first use and not
+about survival, so it put `#editor-container-{uuid}` at the top of the list on Plane Cloud
+and a content hash at the top on Linear. Rank by how the handle was authored, and *say* which
+ones expire — a demotion alone moves a row in a list the reader is about to pick from anyway.
+Demote, never filter: this is a guess about somebody else's markup and the cost of being
+wrong belongs on the ordering, not on whether the option exists.
+
+Two things learned doing it, both by measuring rather than reasoning. A pattern that reads a
+token in isolation cannot catch a digit-free hash — nothing distinguishes `sx-euugli` from
+`bg-white` — so one signal has to come from the page: a prefix carrying an implausible number
+of distinct classes is a namespace, and the counts are not close (Linear `sx`: 862; the
+largest Tailwind prefix on a Plane Cloud work item: `text` at 33). And every tightening has to
+be re-run against both real pages, because the patterns that catch more also catch `h-screen`
+and `bg-white`: the version before last flagged both, for want of one lookahead.
+
 **A config the user already wrote is a grammar, and a grammar reads both ways.** Copy
 reference became portable without a single new setting because a Quick open link
 (`https://linear.app/acme/issue/{{key}}`) is not just a way to build a URL from a key — read

@@ -1291,10 +1291,31 @@
   }
 
   // From the clicked element, build candidate selectors (individual class / full / id / path) with each match count
+  // A value safe to put inside an attribute selector's quotes.
+  function attrValue(v) {
+    return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
+
+  // The selectors this element could be addressed by, best first. peSortPickCandidates
+  // decides the order and peLooksGenerated decides what gets flagged; both are in common.js
+  // because ranking is a judgement that can be argued with in a test, and only the counting
+  // needs a document.
   function buildCandidates(el) {
     const out = [];
     const seen = new Set();
-    const add = (sel, note) => {
+    // Every class on the page, so peHashNamespaces can spot a prefix that is a build
+    // artefact rather than a vocabulary. Done once per pick, which is a user gesture.
+    let namespaces = null;
+    try {
+      const all = [];
+      document.querySelectorAll("[class]").forEach((n) => {
+        if (typeof n.className === "string") all.push(...n.className.split(/\s+/));
+      });
+      namespaces = peHashNamespaces(all.filter(Boolean));
+    } catch (_) {
+      namespaces = null; // a page we cannot survey is one we judge by pattern alone
+    }
+    const add = (sel, kind, token) => {
       if (!sel || seen.has(sel)) return;
       let count = 0;
       try {
@@ -1302,28 +1323,43 @@
       } catch (_) {
         return;
       }
-      out.push({ sel, count, note });
+      out.push({ sel, count, kind, token, generated: peLooksGenerated(token, kind, namespaces) });
       seen.add(sel);
     };
-    if (el.id) add("#" + cssEsc(el.id), "id");
+
+    if (el.id) {
+      add("#" + cssEsc(el.id), "id", el.id);
+      // An id with a generated tail still has a usable head. This is not a clever extra: it
+      // is what the shipped dropdown preset does by hand for headlessui's counter, and what
+      // Plane's per-item `editor-container-{uuid}` needs to be addressable at all.
+      const head = peLooksGenerated(el.id, "id", namespaces) ? pePickIdPrefix(el.id) : "";
+      if (head) add("[id^=" + attrValue(head) + "]", "id-prefix", head);
+    }
+
+    // Attributes were missing entirely, which on a page whose classes are all hashes meant
+    // the list held no stable option at all — the picker could not reach `[data-view-id]` or
+    // `[aria-label="Issue description"]` however hard the user looked.
+    for (const a of el.attributes || []) {
+      const name = a.name;
+      const kind = name === "aria-label" ? "label" : name === "role" ? "role" : name.indexOf("data-") === 0 ? "data" : "";
+      if (!kind) continue;
+      const val = String(a.value == null ? "" : a.value);
+      // The value is part of the handle only when it is itself a handle. A uuid in
+      // `data-view-id` is this element today and a different element tomorrow, so there the
+      // useful selector is the attribute's presence.
+      const useValue = val && val.length <= 40 && !peLooksGenerated(val, "data", namespaces);
+      add("[" + name + (useValue ? "=" + attrValue(val) : "") + "]", kind, useValue ? name + "-" + val : name);
+    }
+
     const tag = el.tagName.toLowerCase();
     const cls =
       el.className && typeof el.className === "string"
         ? el.className.trim().split(/\s+/).filter(Boolean)
         : [];
-    // rank width-related classes first, then height, then the rest (the user picks from the list)
-    const score = (c) => {
-      if (/^(max-w|min-w|w)-/.test(c)) return 3;
-      if (/^(max-h|min-h|h)-/.test(c)) return 1;
-      return 0;
-    };
-    cls
-      .slice()
-      .sort((a, b) => score(b) - score(a))
-      .forEach((c) => add("." + cssEsc(c), "class"));
-    if (cls.length) add(tag + cls.slice(0, 6).map((c) => "." + cssEsc(c)).join(""), "tag + classes");
-    add(buildSelector(el), "auto");
-    return out.slice(0, 14);
+    cls.forEach((c) => add("." + cssEsc(c), "class", c));
+    if (cls.length) add(tag + cls.slice(0, 6).map((c) => "." + cssEsc(c)).join(""), "tag+classes", cls[0]);
+    add(buildSelector(el), "auto", "");
+    return peSortPickCandidates(out).slice(0, 14);
   }
 
   function toast(msg) {
@@ -1430,6 +1466,16 @@
       n.textContent = peMsg("pickMatches", [String(c.count)]);
       it.appendChild(s);
       it.appendChild(n);
+      // Ranking alone moves a hashed class down a list the user is about to pick from
+      // anyway. Saying why is what stops them picking it: the selector looks perfectly
+      // ordinary, and nothing else on screen suggests it expires.
+      if (c.generated) {
+        it.classList.add("generated");
+        const w = document.createElement("span");
+        w.className = "pe-pick-warn";
+        w.textContent = peMsg("pickGenerated");
+        it.appendChild(w);
+      }
       it.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();

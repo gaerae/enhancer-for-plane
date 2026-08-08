@@ -642,6 +642,10 @@
   "pickerHint": {
     "message": "Click an element to create a rule · Esc to cancel"
   },
+  "pickGenerated": {
+    "message": "may not last",
+    "description": "Badge on a picker candidate whose class or id looks build-generated (a hash, a uuid, a counter) rather than authored. Short: it sits inline beside the selector and a match count."
+  },
   "pickMatches": {
     "message": "matches $COUNT$",
     "placeholders": {

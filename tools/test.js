@@ -1281,6 +1281,177 @@ test("quick: the schema is stamped and a v5 user gains an empty quickLinks list"
   eq(ctx.peMigrate({ schema: 5 }).schema, ctx.__SCHEMA, "stamp advances to PE_SCHEMA");
 });
 
+/* ---------------- the picker's candidate ranking ---------------- */
+
+// Every string in this suite was read off a real page on 2026-08-08 — app.plane.so/gaerae
+// and linear.app/gaerae — because the whole judgement is "does this look authored", and a
+// made-up example proves nothing about markup nobody writes.
+test("pick: a build-generated handle is recognised", () => {
+  const { peLooksGenerated } = loadCommon();
+  const yes = (t, kind) => ok(peLooksGenerated(t, kind), t + " should read as generated");
+  yes("sx-3nfvp2", "class"); // Linear, every class on an issue page
+  yes("sx-1heor9g", "class");
+  yes("sx-o45ghp", "class");
+  yes("sc2sx-Flex-d11c8f6e", "class"); // Linear, a hashed component class
+  yes("editor-container-d833e58d-d489-433e-9551-c2ab0768068d", "id"); // Plane Cloud, per item
+  yes("theme-provider-399572923184751ace34e60b5a9654a7b0a6f23b", "class"); // Plane Cloud
+  yes("headlessui-combobox-options-42", "id"); // Plane, and what the shipped preset works around
+  yes("DndLiveRegion-0", "id");
+  yes("Button_root__x7f2a", "class"); // CSS modules, the other common build output
+  // React's useId, on Plane Cloud via three different headless libraries at once. The value
+  // changes every render, so a rule written against one of these is dead on arrival.
+  yes("headlessui-menu-button-:r1b:", "id");
+  yes("radix-:r1e:", "id");
+  yes("base-ui-:r1i:", "id");
+  yes(":r1c:", "id");
+  // Plane Cloud puts bare uuids in ids too, and prefixes them in others.
+  yes("sidebar-36947e51-c716-477e-bf04-75db338e6d44-JOINED", "id");
+  yes("editor-image-block-9c3aea94-703a-4d4c-8c39-4201e994711d", "id");
+});
+
+// The false positives that would matter. Demoting a real Tailwind class would push the
+// thing the user came for to the bottom of the list and label it a risk.
+test("pick: ordinary authored handles are not demoted", () => {
+  const { peLooksGenerated } = loadCommon();
+  const no = (t, kind) => ok(!peLooksGenerated(t, kind), t + " should read as authored");
+  // The two that broke an earlier version of the pattern: a short prefix and a five-letter
+  // tail is not a hash unless the tail also has a digit in it.
+  no("bg-white", "class");
+  no("h-screen", "class");
+  // Tailwind with numbers in it — the reason the trailing-counter rule is ids only.
+  no("max-w-40", "class");
+  no("max-w-[150px]", "class");
+  no("px-9", "class");
+  no("py-6", "class");
+  no("w-full", "class");
+  no("z-[5]", "class");
+  no("bg-surface-1", "class");
+  no("shrink-0", "class");
+  no("overflow-y-auto", "class");
+  no("truncate", "class");
+  // Ids people wrote.
+  no("main-sidebar", "id");
+  no("title-input", "id");
+  no("mainLayoutContainer", "id");
+  no("", "class");
+  no(null, "class");
+});
+
+// Half of Linear's hashes have no digit in them, and nothing about `sx-euugli` on its own
+// tells it from `bg-white`. The tell is that it has eight hundred siblings — a fact about
+// the page, which is why this one signal is measured rather than pattern-matched.
+test("pick: a prefix with a page full of siblings is a hash namespace", () => {
+  const ctx = loadCommon();
+  // The real counts, 2026-08-08: Linear's `sx` covers 862 classes on an issue page; the
+  // biggest utility prefix on a Plane Cloud work item is `text` at 33.
+  const linear = [];
+  for (let i = 0; i < 862; i++) linear.push("sx-tok" + i.toString(36));
+  const plane = [];
+  for (let i = 0; i < 33; i++) plane.push("text-" + i.toString(36));
+  for (let i = 0; i < 17; i++) plane.push("border-" + i.toString(36));
+
+  const ns = ctx.peHashNamespaces(linear.concat(plane));
+  ok(ns.has("sx"), "Linear's namespace is caught");
+  ok(!ns.has("text"), "and Plane's biggest utility prefix is not");
+  ok(!ns.has("border"), "nor its second");
+  // The digit-free hashes that no pattern can reach, now reachable.
+  ok(ctx.peLooksGenerated("sx-euugli", "class", ns), "sx-euugli");
+  ok(ctx.peLooksGenerated("sx-hfnvfx", "class", ns), "sx-hfnvfx");
+  ok(!ctx.peLooksGenerated("sx-euugli", "class"), "and not without the page to say so");
+  // The namespace must not drag a real utility class down with it.
+  ok(!ctx.peLooksGenerated("text-sm", "class", ns), "text-sm survives");
+  ok(!ctx.peLooksGenerated("max-w-40", "class", ns), "max-w-40 survives");
+  // Headroom in both directions, asserted so a future tweak to the threshold has to face it.
+  ok(ctx.peHashNamespaces(plane).size === 0, "a purely Tailwind page has no namespace at all");
+  eq(ctx.peHashNamespaces([]).size, 0);
+  eq(ctx.peHashNamespaces(null).size, 0);
+  eq(ctx.peLooksGenerated("x-y", "class", { has: null }), false, "a junk hint is ignored, not a crash");
+});
+
+// Linear's other build output, which the digit rule also cannot see: `_name_hash_counter`
+// with single underscores, not the double-underscore CSS-modules form.
+test("pick: the single-underscore module classes are recognised", () => {
+  const { peLooksGenerated } = loadCommon();
+  ok(peLooksGenerated("_draggableRegion_1ojkm_1", "class"));
+  ok(peLooksGenerated("_tooltipTriggerContent_1et26_1", "class"));
+  ok(peLooksGenerated("_menuOpenBg_ekx18_56", "class"));
+  ok(!peLooksGenerated("_", "class"), "a bare underscore is not a pattern");
+  ok(!peLooksGenerated("_private_thing", "class"), "an authored underscore name is left alone");
+});
+
+test("pick: an id with a generated tail still has a usable head", () => {
+  const { pePickIdPrefix } = loadCommon();
+  eq(pePickIdPrefix("headlessui-combobox-options-42"), "headlessui-combobox-options");
+  eq(pePickIdPrefix("editor-container-d833e58d-d489-433e-9551-c2ab0768068d"), "editor-container");
+  eq(pePickIdPrefix("DndLiveRegion-0"), "DndLiveRegion");
+  eq(pePickIdPrefix("headlessui-menu-button-:r1b:"), "headlessui-menu-button");
+  eq(pePickIdPrefix("sidebar-36947e51-c716-477e-bf04-75db338e6d44-JOINED"), "sidebar");
+  eq(pePickIdPrefix("main-sidebar"), "", "nothing generated to cut");
+  eq(pePickIdPrefix("a-1"), "", "what is left is too short to mean anything");
+  eq(pePickIdPrefix(""), "");
+});
+
+// The order is the recommendation. This is the case that started it: on Linear there is no
+// authored class at all, so what the picker must not do is put a hash at the top with
+// nothing said about it.
+test("pick: on a page of hashed classes, the stable handles come first", () => {
+  const ctx = loadCommon();
+  // `generated` is what buildCandidates stamps on each candidate; the scorer trusts it
+  // rather than re-deriving, so that the rank and the badge can never disagree.
+  const cands = [
+    { sel: ".sx-3nfvp2", kind: "class", token: "sx-3nfvp2", generated: true },
+    { sel: ".sx-16dsc37", kind: "class", token: "sx-16dsc37", generated: true },
+    { sel: 'div.sx-3nfvp2.sx-16dsc37', kind: "tag+classes", token: "sx-3nfvp2", generated: true },
+    { sel: '[aria-label="Issue description"]', kind: "label", token: "aria-label-Issue description" },
+    { sel: "[data-view-id]", kind: "data", token: "data-view-id" }
+  ];
+  eq(
+    ctx.peSortPickCandidates(cands).map((c) => c.sel),
+    ["[data-view-id]", '[aria-label="Issue description"]', ".sx-3nfvp2", ".sx-16dsc37", "div.sx-3nfvp2.sx-16dsc37"],
+    "the two attributes first, and every hash below them"
+  );
+  // Last of all is the compound, and that is the right way round: it is the same hashes as
+  // the single-class option plus a tag, so it depends on more of what is about to change.
+  ok(
+    ctx.pePickScore({ kind: "tag+classes", generated: true }) < ctx.pePickScore({ kind: "class", generated: true }),
+    "more hashes, lower rank"
+  );
+});
+
+test("pick: among authored handles the old width-first order survives", () => {
+  const ctx = loadCommon();
+  const cands = [
+    { sel: ".truncate", kind: "class", token: "truncate" },
+    { sel: ".h-full", kind: "class", token: "h-full" },
+    { sel: ".max-w-40", kind: "class", token: "max-w-40" },
+    { sel: "#main-sidebar", kind: "id", token: "main-sidebar" }
+  ];
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), ["#main-sidebar", ".max-w-40", ".h-full", ".truncate"]);
+});
+
+test("pick: a generated id ranks below an ordinary class, and its prefix above both", () => {
+  const ctx = loadCommon();
+  const cands = [
+    { sel: '#editor-container-d833e58d-d489-433e-9551-c2ab0768068d', kind: "id", token: "editor-container-d833e58d-d489-433e-9551-c2ab0768068d", generated: true },
+    { sel: ".editor-container", kind: "class", token: "editor-container" },
+    { sel: '[id^="editor-container"]', kind: "id-prefix", token: "editor-container" }
+  ];
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), [
+    '[id^="editor-container"]',
+    ".editor-container",
+    "#editor-container-d833e58d-d489-433e-9551-c2ab0768068d"
+  ]);
+});
+
+test("pick: ties keep the order the page gave them", () => {
+  const ctx = loadCommon();
+  const cands = ["a", "b", "c"].map((t) => ({ sel: "." + t, kind: "class", token: t }));
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), [".a", ".b", ".c"]);
+  eq(ctx.peSortPickCandidates([]), []);
+  eq(ctx.peSortPickCandidates(null), []);
+  eq(ctx.pePickScore({ kind: "nonsense" }), 0, "an unknown kind is last, not a crash");
+});
+
 /* ---------------- rule health ---------------- */
 
 // The measurement this is built on, taken on Plane Cloud 2026-08-08: `.max-w-40` matches 35

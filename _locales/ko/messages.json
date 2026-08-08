@@ -639,6 +639,10 @@
   "pickerHint": {
     "message": "요소를 클릭하면 규칙이 만들어집니다 · Esc로 취소"
   },
+  "pickGenerated": {
+    "message": "곧 바뀔 수 있음",
+    "description": "Badge on a picker candidate whose class or id looks build-generated (a hash, a uuid, a counter) rather than authored. Short: it sits inline beside the selector and a match count."
+  },
   "pickMatches": {
     "message": "$COUNT$개 일치",
     "placeholders": {

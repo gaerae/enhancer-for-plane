@@ -71,6 +71,29 @@ Schema 7 → 8.
   The record is per device (`chrome.storage.local`), never synced, and disabled rules are
   left out of it — a rule nobody applies has nothing to answer for.
 
+### Improved
+- **The element picker now offers stable selectors first, and marks the ones that expire.**
+  It ranked on one axis — "is this a Tailwind width class" — which says nothing about the
+  question that decides whether a rule survives: did a person write this handle, or did a
+  build step generate it? A hashed class sat at the top of the list looking like any other.
+
+  Two things changed. **Attribute selectors are generated at all**, which they were not:
+  `[data-view-id]`, `[aria-label="Issue description"]`, and — for an id with a generated tail
+  — the `[id^="…"]` prefix form the shipped dropdown preset had to be written by hand. And
+  anything that looks build-generated is demoted and badged **"may not last"**: hashes
+  (`sx-3nfvp2`), uuids (`editor-container-d833e58d-…`), CSS-module names, counters, and
+  React's `useId` values (`headlessui-menu-button-:r1b:`, `radix-:r1e:`). Demoted, not
+  hidden — it is a guess about someone else's markup, so being wrong costs a position rather
+  than an option.
+
+  Some hashes have no digit in them and nothing tells `sx-euugli` from `bg-white` in
+  isolation, so one signal is measured from the page instead: a prefix carrying an
+  implausible number of distinct classes is a hash namespace. Measured 2026-08-08 —
+  Linear's `sx` covers 862 classes on an issue page; the largest utility prefix on a Plane
+  Cloud work item is `text` at 33. Over both real pages the finished detector flags 908 of
+  Linear's 937 classes (the 29 it leaves are genuinely authored — `ProseMirror`, `editor`,
+  `heading-node`) and **none** of Plane Cloud's 515.
+
 ### Internal
 - **`tools/dom-harness.js`'s synthetic Plane page carries two generations of the markup**,
   1.4 and Cloud, plus a decoy for each. A page that carries one generation cannot notice

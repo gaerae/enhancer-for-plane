@@ -163,11 +163,25 @@ Plane server**, applied only on the domains you enable.
      reaches it and its own resize effect forces it back open above 768px — so this hides the
      panel with CSS instead of driving Plane's state, which would be a fight.
 6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
-   then click any element on the Plane page. A **candidate selector list**
-   appears (individual classes / full / id, each with a match count, width
-   classes ranked first) so you can choose the right one. The picked rule is
-   added to Settings (with an empty value → set the value there and apply). Build
-   width/style rules without DevTools.
+   then click any element on the page. A **candidate selector list** appears — attributes,
+   individual classes, id, each with a match count — so you can choose the right one. The
+   picked rule is added to Settings (with an empty value → set the value there and apply).
+   Build width/style rules without DevTools.
+   - **The list is ordered by what will still work next month, not by what is most
+     precise.** A handle a person wrote (`#main-sidebar`, `[data-view-id]`,
+     `[aria-label="Issue description"]`, `.max-w-40`) comes first; anything that looks
+     build-generated is pushed down and badged **"may not last"** — hashed classes
+     (`sx-3nfvp2`), uuids (`editor-container-d833e58d-…`), CSS-module names, counters, and
+     React `useId` values (`headlessui-menu-button-:r1b:`). Demoted, never hidden: it is a
+     guess about someone else's markup, so being wrong should cost a position, not an
+     option.
+   - For an id whose tail is generated, you also get the **`[id^="…"]` prefix form** — the
+     same shape the shipped dropdown preset had to be written by hand.
+   - Some hashes have no digit in them, and nothing tells `sx-euugli` from `bg-white` in
+     isolation. So one signal is measured from the page: a prefix carrying an implausible
+     number of distinct classes is a hash namespace. On real pages (2026-08-08) this flags
+     908 of Linear's 937 classes — leaving the 29 that really are authored — and **none** of
+     Plane Cloud's 515.
    - When the picker adds a rule, an open Settings page reflects it
      automatically (via `chrome.storage.onChanged`, unless you have unsaved
      edits).

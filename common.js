@@ -356,6 +356,150 @@ function peRuleHealthColdCount(health, rules) {
   ).length;
 }
 
+/* ================================================================== */
+/* The element picker's candidate ranking                              */
+/* ================================================================== */
+//
+// The picker offers the selectors an element could be addressed by, and the order it offers
+// them in is a recommendation. It used to rank on one axis — "is this a Tailwind width
+// class" — which was right for the feature's first purpose and says nothing about the
+// question that actually decides whether a rule survives: is this handle one a human wrote,
+// or one a build step generated?
+//
+// Measured on Linear (2026-08-08), every class on an issue page is a content hash:
+// `sx-3nfvp2 sx-16dsc37 sx-l56j7k`. They change when the CSS changes. Offering one first,
+// with no mark on it, is the picker recommending a rule that will be dead by the next
+// deploy. Plane has a milder version of the same thing — `editor-container-{uuid}`,
+// `headlessui-combobox-options-42` — and the shipped dropdown preset already works around
+// it by hand, with `[id^="headlessui-combobox-options"]`.
+//
+// So: rank by what kind of handle it is, demote anything that looks generated, and say so
+// in the list. Demote, not hide — this is a guess about someone else's markup, and the cost
+// of being wrong should be a worse position, never a missing option.
+
+// A hash namespace is a prefix that accounts for an implausible number of distinct classes
+// on one page. Measured 2026-08-08: Linear's `sx` covers 862 of the 937 classes on an issue
+// page, while the largest utility prefix on a Plane Cloud work item is `text` at 33, then
+// `h` and `border` at 17. Anything between those is a threshold; 120 sits an order of
+// magnitude clear of Plane and 7x clear of Linear, so it takes a page unlike either to make
+// this wrong — and being wrong costs a demotion, not a missing option.
+//
+// This exists because the patterns below cannot see it. Half of Linear's hashes have no
+// digit in them (`sx-hfnvfx`, `sx-euugli`), and nothing about `sx-euugli` in isolation
+// distinguishes it from `bg-white` — the tell is that there are eight hundred of its
+// siblings, which is a fact about the page and not about the token.
+const PE_PICK_NAMESPACE_MIN = 120;
+
+function peHashNamespaces(tokens) {
+  const counts = Object.create(null);
+  (Array.isArray(tokens) ? tokens : []).forEach((t) => {
+    const s = String(t == null ? "" : t);
+    const i = s.indexOf("-");
+    if (i <= 0) return;
+    const p = s.slice(0, i);
+    (counts[p] = counts[p] || new Set()).add(s);
+  });
+  const out = new Set();
+  Object.keys(counts).forEach((p) => {
+    if (counts[p].size >= PE_PICK_NAMESPACE_MIN) out.add(p);
+  });
+  return out;
+}
+
+// A handle a build step produced rather than a person. Each pattern is here because
+// something real matches it; the comment says what. `namespaces` is optional — the caller
+// passes what peHashNamespaces found on the page, which is the only way to catch a hash
+// that has no digit in it.
+function peLooksGenerated(token, kind, namespaces) {
+  const t = String(token == null ? "" : token);
+  if (!t) return false;
+  if (namespaces && typeof namespaces.has === "function") {
+    const i = t.indexOf("-");
+    if (i > 0 && namespaces.has(t.slice(0, i))) return true;
+  }
+  // CSS modules, the single-underscore flavour: Linear's `_draggableRegion_1ojkm_1`,
+  // `_menuOpenBg_ekx18_56`. A leading underscore, a name, a hash and a counter.
+  if (/^_[A-Za-z]\w*_[a-z0-9]{4,}_\d+$/.test(t)) return true;
+  // React's useId, which every headless UI library on Plane Cloud leans on:
+  // `headlessui-menu-button-:r1b:`, `radix-:r1e:`, `base-ui-:r1i:`, or the bare `:r1c:`.
+  // The value changes on every render, so a rule written against one is dead immediately.
+  if (/:[a-z0-9]+:/i.test(t)) return true;
+  // A uuid anywhere: Plane's `editor-container-d833e58d-d489-433e-9551-c2ab0768068d`.
+  if (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t)) return true;
+  // A run of 8+ hex containing a digit, as a whole segment: Linear's `sc2sx-Flex-d11c8f6e`,
+  // Plane's `theme-provider-399572923184751ace…`. The digit requirement keeps it off words
+  // that happen to be spelled in hex letters.
+  if (/(^|[-_])(?=[0-9a-f]*\d)[0-9a-f]{8,}([-_]|$)/i.test(t)) return true;
+  // A tiny prefix and an opaque tail mixing letters and digits: Linear's `sx-3nfvp2`. Both
+  // lookaheads are load-bearing — without the digit this also matches `bg-white` and
+  // `h-screen`, which are ordinary Tailwind and must not be demoted.
+  if (/^[a-z]{1,3}-(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{5,}$/i.test(t)) return true;
+  // CSS modules: `Button_root__x7f2a`.
+  if (/__[a-z0-9]{5,}$/i.test(t)) return true;
+  // A trailing counter, ids only. `headlessui-combobox-options-42`, `DndLiveRegion-0` — but
+  // NOT `max-w-40` or `px-9`, which is why this one does not apply to classes.
+  if (kind === "id" && /-\d+$/.test(t)) return true;
+  return false;
+}
+
+// For an id whose tail is generated, the part that is not. `headlessui-combobox-options-42`
+// → `headlessui-combobox-options`, which is exactly what the shipped dropdown preset
+// selects with `[id^="…"]`. Returns "" when there is no stable head worth offering.
+function pePickIdPrefix(id) {
+  const t = String(id == null ? "" : id);
+  const cut = t
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*$/i, "")
+    .replace(/:[a-z0-9]+:.*$/i, "")
+    .replace(/-\d+$/, "")
+    .replace(/[-_]+$/, "");
+  // Long enough to mean something, and it has to be a real prefix or there is nothing to say.
+  return cut.length >= 4 && cut.length < t.length ? cut : "";
+}
+
+// Higher is better. The kinds are ordered by how much of a promise they carry: an id or a
+// data attribute is something a developer named on purpose; a class may be either; the
+// generated path at the bottom is a description of where the element happens to sit today.
+const PE_PICK_KIND_SCORE = {
+  id: 100,
+  "id-prefix": 95,
+  data: 90,
+  label: 80,
+  role: 60,
+  class: 40,
+  "tag+classes": 20,
+  auto: 10
+};
+// Enough to sink a generated id below an ordinary class, and a generated class below the
+// path fallback — which is the honest order, because on a page where every class is a hash
+// the path is no worse a guess and at least does not look authored.
+const PE_PICK_GENERATED_PENALTY = 70;
+
+function pePickScore(cand) {
+  const c = cand && typeof cand === "object" ? cand : {};
+  let score = PE_PICK_KIND_SCORE[c.kind];
+  if (typeof score !== "number") score = 0;
+  // The original axis, kept: width is what this feature is most often used for, so among
+  // equals a width class is still the one to offer first.
+  if (c.kind === "class") {
+    if (/^(max-w|min-w|w)-/.test(String(c.token || ""))) score += 8;
+    else if (/^(max-h|min-h|h)-/.test(String(c.token || ""))) score += 4;
+  }
+  // The candidate carries the verdict rather than re-deriving it: buildCandidates knows the
+  // page's hash namespaces and this does not, and one of them having a different answer to
+  // the other is how a row gets demoted without the badge that explains it.
+  if (c.generated) score -= PE_PICK_GENERATED_PENALTY;
+  return score;
+}
+
+// Sorted best-first, ties keeping the order they were built in (the DOM's own order for
+// classes, which is the only order the page gives us and is stable between runs).
+function peSortPickCandidates(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((c, i) => ({ c, i, s: pePickScore(c) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.c);
+}
+
 const PE_DEFAULTS = {
   schema: PE_SCHEMA,
   enabled: true,
