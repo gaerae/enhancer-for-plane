@@ -895,7 +895,15 @@
     "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
   },
   "optKeysRebind": {
-    "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>.\nThe other two are handled inside the page and are fixed."
+    "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The two <kbd>Alt</kbd> shortcuts are handled inside the page and are fixed."
+  },
+  "optKeysKeyword": {
+    "message": "<kbd>issue</kbd> is fixed as well, for a different reason: an extension declares its address-bar keyword in its manifest and there is no API to change it.\nChrome lists it under <code>chrome://settings/searchEngines</code> → Extensions, but offers only <b>Manage</b> and <b>Deactivate</b> there — no rename.",
+    "description": "Answers a question asked directly: the omnibox keyword looks like a setting because Chrome lists it among the search engines. Verified on Chrome 151 — the row's menu has Manage and Deactivate and nothing else."
+  },
+  "optKeysKeywordDiy": {
+    "message": "If you want a shorter one, add your own on that same page under <b>Site search</b>: any keyword you like, pointing at <code>https://your-plane/your-workspace/browse/%s</code>.\nThat is Chrome's own feature, not this extension's, so it opens one fixed address — no prefix routing to a second tracker, no recent items, and no falling back to a search when what you typed is not a key.",
+    "description": "The thing you can actually do instead, with its limits stated. A Chrome site-search shortcut is one URL: it skips the prefix routing, the recents and the search fallback, and saying so is the difference between an alternative and a disappointment."
   },
   "optKeysWhyTyping": {
     "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type.\n<kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives."

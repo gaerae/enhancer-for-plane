@@ -704,6 +704,14 @@ const suites = [
         const t = document.getElementById("panel-keys").textContent;
         ok(t.indexOf("chrome://extensions/shortcuts") > -1, "the rebinding address");
       });
+      // The address-bar keyword looks like a setting, because Chrome lists it among the
+      // search engines — so the page has to say it is not one, and say what to do instead.
+      // Verified on Chrome 151: the extension's row there offers Manage and Deactivate only.
+      check("and answers the keyword question, with the way round it", () => {
+        const t = document.getElementById("panel-keys").textContent;
+        ok(t.indexOf("chrome://settings/searchEngines") > -1, "no pointer to where Chrome shows it");
+        ok(t.indexOf("%s") > -1, "no site-search URL to copy: " + t.slice(-260));
+      });
       // Four columns, one of them a sentence: on a narrow window the table has to scroll
       // inside its own box rather than making the whole page scroll sideways.
       check("a narrow window scrolls the table, not the page", () => {

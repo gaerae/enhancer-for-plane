@@ -892,7 +892,15 @@
     "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
   },
   "optKeysRebind": {
-    "message": "집중 모드는 브라우저 명령이라 <code>chrome://extensions/shortcuts</code>에서 다른 키로 바꾸거나 비울 수 있습니다.\n나머지 둘은 페이지 안에서 처리하는 키라 고정입니다."
+    "message": "집중 모드는 브라우저 명령이라 <code>chrome://extensions/shortcuts</code>에서 다시 지정하거나 해제할 수 있습니다. <kbd>Alt</kbd> 단축키 두 개는 페이지 안에서 처리되며 고정입니다."
+  },
+  "optKeysKeyword": {
+    "message": "<kbd>issue</kbd>도 고정인데, 이유는 다릅니다. 확장 프로그램의 주소창 키워드는 매니페스트에 선언하며 바꾸는 API가 없습니다.\nChrome은 <code>chrome://settings/searchEngines</code> → 확장 프로그램에 이 키워드를 보여주지만, 거기서 제공하는 건 <b>관리</b>와 <b>사용 중지</b>뿐입니다 — 이름 바꾸기는 없습니다.",
+    "description": "Answers a question asked directly: the omnibox keyword looks like a setting because Chrome lists it among the search engines. Verified on Chrome 151 — the row's menu has Manage and Deactivate and nothing else."
+  },
+  "optKeysKeywordDiy": {
+    "message": "더 짧은 걸 쓰고 싶다면 같은 페이지의 <b>사이트 검색</b>에 직접 추가하세요. 원하는 키워드에 <code>https://내-plane/내-워크스페이스/browse/%s</code>를 넣으면 됩니다.\n이건 이 확장이 아니라 Chrome의 기능이라 주소 하나만 엽니다 — 접두사로 다른 트래커에 보내는 것도, 최근 항목도, 키가 아닐 때 검색으로 넘기는 것도 없습니다.",
+    "description": "The thing you can actually do instead, with its limits stated. A Chrome site-search shortcut is one URL: it skips the prefix routing, the recents and the search fallback, and saying so is the difference between an alternative and a disappointment."
   },
   "optKeysWhyTyping": {
     "message": "<kbd>Alt</kbd>+<kbd>T</kbd>는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다.\n<kbd>Alt</kbd>+<kbd>C</kbd>는 일부러 그렇게 하지 않았습니다.\nmacOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다."

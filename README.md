@@ -35,11 +35,18 @@ Plane server**, applied only on the domains you enable.
    - It **opens a URL and nothing more** — no host permission, no content script — so it
      works on any tab, including ones where the rest of the extension never runs. Ships with
      no targets; add yours in Settings, where each row previews where a sample key lands.
-   - **Adding one starts from an example.** The Add button offers a row per site you have
-     already added (host filled in) and one per tracker — Plane, Jira, Linear, GitHub,
-     GitLab. Picking one fills both URLs and selects the part you still have to replace,
-     `⟨workspace⟩` or `⟨site⟩`, so the next keystroke overwrites it. Every shape was opened
-     in a browser and every search URL checked against a nonsense query too; the two that
+   - **Adding one starts from a real address.** Open a work item in your tracker, copy the
+     address bar, paste it into the Add panel: a known shape is recognised and both URLs are
+     filled from it, search included, with nothing left to type. A tracker nobody listed
+     still works — the last key-shaped segment of the path becomes the token, so
+     `https://redmine.example.org/issues/45231` gives you `…/issues/{{key.num}}` and asks
+     only for a prefix to type before the number. An address with no key in it is refused
+     rather than guessed at.
+   - **Or start from an example**, if you do not have one open: a row per site you already
+     added (host filled in) and one per tracker — Plane, Jira, Linear, GitHub, GitLab. Each
+     row shows both addresses it will fill. Picking one selects the first part you have to
+     replace, `⟨workspace⟩` or `⟨site⟩`, and Tab walks the rest. Every shape was opened in a
+     browser and every search URL checked against a nonsense query too; the two that
      underdeliver (Plane's search, Linear having none) say so on the row instead of being
      left out.
    - **The keys you opened last come back to you.** The one real barrier here was having to
@@ -196,11 +203,16 @@ Plane server**, applied only on the domains you enable.
    - **The list is ordered by what will still work next month, not by what is most
      precise.** A handle a person wrote (`#main-sidebar`, `[data-view-id]`,
      `[aria-label="Issue description"]`, `.max-w-40`) comes first; anything that looks
-     build-generated is pushed down and badged **"may not last"** — hashed classes
-     (`sx-3nfvp2`), uuids (`editor-container-d833e58d-…`), CSS-module names, counters, and
-     React `useId` values (`headlessui-menu-button-:r1b:`). Demoted, never hidden: it is a
-     guess about someone else's markup, so being wrong should cost a position, not an
-     option.
+     build-generated is pushed down — hashed classes (`sx-3nfvp2`), uuids
+     (`editor-container-d833e58d-…`), CSS-module names, counters, and React `useId` values
+     (`headlessui-menu-button-:r1b:`). Demoted, never hidden: it is a guess about someone
+     else's markup, so being wrong should cost a position, not an option.
+   - **Every row says so in words** — what kind of handle it is (id, id prefix, data
+     attribute, label, class, position) and whether it **lasts** or **may change**. On every
+     row, not only the doubtful ones: ordinary Plane markup yields four candidates that are
+     all durable, and a mark that shows up only on the exception says nothing on a list that
+     has no exception. Group headings sit above them; the per-row verdict is what survives
+     when there is only one group.
    - For an id whose tail is generated, you also get the **`[id^="…"]` prefix form** — the
      same shape the shipped dropdown preset had to be written by hand.
    - Some hashes have no digit in them, and nothing tells `sx-euugli` from `bg-white` in
