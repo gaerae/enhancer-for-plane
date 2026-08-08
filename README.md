@@ -154,6 +154,10 @@ Plane server**, applied only on the domains you enable.
      - A rule needs 20 checks with no match before the page will say it has never worked,
        and disabled rules are left out entirely. The record is per device
        (`chrome.storage.local`), never synced.
+     - A rule can also watch something that is only there while a menu or a modal is open —
+       the shipped dropdown-width preset is one. Those are sampled again just after a click,
+       counting **hits only**, so being open once is enough and never being open at the
+       moment of a routine check is not held against them.
 5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
    is what is left. There is also a toggle beside the work item's key, next to Copy reference,
    and a switch in the toolbar popup — the shortcut alone would only exist for whoever already

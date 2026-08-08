@@ -267,8 +267,9 @@ function run(chrome, page, hash) {
         // Virtual milliseconds, not real ones, so this is a bound on what a page may wait
         // for rather than on how long the run takes. It was 5000, which was under the
         // rule-health delay alone — a suite that has to prove "nothing happened for 2.5s,
-        // then this did" needs several of those windows back to back.
-        "--virtual-time-budget=20000",
+        // then this did" needs several of those windows back to back, and the click scan's
+        // own throttle has to be waited out on top of them.
+        "--virtual-time-budget=40000",
         url
       ],
       {
@@ -1423,12 +1424,46 @@ const suites = [
       await sleep(3000);
       check("mutations alone do not re-measure", () => eq(window.__localWrites, writes, "extra writes"));
 
+      // A rule aimed at something that only exists while a menu is open. The route sample
+      // will always miss it, which is how the shipped dropdown preset came to be reported
+      // dead; the click scan is what rescues it. Both halves are here because the safe part
+      // is that the rescue counts hits and never misses.
+      const dead = () => health()["r-dead"].checks;
+      const missesBefore = dead();
+      const transient = Object.assign(document.createElement("div"), { className: "not-on-this-page" });
+      document.body.appendChild(transient);
+      document.body.click();
+      await waitFor(() => health()["r-dead"].hits === 1, "the click scan to see it");
+      check("a click rescues a rule that is only there while something is open", () => {
+        eq(health()["r-dead"].hits, 1, "seen once");
+        ok(health()["r-dead"].at > 0, "and stamped");
+      });
+      transient.remove();
+      const deadChecks = dead();
+      const liveChecks = health()["r-live"].checks;
+      // Past the scan's own throttle, so the click below definitely produces one — otherwise
+      // this passes by not running, which is the failure mode it exists to rule out.
+      await sleep(4200);
+      document.body.click();
+      await waitFor(() => health()["r-live"].checks > liveChecks, "a scan to have run");
+      check("and a scan with nothing open accuses nobody", () => {
+        // The discriminating value: r-live matches either way, so only the rule that is now
+        // absent can tell a hits-only pass from a full one.
+        eq(dead(), deadChecks, "the absent rule was not counted as a miss");
+        eq(health()["r-dead"].hits, 1, "and still remembers the one time it was there");
+      });
+
+      // Counted against a baseline rather than an absolute, because the click scans above
+      // legitimately move r-live's numbers — it matches, so a hit-only pass counts it.
+      // r-dead is the one whose miss count only a route sample may raise.
+      const beforeRoute = { live: health()["r-live"].checks, dead: dead() };
       history.pushState({}, "", location.pathname + "?route=2");
       document.body.appendChild(document.createElement("div"));
-      await waitFor(() => health()["r-live"].checks === 2, "the new route to be measured");
-      check("a route change is what triggers the next measurement", () => {
-        eq(health()["r-live"].hits, 2, "still matching");
-        eq(health()["r-dead"].checks, 2, "and still not");
+      await waitFor(() => dead() === beforeRoute.dead + 1, "the new route to be measured");
+      check("a route change is what triggers the next full measurement", () => {
+        eq(health()["r-live"].checks, beforeRoute.live + 1, "the matching rule counted once more");
+        eq(health()["r-dead"].checks, beforeRoute.dead + 1, "and so did the one that misses");
+        eq(health()["r-dead"].hits, 1, "whose single sighting still stands");
       });`
   },
   {

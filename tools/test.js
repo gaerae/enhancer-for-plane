@@ -1777,6 +1777,31 @@ test("health: the two dead presets are counted and the live one is not", () => {
   eq(ctx.peRuleHealthState(h["rule-focus-main-nav"]), "ok", "and the one that worked is not");
 });
 
+// The false positive that shipped: the "search dropdown width" preset selects
+// `[id^="headlessui-combobox-options"] > div`, which exists only while a dropdown is open.
+// Measured on Plane Cloud 2026-08-08 — closed 0, open 1 — so every routine sample missed it
+// and the settings page called a working preset dead. The rescue is a second sampling that
+// counts hits and never misses; this is the property that makes it safe.
+test("health: a hit-only pass can rescue a rule but never accuse one", () => {
+  const ctx = loadCommon();
+  let h = {};
+  // A rule pointing at a dropdown: never present when the route is sampled.
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, { dropdown: 0, always: 1 }, 100);
+  eq(ctx.peRuleHealthState(h.dropdown), "cold", "which is how it went wrong");
+  // Now the user opens one, and the click scan reports only what it found. The key is that
+  // `dropdown` is the only id in the object — a hit-only pass leaves the others untouched.
+  const before = JSON.stringify(h.always);
+  h = ctx.peRuleHealthUpdate(h, { dropdown: 1 }, 200);
+  eq(ctx.peRuleHealthState(h.dropdown), "ok", "one sighting is enough, forever");
+  eq(h.dropdown.at, 200, "stamped when it was seen");
+  eq(JSON.stringify(h.always), before, "and the rule that was not in the report is untouched");
+  // The mirror image, and the reason the scan filters before merging rather than after: a
+  // pass that included the zeroes would march every route-specific rule toward cold on every
+  // click, which is a lot of clicks and no new evidence.
+  const withZeroes = ctx.peRuleHealthUpdate(h, { dropdown: 0, always: 0 }, 300);
+  ok(withZeroes.always.checks > h.always.checks, "a full pass does count a miss — hence hits-only");
+});
+
 test("health: a disabled rule is never reported", () => {
   const ctx = loadCommon();
   let h = {};

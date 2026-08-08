@@ -120,7 +120,37 @@
     }, PE_HEALTH_DELAY);
   }
 
-  function recordRuleHealth() {
+  // A second sampling, taken after a click and counting hits only.
+  //
+  // The route-change sample assumes a rule points at something the page is already showing.
+  // Plenty do not: the shipped "search dropdown width" rule selects
+  // `[id^="headlessui-combobox-options"] > div`, which exists only while a dropdown is OPEN.
+  // Measured on Plane Cloud 2026-08-08 — closed: 0 matches, open: 1 — so every routine
+  // sample missed it and the settings page eventually called a working preset dead. Any rule
+  // aimed at a menu, a modal or a tooltip has the same shape.
+  //
+  // Hits only, and that is what makes it safe: a click is when transient UI is on screen, so
+  // this can rescue a rule, but it can never accuse one. Sampling more often would otherwise
+  // make a route-specific rule reach the "never matched" threshold faster while telling us
+  // nothing new — the same page looked at twice is not more evidence.
+  let hitScanAt = 0;
+  const PE_HIT_SCAN_EVERY = 4000;
+
+  function scheduleHitScan() {
+    if (!settings || !isActive()) return;
+    const now = Date.now();
+    if (now - hitScanAt < PE_HIT_SCAN_EVERY) return;
+    hitScanAt = now;
+    // Long enough for the thing the click opened to have mounted, short enough that it is
+    // probably still open.
+    setTimeout(() => {
+      try {
+        recordRuleHealth(true);
+      } catch (_) {}
+    }, 400);
+  }
+
+  function recordRuleHealth(hitsOnly) {
     if (!settings || !isActive()) return;
     const rules = Array.isArray(settings.rules) ? settings.rules : [];
     const counts = {};
@@ -132,7 +162,10 @@
       const sel = String(r.selector == null ? "" : r.selector).trim();
       if (!sel || !validSelector(sel)) return;
       try {
-        counts[r.id] = document.querySelectorAll(sel).length;
+        const n = document.querySelectorAll(sel).length;
+        // Leaving a rule out of `counts` is what keeps a hit-only pass from recording a
+        // miss: peRuleHealthUpdate only touches the ids it is given.
+        if (n > 0 || !hitsOnly) counts[r.id] = n;
       } catch (_) {}
     });
     if (!Object.keys(counts).length) return;
@@ -1568,7 +1601,10 @@
   document.addEventListener(
     "click",
     () => {
-      if (isActive()) kickInject();
+      if (!isActive()) return;
+      kickInject();
+      // A click is also the moment transient UI exists — see scheduleHitScan.
+      scheduleHitScan();
     },
     true
   );

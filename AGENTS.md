@@ -123,6 +123,15 @@ but to record what was observed and show it where the thing is configured. Anyth
 degrades quietly (a selector, an anchor, a token that cannot be resolved) owes the reader the
 same: not an error, a fact about whether it did anything.
 
+And it must not assume the thing being watched is on screen. The first version sampled once
+per route, which quietly accused every rule aimed at transient UI: the shipped "search
+dropdown width" preset selects `[id^="headlessui-combobox-options"] > div`, measured on Plane
+Cloud as 0 matches closed and 1 open, so no routine sample ever saw it and Settings called a
+working preset dead. The rescue is a second sampling taken after a click — when a menu or a
+modal is actually up — that records **hits only**. Hits-only is what makes extra sampling
+safe: it can promote a rule to "working" and can never move one toward "never matched", so
+adding sampling opportunities cannot make the warning noisier.
+
 What that must not become is a per-page verdict. Measured on Plane Cloud: `.max-w-40` matches
 35 elements on the work item list and zero on the item page, the projects list, the labels
 page and the states page. A healthy rule matches nothing on most routes, so "no match here" is

@@ -70,6 +70,13 @@ Schema 7 → 8.
   the document, so a long work item title or format name could make it open far wider than it
   should — measured at 1132px against a 260px design. The width is now a property of the
   popup rather than a result of what is in it.
+- **Rule health no longer accuses a rule that watches something transient.** It sampled once
+  per route, so a rule pointing at a dropdown, a menu or a modal was never looked at while
+  its target existed — the shipped "search dropdown width" preset selects
+  `[id^="headlessui-combobox-options"] > div`, measured on Plane Cloud as 0 matches closed
+  and 1 open, and Settings was calling it dead. A second sampling now runs shortly after a
+  click, when transient UI is up, and records **hits only**: it can promote a rule to
+  working and can never move one toward "never matched".
 - **A quick link says when its URL looks like an API address.** Plane's search *page* is
   `/{workspace}/search/?q={{q}}`; the `/api/…/search/?search=…` behind it returns JSON, and
   pasting that opens raw JSON in a tab. Nothing downstream can tell the difference — it
