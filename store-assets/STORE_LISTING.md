@@ -314,6 +314,31 @@ makeplane / plane.so — 오픈소스 프로젝트 관리·이슈·위키 도구
 
 ---
 
+## Real captures vs drawn templates
+
+Two kinds of image live here, and the difference matters when you go to replace one.
+
+`screenshot-*.html` and `promo-*.html` are **illustrations**: every pixel, including the
+window frame and the address bar, is drawn in CSS. That is the only way to picture the
+omnibox at all — the dropdown Chrome shows under the address bar is browser UI, outside
+every page's viewport, so no page-level tool can photograph it. It also means those images
+are only as honest as whoever drew them, and they date the moment the product moves.
+
+`ui/*.png` are **real**: `node store-assets/capture-ui.js` renders the shipped `popup.html`
+and `options.html`, with the shipped CSS byte for byte, in a real browser at 2x. Only
+`chrome` is stubbed — the same technique `tools/dom-harness.js` asserts against — so these
+cannot drift from the product without the checks noticing first. Prefer embedding these in a
+template over drawing our own UI a second time.
+
+The seed in `capture-ui.js` is invented on purpose (`acme.atlassian.net`, PROJ-142). A store
+image is published for as long as the listing exists, and a real workspace's project names,
+item titles and colleagues' avatars are not ours to publish.
+
+What still needs a human with a screen recorder: the omnibox dropdown, the toolbar popup as
+Chrome frames it, and the in-page buttons on a workspace whose contents are safe to show.
+
+---
+
 ## Assets checklist
 
 • Store icon 128×128 ............ icons/icon128.png ✓
