@@ -70,7 +70,9 @@ Setting one up is one paste: copy the address of any work item you have open, an
 Plane, Jira, Linear, GitHub and GitLab are recognised by name; any other tracker is read from wherever the key sits in its address.
 Keep several and the key's prefix picks between them: point ENG- at Linear and leave everything else on Plane.
 The keys you opened last come back in the address bar, so you do not have to remember one.
-Type words instead of a key and it searches instead; find a key in someone else's message, select it and right-click to open it.
+Type words instead of a key and it searches instead — "issue login bug" goes to the tracker's search.
+A key almost never arrives on its own; it arrives inside a sentence, in a Slack message or a pull request title.
+Select it anywhere, right-click, and choose "Open work item from selection" — no key to retype, and nothing to set up beyond the link you already have.
 It only opens a URL, so it asks for no site access at all and works on any tab.
 
 📝 Fill a work item in one click — issue templates (title + body)
@@ -258,7 +260,9 @@ Plane Cloud와 자체 호스팅 Plane 모두에서 동작합니다 — 기본 �
 Plane·Jira·Linear·GitHub·GitLab은 이름으로 알아보고, 그 밖의 트래커는 주소에서 키가 놓인 자리로 읽습니다.
 여러 개를 두면 키의 접두사가 골라 줍니다. ENG-는 Linear로 보내고 나머지는 Plane에 두는 식입니다.
 최근에 연 항목이 주소창에 다시 나와, 키를 외우고 있지 않아도 됩니다.
-키 대신 낱말을 입력하면 검색으로 가고, 남의 메시지 속 키는 드래그한 뒤 우클릭으로 엽니다.
+키 대신 낱말을 입력하면 검색으로 갑니다 — "issue login bug"는 트래커의 검색으로 이어집니다.
+키는 키의 모습으로 오지 않습니다. Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
+그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요 — 키를 다시 입력할 일도, 링크 말고 따로 준비할 것도 없습니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
 
 📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
