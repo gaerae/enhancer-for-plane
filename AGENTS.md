@@ -387,13 +387,27 @@ lies:
   Batch the commits. A wording pass is one commit, not one per file you touched — eleven
   commits in a day for a single editing session is a history nobody can read back.
 
-- **`.github/CONTRIBUTING.md` is a pointer to this file and must stay one.** GitHub links
-  it from the New Issue and New PR pages, which is the only reason it exists; the rules are
-  here. If you find yourself explaining a rule there, you are writing the second rulebook
-  this file opens by warning about. Same for the PR template: it may list what to check,
-  not why. The issue forms are the exception — they ask for Plane generation, extension and
-  Chrome versions, and what Settings says about the rule, because those are the fields that
-  actually separated "your selector does not fit Cloud" from "you never turned it on".
+- **`.github/` holds four files, and the ones missing from it are missing on purpose.**
+  GitHub's community checklist asks for six; four of them would be ceremony here and were
+  added and removed in the same day rather than left to rot, so here is the reasoning
+  before the checklist nags again.
+
+  What is there: **`ISSUE_TEMPLATE/bug_report.yml`**, which asks which Plane, which
+  versions, and what Settings says about the rule — the fields that actually separate "this
+  selector does not fit Cloud" from "you never switched it on", which is the confusion that
+  let two presets sit dead for a release. **`config.yml`**, which routes exploitable bugs
+  away from a public issue and Plane's own bugs to Plane. **`SECURITY.md`**, because this
+  runs on pages holding somebody's issue tracker and there has to be a private channel.
+  **`pull_request_template.md`**, a checklist and nothing else — it may say what to check,
+  never why, or it becomes the second rulebook this file opens by warning about.
+
+  What is not, and why: a **feature-request form** would gate the rarest input behind a
+  question most people cannot answer. **`CONTRIBUTING.md`** was written as a pointer here
+  and had restated the four checks and five review rules before the commit was finished —
+  which is this file's own warning happening in real time; the README already links here.
+  A **code of conduct** for a repo with one contributor is a promise of a process that does
+  not exist; the draft's main content was a disclaimer about its own unenforceability. Add
+  one when there is a community to govern, with GitHub's one-click button.
 
 - **Zero dependencies.** No `package.json`, no build step. Plain scripts loaded by the
   browser; `tools/` runs on stock node. Adding the first dependency is a project
