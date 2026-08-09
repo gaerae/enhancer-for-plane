@@ -1,8 +1,11 @@
 blank_issues_enabled: true
 contact_links:
+  # Points at the Security tab rather than /security/advisories/new, which only resolves
+  # once private vulnerability reporting is switched on in the repo settings. The tab is
+  # always there, and the email works either way.
   - name: Security vulnerability
-    url: https://github.com/gaerae/enhancer-for-plane/security/advisories/new
-    about: Report privately instead of opening an issue. See SECURITY.md.
+    url: https://github.com/gaerae/enhancer-for-plane/security
+    about: Do not open a public issue — report privately here, or email gaerae@gmail.com.
   - name: A problem with Plane itself
     url: https://github.com/makeplane/plane/issues
     about: This is an unofficial add-on. Bugs in Plane belong in Plane's tracker.

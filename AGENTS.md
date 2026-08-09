@@ -387,27 +387,29 @@ lies:
   Batch the commits. A wording pass is one commit, not one per file you touched — eleven
   commits in a day for a single editing session is a history nobody can read back.
 
-- **`.github/` holds four files, and the ones missing from it are missing on purpose.**
-  GitHub's community checklist asks for six; four of them would be ceremony here and were
-  added and removed in the same day rather than left to rot, so here is the reasoning
-  before the checklist nags again.
+- **`.github/` holds two files besides the workflows, and everything else GitHub's
+  community checklist asks for is absent on purpose.** All of it was written and then
+  removed rather than left to rot; the reasoning is here so the next empty row on the
+  community-standards page does not restart the argument. The test each one failed is the
+  same: 118 commits by one author and no issue or PR from anyone else, so a file that
+  answers a question nobody has asked is a file that will drift instead of help.
 
   What is there: **`ISSUE_TEMPLATE/bug_report.yml`**, which asks which Plane, which
   versions, and what Settings says about the rule — the fields that actually separate "this
   selector does not fit Cloud" from "you never switched it on", which is the confusion that
-  let two presets sit dead for a release. **`config.yml`**, which routes exploitable bugs
-  away from a public issue and Plane's own bugs to Plane. **`SECURITY.md`**, because this
-  runs on pages holding somebody's issue tracker and there has to be a private channel.
-  **`pull_request_template.md`**, a checklist and nothing else — it may say what to check,
-  never why, or it becomes the second rulebook this file opens by warning about.
+  let two presets sit dead for a release. **`config.yml`**, which keeps an exploitable bug
+  off the public tracker and sends Plane's own bugs to Plane.
 
-  What is not, and why: a **feature-request form** would gate the rarest input behind a
-  question most people cannot answer. **`CONTRIBUTING.md`** was written as a pointer here
-  and had restated the four checks and five review rules before the commit was finished —
-  which is this file's own warning happening in real time; the README already links here.
-  A **code of conduct** for a repo with one contributor is a promise of a process that does
-  not exist; the draft's main content was a disclaimer about its own unenforceability. Add
-  one when there is a community to govern, with GitHub's one-click button.
+  What is not: a **feature-request form**, which would gate the rarest input behind a
+  question most people cannot answer. **`CONTRIBUTING.md`**, written as a pointer here and
+  already restating the four checks and five review rules before its own commit was
+  finished — this file's warning about two documents that almost agree, happening inside an
+  hour. A **code of conduct**, which for one contributor promises a process that does not
+  exist; the draft's own main content was a disclaimer saying so. **`SECURITY.md`**, whose
+  working part is a private channel, and that is a repo setting rather than a document —
+  turn on private vulnerability reporting and the button exists without the prose.
+  A **pull-request template**, which for a solo repo restates a checklist that is already
+  here and that every agent working in this repo already has loaded.
 
 - **Zero dependencies.** No `package.json`, no build step. Plain scripts loaded by the
   browser; `tools/` runs on stock node. Adding the first dependency is a project
