@@ -920,7 +920,7 @@
     "message": "Quick open"
   },
   "optQuickDesc": {
-    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too."
+    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too, and both places offer the items you opened last, so a key you cannot remember is usually already on screen.\nA key almost never arrives on its own — it arrives inside a sentence. Select it anywhere, right-click, and choose <b>“Open work item from selection”</b>. Chrome hands over the selected text and nothing else; the page is never read."
   },
   "optQuickTokens": {
     "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe second line is optional: give it a search URL with <code>{{q}}</code> and typing words instead of a key goes there. Give it the page, not the <code>/api/</code> address behind it — and note that some trackers only pre-fill the box rather than run the search.\nThe lines under each row show where a sample key and a sample phrase would land."
