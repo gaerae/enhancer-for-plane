@@ -55,6 +55,11 @@
           </div>
           <p class="desc" data-i18n-html="optQuickDesc">In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. Also on the toolbar popup.</p>
           <p class="desc" data-i18n-html="optQuickTokens">Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land.</p>
+          <!-- Starting points, rather than an empty row. An empty row is where a wrong URL
+               gets typed — an API address, a search that ignores its parameter — and none of
+               that is detectable afterwards. Built by options.js from PE_QUICK_EXAMPLES and
+               from the sites already configured. -->
+          <div id="quickExamples" class="qlk-examples" hidden></div>
           <div id="quickList" class="copy-list"></div>
           <div id="quickEmpty" class="tpl-empty" hidden data-i18n="optQuickEmpty">No quick links yet. Click “Add quick link”.</div>
         </section>
@@ -158,6 +163,7 @@
             <button class="primary sm" id="addRule" data-i18n="optRulesAdd">＋ Add rule</button>
           </div>
           <p class="desc" data-i18n-html="optRulesDesc">Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>). If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>.</p>
+          <div id="ruleHealthSummary" class="rule-health-summary" hidden></div>
           <div id="ruleList" class="rule-list"></div>
           <div id="ruleEmpty" class="tpl-empty" hidden data-i18n="optRulesEmpty">No rules yet. Click “Add rule” to start.</div>
           <div class="preset-bar">
@@ -249,10 +255,21 @@
                   <td><kbd>issue</kbd> <span data-i18n="optKeysThenKey">then the key</span></td>
                   <td class="keys-where" data-i18n="optKeysJumpWhere">The address bar, on any tab</td>
                 </tr>
+                <tr>
+                  <td data-i18n="optKeysCtx">Open a work item from selected text</td>
+                  <td data-i18n="optKeysRightClick">Right-click</td>
+                  <td data-i18n="optKeysRightClick">Right-click</td>
+                  <td class="keys-where" data-i18n="optKeysCtxWhere">Any page, once you have selected text containing a key</td>
+                </tr>
               </tbody>
             </table>
           </div>
-          <p class="desc" data-i18n-html="optKeysRebind">Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The other two are handled inside the page and are fixed.</p>
+          <p class="desc" data-i18n-html="optKeysRebind">Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The two <kbd>Alt</kbd> shortcuts are handled inside the page and are fixed.</p>
+          <!-- Asked directly, and the answer is not guessable from the outside: the keyword
+               looks like a setting because Chrome lists it among the search engines. It is
+               not, and the honest reply comes with the thing you can do instead. -->
+          <p class="desc" data-i18n-html="optKeysKeyword"><kbd>issue</kbd> is fixed as well, for a different reason: an extension declares its address-bar keyword in its manifest and there is no API to change it. Chrome lists it under <code>chrome://settings/searchEngines</code> → Extensions, but offers only <b>Manage</b> and <b>Deactivate</b> there — no rename.</p>
+          <p class="desc" data-i18n-html="optKeysKeywordDiy">If you want a shorter one, add your own on that same page under <b>Site search</b>: any keyword you like, pointing at <code>https://your-plane/your-workspace/browse/%s</code>. That is Chrome's own feature, not this extension's, so it opens one fixed address — no prefix routing to a second tracker, no recent items, and no falling back to a search when what you typed is not a key.</p>
           <p class="desc" data-i18n-html="optKeysWhyTyping"><kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives.</p>
           <p class="desc" data-i18n="optKeysWhyCommand">Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key.</p>
         </section>
@@ -285,6 +302,7 @@
             <input type="checkbox" class="rule-focus" />
             <span data-i18n="optRuleFocusOnly">Only while focus mode is on</span>
           </label>
+          <p class="rule-health" hidden></p>
         </div>
         <button class="icon-btn rule-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
       </div>
@@ -331,6 +349,7 @@
           <input class="qlk-name" type="text" data-i18n-placeholder="optQuickNamePh" placeholder="name (e.g. Jira)" />
           <input class="qlk-prefix" type="text" spellcheck="false" data-i18n-placeholder="optQuickPrefixPh" placeholder="prefix" />
           <input class="qlk-url" type="text" spellcheck="false" data-i18n-placeholder="optQuickUrlPh" placeholder="https://…/browse/{{key}}" />
+          <input class="qlk-search" type="text" spellcheck="false" data-i18n-placeholder="optQuickSearchPh" placeholder="search URL (optional): https://…/search?q={{q}}" />
           <button class="icon-btn qlk-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
         </div>
         <div class="cpy-preview qlk-preview"></div>

@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-07-16_
+_Last updated: 2026-08-09_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
@@ -39,11 +39,23 @@ If you have Chrome Sync enabled, Chrome may sync the above across your own
 signed-in devices. It stays within Google's storage for your account and is never
 sent to the developer or any third party.
 
-**Downloaded templates and sync status** (`chrome.storage.local`, this device
-only): the templates fetched from your source URLs, plus each source's last sync
-time, last result, and any error message. This is a cache — the picker reads it
-instead of the network, so inserting a template works offline. It is removed when
-you delete the source, and Chrome Sync never carries it to other devices.
+**Device-only caches** (`chrome.storage.local`, this device only, never carried
+by Chrome Sync):
+
+- **Downloaded templates and sync status** — the templates fetched from your
+  source URLs, plus each source's last sync time, last result, and any error
+  message. The picker reads this instead of the network, so inserting a template
+  works offline. It is removed when you delete the source.
+- **Recently opened work items** — the key, the address, and the name of the
+  target for the last few items you opened through Quick open, so the address bar
+  and the popup can offer them again instead of making you remember a key. This is
+  the one thing here that says anything about what you have been working on, which
+  is exactly why it stays on the device it happened on: waking up at another
+  machine to your own browsing in the address bar is not a feature, and there is
+  no server for it to go to. Clearing settings clears it.
+- **How often each style rule matched** — a count per rule and the time it last
+  matched anything, which is how Settings can tell you a rule has quietly stopped
+  working. Numbers and timestamps only; no page content and no addresses.
 
 ## What is accessed
 
@@ -57,16 +69,31 @@ you delete the source, and Chrome Sync never carries it to other devices.
   "Copy reference" writes that one string to your clipboard. The extension never
   reads the clipboard, and needs no clipboard permission to do this — the write
   happens in your click.
-- **The work item key you type for Quick open.** The key you enter in the address
-  bar (or the popup) is matched against the links **you** configured and used to
-  build a URL, entirely inside the browser. Nothing is sent anywhere, no search
-  service sees it, and it is not stored — the extension then simply navigates the
-  tab to that address, the same as if you had typed it yourself. Quick open needs
-  no site access at all and works with no domain granted.
-- **The current tab's address (activeTab).** When you click the toolbar icon,
-  the popup reads the active tab's hostname to tell you whether the extension is
-  active there. This value is used only in that moment and is not stored or
-  transmitted.
+- **What you type for Quick open.** Chrome hands the extension what follows the
+  `issue` keyword — and only that; it sends nothing before the keyword is active,
+  and nothing you type anywhere else in the address bar. If it is shaped like a
+  key it is matched against the links **you** configured and turned into a URL; if
+  it is not, it goes into the search address **you** configured for that tracker.
+  Either way the work happens inside the browser and the tab is then navigated
+  there, the same as if you had typed the address yourself. No search service sees
+  it unless it is the one you configured, and nothing is sent to the developer.
+  Quick open needs no site access at all and works with no domain granted. Keys
+  you open this way are remembered on this device — see "Recently opened work
+  items" above.
+- **Text you select, only when you use the right-click item.** "Open work item
+  from selection" appears when text is selected. Choosing it makes Chrome pass the
+  extension **that selected text and nothing else** — the page itself is never
+  read, no script is placed on it, and the extension has no access to the site the
+  selection came from. The text is scanned for something key-shaped and, if found,
+  turned into a URL from your own configured link. It is not stored.
+- **The current tab's address and title (activeTab).** When you click the toolbar
+  icon, the popup reads the active tab's address — the hostname is what tells you
+  whether the extension is active on that site — and, when the address matches one
+  of your Quick open links, its title as well, so "Copy reference" can offer you
+  that item's key and title without touching the page. Both values are used in
+  that moment and are neither stored nor transmitted. This is why copying works on
+  a tracker the rest of the extension never runs on: it reads the tab, not the
+  page.
 
 ## Template sync — the only network access
 
@@ -111,8 +138,10 @@ source's cached templates.
 ## Your control
 
 You can view, edit, export, or delete all stored settings at any time from the
-extension's Settings page ("Restore defaults" clears them, including sync sources
-and their cached templates). There are two exports, and they carry different
+extension's Settings page. "Restore defaults" clears them, including sync sources
+and their cached templates — and because it also empties the list of sites, saving
+after it hands Chrome's access to those sites back as well, so switching one on
+again means approving it again. The confirmation says so before you commit to it. There are two exports, and they carry different
 things. "Export JSON" is a backup: it includes your domains, source URLs and
 variable values in plain text, so keep it to yourself. "Export my templates as a
 feed" is meant to be handed to teammates, and carries your templates and nothing

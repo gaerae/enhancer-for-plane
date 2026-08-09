@@ -42,6 +42,14 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__DEFAULTS = PE_DEFAULTS;" +
   "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
   "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
+  "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
+  "\n;globalThis.__V7_DROPDOWN_SELECTOR = PE_V7_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
+  "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
+  "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
+  "\n;globalThis.PE_QUICK_EXAMPLES = PE_QUICK_EXAMPLES;" +
+  "\n;globalThis.PE_QUICK_PARTS = PE_QUICK_PARTS;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
   "\n;globalThis.__IMPORT_LIMITS = PE_IMPORT_LIMITS;" +
   "\n;globalThis.__LOCAL_QUOTA = PE_LOCAL_QUOTA_BYTES;" +
@@ -54,7 +62,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__MAX_QUICK = PE_MAX_QUICK_LINKS;" +
   "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
   "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;" +
-  "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;";
+  "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;" +
+  "\n;globalThis.__EXAMPLE_FEED_URLS = PE_EXAMPLE_FEED_URLS;";
 
 function loadCommon() {
   const ctx = { console, URL, Date, TextEncoder };
@@ -159,7 +168,7 @@ function chromeItemBytes(key, value) {
 
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
-  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [] };
+  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [], recent: [], opened: [] };
   const ctx = {
     console,
     URL,
@@ -191,7 +200,16 @@ function loadWorker({ settings, respond, granted = true }) {
       vm.runInContext(COMMON, ctx);
     },
     chrome: {
-      runtime: { onInstalled: noop, onStartup: noop, onMessage: noop, lastError: null, openOptionsPage() {} },
+      runtime: {
+        // Captured, not discarded: the context menu is created from here, so a test that
+        // wants to assert the menu exists has to be able to fire the event that makes it —
+        // otherwise it is asserting a function it called itself, not the wiring.
+        onInstalled: { addListener: (f) => (state.onInstalled = f) },
+        onStartup: noop,
+        onMessage: { addListener: (f) => (state.onWorkerMessage = f) },
+        lastError: null,
+        openOptionsPage() { state.openedOptions = true; }
+      },
       alarms: { onAlarm: noop, get: async () => null, create: async () => {}, clear: async () => {} },
       permissions: {
         onAdded: noop,
@@ -206,7 +224,19 @@ function loadWorker({ settings, respond, granted = true }) {
         remove: async () => {}
       },
       scripting: { unregisterContentScripts: async () => {}, registerContentScripts: async () => {} },
-      tabs: { query: async () => [] },
+      // Enough of the omnibox to drive it: the listeners are captured so a test can type,
+      // and what was suggested or set as the default row is recorded rather than shown.
+      omnibox: {
+        setDefaultSuggestion: (s2) => (state.omniDefault = s2 && s2.description),
+        onInputChanged: { addListener: (f) => (state.onInput = f) },
+        onInputEntered: { addListener: (f) => (state.onEnter = f) }
+      },
+      contextMenus: {
+        removeAll: (cb) => cb && cb(),
+        create: (o, cb) => { state.menu = o; cb && cb(); },
+        onClicked: { addListener: (f) => (state.onMenu = f) }
+      },
+      tabs: { query: async () => [], create: (o) => state.opened.push(o.url), update: () => {} },
       storage: {
         // Hand back a copy, exactly as chrome.storage does — it structured-clones on
         // read, so a caller can never mutate stored state by writing to what it read.
@@ -215,8 +245,15 @@ function loadWorker({ settings, respond, granted = true }) {
         // aliasing. What hid that bug was that no test drove the in-flight window.)
         sync: { get: (k, cb) => cb({ peSettings: clone(state.settings) }) },
         local: {
-          get: (k, cb) => cb({ peSyncCache: clone(state.cache) }),
+          get: (k, cb) => cb({ peSyncCache: clone(state.cache), peRecent: clone(state.recent || []) }),
           set: (o, cb) => {
+            // The recents list is its own item and its own concern — it must not land in
+            // `writes`, which exists to count sync-cache writes.
+            if (o && "peRecent" in o) {
+              state.recent = clone(o.peRecent);
+              cb();
+              return;
+            }
             // `failSaves` stands in for the quota being full: chrome reports it through
             // lastError, which peSaveSyncCache turns into a rejection.
             if (state.failSaves) {
@@ -1239,13 +1276,775 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 7, "PE_SCHEMA is 7");
+  eq(ctx.__SCHEMA, 8, "PE_SCHEMA is 8");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
   ok(Array.isArray(merged.quickLinks), "quickLinks is an array");
   eq(merged.quickLinks.length, 0, "and it is empty by default");
-  eq(ctx.peMigrate({ schema: 5 }).schema, 7, "stamp advances to PE_SCHEMA");
+  eq(ctx.peMigrate({ schema: 5 }).schema, ctx.__SCHEMA, "stamp advances to PE_SCHEMA");
+});
+
+/* ---------------- search, recents, selection, and reading a tab ---------------- */
+
+// Real templates from real workspaces, 2026-08-08.
+const Q_PLANE = { id: "q1", name: "Plane", enabled: true, prefix: "", url: "https://app.plane.so/gaerae/browse/{{key}}", searchUrl: "https://app.plane.so/gaerae/search?q={{q}}" };
+const Q_LINEAR = { id: "q2", name: "Linear", enabled: true, prefix: "GAE-", url: "https://linear.app/gaerae/issue/{{key}}" };
+
+// The whole disambiguation between "open this" and "find this". It has to be decidable
+// without a mode, a prefix, or a setting — otherwise the omnibox grows a syntax.
+test("search: a key is a key and everything else is a phrase", () => {
+  const { peLooksLikeKey } = loadCommon();
+  ok(peLooksLikeKey("PROJ-123"));
+  ok(peLooksLikeKey("42-7"), "a numeric project identifier is still a key");
+  ok(peLooksLikeKey("  GAE-1  "), "trimmed");
+  ok(!peLooksLikeKey("login bug"), "two words");
+  ok(!peLooksLikeKey("GAE"), "half a key is not one — it is a prefix you are still typing");
+  ok(!peLooksLikeKey("PROJ-0"), "no zero sequence");
+  ok(!peLooksLikeKey("2026-07"), "a zero-padded month is not a key");
+  ok(!peLooksLikeKey(""));
+  ok(!peLooksLikeKey(null));
+});
+
+test("search: a phrase is expanded into the target's search URL", () => {
+  const { peExpandSearchLink } = loadCommon();
+  eq(peExpandSearchLink(Q_PLANE, "login bug"), "https://app.plane.so/gaerae/search?q=login%20bug");
+  eq(peExpandSearchLink(Q_PLANE, "  로그인 오류  "), "https://app.plane.so/gaerae/search?q=" + encodeURIComponent("로그인 오류"), "trimmed and encoded");
+  // A base with no token gets the phrase appended, the same rule peExpandQuickLink follows.
+  eq(peExpandSearchLink({ searchUrl: "https://t.test/s/" }, "x y"), "https://t.test/s/x%20y");
+  eq(peExpandSearchLink(Q_LINEAR, "login bug"), "", "a target with no search URL does not answer");
+  eq(peExpandSearchLink(Q_PLANE, "   "), "", "and neither does an empty phrase");
+  eq(peExpandSearchLink(null, "x"), "");
+});
+
+// The context menu's whole job. What gets selected on a page is a sentence, not a key.
+test("selection: the key is found inside whatever was selected", () => {
+  const { peKeyFromText } = loadCommon();
+  eq(peKeyFromText("blocked by PROJ-123 until Friday"), "PROJ-123");
+  eq(peKeyFromText("PROJ-123"), "PROJ-123");
+  eq(peKeyFromText("see (PROJ-123)."), "PROJ-123", "punctuation around it is not part of it");
+  eq(peKeyFromText("fix: GAE-2, GAE-3"), "GAE-2", "the first one wins");
+  eq(peKeyFromText("배포 전에 DATA-5 확인"), "DATA-5", "and the surrounding text need not be English");
+  eq(peKeyFromText("nothing to see here"), "");
+  // Prose is full of dates. The key shape alone lets "2026-10" through (it is a valid key
+  // for a project called 2026), which is a fair trade everywhere except here.
+  eq(peKeyFromText("released 2026-07 and 2026-10"), "", "neither form of a year-month");
+  eq(peKeyFromText("shipped in 1999-9"), "", "including a two-digit-year-looking one");
+  eq(peKeyFromText("2026-13 is not a month"), "2026-13", "and a 13th month is a key again");
+  eq(peKeyFromText(""), "");
+  eq(peKeyFromText(null), "");
+});
+
+test("recent: newest first, one row per key, capped", () => {
+  const ctx = loadCommon();
+  let list = [];
+  list = ctx.peRecentAdd(list, { key: "A-1", url: "https://t/A-1", name: "Plane" }, 10);
+  list = ctx.peRecentAdd(list, { key: "B-2", url: "https://t/B-2", name: "Plane" }, 20);
+  eq(list.map((r) => r.key), ["B-2", "A-1"], "newest first");
+  // Opening something again moves it up rather than appearing twice — the list is a
+  // shortlist of what you work on, not a log of what you clicked.
+  list = ctx.peRecentAdd(list, { key: "A-1", url: "https://t/A-1", name: "Plane" }, 30);
+  eq(list.map((r) => r.key), ["A-1", "B-2"]);
+  eq(list.length, 2, "and not twice");
+  eq(list[0].at, 30, "with the newer time");
+  for (let i = 0; i < ctx.__MAX_RECENT * 2; i++) list = ctx.peRecentAdd(list, { key: "K-" + (i + 1), url: "https://t/x" }, i);
+  eq(list.length, ctx.__MAX_RECENT, "capped");
+  // Junk in must not become a row the reader can click into nowhere.
+  eq(ctx.peRecentAdd([], { key: "", url: "https://t/x" }, 1), [], "no key");
+  eq(ctx.peRecentAdd([], { key: "A-1", url: "" }, 1), [], "no url");
+  eq(ctx.peRecentAdd(null, null, null), []);
+});
+
+test("recent: an empty box offers everything, and typing narrows it", () => {
+  const ctx = loadCommon();
+  const list = [
+    { key: "GAE-9", url: "https://t/1" },
+    { key: "DATA-5", url: "https://t/2" },
+    { key: "GAE-1", url: "https://t/3" },
+    { key: "bad", url: "" }
+  ];
+  eq(ctx.peRecentMatches(list, "").map((r) => r.key), ["GAE-9", "DATA-5", "GAE-1"], "order kept, junk dropped");
+  eq(ctx.peRecentMatches(list, "GAE").map((r) => r.key), ["GAE-9", "GAE-1"], "prefix on the key");
+  eq(ctx.peRecentMatches(list, "gae-1").map((r) => r.key), ["GAE-1"], "case does not matter");
+  eq(ctx.peRecentMatches(list, "zz"), [], "no match");
+  eq(ctx.peRecentMatches(null, ""), []);
+});
+
+// What the popup's copy block reads. No DOM anywhere in this: a tab has a URL and a title,
+// and that is the whole input.
+test("tab: the popup can name the item from a URL and a title alone", () => {
+  const ctx = loadCommon();
+  const links = [Q_PLANE, Q_LINEAR];
+  const m = ctx.peMatchItemUrl(links, "https://linear.app/gaerae/issue/GAE-2/connect-your-tools");
+  eq(m.key, "GAE-2");
+  eq(ctx.peTitleFromDocTitle("GAE-2 Connect your tools", m.key), "Connect your tools");
+  // The canonical form the template describes, not the address bar — Linear redirects
+  // /issue/GAE-2 to the slug form, so the slug is length nobody reads.
+  eq(ctx.peExpandQuickLink(m.link, m.key), "https://linear.app/gaerae/issue/GAE-2");
+  // Plane's own page, where both halves agree and there is no slug to drop.
+  const p = ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/GAERA-6/");
+  eq(p.key, "GAERA-6");
+  eq(ctx.peTitleFromDocTitle("GAERA-6 5. Use Cycles to time box tasks 🗓️", p.key), "5. Use Cycles to time box tasks 🗓️");
+  // A list route names no item, so the popup shows nothing rather than guessing. Measured:
+  // Plane's peek panel keeps the list's URL AND the list's title, so this is also why the
+  // popup cannot see into a peek — and why the in-page button still has a job.
+  eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/projects/abc/issues/"), null);
+  eq(ctx.peTitleFromDocTitle("gaerae - 작업 항목", "GAERA-2"), "");
+  // A template must validate what it captured or it claims pages it has no business claiming.
+  eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/settings"), null);
+  eq(ctx.peMatchItemUrl([], "https://app.plane.so/gaerae/browse/GAERA-6"), null, "nothing configured, nothing claimed");
+
+  // Jira, measured on a real site 2026-08-08: the key leads but is bracketed, and the site
+  // name trails. Only the key part is ours to remove — cutting a trailing " - something"
+  // would be a guess about titles, and would truncate any title that ends that way.
+  const J = { id: "j", name: "Jira", enabled: true, prefix: "", url: "https://gprxh.atlassian.net/browse/{{key}}" };
+  const j = ctx.peMatchItemUrl([J], "https://gprxh.atlassian.net/browse/TRASHSWD-17");
+  eq(j.key, "TRASHSWD-17");
+  eq(
+    ctx.peTitleFromDocTitle("[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira", j.key),
+    "ArgoCD apps-of-apps 배포 패턴 확인 - Jira",
+    "the bracketed key goes, the site's own suffix stays"
+  );
+  eq(ctx.peTitleFromDocTitle("[GAE-2 Connect your tools", "GAE-2"), "", "an opening bracket with no closing one is not the shape");
+  eq(ctx.peTitleFromDocTitle("[GAE-21] Something", "GAE-2"), "", "and a bracketed longer key is still not this key");
+});
+
+test("tab: a search result is not an item, so it is never remembered as one", () => {
+  const ctx = loadCommon();
+  // The omnibox records what it opened by asking the links which item a URL names. A search
+  // URL matches no template, so a phrase cannot end up in the recents list pretending to be
+  // a key — which is the one way that list could fill with rows that open nothing.
+  eq(ctx.peMatchItemUrl([Q_PLANE], ctx.peExpandSearchLink(Q_PLANE, "login bug")), null);
+});
+
+// The URL that prompted this: the request Plane's own app makes, filled in as if it were
+// the search page. It loads, returns 200, and shows JSON — so nothing downstream can tell
+// it went wrong, and the row where it is typed is the only place to say anything.
+// The examples are the one place this project asserts something about five products at
+// once, so the rule is that each shape was opened in a browser. These hold the results of
+// that: the exact strings, and the two that measured worse than they look.
+test("quick: every example was measured, and says so where it disappoints", () => {
+  const ctx = loadCommon();
+  const by = {};
+  ctx.PE_QUICK_EXAMPLES.forEach((e) => (by[e.id] = e));
+  eq(Object.keys(by).sort(), ["github", "gitlab", "jira", "linear", "plane"]);
+  // Verified 2026-08-08 against real instances; the search halves were each checked with a
+  // nonsense query too, because a search that ignores its parameter looks identical to one
+  // that works.
+  eq(by.jira.searchUrl, 'https://{site}.atlassian.net/issues/?jql=text ~ "{{q}}"');
+  eq(by.github.searchUrl, "https://github.com/{owner}/{repo}/issues?q={{q}}");
+  eq(by.gitlab.searchUrl, "https://gitlab.com/{group}/{project}/-/issues/?search={{q}}");
+  // Plane's fills the box without running the search, and Linear has none. Both still
+  // appear, and both carry a note — an example that quietly underdelivers is worse than one
+  // that is absent, because the reader concludes the extension is broken.
+  eq(by.plane.note, "plane", "Plane's shortfall is written down");
+  eq(by.linear.note, "linear");
+  eq(by.linear.searchUrl, "", "and Linear offers no search URL at all");
+  // GitHub and GitLab number their issues, so a bare 1234 is not a key — they spend a prefix
+  // and take only the number.
+  for (const id of ["github", "gitlab"]) {
+    ok(by[id].prefix, id + " needs a prefix to be typeable");
+    ok(by[id].url.indexOf("{{key.num}}") > -1, id + " must use only the number");
+    eq(by[id].note, "numbered");
+  }
+  // Every blank in every example has to be one the labels know about, or a reader is shown
+  // ⟨project⟩ in English inside an otherwise Korean page.
+  const blanks = new Set();
+  ctx.PE_QUICK_EXAMPLES.forEach((e) =>
+    [e.url, e.searchUrl].forEach((u) => String(u).replace(/\{([a-z]+)\}/g, (_, p) => blanks.add(p)))
+  );
+  blanks.delete("key");
+  blanks.delete("q");
+  for (const b of blanks) ok(ctx.PE_QUICK_PARTS.indexOf(b) > -1, "unknown blank {" + b + "}");
+});
+
+test("quick: filling an example leaves the tokens alone and the blanks marked", () => {
+  const ctx = loadCommon();
+  const labels = { host: "호스트", workspace: "워크스페이스", site: "사이트" };
+  const plane = ctx.PE_QUICK_EXAMPLES.filter((e) => e.id === "plane")[0];
+  eq(
+    ctx.peQuickExample(plane.url, labels),
+    "https://⟨호스트⟩/⟨워크스페이스⟩/browse/{{key}}",
+    "blanks become the reader's words; {{key}} is ours and survives"
+  );
+  // A host already configured arrives filled in, which is the whole point of offering rows
+  // built from the sites the user has added.
+  eq(
+    ctx.peQuickExample(plane.url, labels, { host: "plane.hectoai.co.kr" }),
+    "https://plane.hectoai.co.kr/⟨워크스페이스⟩/browse/{{key}}"
+  );
+  // Jira's search carries raw quotes and a tilde — the expander encodes only the value, and
+  // that exact string was the one navigated to during verification.
+  const jira = ctx.PE_QUICK_EXAMPLES.filter((e) => e.id === "jira")[0];
+  eq(
+    ctx.peQuickExample(jira.searchUrl, labels, { site: "gprxh" }),
+    'https://gprxh.atlassian.net/issues/?jql=text ~ "{{q}}"'
+  );
+  eq(ctx.peExpandSearchLink({ searchUrl: ctx.peQuickExample(jira.searchUrl, labels, { site: "gprxh" }) }, "배포 검증"),
+    'https://gprxh.atlassian.net/issues/?jql=text ~ "' + encodeURIComponent("배포 검증") + '"',
+    "which is what actually went to the browser");
+  eq(ctx.peQuickExample("", labels), "");
+  eq(ctx.peQuickExample("https://x/{nonsense}", labels), "https://x/{nonsense}", "an unknown part is left as written");
+});
+
+test("quick: the caret is sent to the first thing left to replace", () => {
+  const ctx = loadCommon();
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  const at = ctx.peFirstBlank(url);
+  eq(url.slice(at[0], at[1]), "⟨host⟩", "the first blank, not the token");
+  eq(ctx.peFirstBlank("https://plane.test/⟨workspace⟩/browse/{{key}}").length, 2, "the next one when the host is known");
+  // Nothing left is a case worth distinguishing: the caret should not be sent somewhere
+  // arbitrary in a URL that is already complete.
+  eq(ctx.peFirstBlank("https://plane.test/acme/browse/{{key}}"), null);
+  eq(ctx.peFirstBlank("https://x/⟨unclosed"), null, "half a blank is not one");
+  eq(ctx.peFirstBlank(""), null);
+});
+
+test("quick: Tab walks the blanks and then stops being Tab", () => {
+  const ctx = loadCommon();
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  const first = ctx.peNextBlank(url, 0);
+  eq(url.slice(first[0], first[1]), "⟨host⟩");
+  const second = ctx.peNextBlank(url, first[1]);
+  eq(url.slice(second[0], second[1]), "⟨workspace⟩");
+  // The one that matters: past the last blank there is nothing, so Tab has to go back to
+  // moving between fields rather than trapping the caret in the box.
+  eq(ctx.peNextBlank(url, second[1]), null);
+  // Shift+Tab reads from where the selection starts, so standing on a blank goes to the one
+  // before it rather than reselecting the blank the caret is already in.
+  const back = ctx.pePrevBlank(url, second[0]);
+  eq(url.slice(back[0], back[1]), "⟨host⟩");
+  eq(url.slice(...ctx.pePrevBlank(url, url.length)), "⟨workspace⟩", "from the end, the last one");
+  eq(ctx.pePrevBlank(url, first[0]), null, "and standing on the first, nothing");
+  eq(ctx.pePrevBlank(url, 0), null);
+});
+
+test("quick: a pasted address becomes the template it came from", () => {
+  const ctx = loadCommon();
+  // Every one of these was opened in a browser during verification; they are the addresses
+  // as the address bar actually shows them, tail and all.
+  const jira = ctx.peQuickFromUrl("https://gprxh.atlassian.net/browse/DU-61");
+  eq(jira.name, "Jira");
+  eq(jira.url, "https://gprxh.atlassian.net/browse/{{key}}");
+  eq(jira.searchUrl, 'https://gprxh.atlassian.net/issues/?jql=text ~ "{{q}}"',
+    "the half a reader is least likely to know is the half this fills");
+  eq(ctx.peFirstBlank(jira.url), null, "and nothing is left to type");
+
+  // Linear appends a title slug. It is decoration — the bare key navigates, which is why the
+  // example does not carry one, and reading one back must not either.
+  const lin = ctx.peQuickFromUrl("https://linear.app/gaerae/issue/GAE-1/some-title-here");
+  eq(lin.url, "https://linear.app/gaerae/issue/{{key}}");
+  eq(lin.searchUrl, "", "Linear has no URL-addressable search and we do not invent one");
+
+  const gh = ctx.peQuickFromUrl("https://github.com/gaerae/enhancer-for-plane/issues/7");
+  eq(gh.url, "https://github.com/gaerae/enhancer-for-plane/issues/{{key.num}}");
+  eq(gh.prefix, "GH-", "a numbered tracker arrives with the prefix that makes it routable");
+  const gl = ctx.peQuickFromUrl("https://gitlab.com/gitlab-org/gitlab/-/issues/1234");
+  eq(gl.url, "https://gitlab.com/gitlab-org/gitlab/-/issues/{{key.num}}");
+
+  // Self-hosted Plane, on plain http. The scheme is not part of the shape, and refusing to
+  // read it would be pedantry with a cost.
+  const plane = ctx.peQuickFromUrl("http://plane.hectoai.co.kr/hecto/browse/HEC-12/");
+  eq(plane.name, "Plane");
+  eq(plane.url, "http://plane.hectoai.co.kr/hecto/browse/{{key}}");
+  eq(plane.searchUrl, "http://plane.hectoai.co.kr/hecto/search/?q={{q}}");
+  eq(ctx.peQuickFromUrl("https://app.plane.so/gaerae/browse/GAE-3").url,
+    "https://app.plane.so/gaerae/browse/{{key}}", "and https stays https");
+});
+
+test("quick: a tracker nobody listed still yields a template", () => {
+  const ctx = loadCommon();
+  // The whole reason paste beats a list of five: five reads as "these five are supported".
+  const redmine = ctx.peQuickFromUrl("https://redmine.example.org/issues/45231");
+  eq(redmine.from, "guess");
+  eq(redmine.url, "https://redmine.example.org/issues/{{key.num}}");
+  eq(redmine.name, "redmine.example.org", "the host is the only name we honestly have");
+  eq(redmine.kind, "num");
+  eq(redmine.prefix, "", "which letters stand for someone's tracker is theirs to choose");
+  eq(redmine.searchUrl, "", "and a search address is not derivable from an item address");
+
+  const keyed = ctx.peQuickFromUrl("https://tracker.example.com/w/acme/item/ACME-99?tab=activity");
+  eq(keyed.url, "https://tracker.example.com/w/acme/item/{{key}}",
+    "the query string is not part of the shape either");
+  eq(keyed.kind, "key");
+
+  // A key-shaped segment beats a numeric one wherever it sits, because a bare number needs a
+  // prefix spent on it and a key does not.
+  eq(ctx.peQuickFromUrl("https://t.example/p/12/ENG-7").url, "https://t.example/p/12/{{key}}");
+});
+
+test("quick: an address with nothing key-shaped in it is refused, not guessed at", () => {
+  const ctx = loadCommon();
+  // Refusing is the point. A template built from a page that is not a work item is wrong in
+  // a way nothing downstream can notice — it just opens the wrong address forever.
+  eq(ctx.peQuickFromUrl("https://linear.app/gaerae/settings/members"), null);
+  eq(ctx.peQuickFromUrl("https://app.plane.so/gaerae/projects/"), null);
+  eq(ctx.peQuickFromUrl("not a url at all"), null);
+  eq(ctx.peQuickFromUrl("javascript:alert(1)"), null, "only http and https are addresses here");
+  eq(ctx.peQuickFromUrl(""), null);
+  eq(ctx.peQuickFromUrl("   "), null);
+  // An example someone pasted back out of the settings page, blanks and all. Reading it as a
+  // real address would produce a link to a host literally named "⟨host⟩".
+  eq(ctx.peQuickFromUrl("https://⟨host⟩/⟨workspace⟩/browse/PROJ-1"), null);
+});
+
+test("quick: an API address is recognised as one", () => {
+  const { peLooksLikeApiUrl } = loadCommon();
+  ok(peLooksLikeApiUrl("https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true"));
+  ok(peLooksLikeApiUrl("https://t.test/api"), "a bare /api");
+  ok(peLooksLikeApiUrl("https://t.test/v2/api/things"), "not only at the root");
+  ok(peLooksLikeApiUrl("https://t.test/x?format=json"), "or an explicit json format");
+  // The page a person actually wants — verified on app.plane.so, 2026-08-08.
+  ok(!peLooksLikeApiUrl("https://plane.hectoai.co.kr/hecto/search/?q={{q}}"));
+  ok(!peLooksLikeApiUrl("https://app.plane.so/gaerae/browse/{{key}}"));
+  ok(!peLooksLikeApiUrl("https://linear.app/gaerae/issue/{{key}}"));
+  // Words that merely contain "api" are not paths that lead to one.
+  ok(!peLooksLikeApiUrl("https://rapids.test/browse/{{key}}"), "a host with api inside it");
+  ok(!peLooksLikeApiUrl("https://t.test/apiary/{{key}}"), "a path segment that starts with api");
+  ok(!peLooksLikeApiUrl(""));
+});
+
+test("quick: searchUrl survives an import and is optional", () => {
+  const ctx = loadCommon();
+  const out = ctx.peSanitizeSettings({
+    quickLinks: [
+      { id: "a", url: "https://t/{{key}}", searchUrl: "  https://t/s?q={{q}}  " },
+      { id: "b", url: "https://t2/{{key}}" },
+      { id: "c", url: "https://t3/{{key}}", searchUrl: 42 }
+    ]
+  });
+  eq(out.quickLinks[0].searchUrl, "https://t/s?q={{q}}", "trimmed");
+  eq(out.quickLinks[1].searchUrl, "", "absent is empty, not undefined");
+  eq(out.quickLinks[2].searchUrl, "", "and a non-string is not a URL");
+});
+
+/* ---------------- the omnibox and the context menu, driven ---------------- */
+
+// The pure pieces above decide what a key is and where a phrase goes. These drive the
+// worker that wires them together, because the wiring is where the two can disagree — a
+// suggestion row that says one thing and Enter that does another is the failure nobody
+// notices until they are already on the wrong page.
+function loadOmnibox(over) {
+  const settings = Object.assign({ schema: 8, quickLinks: [Q_PLANE, Q_LINEAR] }, over || {});
+  const w = loadWorker({ settings, respond: async () => jsonResponse(feed([])) });
+  return w;
+}
+const typed = (w, text) => new Promise((r) => w.ctx.state ? r() : r()).then(() => new Promise((res) => {
+  w.state.onInput(text, (rows) => res(rows));
+}));
+
+// Chrome offers no per-row icon in the omnibox — the only icon an extension gets is the one
+// in the address bar once the keyword is active — so the label at the front of each row is
+// the whole of what tells these apart from Chrome's own history. That makes the shape a
+// contract rather than a wording choice: one label, one separator, in every locale. The
+// separator is also where an emoji would go if anyone wants one later; it is a message edit,
+// not a code change, which is the reason the label lives in the catalogue at all.
+test("omnibox: every row is labelled, in the same shape, in both locales", () => {
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const key of ["omniboxOpen", "omniboxSearch", "omniboxRecent"]) {
+      const m = (cat[key] || {}).message || "";
+      if (!/^[^$·]+ · /.test(m)) bad.push(loc + "/" + key + ': "' + m + '"');
+      // A label that is itself a placeholder would put a target's name where the row type
+      // belongs, and the row would read as data rather than as an action.
+      if (/^\$/.test(m)) bad.push(loc + "/" + key + " starts with a value, not a label");
+    }
+  }
+  eq(bad, [], "an omnibox row without a leading label:\n  " + bad.join("\n  "));
+});
+
+test("omnibox: a key routes, and the row says where Enter will land", async () => {
+  const w = loadOmnibox();
+  const rows = await typed(w, "GAERA-6");
+  ok(w.state.omniDefault.indexOf("https://app.plane.so/gaerae/browse/GAERA-6") > -1, w.state.omniDefault);
+  // The other target is offered as its resolved URL, which is what onInputEntered opens.
+  ok(rows.some((r) => r.content === "https://linear.app/gaerae/issue/GAERA-6"), JSON.stringify(rows));
+});
+
+test("omnibox: words go to search, and only targets that can search answer", async () => {
+  const w = loadOmnibox();
+  const rows = await typed(w, "login bug");
+  ok(w.state.omniDefault.indexOf("search?q=login%20bug") > -1, w.state.omniDefault);
+  // Linear has no searchUrl in this seed, so it must not offer a row it cannot honour.
+  ok(!rows.some((r) => String(r.content).indexOf("linear.app") > -1), JSON.stringify(rows));
+});
+
+test("omnibox: an empty box offers what you opened last", async () => {
+  const w = loadOmnibox();
+  w.state.recent = [{ key: "GAERA-6", url: "https://app.plane.so/gaerae/browse/GAERA-6", name: "Plane", at: 1 }];
+  const rows = await typed(w, "");
+  eq(rows.length, 1, "the one recent");
+  eq(rows[0].content, "https://app.plane.so/gaerae/browse/GAERA-6");
+  ok(w.state.omniDefault.indexOf("Type a work item key") > -1, "and the hint still explains the box");
+});
+
+// A half-typed key is words to the shape test, which is exactly when the recents are worth
+// offering — it is the list the reader is narrowing.
+test("omnibox: a half-typed key narrows the recents", async () => {
+  const w = loadOmnibox();
+  w.state.recent = [
+    { key: "GAERA-6", url: "https://app.plane.so/gaerae/browse/GAERA-6", name: "Plane", at: 2 },
+    { key: "DATA-5", url: "https://app.plane.so/gaerae/browse/DATA-5", name: "Plane", at: 1 }
+  ];
+  const rows = await typed(w, "GAER");
+  const recents = rows.filter((r) => String(r.content).indexOf("/browse/") > -1);
+  eq(recents.length, 1, "only the one that starts with what was typed");
+  eq(recents[0].content, "https://app.plane.so/gaerae/browse/GAERA-6");
+});
+
+test("omnibox: opening a key remembers it; searching for a phrase does not", async () => {
+  const w = loadOmnibox();
+  await w.state.onEnter("GAERA-6", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "the jump was remembered");
+  eq(w.state.recent[0].name, "Plane", "with the target it went to");
+
+  await w.state.onEnter("login bug", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "a phrase is not an item and is not remembered");
+});
+
+test("omnibox: a picked row is remembered as the item it resolves to", async () => {
+  const w = loadOmnibox();
+  await w.state.onEnter("https://linear.app/gaerae/issue/GAE-2/connect-your-tools", "currentTab");
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAE-2"], "the URL was read back into a key");
+  eq(w.state.recent[0].name, "Linear");
+});
+
+test("menu: a key is opened out of the middle of a selection", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled(); // the menu is built on install, which is the wiring under test
+  ok(w.state.menu && w.state.menu.contexts.indexOf("selection") > -1, "the entry is selection-only");
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "blocked by GAERA-6 until Friday" });
+  await tick();
+  await tick();
+  eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "opened in a new tab");
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "and remembered like any other jump");
+});
+
+test("menu: a selection with no key in it opens nothing", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "just some prose" });
+  await tick();
+  await tick();
+  eq(w.state.opened, [], "nothing was opened");
+  eq(w.state.recent, [], "and nothing remembered");
+});
+
+/* ---------------- the picker's candidate ranking ---------------- */
+
+// Every string in this suite was read off a real page on 2026-08-08 — app.plane.so/gaerae
+// and linear.app/gaerae — because the whole judgement is "does this look authored", and a
+// made-up example proves nothing about markup nobody writes.
+test("pick: a build-generated handle is recognised", () => {
+  const { peLooksGenerated } = loadCommon();
+  const yes = (t, kind) => ok(peLooksGenerated(t, kind), t + " should read as generated");
+  yes("sx-3nfvp2", "class"); // Linear, every class on an issue page
+  yes("sx-1heor9g", "class");
+  yes("sx-o45ghp", "class");
+  yes("sc2sx-Flex-d11c8f6e", "class"); // Linear, a hashed component class
+  yes("editor-container-d833e58d-d489-433e-9551-c2ab0768068d", "id"); // Plane Cloud, per item
+  yes("theme-provider-399572923184751ace34e60b5a9654a7b0a6f23b", "class"); // Plane Cloud
+  yes("headlessui-combobox-options-42", "id"); // Plane, and what the shipped preset works around
+  yes("DndLiveRegion-0", "id");
+  yes("Button_root__x7f2a", "class"); // CSS modules, the other common build output
+  // React's useId, on Plane Cloud via three different headless libraries at once. The value
+  // changes every render, so a rule written against one of these is dead on arrival.
+  yes("headlessui-menu-button-:r1b:", "id");
+  yes("radix-:r1e:", "id");
+  yes("base-ui-:r1i:", "id");
+  yes(":r1c:", "id");
+  // Plane Cloud puts bare uuids in ids too, and prefixes them in others.
+  yes("sidebar-36947e51-c716-477e-bf04-75db338e6d44-JOINED", "id");
+  yes("editor-image-block-9c3aea94-703a-4d4c-8c39-4201e994711d", "id");
+});
+
+// The false positives that would matter. Demoting a real Tailwind class would push the
+// thing the user came for to the bottom of the list and label it a risk.
+test("pick: ordinary authored handles are not demoted", () => {
+  const { peLooksGenerated } = loadCommon();
+  const no = (t, kind) => ok(!peLooksGenerated(t, kind), t + " should read as authored");
+  // The two that broke an earlier version of the pattern: a short prefix and a five-letter
+  // tail is not a hash unless the tail also has a digit in it.
+  no("bg-white", "class");
+  no("h-screen", "class");
+  // Tailwind with numbers in it — the reason the trailing-counter rule is ids only.
+  no("max-w-40", "class");
+  no("max-w-[150px]", "class");
+  no("px-9", "class");
+  no("py-6", "class");
+  no("w-full", "class");
+  no("z-[5]", "class");
+  no("bg-surface-1", "class");
+  no("shrink-0", "class");
+  no("overflow-y-auto", "class");
+  no("truncate", "class");
+  // Ids people wrote.
+  no("main-sidebar", "id");
+  no("title-input", "id");
+  no("mainLayoutContainer", "id");
+  no("", "class");
+  no(null, "class");
+});
+
+// Half of Linear's hashes have no digit in them, and nothing about `sx-euugli` on its own
+// tells it from `bg-white`. The tell is that it has eight hundred siblings — a fact about
+// the page, which is why this one signal is measured rather than pattern-matched.
+test("pick: a prefix with a page full of siblings is a hash namespace", () => {
+  const ctx = loadCommon();
+  // The real counts, 2026-08-08: Linear's `sx` covers 862 classes on an issue page; the
+  // biggest utility prefix on a Plane Cloud work item is `text` at 33.
+  const linear = [];
+  for (let i = 0; i < 862; i++) linear.push("sx-tok" + i.toString(36));
+  const plane = [];
+  for (let i = 0; i < 33; i++) plane.push("text-" + i.toString(36));
+  for (let i = 0; i < 17; i++) plane.push("border-" + i.toString(36));
+
+  const ns = ctx.peHashNamespaces(linear.concat(plane));
+  ok(ns.has("sx"), "Linear's namespace is caught");
+  ok(!ns.has("text"), "and Plane's biggest utility prefix is not");
+  ok(!ns.has("border"), "nor its second");
+  // The digit-free hashes that no pattern can reach, now reachable.
+  ok(ctx.peLooksGenerated("sx-euugli", "class", ns), "sx-euugli");
+  ok(ctx.peLooksGenerated("sx-hfnvfx", "class", ns), "sx-hfnvfx");
+  ok(!ctx.peLooksGenerated("sx-euugli", "class"), "and not without the page to say so");
+  // The namespace must not drag a real utility class down with it.
+  ok(!ctx.peLooksGenerated("text-sm", "class", ns), "text-sm survives");
+  ok(!ctx.peLooksGenerated("max-w-40", "class", ns), "max-w-40 survives");
+  // Headroom in both directions, asserted so a future tweak to the threshold has to face it.
+  ok(ctx.peHashNamespaces(plane).size === 0, "a purely Tailwind page has no namespace at all");
+  eq(ctx.peHashNamespaces([]).size, 0);
+  eq(ctx.peHashNamespaces(null).size, 0);
+  eq(ctx.peLooksGenerated("x-y", "class", { has: null }), false, "a junk hint is ignored, not a crash");
+});
+
+// Linear's other build output, which the digit rule also cannot see: `_name_hash_counter`
+// with single underscores, not the double-underscore CSS-modules form.
+test("pick: the single-underscore module classes are recognised", () => {
+  const { peLooksGenerated } = loadCommon();
+  ok(peLooksGenerated("_draggableRegion_1ojkm_1", "class"));
+  ok(peLooksGenerated("_tooltipTriggerContent_1et26_1", "class"));
+  ok(peLooksGenerated("_menuOpenBg_ekx18_56", "class"));
+  ok(!peLooksGenerated("_", "class"), "a bare underscore is not a pattern");
+  ok(!peLooksGenerated("_private_thing", "class"), "an authored underscore name is left alone");
+});
+
+test("pick: an id with a generated tail still has a usable head", () => {
+  const { pePickIdPrefix } = loadCommon();
+  eq(pePickIdPrefix("headlessui-combobox-options-42"), "headlessui-combobox-options");
+  eq(pePickIdPrefix("editor-container-d833e58d-d489-433e-9551-c2ab0768068d"), "editor-container");
+  eq(pePickIdPrefix("DndLiveRegion-0"), "DndLiveRegion");
+  eq(pePickIdPrefix("headlessui-menu-button-:r1b:"), "headlessui-menu-button");
+  eq(pePickIdPrefix("sidebar-36947e51-c716-477e-bf04-75db338e6d44-JOINED"), "sidebar");
+  eq(pePickIdPrefix("main-sidebar"), "", "nothing generated to cut");
+  eq(pePickIdPrefix("a-1"), "", "what is left is too short to mean anything");
+  eq(pePickIdPrefix(""), "");
+});
+
+// The order is the recommendation. This is the case that started it: on Linear there is no
+// authored class at all, so what the picker must not do is put a hash at the top with
+// nothing said about it.
+test("pick: on a page of hashed classes, the stable handles come first", () => {
+  const ctx = loadCommon();
+  // `generated` is what buildCandidates stamps on each candidate; the scorer trusts it
+  // rather than re-deriving, so that the rank and the badge can never disagree.
+  const cands = [
+    { sel: ".sx-3nfvp2", kind: "class", token: "sx-3nfvp2", generated: true },
+    { sel: ".sx-16dsc37", kind: "class", token: "sx-16dsc37", generated: true },
+    { sel: 'div.sx-3nfvp2.sx-16dsc37', kind: "tag+classes", token: "sx-3nfvp2", generated: true },
+    { sel: '[aria-label="Issue description"]', kind: "label", token: "aria-label-Issue description" },
+    { sel: "[data-view-id]", kind: "data", token: "data-view-id" }
+  ];
+  eq(
+    ctx.peSortPickCandidates(cands).map((c) => c.sel),
+    ["[data-view-id]", '[aria-label="Issue description"]', ".sx-3nfvp2", ".sx-16dsc37", "div.sx-3nfvp2.sx-16dsc37"],
+    "the two attributes first, and every hash below them"
+  );
+  // Last of all is the compound, and that is the right way round: it is the same hashes as
+  // the single-class option plus a tag, so it depends on more of what is about to change.
+  ok(
+    ctx.pePickScore({ kind: "tag+classes", generated: true }) < ctx.pePickScore({ kind: "class", generated: true }),
+    "more hashes, lower rank"
+  );
+});
+
+test("pick: among authored handles the old width-first order survives", () => {
+  const ctx = loadCommon();
+  const cands = [
+    { sel: ".truncate", kind: "class", token: "truncate" },
+    { sel: ".h-full", kind: "class", token: "h-full" },
+    { sel: ".max-w-40", kind: "class", token: "max-w-40" },
+    { sel: "#main-sidebar", kind: "id", token: "main-sidebar" }
+  ];
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), ["#main-sidebar", ".max-w-40", ".h-full", ".truncate"]);
+});
+
+test("pick: a generated id ranks below an ordinary class, and its prefix above both", () => {
+  const ctx = loadCommon();
+  const cands = [
+    { sel: '#editor-container-d833e58d-d489-433e-9551-c2ab0768068d', kind: "id", token: "editor-container-d833e58d-d489-433e-9551-c2ab0768068d", generated: true },
+    { sel: ".editor-container", kind: "class", token: "editor-container" },
+    { sel: '[id^="editor-container"]', kind: "id-prefix", token: "editor-container" }
+  ];
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), [
+    '[id^="editor-container"]',
+    ".editor-container",
+    "#editor-container-d833e58d-d489-433e-9551-c2ab0768068d"
+  ]);
+});
+
+test("pick: ties keep the order the page gave them", () => {
+  const ctx = loadCommon();
+  const cands = ["a", "b", "c"].map((t) => ({ sel: "." + t, kind: "class", token: t }));
+  eq(ctx.peSortPickCandidates(cands).map((c) => c.sel), [".a", ".b", ".c"]);
+  eq(ctx.peSortPickCandidates([]), []);
+  eq(ctx.peSortPickCandidates(null), []);
+  eq(ctx.pePickScore({ kind: "nonsense" }), 0, "an unknown kind is last, not a crash");
+});
+
+/* ---------------- rule health ---------------- */
+
+// The measurement this is built on, taken on Plane Cloud 2026-08-08: `.max-w-40` matches 35
+// elements on the work item list and zero on the item page, the projects list, the labels
+// page and the states page. Every assertion below exists to keep a future "simplification"
+// from turning that healthy rule into a warning.
+test("health: a rule that matches on one route in five is healthy, not cold", () => {
+  const ctx = loadCommon();
+  const rules = [{ id: "r-width", enabled: true }];
+  let h = {};
+  // A morning of item detail pages before the user opens a list. The threshold has to sit
+  // above a run like this, or a rule that is working gets a warning for being route-specific.
+  for (let i = 0; i < ctx.__HEALTH_MIN - 1; i++) h = ctx.peRuleHealthUpdate(h, { "r-width": 0 }, 1000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "unknown", "a long run of honest misses says nothing yet");
+  h = ctx.peRuleHealthUpdate(h, { "r-width": 35 }, 2000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "ok", "and one hit settles it for good");
+  eq(h["r-width"].at, 2000, "the time of the hit");
+  // The point: no number of later misses can take that back, because a rule for one route
+  // misses on every other one and a warning that fires on that is a warning people switch off.
+  for (let i = 0; i < ctx.__HEALTH_MIN * 3; i++) h = ctx.peRuleHealthUpdate(h, { "r-width": 0 }, 3000);
+  eq(ctx.peRuleHealthState(h["r-width"]), "ok", "still ok after three times the threshold in misses");
+  eq(h["r-width"].at, 2000, "and the timestamp still points at the last time it worked");
+  eq(ctx.peRuleHealthColdCount(h, rules), 0, "so nothing is reported");
+});
+
+test("health: silence until there is enough to say", () => {
+  const ctx = loadCommon();
+  let h = {};
+  eq(ctx.peRuleHealthState(undefined), "unknown", "a rule nobody has measured");
+  for (let i = 1; i < ctx.__HEALTH_MIN; i++) {
+    h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+    eq(ctx.peRuleHealthState(h.r), "unknown", "still quiet after " + i + " check(s)");
+  }
+  h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+  eq(ctx.peRuleHealthState(h.r), "cold", "and it speaks up on the " + ctx.__HEALTH_MIN + "th");
+});
+
+// This is the Plane Cloud bug, replayed: two presets that never match anything while the
+// third does. The count is the part that reaches the reader.
+test("health: the two dead presets are counted and the live one is not", () => {
+  const ctx = loadCommon();
+  const rules = ctx.peFocusPresetRules();
+  let h = {};
+  const dead = ["rule-focus-item-properties", "rule-focus-reading-width"];
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) {
+    const counts = {};
+    rules.forEach((r) => (counts[r.id] = dead.indexOf(r.id) > -1 ? 0 : 1));
+    h = ctx.peRuleHealthUpdate(h, counts, 100);
+  }
+  // enabled must be explicit: the third preset ships switched off, and a rule that is not
+  // applied is not evidence of anything.
+  const on = rules.map((r) => ({ id: r.id, enabled: true }));
+  eq(ctx.peRuleHealthColdCount(h, on), 2, "both dead presets are reported");
+  eq(ctx.peRuleHealthState(h["rule-focus-main-nav"]), "ok", "and the one that worked is not");
+});
+
+// The false positive that shipped: the "search dropdown width" preset selects
+// `[id^="headlessui-combobox-options"] > div`, which exists only while a dropdown is open.
+// Measured on Plane Cloud 2026-08-08 — closed 0, open 1 — so every routine sample missed it
+// and the settings page called a working preset dead. The rescue is a second sampling that
+// counts hits and never misses; this is the property that makes it safe.
+test("health: a hit-only pass can rescue a rule but never accuse one", () => {
+  const ctx = loadCommon();
+  let h = {};
+  // A rule pointing at a dropdown: never present when the route is sampled.
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, { dropdown: 0, always: 1 }, 100);
+  eq(ctx.peRuleHealthState(h.dropdown), "cold", "which is how it went wrong");
+  // Now the user opens one, and the click scan reports only what it found. The key is that
+  // `dropdown` is the only id in the object — a hit-only pass leaves the others untouched.
+  const before = JSON.stringify(h.always);
+  h = ctx.peRuleHealthUpdate(h, { dropdown: 1 }, 200);
+  eq(ctx.peRuleHealthState(h.dropdown), "ok", "one sighting is enough, forever");
+  eq(h.dropdown.at, 200, "stamped when it was seen");
+  eq(JSON.stringify(h.always), before, "and the rule that was not in the report is untouched");
+  // The mirror image, and the reason the scan filters before merging rather than after: a
+  // pass that included the zeroes would march every route-specific rule toward cold on every
+  // click, which is a lot of clicks and no new evidence.
+  const withZeroes = ctx.peRuleHealthUpdate(h, { dropdown: 0, always: 0 }, 300);
+  ok(withZeroes.always.checks > h.always.checks, "a full pass does count a miss — hence hits-only");
+});
+
+test("health: a disabled rule is never reported", () => {
+  const ctx = loadCommon();
+  let h = {};
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, { r: 0 }, 1);
+  eq(ctx.peRuleHealthState(h.r), "cold", "the record still says what it saw");
+  eq(ctx.peRuleHealthColdCount(h, [{ id: "r", enabled: false }]), 0, "but a rule nobody applies is not news");
+  eq(ctx.peRuleHealthColdCount(h, [{ id: "r", enabled: true }]), 1, "and enabling it makes it news again");
+});
+
+// A rule that was not checked must not be scored a miss — the difference between "we looked
+// and found nothing" and "we never looked". Without this, opening one inactive tab would
+// march every rule toward a warning.
+test("health: only the rules in the report are counted", () => {
+  const ctx = loadCommon();
+  const h = ctx.peRuleHealthUpdate({ a: { checks: 3, hits: 1, at: 5 } }, { b: 0 }, 9);
+  eq(h.a, { checks: 3, hits: 1, at: 5 }, "the rule that was not measured is untouched");
+  eq(h.b, { checks: 1, hits: 0, at: 0 }, "and the one that was gets its first check");
+});
+
+test("health: two tabs interleaving cannot invent a hit or lose one", () => {
+  const ctx = loadCommon();
+  // Same starting point, two tabs, one hit and one miss — in either order the answer is
+  // the same, because nothing is ever decremented and `at` only moves forward on a hit.
+  const base = { r: { checks: 1, hits: 0, at: 0 } };
+  const a = ctx.peRuleHealthUpdate(ctx.peRuleHealthUpdate(base, { r: 4 }, 50), { r: 0 }, 60);
+  const b = ctx.peRuleHealthUpdate(ctx.peRuleHealthUpdate(base, { r: 0 }, 60), { r: 4 }, 50);
+  eq(a, b, "order does not change the record");
+  eq(a.r, { checks: 3, hits: 1, at: 50 }, "one hit, three checks, stamped when it matched");
+});
+
+test("health: junk counts are ignored rather than stored", () => {
+  const ctx = loadCommon();
+  const h = ctx.peRuleHealthUpdate({}, { a: -1, b: NaN, c: "3", d: null, e: 0 }, 7);
+  eq(Object.keys(h), ["e"], "only a real, non-negative count is a measurement");
+  eq(ctx.peRuleHealthUpdate(null, null, null), {}, "and no input at all is not a crash");
+});
+
+test("health: a deleted rule's history goes with it", () => {
+  const ctx = loadCommon();
+  const h = { keep: { checks: 9, hits: 9, at: 1 }, gone: { checks: 9, hits: 0, at: 0 } };
+  const out = ctx.peRuleHealthPrune(h, [{ id: "keep" }, { id: null }, "nope"]);
+  eq(Object.keys(out), ["keep"], "records follow the rules that exist");
+  // An id that comes back is a new rule that happens to reuse a name — it must not inherit
+  // a warning earned by whatever used to hold it.
+  eq(ctx.peRuleHealthState(ctx.peRuleHealthPrune(h, [{ id: "keep" }]).gone), "unknown");
+});
+
+test("health: the record cannot grow without bound", () => {
+  const ctx = loadCommon();
+  const many = {};
+  const rules = [];
+  for (let i = 0; i < ctx.__HEALTH_MAX + 50; i++) {
+    many["r" + i] = { checks: 1, hits: 1, at: 1 };
+    rules.push({ id: "r" + i });
+  }
+  eq(Object.keys(ctx.peRuleHealthPrune(many, rules)).length, ctx.__HEALTH_MAX, "capped");
 });
 
 /* ---------------- focus mode ---------------- */
@@ -1305,10 +2104,10 @@ test("focus: a v6 install gains the presets, and only once", () => {
   eq(out.rules[0], mine, "the user's rule keeps its place");
   const focus = out.rules.filter((r) => r.focus);
   eq(focus.length, ctx.peFocusPresetRules().length, "every preset arrived");
-  eq(out.schema, 7, "and the stamp moved, so this does not run again");
+  eq(out.schema, ctx.__SCHEMA, "and the stamp moved, so this does not run again");
   // A user who deletes a preset and saves must not get it back on the next read.
-  const again = ctx.peMigrate({ schema: 7, rules: [mine] });
-  eq(again.rules.length, 1, "a v7 object is left exactly as it is");
+  const again = ctx.peMigrate({ schema: ctx.__SCHEMA, rules: [mine] });
+  eq(again.rules.length, 1, "an object already at the current schema is left exactly as it is");
 });
 
 test("focus: an id already present is not appended twice", () => {
@@ -1320,6 +2119,117 @@ test("focus: an id already present is not appended twice", () => {
   eq(out.rules[0].value, "block", "and the edit survives");
   // Without this the test would also pass on a migration that appended nothing at all.
   eq(out.rules.length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
+});
+
+// v7 → v8 rewrites a selector that is already in the user's storage, which no earlier
+// migration has done. The guard is the whole feature: it repoints what v7 shipped and
+// nothing else. Measured against Plane Cloud on 2026-08-08 — the v7 selectors matched zero
+// elements there, and a preset that matches nothing is indistinguishable from one nobody
+// turned on, which is how this went unnoticed for a release.
+test("focus: v8 repoints the two presets that stopped matching Plane Cloud", () => {
+  const ctx = loadCommon();
+  const v7 = ctx.__V7_FOCUS_SELECTORS;
+  const shipped = {};
+  ctx.peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+  eq(Object.keys(v7).sort(), ["rule-focus-item-properties", "rule-focus-reading-width"]);
+  Object.keys(v7).forEach((id) => {
+    ok(shipped[id] !== v7[id], id + " actually changed");
+    ok(shipped[id].indexOf(v7[id]) === 0, id + " still leads with the Plane 1.4 shape");
+    ok(shipped[id].indexOf(",") > -1, id + " is a list, so both generations match");
+  });
+  // The nav preset never broke, and a migration that touched it would be reaching further
+  // than the bug it is here for.
+  const nav = "rule-focus-main-nav";
+  ok(!(nav in v7), nav + " is not in the repoint table");
+
+  const stored = Object.keys(v7).map((id) => ({ id, enabled: true, focus: true, selector: v7[id], property: "display", value: "none" }));
+  const out = ctx.peMigrate({ schema: 7, rules: stored.concat([{ id: nav, selector: "#main-sidebar", property: "display", value: "none" }]) });
+  Object.keys(v7).forEach((id) => {
+    eq(out.rules.find((r) => r.id === id).selector, shipped[id], id + " now carries both shapes");
+  });
+  eq(out.rules.find((r) => r.id === nav).selector, "#main-sidebar", "the nav preset is untouched");
+  eq(out.rules.length, 3, "and nothing was appended");
+});
+
+test("focus: v8 leaves a selector the user edited alone", () => {
+  const ctx = loadCommon();
+  const id = "rule-focus-item-properties";
+  // Someone who already worked Cloud's selector out by hand is the person this guard is for:
+  // overwriting them would undo a fix and look like the extension reverting their edit.
+  const mine = ".z-\\[5\\].shrink-0.bg-surface-1";
+  const out = ctx.peMigrate({ schema: 7, rules: [{ id, focus: true, selector: mine, property: "display", value: "none" }] });
+  eq(out.rules[0].selector, mine, "their selector survives the migration");
+  // And a preset the user deleted stays deleted — v8 repoints, it never appends.
+  const empty = ctx.peMigrate({ schema: 7, rules: [] });
+  eq(empty.rules.length, 0, "nothing comes back");
+});
+
+// A v6 install crosses both steps in one read. The v7 step appends the CURRENT presets, so
+// the v8 step must find nothing left to do — if it repointed them the append shipped stale
+// selectors, and this is the only place that would say so.
+test("focus: a v6 install lands on the current selectors in one pass", () => {
+  const ctx = loadCommon();
+  const out = ctx.peMigrate({ schema: 6, rules: [] });
+  const shipped = {};
+  ctx.peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+  out.rules.forEach((r) => eq(r.selector, shipped[r.id], r.id));
+  Object.keys(ctx.__V7_FOCUS_SELECTORS).forEach((id) => {
+    ok(out.rules.some((r) => r.id === id), id + " is there to have been checked");
+  });
+});
+
+// The same rot, one release later and one rule over. Plane Cloud moved its property
+// dropdowns from Headless UI to Base UI; self-hosted 1.4 has not, so this is a union rather
+// than a replacement. Measured 2026-08-08 with the module dropdown open on both instances.
+test("dropdown: v8 repoints the search dropdown preset onto both generations", () => {
+  const ctx = loadCommon();
+  const was = ctx.__V7_DROPDOWN_SELECTOR;
+  const now = ctx.PE_DROPDOWN_SELECTOR;
+  ok(now !== was, "the selector actually changed");
+  ok(now.indexOf(was) === 0, "Plane 1.4's shape still leads, as with the focus selectors");
+  ok(now.indexOf("data-base-ui-portal") > -1, "and Cloud's shape is in it: " + now);
+  // :has(input) is what keeps this to a *search* dropdown. Without it the rule is "every
+  // popover", which is a different feature and a worse one.
+  ok(now.indexOf(":has(input)") > -1, "the search box is part of what identifies it");
+
+  const out = ctx.peMigrate({
+    schema: 7,
+    rules: [
+      { id: "rule-combobox-dropdown", enabled: true, selector: was, property: "width", value: "320px" },
+      { id: "rule-module-name", enabled: true, selector: ".max-w-40", property: "max-width", value: "320px" }
+    ]
+  });
+  eq(out.rules.find((r) => r.id === "rule-combobox-dropdown").selector, now, "repointed");
+  eq(out.rules.find((r) => r.id === "rule-module-name").selector, ".max-w-40",
+    "the rule that never broke is untouched");
+  eq(out.rules.length, 2, "and nothing was appended");
+});
+
+test("dropdown: v8 leaves an edited selector, and a deleted preset, alone", () => {
+  const ctx = loadCommon();
+  const mine = '[data-base-ui-portal] [role="dialog"]';
+  const out = ctx.peMigrate({
+    schema: 7,
+    rules: [{ id: "rule-combobox-dropdown", selector: mine, property: "width", value: "400px" }]
+  });
+  eq(out.rules[0].selector, mine, "someone who already worked it out keeps their fix");
+  eq(ctx.peMigrate({ schema: 7, rules: [] }).rules.length, 0, "and a deleted preset stays deleted");
+});
+
+// The two places that ship this preset must agree, or half the users get the dead selector.
+// PE_DEFAULTS is a fresh install; the widths→rules step at v6 is everyone who came through
+// the old settings shape, and it builds its own copy of the rule.
+test("dropdown: every place that ships the preset ships the same selector", () => {
+  const ctx = loadCommon();
+  const fresh = ctx.__DEFAULTS.rules.find((r) => r.id === "rule-combobox-dropdown");
+  ok(fresh, "the preset is in the defaults");
+  eq(fresh.selector, ctx.PE_DROPDOWN_SELECTOR);
+  // The widths step runs for pre-schema data only, so this is the shape a v1 install has.
+  const upgraded = ctx.peMigrate({
+    widths: { dropdown: { enabled: true, px: 320 }, moduleName: { enabled: true, px: 320 } }
+  }).rules.find((r) => r.id === "rule-combobox-dropdown");
+  ok(upgraded, "and in what a widths-era install is migrated into");
+  eq(upgraded.selector, ctx.PE_DROPDOWN_SELECTOR, "which must not be the dead one");
 });
 
 // Two places ship the same presets — PE_DEFAULTS for a new install, peMigrate for everyone
@@ -1472,21 +2382,107 @@ test("copy: no title field on the page means the token stays, not an empty strin
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
 });
 
-test("example feed: the button's URL points at the file that actually ships", () => {
+// Reported in review, and all three reproduce in a vm before they reproduce anywhere else.
+test("pick: every generated candidate sorts after every durable one", () => {
   const ctx = loadCommon();
-  const url = ctx.__EXAMPLE_FEED_URL;
+  // The mix that exposed it: a generated id (100 - 70 = 30) outscores tag+classes (20) and
+  // the nth-child path (10), so it landed mid-list and split the durable group in two.
+  const cands = [
+    { sel: '[aria-label="x"]', kind: "label", count: 1, generated: false },
+    { sel: ".max-w-40", kind: "class", count: 2, generated: false },
+    { sel: "#editor-container-d833e58d-d489-433e-9551-c2ab0768068d", kind: "id", count: 1, generated: true },
+    { sel: "div.a.b.c", kind: "tag+classes", count: 1, generated: false },
+    { sel: "body > div:nth-child(2)", kind: "auto", count: 1, generated: false }
+  ];
+  const out = ctx.peSortPickCandidates(cands);
+  const firstGen = out.findIndex((c) => c.generated);
+  ok(firstGen > -1, "the fixture has to contain one");
+  ok(out.slice(firstGen).every((c) => c.generated),
+    "durable rows after a generated one: " + out.map((c) => (c.generated ? "G" : "d")).join(""));
+  // Which is what the chooser needs: it draws a heading wherever the group changes, so two
+  // changes means the "Recommended" heading appears twice.
+  let changes = 0;
+  for (let i = 1; i < out.length; i++) if (!!out[i].generated !== !!out[i - 1].generated) changes++;
+  ok(changes <= 1, changes + " group changes, so " + (changes + 1) + " headings");
+  // And the partition must not scramble the ranking inside each group.
+  eq(out[0].sel, '[aria-label="x"]', "the best durable one still leads");
+});
+
+test("pick: a Tailwind variant stack is not a generated name", () => {
+  const ctx = loadCommon();
+  // A colon in a CLASS is a Tailwind variant. React's useId values never reach a class
+  // attribute, so applying that pattern here demoted hand-written classes Plane writes
+  // everywhere — below even the nth-child path — and badged them as expiring.
+  for (const t of ["dark:hover:bg-custom-background-90", "md:hover:underline", "group-hover:focus:text-white"]) {
+    eq(ctx.peLooksGenerated(t, "class", null), false, t);
+  }
+  // The pattern still has to do its job on ids, which is where useId actually lands.
+  for (const t of ["headlessui-menu-button-:r1b:", "radix-:r1e:", ":r1c:"]) {
+    eq(ctx.peLooksGenerated(t, "id", null), true, t);
+  }
+});
+
+test("quick: a link still holding a blank is not an address", () => {
+  const ctx = loadCommon();
+  // `new URL` reads "⟨host⟩" as the valid hostname "xn--host-fg5bk", so nothing downstream
+  // would have refused it — and the chooser seeds rows carrying blanks by design.
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  eq(ctx.peIsHttpUrl(url), false, "the gate every navigation passes");
+  eq(ctx.peIsHttpUrl(ctx.peExpandQuickLink({ url }, "PROJ-1")), false, "and after expansion");
+  eq(ctx.peIsHttpUrl("https://plane.example.com/acme/browse/PROJ-1"), true, "a real one still passes");
+  // Half-configured is not a target: routing skips it, which is what makes the omnibox say
+  // "no quick link set — Enter opens Settings" instead of opening a nonsense host.
+  const links = [{ id: "a", enabled: true, prefix: "", url }];
+  eq(ctx.peRouteQuickLink(links, "PROJ-1"), null, "an unfilled link is not routed to");
+  links.push({ id: "b", enabled: true, prefix: "", url: "https://plane.example.com/acme/browse/{{key}}" });
+  eq(ctx.peRouteQuickLink(links, "PROJ-1").id, "b", "and a filled one beside it still is");
+});
+
+test("example feed: every URL the button can use points at a file that ships", () => {
+  const ctx = loadCommon();
+  const urls = ctx.__EXAMPLE_FEED_URLS;
+  eq(urls.length, 2, "English and Korean");
   // A dead example is worse than none — it teaches a first-time user that sync is broken.
-  // The URL must be a real https address Save will accept, and its path must be the file
-  // present in the repo, so renaming or removing that file breaks this test loudly.
-  ok(/^https:\/\//.test(url), "https");
-  ok(ctx.peOriginPatternForUrl(url), "Save can turn it into a host permission");
-  const path = new URL(url).pathname;
-  ok(path.endsWith("/examples/team-templates.json"), "path is the example file");
-  const shipped = read("examples/team-templates.json");
-  const feed = JSON.parse(shipped);
-  // And it has to be a feed the normalizer accepts, or the example would sync to nothing.
-  const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
-  ok(out.templates.length > 0, "the shipped file parses into templates");
+  // Each URL must be a real https address Save will accept, its path must be a file present
+  // in the repo, and the file must parse into templates. Renaming one breaks this loudly.
+  for (const url of urls) {
+    ok(/^https:\/\//.test(url), "https: " + url);
+    ok(ctx.peOriginPatternForUrl(url), "Save can turn it into a host permission: " + url);
+    const path = new URL(url).pathname;
+    ok(/\/examples\/team-templates(-ko)?\.json$/.test(path), "path is an example file: " + path);
+    const feed = JSON.parse(read(path.replace(/^.*\/examples\//, "examples/")));
+    const out = ctx.peNormalizeRemoteTemplates(feed, "src-example");
+    ok(out.templates.length > 0, "parses into templates: " + path);
+  }
+  ok(urls.indexOf(ctx.__EXAMPLE_FEED_URL) > -1, "the English one is in the list");
+});
+
+// The Korean pack shipped alongside the English one and the button handed everybody English,
+// so a Korean reader's first look at sync was a picker in a language they had not chosen.
+test("example feed: the language the reader chose picks the file", () => {
+  const ctx = loadCommon();
+  const ko = ctx.peExampleFeedUrl("ko");
+  ok(ko.endsWith("team-templates-ko.json"), ko);
+  // Chrome reports ko, ko-KR, and on some builds a script subtag — all of them are Korean.
+  for (const l of ["ko", "ko-KR", "KO-kr", "ko-Kore-KR"]) eq(ctx.peExampleFeedUrl(l), ko, l);
+  // Everything else gets English, including the cases with no answer at all. There is no
+  // third file, so there is no third thing to return.
+  for (const l of ["en", "en-US", "ja", "kok", "", null]) {
+    eq(ctx.peExampleFeedUrl(l), ctx.__EXAMPLE_FEED_URL, JSON.stringify(l));
+  }
+  // "kok" is Konkani, not Korean, and a bare startsWith("ko") would have handed it the
+  // Korean pack — which is why the test names it.
+});
+
+// The two packs are one feed in two languages, so a template missing from one is a template
+// half the readers never see.
+test("example feed: the two packs are the same collection", () => {
+  const en = JSON.parse(read("examples/team-templates.json"));
+  const ko = JSON.parse(read("examples/team-templates-ko.json"));
+  eq(ko.templates.length, en.templates.length, "same number of templates");
+  eq(new Set(ko.templates.map((t) => t.group)).size, new Set(en.templates.map((t) => t.group)).size,
+    "and the same number of groups");
+  ok(ko.name !== en.name, "each names itself in its own language");
 });
 
 // Alt+Shift+F was written for macOS as "⌥⇧F" in eleven places while Windows kept its plus
@@ -1502,6 +2498,10 @@ test("shortcuts: a modifier chain reads the same on both platforms", () => {
     "README.md",
     "README.ko.md",
     "store-assets/STORE_LISTING.md"
+    // Deliberately not CHANGELOG.md or AGENTS.md. Both quote wrong spellings on purpose —
+    // "was written as ⌥⇧F in eleven places", "⌥C = ç" — and a check that cannot tell a
+    // shortcut from a story about one would push those toward being written inaccurately.
+    // The files listed above are the ones a reader consults to decide which keys to press.
   ];
   // A modifier symbol butting straight into the next key: ⌥⇧, ⌥T, ⌘⇧K. A trailing space, a
   // "+", a bracket or Hangul after it is prose, not a chain.
@@ -1550,7 +2550,12 @@ test("i18n: a message with a line break is only used where a break renders", () 
         const attr = new RegExp(`data-i18n-(?!html)[a-z-]+="${key}"`).exec(src);
         if (attr) bad.push(`${loc}/${key} → ${file} ${attr[0]}`);
       }
-      if (new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
+      // A native dialog is the one script sink that DOES render a break — confirm() lays out
+      // "\n" as a new line, which is why the reset warning is allowed three of them for its
+      // three separate facts. Toasts and the status line still are not, so this is matched on
+      // the call itself rather than waved through for every script use.
+      const inDialog = new RegExp(`(?:confirm|alert)\\(\\s*peMsg\\("${key}"`).test(scripts);
+      if (!inDialog && new RegExp(`peMsg\\("${key}"`).test(scripts)) bad.push(`${loc}/${key} → read by a script`);
       // And where it IS rendered, the element has to be one the stylesheet keeps breaks in.
       const uses = [];
       for (const src of Object.values(pages)) {
@@ -1558,7 +2563,7 @@ test("i18n: a message with a line break is only used where a break renders", () 
           uses.push(m[0]);
         }
       }
-      if (!uses.length) bad.push(`${loc}/${key} → rendered nowhere`);
+      if (!uses.length && !inDialog) bad.push(`${loc}/${key} → rendered nowhere`);
       for (const use of uses) {
         if (!PRE_LINE.some((cls) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(use))) {
           bad.push(`${loc}/${key} → ${use.slice(0, 60)}`);

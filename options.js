@@ -5,7 +5,16 @@
   const $ = (id) => document.getElementById(id);
   let state = null;
   let syncCache = { bySource: {} }; // synced-template status/cache (chrome.storage.local)
+  // Whether each rule's selector has ever matched anything, as observed by the content
+  // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
+  let ruleHealth = {};
   let dirty = false; // whether the user has edited the form
+  // The active domains as they stood the last time this page took its state FROM storage.
+  // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
+  // it is updated even when a foreign change is refused because the form is dirty. This is
+  // the list the user has actually had in front of them, which is the only list they can be
+  // said to have an opinion about. See mergeForeignDomains.
+  let knownDomains = [];
   // Ignore the storage changes our own save triggers. It has to span the whole save, not
   // absorb a single event: one save writes the settings and — when the template shards
   // shrink — prunes the ones it no longer needs, which is a second storage operation and
@@ -36,6 +45,7 @@
     domains: $("domains"),
     ruleList: $("ruleList"),
     ruleEmpty: $("ruleEmpty"),
+    ruleHealthSummary: $("ruleHealthSummary"),
     addRule: $("addRule"),
     ruleRow: $("ruleRow"),
     templateList: $("templateList"),
@@ -60,6 +70,7 @@
     tabs: $("tabs"),
     quickList: $("quickList"),
     quickEmpty: $("quickEmpty"),
+    quickExamples: $("quickExamples"),
     addQuickLink: $("addQuickLink"),
     qlkRow: $("qlkRow"),
     save: $("save"),
@@ -84,7 +95,7 @@
     },
     dropdown: {
       labelKey: "optPresetDropdown",
-      selector: '[id^="headlessui-combobox-options"] > div',
+      selector: PE_DROPDOWN_SELECTOR,
       property: "width",
       value: "320px"
     },
@@ -201,6 +212,7 @@
       const property = node.querySelector(".rule-property");
       const value = node.querySelector(".rule-value");
       const focus = node.querySelector(".rule-focus");
+      const health = node.querySelector(".rule-health");
       const del = node.querySelector(".rule-del");
 
       enabled.checked = rule.enabled !== false;
@@ -225,8 +237,51 @@
       });
 
       markSelector(selector);
+      renderRuleHealth(health, rule);
       el.ruleList.appendChild(node);
     });
+    renderRuleHealthSummary();
+  }
+
+  // What this rule's row says about whether it is doing anything. Silent unless there is
+  // something to report — an unmeasured rule (a fresh install, a rule added a minute ago)
+  // gets no badge at all, because "we do not know yet" is not worth a line of the page.
+  function renderRuleHealth(node, rule) {
+    if (!node) return;
+    // A switched-off rule is not being applied, so it has nothing to report and nothing to
+    // answer for — the same reason peRuleHealthColdCount skips it. Saying "never matched"
+    // beside a rule the user deliberately turned off reads as an accusation about a choice.
+    const entry = rule && rule.enabled !== false ? ruleHealth[rule.id] : null;
+    const st = peRuleHealthState(entry);
+    node.classList.toggle("cold", st === "cold");
+    if (st === "cold") {
+      node.textContent = peMsg("optRuleHealthCold");
+      node.hidden = false;
+    } else if (st === "ok") {
+      node.textContent = peMsg("optRuleHealthOk", [fmtTime(entry.at)]);
+      node.hidden = false;
+    } else {
+      node.textContent = "";
+      node.hidden = true;
+    }
+  }
+
+  // A health record arrives every time a Plane tab visits a new route, which can be while
+  // the user is typing a selector into one of these rows. So this updates the badges in
+  // place instead of calling renderRules — rebuilding the rows would take the caret out of
+  // the field mid-word, and a status line is not worth that.
+  function refreshRuleHealthBadges() {
+    const rules = (state && state.rules) || [];
+    [...el.ruleList.children].forEach((row, i) => renderRuleHealth(row.querySelector(".rule-health"), rules[i]));
+    renderRuleHealthSummary();
+  }
+
+  // The count is what turns a quiet row into something the reader notices — two dead
+  // presets read as two ordinary rows, but "2 of these rules" is a number you check.
+  function renderRuleHealthSummary() {
+    const n = peRuleHealthColdCount(ruleHealth, state && state.rules);
+    el.ruleHealthSummary.textContent = n ? peMsg("optRuleHealthWarn", [String(n)]) : "";
+    el.ruleHealthSummary.hidden = n === 0;
   }
 
   // visual feedback for selector validity
@@ -375,6 +430,240 @@
   // A sample key for the row previews. "PROJ-123" splits cleanly into proj/num, so a URL
   // using {{key}}, {{key.proj}} or {{key.num}} all show something real.
   const PE_QUICK_SAMPLE = "PROJ-123";
+  // Two words, so the preview shows the encoding a real phrase gets.
+  const PE_QUICK_SEARCH_SAMPLE = "login bug";
+
+  // The words that stand in for the parts a reader has to replace. Read from the catalogue
+  // so a Korean reader gets ⟨워크스페이스⟩ rather than ⟨workspace⟩ — the blank is the one
+  // piece of a URL that is addressed to a person.
+  // Mapped with literal calls rather than peMsg(e.note): check-i18n reads the key out of the
+  // call site, and a key that only exists as a data value is a key nothing can verify.
+  function quickNote(id) {
+    if (id === "plane") return peMsg("optQuickExampleNotePlane");
+    if (id === "linear") return peMsg("optQuickExampleNoteLinear");
+    if (id === "numbered") return peMsg("optQuickExampleNoteNumbered");
+    return "";
+  }
+
+  const quickPartLabels = () => ({
+    host: peMsg("optQuickPartHost"),
+    workspace: peMsg("optQuickPartWorkspace"),
+    site: peMsg("optQuickPartSite"),
+    owner: peMsg("optQuickPartOwner"),
+    repo: peMsg("optQuickPartRepo"),
+    group: peMsg("optQuickPartGroup"),
+    project: peMsg("optQuickPartProject")
+  });
+
+  // A host we can fill in for the reader. Their active domains are the hosts this extension
+  // already runs on, which on a Plane install is the Plane host — so the Plane example can
+  // arrive with the only hard part already right. A wildcard is a pattern, not a host, and
+  // is no use here.
+  const quickKnownHosts = () =>
+    (state.domains || [])
+      .map((d) => String(d || "").trim())
+      .filter((d) => d && d.indexOf("*") === -1)
+      .slice(0, 4);
+
+  function pushQuickLink(link) {
+    state.quickLinks.push({
+      id: uid("qlk"),
+      name: link.name || "",
+      prefix: link.prefix || "",
+      url: link.url || "",
+      searchUrl: link.searchUrl || "",
+      enabled: true
+    });
+    el.quickExamples.hidden = true;
+    renderQuickLinks();
+    // Pushed programmatically, so no input event fired to mark the form dirty — and an
+    // unmarked form adopts the next foreign storage change, taking the new row with it.
+    // Same reason the example-feed button sets this by hand.
+    dirty = true;
+    // Put the caret on the first thing left to replace, selected, so the next keystroke
+    // overwrites it. With nothing left, send it to whichever field still needs a decision:
+    // a numbered tracker needs a prefix to spend, and everything else needs a name.
+    const rows = el.quickList.querySelectorAll(".cpy-item");
+    const row = rows[rows.length - 1];
+    if (!row) return;
+    const urlEl = row.querySelector(".qlk-url");
+    const at = urlEl ? peFirstBlank(urlEl.value) : null;
+    if (urlEl && at) {
+      urlEl.focus();
+      urlEl.setSelectionRange(at[0], at[1]);
+      return;
+    }
+    if (link.kind === "num" && !link.prefix) {
+      const p = row.querySelector(".qlk-prefix");
+      if (p) {
+        p.focus();
+        return;
+      }
+    }
+    focusLast(".qlk-name");
+  }
+
+  function addQuickLinkFrom(example, host) {
+    const labels = quickPartLabels();
+    const known = host ? { host } : null;
+    pushQuickLink({
+      name: example ? example.name : "",
+      prefix: example ? example.prefix || "" : "",
+      url: example ? peQuickExample(example.url, labels, known) : "",
+      searchUrl: example ? peQuickExample(example.searchUrl, labels, known) : ""
+    });
+  }
+
+  // What the paste box says about what it just read. Literal peMsg calls in an if-chain, the
+  // same reason as everywhere else: check-i18n reads the key out of the call site.
+  function quickPasteHint(derived) {
+    if (!derived) return { text: peMsg("optQuickPasteUnread"), bad: true };
+    if (derived.from === "guess" && derived.kind === "num")
+      return { text: peMsg("optQuickPasteGuessNumbered", [derived.name]), bad: false };
+    if (derived.from === "guess") return { text: peMsg("optQuickPasteGuess", [derived.name]), bad: false };
+    if (derived.searchUrl) return { text: peMsg("optQuickPasteKnown", [derived.name]), bad: false };
+    return { text: peMsg("optQuickPasteKnownNoSearch", [derived.name]), bad: false };
+  }
+
+  // Paste an address, get the template. The example list can only cover trackers we thought
+  // of; the reader already has theirs open, and their address bar knows the shape better than
+  // any list of five does.
+  function buildQuickPaste(box) {
+    const wrap = document.createElement("div");
+    wrap.className = "qlk-paste";
+    const label = document.createElement("label");
+    label.className = "qlk-paste-label";
+    label.setAttribute("for", "quickPasteUrl");
+    label.textContent = peMsg("optQuickPasteLabel");
+    const line = document.createElement("div");
+    line.className = "qlk-paste-line";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "quickPasteUrl";
+    input.className = "qlk-paste-url";
+    input.placeholder = peMsg("optQuickPastePlaceholder");
+    input.spellcheck = false;
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "btn qlk-paste-go";
+    go.textContent = peMsg("optQuickPasteGo");
+    go.disabled = true;
+    const hint = document.createElement("div");
+    hint.className = "qlk-paste-hint";
+
+    let derived = null;
+    const reread = () => {
+      const raw = input.value.trim();
+      derived = raw ? peQuickFromUrl(raw) : null;
+      go.disabled = !derived;
+      if (!raw) {
+        hint.textContent = "";
+        hint.classList.remove("bad");
+        return;
+      }
+      const h = quickPasteHint(derived);
+      hint.textContent = h.text;
+      hint.classList.toggle("bad", h.bad);
+    };
+    const submit = () => {
+      if (!derived) return;
+      pushQuickLink(derived);
+    };
+    input.addEventListener("input", reread);
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      submit();
+    });
+    go.addEventListener("click", submit);
+
+    line.appendChild(input);
+    line.appendChild(go);
+    wrap.appendChild(label);
+    wrap.appendChild(line);
+    wrap.appendChild(hint);
+    box.appendChild(wrap);
+  }
+
+  function toggleQuickExamples() {
+    const box = el.quickExamples;
+    if (!box.hidden) {
+      box.hidden = true;
+      return;
+    }
+    box.innerHTML = "";
+    const labels = quickPartLabels();
+    const section = (title) => {
+      const h = document.createElement("div");
+      h.className = "qlk-ex-head";
+      h.textContent = title;
+      box.appendChild(h);
+    };
+    const row = (label, url, searchUrl, note, onPick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "qlk-ex";
+      const n = document.createElement("span");
+      n.className = "qlk-ex-name";
+      n.textContent = label;
+      const u = document.createElement("span");
+      u.className = "qlk-ex-url";
+      u.textContent = url;
+      b.appendChild(n);
+      b.appendChild(u);
+      // Picking a row fills two addresses, and the panel was showing one. Nobody should have
+      // to discover the second one after the fact, least of all in a field they did not type.
+      if (searchUrl) {
+        const s = document.createElement("span");
+        s.className = "qlk-ex-url qlk-ex-search";
+        s.textContent = peMsg("optQuickExampleSearchLine", [searchUrl]);
+        b.appendChild(s);
+      }
+      if (note) {
+        const s = document.createElement("span");
+        s.className = "qlk-ex-note";
+        s.textContent = note;
+        b.appendChild(s);
+      }
+      b.addEventListener("click", onPick);
+      box.appendChild(b);
+    };
+
+    buildQuickPaste(box);
+    // ⟨…⟩ and {{…}} look alike and mean opposite things: one is a blank for the reader, one
+    // is a token the extension expands. Nothing on the panel said so.
+    const legend = document.createElement("div");
+    legend.className = "qlk-ex-legend";
+    legend.textContent = peMsg("optQuickExamplesLegend");
+    box.appendChild(legend);
+
+    const plane = PE_QUICK_EXAMPLES.filter((e) => e.id === "plane")[0];
+    const hosts = quickKnownHosts();
+    if (plane && hosts.length) {
+      section(peMsg("optQuickExamplesFromSites"));
+      hosts.forEach((h) =>
+        row(
+          h,
+          peQuickExample(plane.url, labels, { host: h }),
+          peQuickExample(plane.searchUrl, labels, { host: h }),
+          quickNote(plane.note),
+          () => addQuickLinkFrom(plane, h)
+        )
+      );
+    }
+    section(peMsg("optQuickExamplesFromScratch"));
+    PE_QUICK_EXAMPLES.forEach((e) =>
+      row(
+        e.name,
+        peQuickExample(e.url, labels),
+        peQuickExample(e.searchUrl, labels),
+        quickNote(e.note),
+        () => addQuickLinkFrom(e, "")
+      )
+    );
+    row(peMsg("optQuickExamplesBlank"), "", "", "", () => addQuickLinkFrom(null, ""));
+    box.hidden = false;
+  }
 
   function renderQuickLinks() {
     if (!Array.isArray(state.quickLinks)) state.quickLinks = [];
@@ -387,18 +676,31 @@
       const name = node.querySelector(".qlk-name");
       const prefix = node.querySelector(".qlk-prefix");
       const url = node.querySelector(".qlk-url");
+      const search = node.querySelector(".qlk-search");
       const preview = node.querySelector(".qlk-preview");
       const del = node.querySelector(".qlk-del");
 
       name.value = q.name || "";
       prefix.value = q.prefix || "";
       url.value = q.url || "";
+      search.value = q.searchUrl || "";
 
       // Where a sample key would land — the same expander the omnibox runs, so the preview
-      // cannot drift from the real jump.
+      // cannot drift from the real jump. The search line is only shown once there is one to
+      // show: an empty second line under every row would suggest something is missing.
       const paint = () => {
-        const u = peExpandQuickLink(state.quickLinks[idx], PE_QUICK_SAMPLE);
-        preview.textContent = u ? peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]) : "";
+        const q2 = state.quickLinks[idx];
+        const u = peExpandQuickLink(q2, PE_QUICK_SAMPLE);
+        const s = peExpandSearchLink(q2, PE_QUICK_SEARCH_SAMPLE);
+        const lines = [];
+        if (u) lines.push(peMsg("optQuickPreview", [PE_QUICK_SAMPLE, u]));
+        if (s) lines.push(peMsg("optQuickSearchPreview", [PE_QUICK_SEARCH_SAMPLE, s]));
+        // An API path loads fine and returns JSON, so nothing downstream can tell it went
+        // wrong — this is the only moment anyone is looking at the URL.
+        const api = [q2.url, q2.searchUrl].some(peLooksLikeApiUrl);
+        if (api) lines.push(peMsg("optQuickApiHint"));
+        preview.classList.toggle("warn", api);
+        preview.textContent = lines.join("\n");
       };
 
       name.addEventListener("input", () => (state.quickLinks[idx].name = name.value));
@@ -407,10 +709,41 @@
         state.quickLinks[idx].url = url.value;
         paint();
       });
+      search.addEventListener("input", () => {
+        state.quickLinks[idx].searchUrl = search.value;
+        paint();
+      });
       del.addEventListener("click", () => {
         state.quickLinks.splice(idx, 1);
         renderQuickLinks();
       });
+
+      // Tab walks the remaining ⟨blanks⟩ before it goes anywhere else. An example arrives with
+      // the first one selected and the rest were left to be found and dragged over by hand,
+      // which on GitHub's two-blank shape is most of the work the chooser was meant to save.
+      // Once a field has none left, Tab is Tab again — a box you cannot leave with the
+      // keyboard is worse than the problem this solves, so the fallthrough is the default.
+      const walk = (field, next) => {
+        field.addEventListener("keydown", (e) => {
+          if (e.key !== "Tab" || e.altKey || e.ctrlKey || e.metaKey) return;
+          const at = e.shiftKey
+            ? pePrevBlank(field.value, field.selectionStart)
+            : peNextBlank(field.value, field.selectionEnd);
+          if (at) {
+            e.preventDefault();
+            field.setSelectionRange(at[0], at[1]);
+            return;
+          }
+          if (e.shiftKey || !next) return;
+          const on = peFirstBlank(next.value);
+          if (!on) return;
+          e.preventDefault();
+          next.focus();
+          next.setSelectionRange(on[0], on[1]);
+        });
+      };
+      walk(url, search);
+      walk(search, null);
 
       paint();
       el.quickList.appendChild(node);
@@ -631,9 +964,10 @@
         flash(peMsg("msgQuickLimit", [String(PE_MAX_QUICK_LINKS)]), true);
         return;
       }
-      state.quickLinks.push({ id: uid("qlk"), name: "", prefix: "", url: "", enabled: true });
-      renderQuickLinks();
-      focusLast(".qlk-name");
+      // A chooser rather than an empty row. The empty row is still one click away — it is
+      // just no longer the only thing on offer, which is what made a wrong URL the easiest
+      // thing to produce here.
+      toggleQuickExamples();
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
@@ -661,8 +995,11 @@
         flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
         return;
       }
-      // Adding it twice would fetch one file under two headers and show it twice.
-      if ((sync.sources || []).some((s) => (s.url || "").trim() === PE_EXAMPLE_FEED_URL)) {
+      // Adding it twice would fetch one file under two headers and show it twice. Both
+      // languages count as "the example": someone who switches Chrome's language should not
+      // end up subscribed to two copies of the same 26 templates.
+      const already = (s) => PE_EXAMPLE_FEED_URLS.indexOf((s.url || "").trim()) > -1;
+      if ((sync.sources || []).some(already)) {
         flash(peMsg("msgExampleExists"), true);
         return;
       }
@@ -672,7 +1009,7 @@
       sync.enabled = true;
       sync.sources.push({
         id: uid("src"),
-        url: PE_EXAMPLE_FEED_URL,
+        url: peExampleFeedUrl(),
         name: "",
         intervalMinutes: 360,
         enabled: true,
@@ -737,6 +1074,13 @@
           renderSources();
           return;
         }
+        // A Plane tab just measured the rules. Badges only — see refreshRuleHealthBadges.
+        if (area === "local" && changes[PE_RULE_HEALTH_KEY]) {
+          const nv = changes[PE_RULE_HEALTH_KEY].newValue;
+          ruleHealth = nv && typeof nv === "object" ? nv : {};
+          refreshRuleHealthBadges();
+          return;
+        }
         if (!peSettingsChanged(changes, area)) return;
         if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
@@ -759,6 +1103,7 @@
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
+          knownDomains = (s.domains || []).slice();
           render();
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
@@ -931,6 +1276,32 @@
     }
   }
 
+  // A site enabled somewhere else while this page was open must survive this page's save.
+  //
+  // The popup's "Enable on this site" appends a domain and saves. If this form is dirty when
+  // that lands, the change is announced but deliberately not adopted — taking it would throw
+  // away what the user is typing. So this page still holds a list without that domain, and
+  // saving would write it back AND hand the origin's permission back to Chrome, turning off
+  // a site the user switched on a moment ago. The warning it prints says something changed;
+  // it does not say saving will undo it, and "save your work" is the natural next move.
+  //
+  // A domain in storage that this page has never had on screen is one the user cannot have
+  // meant to remove, so it is carried into the save rather than dropped. Deliberate removal
+  // still works: a domain that WAS on screen is in knownDomains, so deleting it and saving
+  // removes it, and Restore defaults still clears the list it just showed you.
+  async function mergeForeignDomains() {
+    let stored = null;
+    try {
+      stored = await peGetSettings();
+    } catch (_) {
+      return []; // cannot read storage: save what we have rather than refusing
+    }
+    const mine = state.domains || [];
+    const added = (stored.domains || []).filter((d) => knownDomains.indexOf(d) === -1 && mine.indexOf(d) === -1);
+    if (added.length) state.domains = mine.concat(added);
+    return added;
+  }
+
   async function syncHostPermissions() {
     const desired = desiredOrigins();
     if (desired.length) {
@@ -1016,13 +1387,22 @@
           ? [...new Set(s.hiddenGroups.map((x) => peClampStr(String(x), PE_SYNC_LIMITS.maxFieldLen)))]
           : []
       }));
+    // Before the permission pass, because that is what would hand the origin back.
+    const kept = await mergeForeignDomains();
     const permOk = await syncHostPermissions();
     try {
       savingSelf = true;
       await peSaveSettings(state);
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
+      knownDomains = (state.domains || []).slice();
       render();
-      flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
+      // A failed grant outranks the good news. These two can happen together — and when
+      // they do it is not a coincidence: the origin Chrome refused is the one that was just
+      // carried across, so reporting only "kept it" would be reporting the opposite of what
+      // happened.
+      if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
+      else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
+      else flash(peMsg("msgSaved"));
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
         try {
@@ -1167,10 +1547,12 @@
   }
 
   peApplyI18n(document);
-  Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
+  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth()]).then(([s, c, h]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
+    knownDomains = (s.domains || []).slice();
     syncCache = c;
+    ruleHealth = h;
     render();
     bind();
     bindTabs();

@@ -369,6 +369,30 @@ input[type="number"]:focus {
   width: 13px;
   height: 13px;
 }
+/* Whether the rule is doing anything. Last in the row and quiet by default: a working rule
+   says only when it last applied, which is information you go looking for. The cold state
+   is the one that has to catch an eye it did not ask for, so it takes the warning colour —
+   the same one .src-status.err uses, because it is the same kind of news. */
+.rule-health {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.rule-health.cold {
+  color: #b45309;
+  font-weight: 600;
+}
+.rule-health-summary {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid #fcd9a4;
+  border-radius: 8px;
+  background: #fff8ec;
+  font-size: 12.5px;
+  color: #92400e;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -624,13 +648,146 @@ input:checked + .switch.sm::after {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-.cpy-preview.has-unknown {
+.cpy-preview.has-unknown,
+.cpy-preview.warn {
   color: #b45309;
+}
+/* A quick link row previews the open URL and, when it has one, the search URL — and may add
+   a hint under both. Three lines joined with newlines, so the box has to keep them. */
+.qlk-preview {
+  white-space: pre-line;
+}
+
+/* Starting points, shown instead of an empty row. Each is one line: what it is, what the URL
+   will look like, and — where it matters — what that tracker will not do. The URL is the
+   point of the whole panel, so it gets the monospace and the room. */
+.qlk-examples {
+  margin: 4px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  background: #fcfcfd;
+}
+.qlk-examples[hidden] {
+  display: none;
+}
+.qlk-ex-head {
+  padding: 7px 8px 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+/* Paste an address instead of recognising your tracker in a list of five. It sits above the
+   examples, not among them, because it is the path that works for a tracker nobody listed. */
+.qlk-paste {
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.qlk-paste-label {
+  display: block;
+  padding: 3px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.qlk-paste-line {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.qlk-paste-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.qlk-paste-go {
+  flex: 0 0 auto;
+}
+/* What it made of what you pasted, before you commit to it. The refusal is the case that
+   matters: a template built from a page that is not a work item is wrong forever, quietly. */
+.qlk-paste-hint {
+  padding: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted-2);
+}
+.qlk-paste-hint:empty {
+  display: none;
+}
+.qlk-paste-hint.bad {
+  color: #b45309;
+}
+/* ⟨…⟩ and {{…}} look alike and mean opposite things. */
+.qlk-ex-legend {
+  padding: 6px 8px 2px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.qlk-ex {
+  display: grid;
+  /* Wide enough for a host name, which is what the first section's rows are named after —
+     at 92px "plane.example.com" broke across two lines and read as two entries. */
+  grid-template-columns: minmax(0, 124px) 1fr;
+  gap: 2px 10px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.qlk-ex:hover {
+  background: #f1f2f4;
+}
+.qlk-ex-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.qlk-ex-url {
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--muted-2);
+  overflow-wrap: anywhere;
+}
+/* The second address a row fills. In the same column as the first, one line down, so the two
+   read as a pair rather than as two entries. */
+.qlk-ex-search {
+  grid-column: 2;
+}
+/* What this tracker will not do — Plane's search that does not search, Linear having none.
+   Under the URL rather than beside it: it qualifies the thing above it. */
+.qlk-ex-note {
+  grid-column: 2;
+  font-size: 11.5px;
+  color: #b45309;
+}
+@media (prefers-color-scheme: dark) {
+  .qlk-examples {
+    background: #171b20;
+  }
+  .qlk-ex:hover {
+    background: #262b31;
+  }
 }
 
 /* quick jump rows reuse .cpy-item / .copy-list; only the field widths differ */
 .qlk-fields {
   flex-wrap: wrap;
+}
+/* Two URLs on one row means it has to wrap, and the delete button was landing on a third
+   line by itself, reading as a stray control rather than this row's. CSS order puts it back
+   on the first line without moving it in the DOM, so the tab order still runs through the
+   fields it belongs to and reaches the destructive button last. */
+.qlk-del {
+  order: 1;
+  margin-left: auto;
 }
 .qlk-name {
   flex: 0 0 130px;
@@ -642,7 +799,15 @@ input:checked + .switch.sm::after {
   font-size: 12px;
 }
 .qlk-url {
-  flex: 1 1 220px;
+  order: 2;
+  flex: 1 1 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.qlk-search {
+  order: 3;
+  flex: 1 1 100%;
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -939,6 +1104,16 @@ kbd {
   }
   .src-status.err {
     color: #f87171;
+  }
+  /* The amber wash is a near-white block on a dark card; tint the dark surface instead and
+     lift the text, the same trade the .icon-btn:hover rule above makes. */
+  .rule-health-summary {
+    border-color: #4d3a17;
+    background: #241d10;
+    color: #fbbf24;
+  }
+  .rule-health.cold {
+    color: #fbbf24;
   }
   .fmt-pre,
   .src-group-count {

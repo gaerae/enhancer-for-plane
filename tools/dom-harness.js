@@ -91,7 +91,7 @@ function darkCss(name) {
 
 // The chrome API surface these pages actually touch — no more than that, so an
 // implementation cannot pass here by calling something production does not have.
-function stub(seed, lang) {
+function stub(seed, lang, local) {
   return `<script>
 const __CAT = ${CATALOGUES[lang] || CATALOGUES.en};
 function __msg(key, subs) {
@@ -108,37 +108,58 @@ function __msg(key, subs) {
   return m;
 }
 window.__SEED = ${JSON.stringify(seed)};
+window.__LOCAL = ${JSON.stringify(local || {})};
+window.__localWrites = 0;
+window.__written = [];
+window.__optionsOpened = false;
 window.__opened = null;
 window.__closed = false;
 window.chrome = {
   i18n: { getMessage: (k, s) => __msg(k, s), getUILanguage: () => "${lang || "en"}" },
   storage: {
+    // Writes are kept, for the same reason local's are: a save that carries a domain across
+    // from another surface is only provable by reading back what was actually written.
     sync: {
       get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__SEED))),
-      set: (o, cb) => cb && cb(),
+      set: (o, cb) => { window.__written.push(JSON.parse(JSON.stringify(o))); cb && cb(); },
       remove: (k, cb) => cb && cb()
     },
-    local: { get: (k, cb) => cb({}), set: (o, cb) => cb && cb() },
+    // Readable and writable, unlike sync: the rule-health record is the one piece of state
+    // the content script both writes and the settings page reads back, so a stub that
+    // swallowed the write could not tell a working feature from a silent one. Writes are
+    // kept so an assertion can read what was actually stored, and counted so "it wrote
+    // once per route" is provable rather than assumed.
+    local: {
+      get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__LOCAL))),
+      set: (o, cb) => { Object.assign(window.__LOCAL, JSON.parse(JSON.stringify(o))); window.__localWrites++; cb && cb(); }
+    },
     onChanged: { addListener: (f) => { window.__onChanged = f; } }
   },
   runtime: {
     lastError: null,
     getManifest: () => ({ version: "test", action: {} }),
-    openOptionsPage: () => {},
+    openOptionsPage: () => { window.__optionsOpened = true; },
     sendMessage: () => {},
     // Captured, not discarded: this is how the popup and the keyboard command reach the
     // content script, so a page that hosts content.js has to be able to knock on it.
     onMessage: { addListener: (f) => { window.__onMessage = f; } }
   },
+  // Promise-aware as well as callback-aware, because options.js awaits these: a
+  // callback-only stub resolves to undefined, which reads as "refused" and sent every save
+  // down the no-permission branch.
   permissions: {
     contains: (o, cb) => (cb ? cb(true) : Promise.resolve(true)),
-    request: (o, cb) => cb && cb(true),
-    getAll: (cb) => cb({ origins: [] }),
+    request: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
+    getAll: (cb) => { const v = { origins: [] }; cb && cb(v); return Promise.resolve(v); },
+    remove: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
     onRemoved: { addListener: () => {} }
   },
   tabs: {
-    query: (o, cb) => cb([{ id: 1, url: "https://plane.example.com/acme/browse/PROJ-7" }]),
+    // A title as well as a URL, because that pair is the whole input to the popup's copy
+    // block — it reads a tab, never a page. The shape is the one Plane and Linear both
+    // write, measured 2026-08-08: "{KEY} {title}".
+    query: (o, cb) => cb([{ id: 1, url: "https://plane.example.com/acme/browse/PROJ-7", title: "PROJ-7 Fix the login redirect" }]),
     create: (o) => { window.__opened = o.url; },
     update: () => {},
     sendMessage: () => {}
@@ -156,12 +177,19 @@ window.close = () => { window.__closed = true; };
 const PREAMBLE = `
 const __out = [];
 window.addEventListener("error", (e) => __out.push({ name: "uncaught page error", pass: false, detail: String(e.message) }));
-const check = (name, fn) => { try { const d = fn(); __out.push({ name, pass: true, detail: d === undefined ? "" : String(d) }); } catch (e) { __out.push({ name, pass: false, detail: String(e && e.message || e) }); } };
+// A check body must be synchronous. An async one returns a Promise, this records a pass
+// before it settles, and every assertion inside it becomes decorative — the failure mode
+// being that the suite goes green having asserted nothing. Await outside the check and
+// assert on the result.
+const check = (name, fn) => { try { const d = fn(); if (d && typeof d.then === "function") throw new Error("check body is async — await outside it and assert on the result"); __out.push({ name, pass: true, detail: d === undefined ? "" : String(d) }); } catch (e) { __out.push({ name, pass: false, detail: String(e && e.message || e) }); } };
 const eq = (a, b, what) => { if (String(a) !== String(b)) throw new Error((what || "value") + ": " + JSON.stringify(a) + " !== " + JSON.stringify(b)); return a; };
 const ok = (c, what) => { if (!c) throw new Error(what || "expected true"); return true; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 8 virtual seconds. It polls in virtual time, so the ceiling costs nothing when the
+// condition is met early and only decides how long a genuine failure waits before saying so
+// — and 2s was under a single rule-health delay, which made a slow answer look like no answer.
 const waitFor = async (cond, label) => {
-  for (let i = 0; i < 100; i++) { if (cond()) return true; await sleep(20); }
+  for (let i = 0; i < 400; i++) { if (cond()) return true; await sleep(20); }
   throw new Error("timed out waiting for " + (label || "condition"));
 };
 const rgb = (s) => (String(s).match(/\\d+/g) || []).slice(0, 3).map(Number);
@@ -171,24 +199,30 @@ const bg = (sel) => getComputedStyle(typeof sel === "string" ? document.querySel
 const report = () => { const el = document.createElement("pre"); el.id = "pe-results"; el.textContent = JSON.stringify(__out); document.body.appendChild(el); };
 `;
 
-function buildPage({ name, html, css, js, seed, dark, lang, body }) {
+function buildPage({ name, html, css, js, seed, local, dark, lang, body }) {
   let src = fs.readFileSync(path.join(ROOT, html), "utf8");
   const cssPath = dark ? darkCss(css) : path.join(ROOT, css);
-  src = src.replace(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
+  // Every insertion goes through a replacer function, never a replacement string. A string
+  // replacement reads $&, $1 and $' as instructions, and the things being inserted here are
+  // an entire message catalogue and an entire test body — authored text, full of $ signs.
+  // One "$NAME$'s" in a catalogue entry expanded $' into the rest of the file and truncated
+  // the page mid-string; every suite on it then failed for reasons that pointed elsewhere.
+  const put = (re, text) => (src = src.replace(re, () => text));
+  put(new RegExp(`href="${css}"`), `href="${fileUrl(cssPath)}"`);
   for (const f of ["common.js", js]) {
-    src = src.replace(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
+    put(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
   }
   // The stub has to define `chrome` before the page's own scripts run.
-  src = src.replace(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
+  put(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
   // Transitions off. Virtual time advances timers but not the compositor clock that drives
   // a CSS transition, so a colour read after a toggle came back mid-interpolation — the
   // toggle knob measured 1.1:1 here while a real browser settled at 9.5:1. Asserting the
   // final computed value is both what matters and the only thing that can be deterministic.
-  src = src.replace(
+  put(
     "</head>",
     "<style>*, *::before, *::after { transition: none !important; animation: none !important; }</style>\n</head>"
   );
-  src = src.replace(
+  put(
     "</body>",
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n</body>`
   );
@@ -206,12 +240,12 @@ function buildPage({ name, html, css, js, seed, dark, lang, body }) {
 // it is null the content script reports "not active" for the same reason it does on a site
 // the user never enabled. A suite that opened on an inactive site could not tell those apart,
 // so the negative case is asserted here, after the positive one has proved settings arrived.
-function buildPlanePage({ name, seed, lang, plane, body }) {
+function buildPlanePage({ name, seed, local, lang, plane, body }) {
   const src =
     `<!doctype html>\n<html lang="en"><head><meta charset="utf-8" />\n` +
     `<link rel="stylesheet" href="${fileUrl(path.join(ROOT, "content.css"))}" />\n` +
     `<style>*, *::before, *::after { transition: none !important; animation: none !important; }</style>\n` +
-    `</head><body>\n${plane}\n${stub(seed, lang)}\n` +
+    `</head><body>\n${plane}\n${stub(seed, lang, local)}\n` +
     `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>\n` +
     `<script src="${fileUrl(path.join(ROOT, "content.js"))}"></script>\n` +
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n` +
@@ -244,7 +278,12 @@ function run(chrome, page, hash) {
         ...(process.env.PE_CHROME_PROFILE ? [`--user-data-dir=${process.env.PE_CHROME_PROFILE}-${++launch}`] : []),
         "--dump-dom",
         // Virtual time: timers fire as fast as the page allows, deterministically.
-        "--virtual-time-budget=5000",
+        // Virtual milliseconds, not real ones, so this is a bound on what a page may wait
+        // for rather than on how long the run takes. It was 5000, which was under the
+        // rule-health delay alone — a suite that has to prove "nothing happened for 2.5s,
+        // then this did" needs several of those windows back to back, and the click scan's
+        // own throttle has to be waited out on top of them.
+        "--virtual-time-budget=40000",
         url
       ],
       {
@@ -310,16 +349,50 @@ const seedOf = (over) => ({ peSettings: settings(over) });
 const OPTIONS = { html: "options.html", css: "options.css", js: "options.js" };
 const POPUP = { html: "popup.html", css: "popup.css", js: "popup.js" };
 
-// The classes and the id are copied from Plane 1.4's own markup — the properties panel is a
+// The classes and the id are copied from Plane's own markup — the properties panel is a
 // flex sibling of the description column, the left navigation carries an id. The widths are
 // here so a hidden panel has something to give its space back to.
+//
+// Two generations sit on this one page on purpose. Plane 1.4 (self-hosted) and Plane Cloud
+// write the properties panel and the body column with completely different classes, and no
+// install ever sees both — which is exactly why a page that carried only one of them let
+// the Cloud half rot unnoticed through a release. A single page proves the shipped selector
+// list matches both, and it costs one extra element per pair. Measured against Cloud on
+// 2026-08-08; the ones marked "decoy" are the near misses that a looser selector would
+// wrongly catch, and they must stay visible while focus mode is on.
 const PLANE = `
 <div class="flex h-full w-full overflow-hidden" style="width: 1200px">
   <div class="h-full w-full space-y-6 overflow-y-auto px-9 py-5" id="probe-body">description</div>
   <div class="fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle bg-surface-1 sm:w-1/2 md:relative md:w-1/4" id="probe-props">properties</div>
 </div>
+<div class="relative flex h-full w-full overflow-hidden" style="width: 1200px">
+  <div class="h-full flex-1 min-w-0 overflow-y-auto px-8 py-6" id="probe-body-cloud">description (cloud)</div>
+  <div class="relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1 motion-safe:transition-[width,min-width]" id="probe-props-cloud">properties (cloud)</div>
+</div>
+<div class="shrink-0 bg-surface-1" id="probe-props-decoy">a cycles-route chip that .shrink-0.bg-surface-1 alone would have hidden</div>
+<div class="overflow-y-auto px-8 py-5" id="probe-body-decoy">neither generation's body column</div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
 <div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
+<!-- The search dropdown, in both generations, exactly as each renders it with the module
+     picker open. Plane 1.4 (self-hosted) uses Headless UI; Cloud has moved to Base UI, and
+     the shipped preset went on selecting only the first for a release. Measured 2026-08-08.
+     The two decoys under them are the whole reason the Cloud half is :has(input): a popover
+     with no search box, and the command palette, which is role="dialog" at window width and
+     lives outside the portal. Widening either is this preset reaching past its own name. -->
+<div id="headlessui-combobox-options-:r6j:" class="absolute w-48 rounded-md border">
+  <div id="probe-dropdown-14"><input placeholder="Search" /><div>Data Unit</div></div>
+</div>
+<div id=":ra0:" data-base-ui-portal>
+  <div role="presentation" class="z-40">
+    <div role="dialog" class="rounded-md border border-subtle bg-surface-1 p-1 shadow-overlay-200" id="probe-dropdown-cloud">
+      <div class="flex flex-col gap-1"><div class="relative"><input id="base-ui-:ra2:" placeholder="Search modules..." /></div></div>
+    </div>
+  </div>
+  <div role="dialog" class="rounded-md border border-subtle bg-surface-1 p-1 shadow-overlay-200" id="probe-dropdown-decoy">
+    <div class="flex flex-col gap-1">a menu with no search box</div>
+  </div>
+</div>
+<div role="dialog" class="relative z-50" id="probe-palette"><input placeholder="Type a command or search..." /></div>
 <div id="probe-header">
   <!-- An item with a parent, which is where the buttons were landing on the wrong key. Plane
        renders both keys from one component: the parent's inside a link to the parent and inert,
@@ -400,7 +473,203 @@ const midWordBreaks = (root) => {
   return bad;
 };`;
 
+// The page builder is a text substitution, and everything it substitutes in is authored text
+// — an entire catalogue, an entire suite body. If any of it reaches String.replace as a
+// replacement string, "$&", "$1" and "$'" are read as instructions. One catalogue entry
+// containing "$NAME$'s" expanded $' into the rest of the file, truncating the page mid-string;
+// 32 assertions on 6 pages then failed with messages pointing at tabs and preview text.
+// Cheaper to assert the builder is immune than to diagnose that twice.
+function checkPageBuilderQuotesNothing() {
+  const src = fs.readFileSync(path.join(__dirname, "dom-harness.js"), "utf8");
+  const fn = src.slice(src.indexOf("function buildPage("), src.indexOf("function buildPlanePage("));
+  // The one legitimate src.replace is `put`, whose replacement is a function.
+  const bad = fn.split("\n").filter((l) => l.indexOf("src.replace(") > -1 && l.indexOf("() =>") === -1);
+  if (bad.length) {
+    hardError = "buildPage substitutes with a replacement string: " + bad[0].trim();
+    console.log(`  ERROR ${hardError}`);
+  }
+}
+checkPageBuilderQuotesNothing();
+
 const suites = [
+  {
+    // Chrome caps a toolbar popup at 600px and cuts the rest. This one reached 606 on an
+    // ordinary work item tab and 761 with every block showing, so Settings — the one control
+    // worth reaching from any state — was the part below the line, and macOS overlay
+    // scrollbars meant nothing on screen said there was a below.
+    name: "popup · taller than the window Chrome gives it",
+    page: {
+      name: "pop-tall",
+      ...POPUP,
+      seed: seedOf(),
+      local: { peRecent: [
+        { key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", at: 700 },
+        { key: "ENG-9", url: "https://linear.app/acme/issue/ENG-9", name: "Linear", at: 600 },
+        { key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 500 },
+        { key: "DU-61", url: "https://gprxh.atlassian.net/browse/DU-61", name: "Jira", at: 400 },
+        { key: "GH-1234", url: "https://github.com/gaerae/enhancer-for-plane/issues/1234", name: "GitHub", at: 300 },
+        { key: "TRASHSWD-17", url: "https://gprxh.atlassian.net/browse/TRASHSWD-17", name: "Jira", at: 200 }
+      ] }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const scroll = () => document.getElementById("popScroll");
+      const foot = () => document.querySelector(".pop-foot");
+      check("the document stays inside Chrome's 600px", () => {
+        const h = document.documentElement.scrollHeight;
+        ok(h <= 600, "the popup is " + h + "px and Chrome will cut " + (h - 600) + " of it");
+        return h + "px";
+      });
+      // Overflow has to be FORCED, not seeded. The seed overflowed on macOS and did not on
+      // CI's Linux, because how tall this content is depends on font metrics — so the check
+      // was really asserting which machine it ran on. Everything below is about what holds
+      // WHEN it overflows, so the box is squeezed until it does and the question becomes
+      // deterministic. The real content's height is asserted above, against Chrome's cap,
+      // which is the part that genuinely depends on the seed.
+      scroll().closest(".pop").style.maxHeight = "300px";
+      await sleep(50);
+      check("the box now overflows, which is the state the rest of this is about", () => {
+        ok(scroll().scrollHeight > scroll().clientHeight + 4,
+           "content " + scroll().scrollHeight + " fits in " + scroll().clientHeight);
+      });
+      check("the scrollbar takes real space rather than fading out of sight", () => {
+        const gutter = scroll().offsetWidth - scroll().clientWidth;
+        ok(gutter >= 6, "gutter is " + gutter + "px — an overlay scrollbar is invisible at rest");
+      });
+      check("the way out is outside the part that scrolls", () => {
+        ok(!scroll().contains(document.getElementById("openOptions")), "Settings is inside the scroll box");
+        ok(!scroll().contains(document.getElementById("tplCount")), "so is the template count");
+        const before = foot().getBoundingClientRect().top;
+        scroll().scrollTop = scroll().scrollHeight;
+        eq(foot().getBoundingClientRect().top, before, "the footer moved when the middle scrolled");
+      });
+      check("and scrolling reaches the last thing in the middle", () => {
+        scroll().scrollTop = scroll().scrollHeight;
+        const last = [...scroll().children].filter((n) => !n.hidden).pop();
+        const r = last.getBoundingClientRect();
+        const box = scroll().getBoundingClientRect();
+        ok(r.bottom <= box.bottom + 1 && r.top >= box.top - 1, "the last block is still out of view");
+      });
+      // The other half of the same mistake: a short popup padded out to the cap.
+      check("the header and the footer are not what scrolled", () => {
+        const head = document.querySelector(".pop-head").getBoundingClientRect();
+        ok(head.top >= 0 && head.bottom <= scroll().getBoundingClientRect().top + 1, "the header is in the scroll flow");
+      });`
+  },
+  {
+    // The case the two earlier attempts at "this selector expires" both missed. Ordinary
+    // Plane markup carries Tailwind and nothing else, so every candidate is durable, one
+    // heading renders, and a mark that appears only on generated rows appears nowhere. It
+    // was reported exactly that way twice: "is it shown in words? am I not finding it?"
+    name: "content · picker on ordinary markup",
+    page: {
+      name: "ct-picker-plain",
+      plane: `
+        <div class="overflow-y-auto px-9 py-5"><span class="text-sm font-medium">Real Plane body</span></div>
+        <div class="px-9 py-5">a sibling sharing two of the three classes</div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await sleep(200);
+      await new Promise((r) => window.__onMessage({ type: "pe-start-picker" }, {}, r));
+      document.querySelector(".overflow-y-auto").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitFor(() => document.getElementById("pe-pick-menu"), "the candidate list");
+      const rows = () => [...document.querySelectorAll("#pe-pick-menu .pe-pick-item")];
+      check("this page really is the one-group case", () => {
+        const heads = [...document.querySelectorAll("#pe-pick-menu .pe-pick-group")].map((g) => g.textContent);
+        eq(heads, [peMsg("pickGroupDurable")], "a second group would make the check meaningless");
+        ok(rows().length >= 3, "only " + rows().length + " candidates");
+      });
+      check("every row still says how long it lasts", () => {
+        for (const r of rows()) {
+          const l = r.querySelector(".pe-pick-life");
+          ok(l, "no verdict on " + r.querySelector(".pe-pick-sel").textContent);
+          eq(l.textContent, peMsg("pickLifeLasts"), r.querySelector(".pe-pick-sel").textContent);
+        }
+      });
+      check("the verdict is legible and is not the same grey as the row furniture", () => {
+        const l = rows()[0].querySelector(".pe-pick-life");
+        const c = contrast(getComputedStyle(l).color, bg(l));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+        const kind = getComputedStyle(rows()[0].querySelector(".pe-pick-kind")).color;
+        ok(getComputedStyle(l).color !== kind, "the verdict is the same colour as the kind label");
+      });
+      check("the extra chip did not squeeze a row into wrapping", () => {
+        for (const r of rows()) {
+          ok(r.offsetHeight < 44, r.querySelector(".pe-pick-sel").textContent + " is " + r.offsetHeight + "px tall");
+          const l = r.querySelector(".pe-pick-life");
+          ok(l.scrollWidth <= l.clientWidth + 1, "the verdict is clipped: " + l.scrollWidth + " > " + l.clientWidth);
+        }
+      });`
+  },
+  {
+    // Restore defaults empties the domain list, and saving after it hands every host
+    // permission back to Chrome — which is what actually happened here: the extension went
+    // dark on a site that was working, and nothing on screen connected the two. The confirm
+    // is the only moment to say so, because after it the cost is one click away and looks
+    // like an ordinary Save.
+    name: "options · restore defaults says what it costs",
+    page: { name: "opt-reset", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      check("the confirm names the sites, the Save, and the re-approval", () => {
+        const t = peMsg("msgResetConfirm");
+        for (const want of ["Save", "access"]) ok(t.indexOf(want) > -1, want + " missing from: " + t);
+        ok(t.split(String.fromCharCode(10)).length >= 2, "one long line for three separate facts");
+      });
+      // Reset is in-memory until Save — which is exactly why the confirm has to mention Save.
+      check("it empties the list on screen but writes nothing yet", () => {
+        const before = window.__localWrites;
+        window.confirm = () => true;
+        document.getElementById("reset").click();
+        eq(document.getElementById("domains").value.trim(), "", "the textarea still lists a site");
+        eq(window.__localWrites, before, "reset wrote to storage before Save");
+      });`
+  },
+  {
+    // A site switched on from the popup while this page sits open with unsaved edits. The
+    // page refuses to adopt the change (correctly — it would discard what is being typed),
+    // so its own list has never held that domain, and saving used to write the old list AND
+    // revoke the origin. The site went dark, right after the user turned it on.
+    name: "options · a save keeps a site enabled elsewhere",
+    page: { name: "opt-foreign", ...OPTIONS, seed: seedOf({ domains: ["plane.example.com"] }) },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="sites"]').click();
+      // Make the form dirty first, so the storage change below is announced and NOT adopted.
+      const rules = document.querySelector('#tabs .tab[data-tab="appearance"]');
+      document.getElementById("domains").dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(50);
+
+      // The popup's write: same shape as peSaveSettings, landing while this page is dirty.
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.domains = ["plane.example.com", "app.plane.so"];
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(300);
+
+      check("the page says so and keeps the edit rather than adopting", () => {
+        eq(document.getElementById("domains").value.indexOf("app.plane.so"), -1,
+           "it adopted the change and threw away the edit");
+      });
+      // Clear the "changed elsewhere" flash first — it is still on screen and non-empty,
+      // so waiting for "any status" would match it and check before the save has run.
+      document.getElementById("status").textContent = "";
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await waitFor(() => (document.getElementById("status").textContent || "").length > 0, "the save to report");
+      check("the site enabled elsewhere survives the save", () => {
+        const written = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(written, "nothing was saved");
+        ok((written.domains || []).indexOf("app.plane.so") > -1,
+           "saved domains: " + JSON.stringify(written.domains));
+        ok((written.domains || []).indexOf("plane.example.com") > -1, "and the original is still there");
+      });
+      check("and the save says it did that, rather than just Saved", () => {
+        eq(document.getElementById("status").textContent, peMsg("msgKeptDomains", ["app.plane.so"]));
+      });`
+  },
   {
     name: "options · tabs",
     page: { name: "opt-tabs", ...OPTIONS, seed: seedOf() },
@@ -507,9 +776,15 @@ const suites = [
       const rows = () => [...document.querySelectorAll("#panel-keys .keys tbody tr")];
       check("every shortcut the extension answers to is listed", () => {
         const keys = rows().map((r) => [...r.querySelectorAll("td")].slice(1, 3).map((td) => td.textContent.replace(/\\s+/g, " ").trim()));
-        eq(rows().length, 4, "rows");
+        eq(rows().length, 5, "rows");
         const win = keys.map((k) => k[0]).join(" | ");
-        for (const combo of ["Alt+T", "Alt+C", "Alt+Shift+F", "issue"]) ok(win.indexOf(combo) > -1, combo + " missing from: " + win);
+        // The context menu earns a row for the same reason the omnibox keyword does: it is a
+        // way in that answers a gesture, and this table is the one place they are all
+        // written down. Its "key" is a right-click, which is why the check is on the text of
+        // the column rather than on a modifier combination.
+        for (const combo of ["Alt+T", "Alt+C", "Alt+Shift+F", "issue", peMsg("optKeysRightClick")]) {
+          ok(win.indexOf(combo) > -1, combo + " missing from: " + win);
+        }
       });
       check("each row gives the macOS keys too, and neither column wraps", () => {
         for (const r of rows()) {
@@ -530,6 +805,14 @@ const suites = [
         const t = document.getElementById("panel-keys").textContent;
         ok(t.indexOf("chrome://extensions/shortcuts") > -1, "the rebinding address");
       });
+      // The address-bar keyword looks like a setting, because Chrome lists it among the
+      // search engines — so the page has to say it is not one, and say what to do instead.
+      // Verified on Chrome 151: the extension's row there offers Manage and Deactivate only.
+      check("and answers the keyword question, with the way round it", () => {
+        const t = document.getElementById("panel-keys").textContent;
+        ok(t.indexOf("chrome://settings/searchEngines") > -1, "no pointer to where Chrome shows it");
+        ok(t.indexOf("%s") > -1, "no site-search URL to copy: " + t.slice(-260));
+      });
       // Four columns, one of them a sentence: on a narrow window the table has to scroll
       // inside its own box rather than making the whole page scroll sideways.
       check("a narrow window scrolls the table, not the page", () => {
@@ -540,6 +823,416 @@ const suites = [
         const box = document.querySelector(".keys-scroll");
         eq(getComputedStyle(box).overflowX, "auto", "the table's own box scrolls");
         wrap.style.maxWidth = "";
+      });`
+  },
+  {
+    // The quick link row is where a wrong URL is caught or not caught at all: an API address
+    // loads, returns 200 and shows JSON, so no later surface can tell. Both previews and the
+    // hint have to be on screen at the same time, which is a layout question as much as a
+    // logic one — three lines joined with newlines in a box that has to keep them.
+    name: "options · quick link previews",
+    page: {
+      name: "opt-quick",
+      ...OPTIONS,
+      seed: seedOf({
+        quickLinks: [
+          { id: "ok", name: "Plane", prefix: "", enabled: true,
+            url: "https://plane.hectoai.co.kr/hecto/browse/{{key}}",
+            searchUrl: "https://plane.hectoai.co.kr/hecto/search/?q={{q}}" },
+          { id: "api", name: "Wrong", prefix: "X-", enabled: true,
+            url: "https://plane.hectoai.co.kr/hecto/browse/{{key}}",
+            searchUrl: "https://plane.hectoai.co.kr/api/workspaces/hecto/search/?search={{q}}&workspace_search=true" }
+        ]
+      })
+    },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      await waitFor(() => document.querySelectorAll("#quickList .qlk-preview").length === 2, "the rows");
+
+      // The chooser exists because an empty row is where a wrong URL gets typed. What only a
+      // browser can answer is whether picking one lands the caret on the part that still
+      // needs replacing — a filled URL with the caret at position 0 is no better than a
+      // placeholder nobody reads.
+      const box = document.getElementById("quickExamples");
+      check("the add button opens a chooser rather than adding a row", () => {
+        const before = document.querySelectorAll("#quickList .cpy-item").length;
+        document.getElementById("addQuickLink").click();
+        ok(!box.hidden, "the chooser is shown");
+        eq(document.querySelectorAll("#quickList .cpy-item").length, before, "and nothing was added yet");
+      });
+      check("the sites already configured come first, with the host filled in", () => {
+        const heads = [...box.querySelectorAll(".qlk-ex-head")].map((h) => h.textContent);
+        eq(heads[0], peMsg("optQuickExamplesFromSites"));
+        const first = box.querySelector(".qlk-ex");
+        eq(first.querySelector(".qlk-ex-name").textContent, "plane.example.com", "the domain from Sites");
+        ok(first.querySelector(".qlk-ex-url").textContent.indexOf("https://plane.example.com/") === 0,
+           "with the host already right: " + first.querySelector(".qlk-ex-url").textContent);
+      });
+      check("every tracker is offered, and the two that disappoint say so", () => {
+        const names = [...box.querySelectorAll(".qlk-ex-name")].map((n) => n.textContent);
+        for (const t of ["Plane", "Jira", "Linear", "GitHub", "GitLab"]) ok(names.indexOf(t) > -1, t + " missing: " + names.join(", "));
+        ok(names.indexOf(peMsg("optQuickExamplesBlank")) > -1, "and the empty row is still reachable");
+        const noteFor = (name) => {
+          const row = [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === name);
+          const n = row.querySelector(".qlk-ex-note");
+          return n ? n.textContent : "";
+        };
+        eq(noteFor("Plane"), peMsg("optQuickExampleNotePlane"));
+        eq(noteFor("Linear"), peMsg("optQuickExampleNoteLinear"));
+        eq(noteFor("GitHub"), peMsg("optQuickExampleNoteNumbered"));
+        eq(noteFor("Jira"), "", "Jira's works, so it says nothing");
+      });
+      // Picking the Jira example: nothing about it is known in advance, so both halves are
+      // filled and the caret goes to ⟨site⟩.
+      [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === "Jira").click();
+      await waitFor(() => document.querySelectorAll("#quickList .cpy-item").length === 3, "the row to be added");
+      check("picking one fills both URLs and selects the first blank", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[2];
+        const url = row.querySelector(".qlk-url");
+        eq(row.querySelector(".qlk-name").value, "Jira");
+        ok(url.value.indexOf(".atlassian.net/browse/{{key}}") > -1, url.value);
+        ok(row.querySelector(".qlk-search").value.indexOf("jql=text ~") > -1, "and the search URL too");
+        eq(document.activeElement, url, "the caret is in the URL field");
+        eq(url.value.slice(url.selectionStart, url.selectionEnd), "⟨" + peMsg("optQuickPartSite") + "⟩",
+           "with the part to replace selected, so typing overwrites it");
+        ok(box.hidden, "and the chooser closed behind it");
+      });
+      // The preview under the new row has to say something a reader can act on rather than
+      // echoing the blanks back — this is the row they are about to edit.
+      check("the new row previews where its blanks would land", () => {
+        const p = document.querySelectorAll("#quickList .qlk-preview")[2];
+        ok(p.textContent.indexOf("PROJ-123") > -1, "the sample key: " + p.textContent);
+      });
+      const prev = (i) => document.querySelectorAll("#quickList .qlk-preview")[i];
+      check("a good row previews both destinations", () => {
+        const t = prev(0).textContent;
+        ok(t.indexOf("PROJ-123") > -1 && t.indexOf("/browse/PROJ-123") > -1, "the key: " + t);
+        ok(t.indexOf("login%20bug") > -1, "and the phrase, encoded: " + t);
+        ok(!prev(0).classList.contains("warn"), "with nothing to warn about");
+      });
+      check("an API address is called out where it was typed", () => {
+        ok(prev(1).classList.contains("warn"), "the row is marked");
+        ok(prev(1).textContent.indexOf("JSON") > -1, "and says what will happen: " + prev(1).textContent);
+      });
+      // Two URLs force the row to wrap, and the delete button was ending up on a line of its
+      // own — which reads as a control belonging to nothing.
+      check("the delete button stays on the row's first line", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[0];
+        const box = (sel) => row.querySelector(sel).getBoundingClientRect();
+        // Overlap, not an exact top: the button is shorter than an input and sits centred
+        // against it, so equal tops would be asserting a coincidence.
+        const overlaps = (a, b) => a.top < b.bottom && b.top < a.bottom;
+        ok(overlaps(box(".qlk-del"), box(".qlk-name")), "the ✕ is on the name field's line");
+        ok(box(".qlk-url").top >= box(".qlk-name").bottom, "and the URLs are on their own lines");
+        ok(box(".qlk-search").top >= box(".qlk-url").bottom, "one each");
+      });
+      // The tab order must still run through the fields in the order they are read, with the
+      // destructive button last: CSS order moves the button visually and must not move that.
+      check("moving it did not move it in the tab order", () => {
+        const row = document.querySelectorAll("#quickList .cpy-item")[0];
+        const focusable = [...row.querySelectorAll("input, button")];
+        eq(focusable[focusable.length - 1].className.indexOf("qlk-del") > -1, true, "delete is reached last");
+      });
+      // Joined with newlines, so the stylesheet has to keep them — otherwise the hint runs
+      // onto the end of the preview and reads as part of the URL.
+      check("the lines are lines", () => {
+        const box = prev(1);
+        const line = parseFloat(getComputedStyle(box).lineHeight);
+        ok(box.getBoundingClientRect().height > line * 2.2, "the preview did not break into lines");
+        eq(getComputedStyle(box).whiteSpace, "pre-line");
+      });`
+  },
+  {
+    // The template button, which had no browser coverage at all — and went a release without
+    // appearing on Plane Cloud because of it. It is anchored on the description toolbar's
+    // attach button, found by walking up from the editor, and the walk had a fixed ceiling
+    // of 8 levels. Measured 2026-08-09 on a real work item in each generation: self-hosted
+    // 1.4 puts the attach button within 8 of the editor, Plane Cloud puts it at 10 — and the
+    // comment editor's is at 14. So the ceiling has a floor AND a lid, and this page holds
+    // one editor at each of those three depths to hold it there.
+    name: "content · the template button finds its toolbar",
+    page: {
+      name: "ct-tmpl",
+      plane: `<div id="editors"></div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      // Build an editor whose attach button sits exactly \`depth\` levels above it: depth-1
+      // wrappers between the shared container and the editor puts the container at depth.
+      const make = (id, depth) => {
+        const box = document.createElement("div");
+        box.id = id;
+        let n = box;
+        for (let i = 0; i < depth - 1; i++) { const d = document.createElement("div"); n.appendChild(d); n = d; }
+        const ed = document.createElement("div");
+        ed.className = "ProseMirror";
+        ed.id = id + "-editor";
+        n.appendChild(ed);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("aria-label", "Attach");
+        const f = document.createElement("input");
+        f.type = "file";
+        btn.appendChild(f);
+        box.appendChild(btn);
+        document.getElementById("editors").appendChild(box);
+        return box;
+      };
+      make("shallow", 6);   // self-hosted 1.4
+      make("cloud", 10);    // Plane Cloud's description
+      make("far", 14);      // Plane Cloud's comment box
+      document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await sleep(1200);
+
+      const btnIn = (id) => document.getElementById(id).querySelectorAll(".pe-body-tmpl-btn").length;
+      check("it reaches a toolbar 10 levels up, which is where Cloud puts it", () => {
+        eq(btnIn("cloud"), 1, "no template button on Plane Cloud's description editor");
+      });
+      check("and still finds the one self-hosted Plane puts closer", () => {
+        eq(btnIn("shallow"), 1);
+      });
+      // The lid. Raising the ceiling until "it works" would hand the comment box the
+      // description's attach button, and a template fills a title the comment box has not
+      // got. Comment templates are deliberately not a feature.
+      check("but stops short of the comment box's own toolbar", () => {
+        eq(btnIn("far"), 0, "a template button landed on a comment editor");
+      });
+      check("one button per toolbar, not one per mutation", () => {
+        eq(document.querySelectorAll(".pe-body-tmpl-btn").length, 2, "duplicates");
+      });`
+  },
+  {
+    // Paste beats a list of five, and the list of five is what the chooser was. Everything
+    // here is a question about the assembled page: whether the box reports what it read
+    // before anything is committed, whether refusing looks like refusing, and where the caret
+    // ends up in each of the three outcomes.
+    name: "options · quick link from a pasted address",
+    page: { name: "opt-quick-paste", ...OPTIONS, seed: seedOf({ quickLinks: [] }) },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      const box = document.getElementById("quickExamples");
+      const open = () => { if (box.hidden) document.getElementById("addQuickLink").click(); };
+      const type = (v) => {
+        const i = document.getElementById("quickPasteUrl");
+        i.value = v;
+        i.dispatchEvent(new Event("input", { bubbles: true }));
+        return i;
+      };
+      const go = () => document.querySelector(".qlk-paste-go");
+      const hint = () => document.querySelector(".qlk-paste-hint");
+      const rows = () => [...document.querySelectorAll("#quickList .cpy-item")];
+      open();
+
+      check("the panel explains the two kinds of brace before anything else does", () => {
+        const legend = box.querySelector(".qlk-ex-legend");
+        ok(legend, "no legend");
+        ok(legend.textContent.indexOf("⟨") > -1 && legend.textContent.indexOf("{{key}}") > -1, legend.textContent);
+      });
+      // Picking a row fills two fields. Showing one of them is how a search URL nobody chose
+      // ends up in the settings.
+      check("every example row shows the search address it will also fill", () => {
+        const rowFor = (name) => [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === name);
+        const searchOf = (name) => { const s = rowFor(name).querySelector(".qlk-ex-search"); return s ? s.textContent : ""; };
+        ok(searchOf("Jira").indexOf("jql=text ~") > -1, "Jira: " + searchOf("Jira"));
+        ok(searchOf("GitHub").indexOf("{{q}}") > -1, "GitHub: " + searchOf("GitHub"));
+        eq(searchOf("Linear"), "", "Linear has none, and an empty line would imply one is missing");
+      });
+      check("the box starts inert and says nothing", () => {
+        ok(go().disabled, "the button is live before anything was pasted");
+        eq(hint().textContent, "");
+      });
+      check("a known tracker is named back, and the search address is promised", () => {
+        type("https://gprxh.atlassian.net/browse/DU-61");
+        ok(!go().disabled, "the button did not come alive");
+        eq(hint().textContent, peMsg("optQuickPasteKnown", ["Jira"]));
+        ok(!hint().classList.contains("bad"));
+      });
+      check("an address with no key in it is refused, and looks refused", () => {
+        type("https://linear.app/gaerae/settings/members");
+        ok(go().disabled, "a template would have been built from a settings page");
+        eq(hint().textContent, peMsg("optQuickPasteUnread"));
+        ok(hint().classList.contains("bad"), "and it reads as ordinary body text");
+        const c = contrast(getComputedStyle(hint()).color, bg(document.querySelector(".qlk-examples")));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      check("Enter is the same as the button", () => {
+        const i = type("https://gprxh.atlassian.net/browse/DU-61");
+        i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      });
+      await waitFor(() => rows().length === 1, "the row to be added");
+      check("what it built needs no typing at all", () => {
+        const r = rows()[0];
+        eq(r.querySelector(".qlk-name").value, "Jira");
+        eq(r.querySelector(".qlk-url").value, "https://gprxh.atlassian.net/browse/{{key}}");
+        ok(r.querySelector(".qlk-search").value.indexOf("gprxh.atlassian.net") > -1, r.querySelector(".qlk-search").value);
+        eq(peFirstBlank(r.querySelector(".qlk-url").value), null, "a blank was left in a URL read from a real address");
+        ok(box.hidden, "and the chooser closed behind it");
+      });
+      check("the preview agrees that it is a working link", () => {
+        const p = document.querySelectorAll("#quickList .qlk-preview")[0].textContent;
+        ok(p.indexOf("https://gprxh.atlassian.net/browse/PROJ-123") > -1, p);
+      });
+
+      // The tracker nobody listed, which is the case the example list cannot serve at all.
+      open();
+      type("https://redmine.example.org/issues/45231");
+      check("an unlisted numbered tracker is built, and says which part is left to you", () => {
+        eq(hint().textContent, peMsg("optQuickPasteGuessNumbered", ["redmine.example.org"]));
+        ok(!go().disabled);
+      });
+      go().click();
+      await waitFor(() => rows().length === 2, "the second row");
+      check("and the caret goes to the prefix, which is the decision it could not make", () => {
+        const r = rows()[1];
+        eq(r.querySelector(".qlk-url").value, "https://redmine.example.org/issues/{{key.num}}");
+        eq(r.querySelector(".qlk-name").value, "redmine.example.org");
+        eq(r.querySelector(".qlk-search").value, "");
+        eq(document.activeElement, r.querySelector(".qlk-prefix"), "the caret is somewhere else");
+      });`
+  },
+  {
+    // Tab walking the blanks. Only a browser has a selection to move, and the failure worth
+    // guarding is the one where Tab stops being Tab — a field the keyboard cannot leave is
+    // worse than the two-blank example it was added for.
+    name: "options · tabbing between the blanks",
+    page: { name: "opt-quick-tab", ...OPTIONS, seed: seedOf({ quickLinks: [] }) },
+    body: `
+      document.querySelector('#tabs .tab[data-tab="items"]').click();
+      document.getElementById("addQuickLink").click();
+      const box = document.getElementById("quickExamples");
+      // GitHub is the two-blank shape: ⟨owner⟩ and ⟨repo⟩ in the URL, and both again in the
+      // search URL. Four blanks over two fields is most of the work the chooser was meant to
+      // save, and all of it was being done by dragging over text.
+      [...box.querySelectorAll(".qlk-ex")].find((r) => r.querySelector(".qlk-ex-name").textContent === "GitHub").click();
+      await waitFor(() => document.querySelectorAll("#quickList .cpy-item").length === 1, "the row");
+      const row = () => document.querySelectorAll("#quickList .cpy-item")[0];
+      const url = () => row().querySelector(".qlk-url");
+      const search = () => row().querySelector(".qlk-search");
+      const sel = (f) => f.value.slice(f.selectionStart, f.selectionEnd);
+      const tab = (f, shift) => f.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: !!shift, bubbles: true, cancelable: true }));
+      const OWNER = "⟨" + peMsg("optQuickPartOwner") + "⟩";
+      const REPO = "⟨" + peMsg("optQuickPartRepo") + "⟩";
+
+      check("it opens on the first blank", () => {
+        eq(document.activeElement, url());
+        eq(sel(url()), OWNER);
+      });
+      check("Tab goes to the next blank rather than the next field", () => {
+        tab(url());
+        eq(document.activeElement, url(), "focus left the field");
+        eq(sel(url()), REPO);
+      });
+      check("Shift+Tab goes back to the previous one", () => {
+        tab(url(), true);
+        eq(sel(url()), OWNER);
+      });
+      check("past the last blank it crosses into the search field, on its first blank", () => {
+        tab(url());
+        tab(url());
+        eq(document.activeElement, search(), "it stayed in the URL field");
+        eq(sel(search()), OWNER);
+      });
+      check("and once nothing is left, Tab is Tab again", () => {
+        tab(search());
+        eq(sel(search()), REPO, "the second one in the search URL");
+        const e = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+        search().dispatchEvent(e);
+        ok(!e.defaultPrevented, "the last blank trapped the caret in the box");
+      });
+      // Typing over a blank removes it, which is the whole point — the walk has to shorten as
+      // the row gets filled rather than sending the caret back to text that is now real.
+      check("a filled-in blank is no longer walked to", () => {
+        const u = url();
+        u.focus();
+        const at = peFirstBlank(u.value);
+        u.setSelectionRange(at[0], at[1]);
+        u.setRangeText("gaerae", at[0], at[1], "end");
+        u.dispatchEvent(new Event("input", { bubbles: true }));
+        tab(u);
+        eq(sel(u), REPO, "it went back to the part that is now a real owner");
+      });`
+  },
+  {
+    // Rule health is the answer to "a preset that stops matching is invisible", so the thing
+    // to prove is that it is actually visible — which is a question about rendered rows, not
+    // about the pure functions tools/test.js already covers. The seed is the Plane Cloud bug
+    // as the storage would have recorded it: one rule working, two never matching.
+    name: "options · rule health",
+    page: {
+      name: "opt-health",
+      ...OPTIONS,
+      seed: seedOf({
+        rules: [
+          { id: "r-live", enabled: true, label: "Working", selector: ".max-w-40", property: "max-width", value: "320px" },
+          { id: "r-dead", enabled: true, label: "Dead", selector: ".gone", property: "display", value: "none" },
+          { id: "r-new", enabled: true, label: "Just added", selector: ".fresh", property: "display", value: "none" },
+          { id: "r-off", enabled: false, label: "Switched off", selector: ".nope", property: "display", value: "none" }
+        ]
+      }),
+      local: {
+        peRuleHealth: {
+          "r-live": { checks: 40, hits: 12, at: 1754600000000 },
+          "r-dead": { checks: 40, hits: 0, at: 0 },
+          "r-new": { checks: 2, hits: 0, at: 0 },
+          "r-off": { checks: 40, hits: 0, at: 0 }
+        }
+      }
+    },
+    body: `
+      const rows = () => [...document.querySelectorAll("#ruleList .rule-item")];
+      const healthOf = (i) => rows()[i].querySelector(".rule-health");
+      const summary = document.getElementById("ruleHealthSummary");
+      await waitFor(() => rows().length === 4, "the rules to render");
+      // The rules live behind a tab, and nothing inside a hidden panel can take focus — so
+      // the "does not disturb the row" check below would pass on a page where focus never
+      // landed anywhere. Open the tab the way a reader does.
+      document.querySelector('#tabs .tab[data-tab="appearance"]').click();
+      await waitFor(() => !document.getElementById("panel-appearance").hidden, "the rules panel");
+
+      check("a rule that has matched says when it last did, and does not shout", () => {
+        const h = healthOf(0);
+        ok(!h.hidden, "the badge is shown");
+        ok(!h.classList.contains("cold"), "in the quiet style");
+        ok(h.textContent.indexOf("2025") > -1 || /\\d{4}-\\d{2}-\\d{2}/.test(h.textContent), "a date: " + h.textContent);
+      });
+      check("a rule that has never matched says so, in the warning style", () => {
+        const h = healthOf(1);
+        ok(!h.hidden, "shown");
+        ok(h.classList.contains("cold"), "and marked as the thing to look at");
+        eq(h.textContent, peMsg("optRuleHealthCold"));
+      });
+      // The state that keeps this from becoming noise: too little evidence, so no claim.
+      check("a rule nobody has measured yet says nothing at all", () => {
+        const h = healthOf(2);
+        ok(h.hidden, "no badge");
+        eq(h.textContent, "", "and no text hiding behind the attribute");
+      });
+      check("a switched-off rule is not accused of anything", () => {
+        ok(healthOf(3).hidden, "no badge on a rule that is not being applied");
+      });
+      // The count is what carries this to someone not reading row by row — which is exactly
+      // how two dead presets went unnoticed for a release.
+      check("the summary counts only the enabled rules that never matched", () => {
+        ok(!summary.hidden, "the summary is shown");
+        ok(summary.textContent.indexOf("1") > -1, "one rule: " + summary.textContent);
+        ok(summary.textContent.indexOf("Plane") > -1, "and it says what to suspect");
+      });
+      check("the warning is legible against the card it sits on", () => {
+        const c = contrast(getComputedStyle(summary).color, bg(summary));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      // Arriving mid-edit is the normal case: a Plane tab writes this every time it changes
+      // route. Rebuilding the rows would take the caret out of the field being typed in.
+      const sel = rows()[1].querySelector(".rule-selector");
+      sel.focus();
+      sel.setSelectionRange(2, 2);
+      window.__onChanged({ peRuleHealth: { newValue: { "r-dead": { checks: 41, hits: 1, at: 1754600000000 } } } }, "local");
+      await waitFor(() => !healthOf(1).classList.contains("cold"), "the badge to update in place");
+      check("a record arriving while the user types does not disturb the row", () => {
+        ok(document.activeElement === sel, "focus left the selector field for " + document.activeElement.tagName + "." + document.activeElement.className);
+        eq(sel.selectionStart, 2, "and so did the caret");
+        ok(summary.hidden, "the summary went away with the last cold rule");
       });`
   },
   {
@@ -580,17 +1273,44 @@ const suites = [
         ok(text.indexOf("chrome://extensions/shortcuts") > -1, "and so is the way to change it");
         ok(document.querySelectorAll("#panel-appearance kbd").length >= 6, "and they are marked up as keys");
       });
-      // The one thing no data test can check: whether a class Plane writes as
-      // min-w-[300px] is matched by the escaping we ship for it.
+      // The one thing no data test can check: whether a class Plane writes as min-w-[300px]
+      // or z-[5] is matched by the escaping we ship for it. Both generations are probed from
+      // the one selector, and the near misses are probed too — a selector list is as easy to
+      // widen by accident as to narrow, and .shrink-0.bg-surface-1 without the .z-[5] really
+      // does catch an unrelated chip on Plane Cloud's cycles route.
       check("every preset selector is one the browser can read", () => {
         peFocusPresetRules().forEach((r) => document.querySelector(r.selector));
-        const probe = document.createElement("div");
-        probe.className = "fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle";
-        document.body.appendChild(probe);
-        const sel = peFocusPresetRules().find((r) => r.id === "rule-focus-item-properties").selector;
-        eq(document.querySelectorAll(sel).length, 1, "the properties panel selector matches exactly one probe");
-        ok(document.querySelector(sel) === probe, "and it is the element carrying Plane's classes");
-        probe.remove();
+        const add = (cls) => {
+          const el = document.createElement("div");
+          el.className = cls;
+          document.body.appendChild(el);
+          return el;
+        };
+        const cases = [
+          {
+            id: "rule-focus-item-properties",
+            hit: [
+              "fixed right-0 z-[5] h-full w-full min-w-[300px] border-l border-subtle",
+              "relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1 motion-safe:transition-[width,min-width]"
+            ],
+            miss: ["shrink-0 bg-surface-1", "fixed right-0 border-l", "z-[5] overflow-hidden bg-surface-1"]
+          },
+          {
+            id: "rule-focus-reading-width",
+            hit: ["h-full w-full space-y-6 overflow-y-auto px-9 py-5", "h-full flex-1 min-w-0 overflow-y-auto px-8 py-6"],
+            miss: ["overflow-y-auto px-8 py-5", "overflow-y-auto px-6 py-6"]
+          }
+        ];
+        for (const c of cases) {
+          const sel = peFocusPresetRules().find((r) => r.id === c.id).selector;
+          const hits = c.hit.map(add);
+          const misses = c.miss.map(add);
+          const got = [...document.querySelectorAll(sel)];
+          eq(got.length, hits.length, c.id + ": one match per generation, and no more");
+          hits.forEach((el, i) => ok(got.indexOf(el) > -1, c.id + ": shape " + i + " is matched"));
+          misses.forEach((el, i) => ok(got.indexOf(el) === -1, c.id + ": near miss " + i + " was caught"));
+          hits.concat(misses).forEach((el) => el.remove());
+        }
       });
       // padding-inline carries a max() with a percentage in it. An invalid value is not an
       // error anywhere — the declaration is simply dropped and the column stays full width,
@@ -779,6 +1499,21 @@ const suites = [
       check("the interface is in Korean", () => {
         eq(document.querySelector(".master-label").textContent, "확장 프로그램 사용");
       });
+      // The Korean pack shipped alongside the English one and the button handed everybody
+      // English, so a Korean reader's first look at sync was 26 templates in a language they
+      // had not chosen. Only a real page can answer this: it depends on what the UI language
+      // resolves to at click time, not on what the constant says.
+      check("try-the-example subscribes to the Korean pack", () => {
+        document.querySelector('#tabs .tab[data-tab="templates"]').click();
+        document.getElementById("addExample").click();
+        const urls = [...document.querySelectorAll("#sourceList .src-url")].map((i) => i.value);
+        eq(urls.length, 1, "one source: " + urls.join(" | "));
+        ok(urls[0].endsWith("/examples/team-templates-ko.json"), urls[0]);
+      });
+      check("and pressing it again does not subscribe to the English one as well", () => {
+        document.getElementById("addExample").click();
+        eq(document.querySelectorAll("#sourceList .src-url").length, 1, "a second copy of one feed");
+      });
       check("the master switch label stays on one line", () => {
         const el = document.querySelector(".master-label");
         const oneLine = parseFloat(getComputedStyle(el).fontSize) * 2; // generous ceiling
@@ -867,11 +1602,208 @@ const suites = [
       check("dark: the toggle knob is visible when off", () => { const r = knobVsTrack(); ok(r >= 3, "contrast " + r.toFixed(2)); return r.toFixed(2); });`
   },
   {
+    // Enter on words when nothing can search. Reported as a silent no-op: no tab, no
+    // message, no close, and Enter looking broken. The omnibox answers this by opening
+    // Settings, and two ways into one feature may not disagree about what happens.
+    name: "popup · searching with no search URL anywhere",
+    page: {
+      name: "pop-nosearch",
+      ...POPUP,
+      seed: seedOf({
+        quickLinks: [{ id: "q1", name: "Plane", prefix: "", enabled: true, url: "https://plane.example.com/acme/browse/{{key}}" }]
+      })
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const submit = (v) => {
+        document.getElementById("jumpKey").value = v;
+        document.getElementById("jumpForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      };
+      check("a key still opens, so the seed is not simply broken", () => {
+        submit("PROJ-9");
+        eq(window.__opened, "https://plane.example.com/acme/browse/PROJ-9");
+      });
+      check("words with nowhere to search open Settings rather than nothing", () => {
+        window.__opened = null;
+        submit("login bug");
+        eq(window.__opened, null, "it navigated somewhere it has no address for");
+        ok(window.__optionsOpened, "Enter did nothing at all");
+      });`
+  },
+  {
+    // Recents and the copy block: the two things the popup can do from a tab alone. Neither
+    // injects anything or reads a page, which is what lets them work on a tracker the rest
+    // of the extension never runs on — the stub tab is a Plane URL only because QUICK's
+    // first target is.
+    name: "popup · recents and copy from the tab",
+    page: {
+      name: "pop-tab",
+      ...POPUP,
+      seed: seedOf(),
+      local: {
+        peRecent: [
+          { key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", at: 300 },
+          { key: "ENG-9", url: "https://linear.app/acme/issue/ENG-9", name: "Linear", at: 200 },
+          { key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 100 }
+        ]
+      }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const chips = () => [...document.querySelectorAll("#recentList .pop-recent-item")];
+
+      check("the keys opened last are offered under the jump box", () => {
+        ok(!document.getElementById("recentList").hidden, "the list is shown");
+        eq(chips().map((c) => c.querySelector(".pop-recent-key").textContent), ["PROJ-7", "ENG-9", "PROJ-1"], "newest first");
+        // A list spanning two trackers has to say which is which, or two keys that look
+        // alike are indistinguishable.
+        eq(chips()[1].querySelector(".pop-recent-name").textContent, "Linear");
+      });
+      // The placeholder had to say two things once the box took phrases as well as keys, and
+      // the first wording it grew ("Issue key, or words to search…") was cut off mid-word at
+      // this width. Nothing else would have caught it: a truncated placeholder is not an
+      // error, it is just a sentence you cannot read. Korean is measured in the pop-ko suite.
+      check("the jump placeholder fits the box it is in", () => {
+        const input = document.getElementById("jumpKey");
+        const probe = document.createElement("span");
+        const cs = getComputedStyle(input);
+        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+        probe.textContent = input.placeholder;
+        document.body.appendChild(probe);
+        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = probe.getBoundingClientRect().width;
+        probe.remove();
+        ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+      });
+      check("a chip fits its row rather than stretching it", () => {
+        const box = document.getElementById("recentList").getBoundingClientRect();
+        for (const c of chips()) {
+          const r = c.getBoundingClientRect();
+          ok(r.right <= box.right + 1, c.textContent + " overflows: " + Math.round(r.right) + " > " + Math.round(box.right));
+        }
+      });
+
+      check("the copy block names the item the tab is showing", () => {
+        ok(!document.getElementById("copyBlock").hidden, "shown");
+        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect", "key and title, from the tab alone");
+      });
+      // The reader has to be able to see what each button will put on the clipboard before
+      // they press it — the popup has no preview row, so the title attribute is it.
+      check("each format offers the text it would copy", () => {
+        const btns = [...document.querySelectorAll(".pop-copy-fmt")];
+        eq(btns.length, 1, "one format in this seed");
+        eq(btns[0].textContent, "Chat");
+        eq(btns[0].title, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7");
+      });
+      // Three formats ship by default and five are allowed. The seed above has one, which is
+      // why this stacked full-width in the real extension while the harness stayed green —
+      // .pop-btn sets width:100% and the override was losing on source order. Add formats
+      // here rather than trusting the single-row case.
+      check("several formats share rows instead of stacking", () => {
+        const box = document.getElementById("copyFormats");
+        for (const name of ["Markdown", "Branch"]) {
+          const b = document.createElement("button");
+          b.className = "pop-btn ghost pop-copy-fmt";
+          b.textContent = name;
+          box.appendChild(b);
+        }
+        const btns = [...box.querySelectorAll(".pop-copy-fmt")];
+        const tops = new Set(btns.map((b) => Math.round(b.getBoundingClientRect().top)));
+        ok(tops.size < btns.length, "each button is on its own line: " + btns.length + " buttons, " + tops.size + " rows");
+        for (const b of btns) {
+          ok(b.getBoundingClientRect().width < box.getBoundingClientRect().width, b.textContent + " is full width");
+        }
+      });
+      let copied = null;
+      navigator.clipboard.writeText = (t) => { copied = t; return Promise.resolve(); };
+      document.querySelector(".pop-copy-fmt").click();
+      await waitFor(() => copied !== null, "the clipboard write");
+      await sleep(20); // the label is set in the same promise chain, one tick later
+      check("clicking one copies, and reports where the heading was", () => {
+        eq(copied, "PROJ-7 https://plane.example.com/acme/browse/PROJ-7", "what reached the clipboard");
+        eq(document.getElementById("copyLabel").textContent, peMsg("msgCopied"));
+      });
+      // Chrome sizes the popup to the DOCUMENT, not to .pop — so a child that overflows
+      // .pop widens the window rather than being clipped by it, and the existing check on
+      // .pop cannot see that. Everything added here is user-supplied and unbounded: a work
+      // item title, a format name, a key.
+      check("hostile content cannot widen the popup", () => {
+        document.getElementById("copyItem").textContent =
+          "PROJ-7 " + "a work item title nobody thought to keep short ".repeat(4);
+        const b = document.createElement("button");
+        b.className = "pop-btn ghost pop-copy-fmt";
+        b.textContent = "a copy format name the user typed and never shortened";
+        document.getElementById("copyFormats").appendChild(b);
+        const chip = document.querySelector(".pop-recent-item");
+        chip.querySelector(".pop-recent-key").textContent = "VERYLONGKEY-123456";
+        // Two measurements, and both matter. "wants" is the document's preferred width,
+        // which is the size Chrome gives a toolbar popup — with this content it is over a
+        // thousand pixels, because a nowrap title only ellipsises once something constrains
+        // it. "is" is what the stylesheet actually renders. The gap between them is the
+        // whole point: the width has to be a property of the popup, not of its contents.
+        document.body.style.width = "max-content";
+        const wants = Math.round(document.body.getBoundingClientRect().width);
+        document.body.style.width = "";
+        const is = Math.round(document.body.getBoundingClientRect().width);
+        eq(is, 260, "the popup is pinned");
+        // Measured on <body>, not on documentElement: in a harness tab the latter reports the
+        // tab's viewport width and would pass or fail for reasons that have nothing to do
+        // with the popup.
+        ok(document.body.scrollWidth <= 261, "content escapes the body: " + document.body.scrollWidth);
+        return wants + "px wanted, " + is + "px rendered";
+      });
+      // Every block at once, which is a state no single suite otherwise produces — and the
+      // one most likely to be on screen when someone reports the popup opening wide.
+      check("no combination of blocks widens it either", () => {
+        for (const id of ["permNotice", "addDomain", "focusWrap", "pickEl", "rescan", "jumpBlock", "copyBlock", "recentList"]) {
+          const e = document.getElementById(id);
+          if (e) e.hidden = false;
+        }
+        const sel = document.getElementById("jumpTarget");
+        sel.hidden = false;
+        sel.innerHTML = "";
+        // An unnamed quick link shows its whole URL as the option text.
+        for (const t of ["Auto", "https://plane.hectoai.co.kr/hecto/browse/{{key}}"]) {
+          const o = document.createElement("option");
+          o.textContent = t;
+          sel.appendChild(o);
+        }
+        eq(Math.round(document.body.getBoundingClientRect().width), 260, "with everything shown");
+        ok(document.body.scrollWidth <= 261, "content escapes the body: " + document.body.scrollWidth);
+      });
+      check("clicking a recent chip opens it", () => {
+        chips()[1].click();
+        eq(window.__opened, "https://linear.app/acme/issue/ENG-9");
+      });`
+  },
+  {
+    // A tab that is not a work item. The block has to be absent, not present and inert — a
+    // "Copy reference" heading over nothing is a bug report waiting to be filed.
+    name: "popup · a tab that is not an item",
+    page: {
+      name: "pop-tab-none",
+      ...POPUP,
+      seed: seedOf({ quickLinks: [{ id: "q", name: "Plane", prefix: "", url: "https://plane.example.com/acme/browse/{{key}}", enabled: true }] }),
+      local: { peRecent: [] }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      // The stub tab IS an item URL, so make it not one the only way that matters here: a
+      // link list that cannot recognise it. (peSanitizeSettings would drop a urlless link.)
+      check("nothing is claimed when no template matches", () => {
+        const m = peMatchItemUrl([{ id: "x", enabled: true, url: "https://elsewhere.test/i/{{key}}" }], "https://plane.example.com/acme/browse/PROJ-7");
+        eq(m, null);
+      });
+      check("an empty recents list shows no row at all", () => {
+        ok(document.getElementById("recentList").hidden, "hidden, not an empty box with a gap");
+      });`
+  },
+  {
     name: "popup · active site",
     page: { name: "pop-active", ...POPUP, seed: seedOf() },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve the site");
-      const visible = () => [...document.querySelectorAll(".pop > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none");
+      const visible = () => [...document.querySelectorAll(".pop > *, .pop-scroll > *, .pop-foot > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none" && e.className.indexOf("pop-scroll") === -1 && e.className.indexOf("pop-foot") === -1);
       check("the jump block leads, with its own label and divider", () => {
         const block = document.getElementById("jumpBlock");
         ok(!block.hidden, "shown when a quick link exists");
@@ -915,8 +1847,213 @@ const suites = [
         ok(t.indexOf("plane.example.com") === -1, "naming the host made a global switch look per-site");
       });
       check("jumping still works with the extension off", () => ok(!document.getElementById("jumpBlock").hidden));
+      // The other half of bounding the popup: a short one has to stay short. A window padded
+      // out to the cap with empty space, and a scrollbar on a box with nothing to scroll, are
+      // the same bug seen from the other side.
+      check("a short popup is short, with no scrollbar on it", () => {
+        const h = document.documentElement.scrollHeight;
+        // 469 measured. The number that matters is the cap: height:588 instead of
+        // max-height:588 would put this at 588 with 119px of nothing under the footer.
+        ok(h < 520, "the popup is " + h + "px with almost nothing in it");
+        const scroll = document.getElementById("popScroll");
+        eq(scroll.offsetWidth - scroll.clientWidth, 0, "a scrollbar on a box that does not overflow");
+        return h + "px";
+      });
       check("no site action is offered while it is off", () => {
         for (const id of ["addDomain", "pickEl", "rescan", "focusWrap"]) ok(document.getElementById(id).hidden, id);
+      });`
+  },
+  {
+    // The picker's list, built from a real element. tools/test.js argues about the ranking;
+    // what only a browser can answer is which candidates get generated at all — the bug that
+    // started this was that attributes were never offered, so on a page whose classes are
+    // all hashes the list held nothing worth picking however far you scrolled.
+    //
+    // The target carries, on one element, every shape measured on 2026-08-08: a per-item
+    // uuid id (Plane Cloud), a data attribute with a uuid value and one with a real value
+    // (Linear), an aria-label (Linear), hashed classes (Linear) and Tailwind (Plane).
+    name: "content · picker candidates",
+    page: {
+      name: "ct-picker",
+      plane: `
+        <div id="editor-container-d833e58d-d489-433e-9551-c2ab0768068d"
+             data-view-id="8f14e45f-ceea-467a-9f36-dcd8ab4d3f21"
+             data-restore-scroll-view="issue-view"
+             aria-label="Issue description"
+             class="sx-3nfvp2 max-w-40 sx-16dsc37 truncate">pick me</div>
+        <div class="max-w-40">another element sharing the width class</div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await sleep(200);
+      await new Promise((r) => window.__onMessage({ type: "pe-start-picker" }, {}, r));
+      const target = document.querySelector('[aria-label="Issue description"]');
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitFor(() => document.getElementById("pe-pick-menu"), "the candidate list");
+      const rows = () => [...document.querySelectorAll("#pe-pick-menu .pe-pick-item")];
+      const sels = () => rows().map((r) => r.querySelector(".pe-pick-sel").textContent);
+
+      // The whole point of the change: these did not exist in the list before.
+      check("attribute candidates are offered at all", () => {
+        const s = sels();
+        ok(s.indexOf('[aria-label="Issue description"]') > -1, "aria-label: " + s.join(" | "));
+        ok(s.indexOf('[data-restore-scroll-view="issue-view"]') > -1, "a data attribute with its value");
+        ok(s.indexOf("[data-view-id]") > -1, "and one whose value is a uuid, offered by presence only");
+      });
+      check("a generated id also yields the prefix form the shipped preset writes by hand", () => {
+        ok(sels().indexOf('[id^="editor-container"]') > -1, sels().join(" | "));
+      });
+      check("the stable handles are what the list opens with", () => {
+        const s = sels();
+        ok(!rows()[0].classList.contains("generated"), "the first row is not one that expires: " + s[0]);
+        // The uuid id is the most precise selector on this element and the least durable, so
+        // "most precise first" is exactly the instinct being corrected here.
+        ok(s.indexOf('#editor-container-d833e58d-d489-433e-9551-c2ab0768068d') > 2, "the uuid id sank: " + s.join(" | "));
+        // A hashed class below the Tailwind one, which is below every attribute.
+        ok(s.indexOf(".max-w-40") < s.indexOf(".sx-3nfvp2"), "Tailwind above the hash");
+        ok(s.indexOf('[aria-label="Issue description"]') < s.indexOf(".max-w-40"), "attributes above Tailwind");
+      });
+      // Order alone is not legible — a reader has nothing to compare a position against, and
+      // a dimmed row reads as the normal colour. It was reported as exactly that: "I thought
+      // grey was the default." So the ranking has to be said in words, twice: a heading over
+      // each group, and the kind of handle on each row.
+      check("the two groups are named, in order", () => {
+        const heads = [...document.querySelectorAll("#pe-pick-menu .pe-pick-group")].map((g) => g.textContent);
+        eq(heads, [peMsg("pickGroupDurable"), peMsg("pickGroupExpiring")], "both headings, durable first");
+      });
+      check("every row says what kind of handle it is", () => {
+        const pairs = rows().map((r) => [r.querySelector(".pe-pick-sel").textContent, r.querySelector(".pe-pick-kind").textContent]);
+        for (const [sel, kind] of pairs) ok(kind, "no kind on " + sel);
+        const kindOf = (sel) => (pairs.find((p) => p[0] === sel) || [])[1];
+        eq(kindOf("[data-view-id]"), peMsg("pickKindData"));
+        eq(kindOf(".max-w-40"), peMsg("pickKindClass"));
+        eq(kindOf('[id^="editor-container"]'), peMsg("pickKindIdPrefix"));
+      });
+      check("the two verdicts differ in word and in colour, side by side", () => {
+        const of = (sel) => rows().find((r) => r.querySelector(".pe-pick-sel").textContent === sel).querySelector(".pe-pick-life");
+        const good = of(".max-w-40");
+        const bad = of(".sx-3nfvp2");
+        eq(good.textContent, peMsg("pickLifeLasts"));
+        eq(bad.textContent, peMsg("pickLifeChanges"));
+        ok(getComputedStyle(good).color !== getComputedStyle(bad).color, "same colour");
+        for (const l of [good, bad]) {
+          const c = contrast(getComputedStyle(l).color, bg(l));
+          ok(c >= 4.5, l.textContent + ": contrast " + c.toFixed(2));
+        }
+      });
+      check("the hashes sit under the second heading, not scattered", () => {
+        const marked = rows().filter((r) => r.classList.contains("generated"));
+        const names = marked.map((r) => r.querySelector(".pe-pick-sel").textContent);
+        ok(names.indexOf(".sx-3nfvp2") > -1, "the hash is in it: " + names.join(" | "));
+        ok(names.indexOf(".max-w-40") === -1, "and Tailwind is not");
+        ok(names.indexOf('[aria-label="Issue description"]') === -1, "nor the aria-label");
+        // Grouped means contiguous: the marked rows must be the tail of the list, or the
+        // heading above them is describing rows it does not cover.
+        const all = rows();
+        const firstMarked = all.findIndex((r) => r.classList.contains("generated"));
+        ok(all.slice(firstMarked).every((r) => r.classList.contains("generated")), "the groups interleave");
+      });
+      check("both headings are legible", () => {
+        for (const g of document.querySelectorAll("#pe-pick-menu .pe-pick-group")) {
+          const c = contrast(getComputedStyle(g).color, bg(document.getElementById("pe-pick-menu")));
+          ok(c >= 4.5, g.textContent + ": contrast " + c.toFixed(2));
+        }
+      });
+      check("the counts are still real", () => {
+        const row = rows().find((r) => r.querySelector(".pe-pick-sel").textContent === ".max-w-40");
+        eq(row.querySelector(".pe-pick-count").textContent, peMsg("pickMatches", ["2"]), "two elements carry it");
+      });`
+  },
+  {
+    // The other half of rule health: the settings page can only show what the content script
+    // measured, and only a browser can say whether it measured the right thing. The rules are
+    // chosen to be the two cases side by side — one that matches the synthetic Plane page and
+    // one that matches nothing on it.
+    name: "content · rule health",
+    page: {
+      name: "ct-health",
+      plane: PLANE,
+      seed: seedOf({
+        allDomains: true,
+        rules: [
+          { id: "r-live", enabled: true, selector: "#main-sidebar", property: "display", value: "none" },
+          { id: "r-dead", enabled: true, selector: ".not-on-this-page", property: "display", value: "none" },
+          { id: "r-off", enabled: false, selector: "#probe-props", property: "display", value: "none" },
+          { id: "r-broken", enabled: true, selector: "((", property: "display", value: "none" }
+        ]
+      })
+    },
+    body: `
+      const health = () => (window.__LOCAL.peRuleHealth || {});
+      await waitFor(() => Object.keys(health()).length > 0, "the first measurement to be written");
+
+      check("what matched and what did not are both recorded", () => {
+        eq(health()["r-live"].hits, 1, "the rule that matches the page");
+        eq(health()["r-live"].checks, 1, "checked once");
+        ok(health()["r-live"].at > 0, "and stamped with when it worked");
+        eq(health()["r-dead"].hits, 0, "the rule that matches nothing");
+        eq(health()["r-dead"].checks, 1, "was still checked — that is the whole difference");
+        eq(health()["r-dead"].at, 0, "and has no time to report");
+      });
+      // Two rules that must never reach the record: one nobody applies, and one the browser
+      // cannot read. The second matters because "selector is nonsense" is already reported
+      // where it is typed, and counting it here would say the same thing in a worse place.
+      check("a disabled rule and an unreadable selector are not measured", () => {
+        ok(!("r-off" in health()), "disabled");
+        ok(!("r-broken" in health()), "unreadable");
+      });
+
+      // Once per route, not once per mutation burst — injectAll runs on every one of those,
+      // and a write per burst would be a storage write per keystroke on a busy page.
+      const writes = window.__localWrites;
+      for (let i = 0; i < 5; i++) {
+        document.body.appendChild(Object.assign(document.createElement("div"), { className: "ProseMirror" }));
+        await sleep(60);
+      }
+      await sleep(3000);
+      check("mutations alone do not re-measure", () => eq(window.__localWrites, writes, "extra writes"));
+
+      // A rule aimed at something that only exists while a menu is open. The route sample
+      // will always miss it, which is how the shipped dropdown preset came to be reported
+      // dead; the click scan is what rescues it. Both halves are here because the safe part
+      // is that the rescue counts hits and never misses.
+      const dead = () => health()["r-dead"].checks;
+      const missesBefore = dead();
+      const transient = Object.assign(document.createElement("div"), { className: "not-on-this-page" });
+      document.body.appendChild(transient);
+      document.body.click();
+      await waitFor(() => health()["r-dead"].hits === 1, "the click scan to see it");
+      check("a click rescues a rule that is only there while something is open", () => {
+        eq(health()["r-dead"].hits, 1, "seen once");
+        ok(health()["r-dead"].at > 0, "and stamped");
+      });
+      transient.remove();
+      const deadChecks = dead();
+      const liveChecks = health()["r-live"].checks;
+      // Past the scan's own throttle, so the click below definitely produces one — otherwise
+      // this passes by not running, which is the failure mode it exists to rule out.
+      await sleep(4200);
+      document.body.click();
+      await waitFor(() => health()["r-live"].checks > liveChecks, "a scan to have run");
+      check("and a scan with nothing open accuses nobody", () => {
+        // The discriminating value: r-live matches either way, so only the rule that is now
+        // absent can tell a hits-only pass from a full one.
+        eq(dead(), deadChecks, "the absent rule was not counted as a miss");
+        eq(health()["r-dead"].hits, 1, "and still remembers the one time it was there");
+      });
+
+      // Counted against a baseline rather than an absolute, because the click scans above
+      // legitimately move r-live's numbers — it matches, so a hit-only pass counts it.
+      // r-dead is the one whose miss count only a route sample may raise.
+      const beforeRoute = { live: health()["r-live"].checks, dead: dead() };
+      history.pushState({}, "", location.pathname + "?route=2");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => dead() === beforeRoute.dead + 1, "the new route to be measured");
+      check("a route change is what triggers the next full measurement", () => {
+        eq(health()["r-live"].checks, beforeRoute.live + 1, "the matching rule counted once more");
+        eq(health()["r-dead"].checks, beforeRoute.dead + 1, "and so did the one that misses");
+        eq(health()["r-dead"].hits, 1, "whose single sighting still stands");
       });`
   },
   {
@@ -924,11 +2061,28 @@ const suites = [
     // because a file:// page has no hostname to match; schema 6 because that is how the
     // presets reach an existing install, and this asserts what they do once they arrive.
     name: "content · focus mode",
-    page: { name: "ct-focus", plane: PLANE, seed: seedOf({ allDomains: true, schema: 6 }) },
+    // Seeded as the OLDEST install there is — pre-schema `widths`, no rules — so every
+    // preset on the page is the one peMigrate builds, not one hand-copied into this file.
+    // That is the gap this suite had: it seeded a synthetic `.max-w-40` rule, so no shipped
+    // preset was ever driven in a browser and the dropdown selector could die unnoticed.
+    // JSON.stringify drops the undefined keys, which is what puts peMigrate at version 1.
+    page: {
+      name: "ct-focus",
+      plane: PLANE,
+      seed: seedOf({
+        allDomains: true,
+        schema: undefined,
+        rules: undefined,
+        widths: { moduleName: { enabled: true, px: 320 }, dropdown: { enabled: true, px: 320 } }
+      })
+    },
     body: `
       const props = document.getElementById("probe-props");
+      const propsCloud = document.getElementById("probe-props-cloud");
+      const propsDecoy = document.getElementById("probe-props-decoy");
       const nav = document.getElementById("main-sidebar");
       const bodyCol = document.getElementById("probe-body");
+      const bodyColCloud = document.getElementById("probe-body-cloud");
       const width = document.getElementById("probe-width");
       const shown = (el) => getComputedStyle(el).display !== "none";
       const send = (msg) => new Promise((r) => window.__onMessage(msg, {}, r));
@@ -937,8 +2091,27 @@ const suites = [
       const toasts = () => [...document.querySelectorAll(".pe-toast")].map((t) => t.textContent);
 
       await waitFor(() => getComputedStyle(width).maxWidth === "320px", "the always-on rules to be injected");
+      // The search dropdown preset, which went a release matching nothing on Plane Cloud
+      // after Plane moved these popovers from Headless UI to Base UI. Both generations are
+      // on this page now, so a selector that covers one and not the other fails here rather
+      // than in somebody's browser. The seed is schema 6, so this also proves the migration
+      // arrives at a selector that works, not merely at a different string.
+      check("the search dropdown is widened in both generations of the markup", () => {
+        for (const id of ["probe-dropdown-14", "probe-dropdown-cloud"]) {
+          eq(getComputedStyle(document.getElementById(id)).width, "320px", id);
+        }
+      });
+      check("and nothing else with a dialog role is", () => {
+        // :has(input) is doing this work. Without it the rule is "every popover", and the
+        // command palette — full window width, outside the portal — would be squeezed to 320.
+        for (const id of ["probe-dropdown-decoy", "probe-palette"]) {
+          ok(getComputedStyle(document.getElementById(id)).width !== "320px",
+             id + " was caught by the dropdown rule");
+        }
+      });
       check("nothing is hidden until it is asked for", () => {
         ok(shown(props), "the properties panel is where Plane put it");
+        ok(shown(propsCloud), "and so is Cloud's");
         ok(shown(nav), "and so is the navigation");
         ok(!focusClass(), "no focus class on <html>");
         eq(stored(), null, "and nothing stored for this tab");
@@ -997,10 +2170,17 @@ const suites = [
         ok(!shown(props), "the properties panel went away");
         eq(stored(), "1", "the tab remembered");
       });
+      // The half that shipped broken. Both shapes come from one selector list, so a change
+      // that drops either end of it fails here rather than on somebody's Cloud workspace.
+      check("both generations of the panel answer to the one preset", () => {
+        ok(!shown(propsCloud), "Plane Cloud's properties panel went away too");
+        ok(shown(propsDecoy), "and the cycles-route chip beside it did not");
+      });
       document.querySelector(".pe-focus-btn").click();
       check("clicking it again brings the panels back", () => {
         eq(document.querySelector(".pe-focus-btn").getAttribute("aria-pressed"), "false");
         ok(shown(props), "properties panel back");
+        ok(shown(propsCloud), "Cloud's too");
       });
 
       const on = await send({ type: "pe-focus-toggle" });
@@ -1008,6 +2188,7 @@ const suites = [
         eq(on.ok, true, "the site is one we run on");
         eq(on.focus, true, "and it reports the new position");
         ok(!shown(props), "properties panel hidden");
+        ok(!shown(propsCloud), "Cloud's properties panel hidden");
         ok(!shown(nav), "navigation hidden");
         ok(focusClass(), "<html> carries the state a rule can hang off");
       });
@@ -1016,6 +2197,7 @@ const suites = [
       check("the rules that were already on stay on", () => eq(getComputedStyle(width).maxWidth, "320px"));
       check("a preset that ships switched off stays off", () => {
         eq(getComputedStyle(bodyCol).paddingLeft, "0px", "the reading-width rule is disabled, so it applies to nothing");
+        eq(getComputedStyle(bodyColCloud).paddingLeft, "0px", "on either generation's body column");
       });
       check("the way back is in the message, not only in the settings page", () => {
         const t = toasts().join(" | ");
@@ -1033,6 +2215,7 @@ const suites = [
       check("toggling back gives every panel its space", () => {
         eq(off.focus, false, "reported");
         ok(shown(props), "properties panel back");
+        ok(shown(propsCloud), "Cloud's too");
         ok(shown(nav), "navigation back");
         ok(!focusClass(), "class gone");
         eq(stored(), null, "and the tab is no longer remembering anything");
@@ -1163,6 +2346,23 @@ const suites = [
         const pop = document.querySelector(".pop");
         ok(pop.scrollWidth <= pop.clientWidth + 1,
            "content is " + pop.scrollWidth + "px inside a " + pop.clientWidth + "px popup");
+      });
+      // A placeholder does not wrap and is not caught by anything above: it is simply cut
+      // off, which reads as a shorter sentence rather than as a broken one. Korean is the
+      // case that matters, since it is measured wider per character than the English the
+      // wording was chosen against.
+      check("the Korean jump placeholder fits the box", () => {
+        const input = document.getElementById("jumpKey");
+        const probe = document.createElement("span");
+        const cs = getComputedStyle(input);
+        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+        probe.textContent = input.placeholder;
+        document.body.appendChild(probe);
+        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const need = probe.getBoundingClientRect().width;
+        probe.remove();
+        ok(need <= room, "needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+        return Math.ceil(need) + "/" + Math.floor(room) + "px";
       });`
   },
   {
@@ -1186,7 +2386,7 @@ const suites = [
         eq(getComputedStyle(block).display, "none");
       });
       check("the popup above the switch is then just the header", () => {
-        const first = [...document.querySelectorAll(".pop > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none")[1];
+        const first = [...document.querySelectorAll(".pop-scroll > *")].filter((e) => !e.hidden && getComputedStyle(e).display !== "none")[0];
         eq(first.className.split(" ")[0], "pop-toggle");
       });`
   },

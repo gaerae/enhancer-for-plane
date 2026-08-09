@@ -3,6 +3,12 @@
 Rules for anyone changing this extension — human or AI. Everything mechanically
 checkable already lives in `tools/`; this file only covers what a script cannot judge.
 
+**This is the only file of rules.** `CLAUDE.md` is one line — an import of this one — so
+Claude Code inlines it rather than leaving it to be found, and every other tool reads
+`AGENTS.md` natively. Nothing goes in `CLAUDE.md` but that import: prose there is loaded on
+every session for no one's benefit, and two files that almost agree are how they start
+disagreeing. If you want to say something to whoever changes this repo, say it here.
+
 ## Before you claim it works
 
 ```bash
@@ -52,6 +58,42 @@ changed anything a user sees, drive it:
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
   value-level pieces (`peItemUrl`, `peExpandCopyFormat`, the snapshot contract) are in
   `tools/test.js`; the DOM timing is only provable in a browser.
+- **Anything anchored by walking the DOM needs a measured number with a floor AND a lid.**
+  The template button finds its toolbar by climbing from the editor, and the climb had a bare
+  `8` in it — enough for self-hosted 1.4, two short of Plane Cloud, so the extension's biggest
+  feature simply never appeared there. Raising it until Cloud worked would have gone past the
+  comment box's own attach button at 14 and put a template button on a box with no title to
+  fill. Measure both generations, write both numbers in the comment, and pick a value between
+  them; then make the harness fail at each end, or the next person will "fix" it by making the
+  number bigger.
+- **Settings can hand back a host permission, and only the Settings page knows it.** `saveAll`
+  revokes every granted origin that is not in the list it is about to write. That is deliberate
+  — an origin we do not run on should not stay granted — but it makes two ordinary actions
+  destructive in a way nothing else in the extension is: **Restore defaults** empties the list,
+  so the next Save turns the extension off on every site; and a save from a stale form drops a
+  domain another surface just added. The first is answered by saying so in the confirm, the
+  second by carrying across domains this page has never displayed (`knownDomains`). If you add
+  a third way to write settings, work out which of those two it is before shipping it.
+- **One schema number per released version.** `PE_SCHEMA` describes what is in somebody's
+  storage, so it only needs to move when storage on a machine somewhere differs from what the
+  code expects. While a release is unreleased, its number has not reached anyone — a second
+  bump in the same cycle adds a `from < N` branch that can never run, and every later reader
+  has to work out that it is dead. Check `git show main:common.js | grep PE_SCHEMA` before
+  bumping: if the number you are about to leave behind is not on `main`, fold your step into
+  the existing one instead, and guard it against what the last *released* version shipped.
+- **A shipped preset has to be driven from a real migration, not from a hand-written seed.**
+  `seedOf` carries a synthetic `.max-w-40` rule, and for a long time that meant no shipped
+  preset except the focus ones was ever applied in a browser — which is how the search
+  dropdown selector died on Plane Cloud for a release while every check stayed green. The
+  `ct-focus` page now seeds pre-schema `widths` with no rules, so `peMigrate` builds the
+  presets the page is measured against. If you add a preset, put its markup on `PLANE` and
+  let the seed reach it the same way.
+- **Anything the harness substitutes into a page** — a catalogue, a suite body, a path —
+  goes in through `put()`, whose replacement is a function. A replacement *string* reads
+  `$&`, `` $` ``, `$'` and `$1` as instructions, and all of this is authored prose. One
+  catalogue entry reading `$NAME$'s` expanded `$'` into the rest of the file and truncated
+  the page mid-string; 32 assertions across 6 pages then failed with messages about tabs and
+  preview text. A guard at the top of the suite list asserts `buildPage` stays immune.
 - **The real extension**: load unpacked, then **reload the extension AND the tab**.
   A reloaded extension does not replace content scripts already running in open tabs,
   and `window.__peLoaded` blocks re-injection — so you will be testing old code and
@@ -77,6 +119,69 @@ in our stylesheet cannot be argued with, works the same on Jira and Linear, and 
 no-op instead of a fight when the markup moves. Same conclusion for "just mirror whatever
 Plane's left-sidebar toggle did": one keystroke doing both is a fine outcome, but it is ours
 to implement, not theirs to be observed.
+
+**The most precise selector is the least durable one, and the picker must not recommend by
+precision.** A uuid id matches exactly the element under the cursor and dies with the next
+render; `.max-w-40` matches thirty things and outlives the release. The picker ranked on "is
+this a Tailwind width class", which is a statement about the feature's first use and not
+about survival, so it put `#editor-container-{uuid}` at the top of the list on Plane Cloud
+and a content hash at the top on Linear. Rank by how the handle was authored, and *say* which
+ones expire — a demotion alone moves a row in a list the reader is about to pick from anyway.
+Demote, never filter: this is a guess about somebody else's markup and the cost of being
+wrong belongs on the ordering, not on whether the option exists.
+
+Two things learned doing it, both by measuring rather than reasoning. A pattern that reads a
+token in isolation cannot catch a digit-free hash — nothing distinguishes `sx-euugli` from
+`bg-white` — so one signal has to come from the page: a prefix carrying an implausible number
+of distinct classes is a namespace, and the counts are not close (Linear `sx`: 862; the
+largest Tailwind prefix on a Plane Cloud work item: `text` at 33). And every tightening has to
+be re-run against both real pages, because the patterns that catch more also catch `h-screen`
+and `bg-white`: the version before last flagged both, for want of one lookahead.
+
+**Prefer a feature that needs a URL over one that needs a screen.** The features here fall
+into three bands, and it is worth knowing which one you are adding to. Quick open depends on
+a URL grammar the user wrote: a Plane release cannot break it. Style rules and focus mode
+depend on CSS selectors: a release makes them no-ops, which is survivable and now reported.
+Copy reference and the templates depend on DOM anchors — `#title-input`, the key button, the
+button wrapping a file input — and a release makes those *vanish*. That third band is where
+the extension is genuinely fragile, and stretching it across products (a second tracker's
+header, a second tracker's toolbar) multiplies the fragility rather than sharing it: it was
+tried for Copy reference and reverted, because the result was a feature half-present in one
+place and whole in another, with two behaviours to explain and keep working.
+
+So: when a capability could be built either way, build the URL one. Copy reference in the
+popup reads a tab's address and title — every tab has both — and is simply absent when it
+cannot tell what it is looking at; the in-page button stays because it is the only thing that
+can see into Plane's peek panel, where the address bar names the list. Two paths are worth it
+when each is doing something the other cannot; they are not worth it to reach one more
+product.
+
+**Degrading to a no-op is right, and it is not free — say when it happens.** "A rule that
+stops matching is a no-op rather than a broken feature" is what lets this extension survive a
+Plane release, and the cost is that a dead rule and an unused one look identical. Two focus
+presets sat matching nothing on Plane Cloud for a whole release because of it. The answer is
+not to make failure loud in the page — the whole point is that it does not break anything —
+but to record what was observed and show it where the thing is configured. Anything else that
+degrades quietly (a selector, an anchor, a token that cannot be resolved) owes the reader the
+same: not an error, a fact about whether it did anything.
+
+And it must not assume the thing being watched is on screen. The first version sampled once
+per route, which quietly accused every rule aimed at transient UI: the shipped "search
+dropdown width" preset selects `[id^="headlessui-combobox-options"] > div`, measured on Plane
+Cloud as 0 matches closed and 1 open, so no routine sample ever saw it and Settings called a
+working preset dead. The rescue is a second sampling taken after a click — when a menu or a
+modal is actually up — that records **hits only**. Hits-only is what makes extra sampling
+safe: it can promote a rule to "working" and can never move one toward "never matched", so
+adding sampling opportunities cannot make the warning noisier.
+
+What that must not become is a per-page verdict. Measured on Plane Cloud: `.max-w-40` matches
+35 elements on the work item list and zero on the item page, the projects list, the labels
+page and the states page. A healthy rule matches nothing on most routes, so "no match here" is
+the normal case and a check that fires on it is noise — and noise is what gets switched off,
+which costs more than the silence it replaced. Record whether it has **ever** matched, and
+when it last did; let the reader compare one stale date against a column of today's. Any
+threshold has to sit above what normal use produces (`PE_RULE_HEALTH_MIN_CHECKS` is 20 for
+exactly that reason), and a rule the user disabled is not evidence of anything.
 
 **A feature reachable only from the popup exists for whoever already knows it exists.** Focus
 mode shipped its first draft with a shortcut and a popup switch, which is two places nobody
@@ -235,6 +340,24 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   "title slug": Korean and emoji titles slug to the empty string, so the feature would
   have worked for English titles and quietly produced `feature/proj-123-` for everyone
   else. Read the key from the URL, which Plane already guarantees.
+- **A preset that stops matching is a feature that stops existing, silently.** "A rule that
+  no longer matches is a no-op rather than a broken feature" is the right design and it has a
+  cost: two of the three focus presets matched zero elements on Plane Cloud for a whole
+  release, and a no-op looks exactly like a preset nobody switched on. Nothing failed, because
+  every check ran against a synthetic page carrying self-hosted Plane 1.4's markup — the one
+  generation the presets were written from. A harness page that models one generation cannot
+  notice when the other rots, so `buildPlanePage` now carries both, plus the near misses each
+  selector must *not* catch: focus mode is global CSS, and `.shrink-0.bg-surface-1` without the
+  `.z-[5]` also matches an unrelated chip on Cloud's cycles route. Any preset that names a
+  vendor class needs a probe per generation, and reverting either half has to fail.
+- **A migration may rewrite what the user already has, but only what it recognises.** Every
+  migration before v8 was additive; v8 repoints two preset selectors that are already in
+  storage. What makes that safe is `PE_V7_FOCUS_SELECTORS` — a rule is repointed only while its
+  selector is character-for-character what the previous version shipped. Anyone who edited
+  theirs (including anyone who worked Cloud's selector out by hand before we did) keeps it, and
+  a preset the user deleted is not resurrected, because the step appends nothing. Never widen
+  that table into "any selector we ever shipped": a value in it is a licence to overwrite
+  somebody's storage.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and
@@ -293,6 +416,17 @@ lies:
   Add new shipped files there too — `check-source.js` walks what the extension actually
   loads (manifest entries, page `<script>`/`<link>`, the worker's injection lists) and
   fails if the zip would miss any of it, so you will hear about it before a release does.
+- **The popup has a hard 600px ceiling and Chrome enforces it by cutting.** It is also 260px
+  wide, so almost everything wraps and a block you add costs more height than it looks like it
+  will — measured 2026-08-08, an ordinary work item tab came to 606px. Nothing warns you: the
+  window is simply shorter than the page, and macOS hides overlay scrollbars at rest, so the
+  part below the line is not merely out of view but unadvertised. `popup.html` is therefore a
+  flex column — `.pop-head`, a scrolling `#popScroll`, and a pinned `.pop-foot` — with
+  `max-height` (never `height`, or a two-line popup becomes a 588px one). Put anything new
+  inside `#popScroll` unless it must always be reachable, and keep the footer to the way out.
+  The harness asserts the document stays under 600, that the scroll box overflows in the tall
+  seed, that its scrollbar takes real space rather than overlaying, and that the footer does
+  not move when the middle scrolls.
 - **Korean needs `word-break: keep-all`.** CSS breaks CJK at any character, which is right
   for Chinese and Japanese and wrong for Korean: every description on the settings page was
   splitting an 어절 down the middle ("폭 조 / 정 규칙"). Both `options.css` and `popup.css` set

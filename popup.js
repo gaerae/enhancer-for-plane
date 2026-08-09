@@ -6,6 +6,9 @@
   let syncCache = { bySource: {} }; // synced templates (chrome.storage.local)
   let currentHost = "";
   let currentTabId = null;
+  let currentTabUrl = "";
+  let currentTabTitle = "";
+  let recent = [];
 
   function updateDomainStatus() {
     const statusEl = $("domainStatus");
@@ -109,13 +112,114 @@
       const forced = targetSel.hidden ? "" : targetSel.value;
       if (forced) link = links.find((l) => l.id === forced) || null;
       if (!link) link = peRouteQuickLink(links, key);
-      const url = link ? peExpandQuickLink(link, key) : "";
-      if (peIsHttpUrl(url)) {
-        chrome.tabs.create({ url });
+      // Words rather than a key go to the target's search URL, the same shape test the
+      // omnibox makes — so the two entry points cannot disagree about what was typed.
+      if (!peLooksLikeKey(key)) {
+        const searchable = forced && link ? [link] : links;
+        const first = searchable.filter((l) => peIsHttpUrl(peExpandSearchLink(l, key)))[0];
+        const surl = first ? peExpandSearchLink(first, key) : "";
+        if (peIsHttpUrl(surl)) {
+          chrome.tabs.create({ url: surl });
+          window.close();
+          return;
+        }
+        // Nothing here can search — no target has a search URL, which is the default for a
+        // hand-added one and for Linear, whose search is not addressable at all. Returning
+        // in silence made Enter look broken. The omnibox answers this case by opening
+        // Settings, and two entry points for one feature may not disagree about it.
+        chrome.runtime.openOptionsPage();
         window.close();
+        return;
       }
+      jumpTo(key, link ? peExpandQuickLink(link, key) : "", link);
     });
     input.focus();
+  }
+
+  // Open a key and remember it. The remembering is handed to the worker rather than done
+  // here: the next two lines destroy this page, and a storage write pending in a context
+  // being torn down may never land. It is also the right shape — the jump happens now, and
+  // bookkeeping never stands between the reader and the tab they asked for.
+  function jumpTo(key, url, link) {
+    if (!peIsHttpUrl(url)) return;
+    try {
+      chrome.runtime.sendMessage({ type: "pe-remember-open", key, url, name: (link && link.name) || "" });
+    } catch (_) {}
+    chrome.tabs.create({ url });
+    window.close();
+  }
+
+  // The keys opened last, as buttons. Same list the omnibox offers, in the other place the
+  // reader might be standing when they cannot remember a key.
+  function renderRecent() {
+    const box = $("recentList");
+    const rows = peRecentMatches(recent, "").filter((r) => peIsHttpUrl(r.url)).slice(0, 6);
+    box.innerHTML = "";
+    box.hidden = !rows.length;
+    rows.forEach((r) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pop-recent-item";
+      b.title = r.url;
+      const k = document.createElement("span");
+      k.className = "pop-recent-key";
+      k.textContent = r.key;
+      b.appendChild(k);
+      if (r.name) {
+        const n = document.createElement("span");
+        n.className = "pop-recent-name";
+        n.textContent = r.name;
+        b.appendChild(n);
+      }
+      b.addEventListener("click", () => jumpTo(r.key, r.url, { name: r.name }));
+      box.appendChild(b);
+    });
+  }
+
+  // Copy reference, from the tab's address and title — no injection, no page read. This is
+  // the low-dependency half of the feature the content script does on Plane: it cannot see
+  // into a peek panel (the address bar names the list there), and it says nothing at all
+  // unless a quick link recognises the URL. When it does work it works anywhere.
+  function setupCopy() {
+    const block = $("copyBlock");
+    const formats = (state.copyFormats || []).filter((f) => f && String(f.format || "").trim());
+    const m = peMatchItemUrl(state.quickLinks || [], currentTabUrl);
+    if (!m || !formats.length) return; // not a work item, or nothing to copy it as
+    const item = {
+      key: m.key,
+      title: peTitleFromDocTitle(currentTabTitle, m.key),
+      // The canonical form the template describes, not the address bar: Linear's address
+      // carries a title slug it redirects from, and that slug is dead weight in a paste.
+      url: peExpandQuickLink(m.link, m.key)
+    };
+    block.hidden = false;
+    $("copyItem").textContent = item.title ? m.key + " " + item.title : m.key;
+    const box = $("copyFormats");
+    box.innerHTML = "";
+    formats.forEach((f) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pop-btn ghost pop-copy-fmt";
+      b.textContent = f.name || peMsg("menuUntitled");
+      const text = peExpandCopyFormat(f.format, item);
+      b.title = text;
+      b.addEventListener("click", async () => {
+        const missing = peMissingItemFields(f.format, item);
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (_) {
+          $("copyLabel").textContent = peMsg("msgCopyFailed");
+          return;
+        }
+        // The same contract the in-page copy follows: a field the tab could not give us
+        // stays on the clipboard as its own token, and the reader is told which one before
+        // they paste rather than after.
+        $("copyLabel").textContent = missing.length
+          ? peMsg("msgCopiedMissing", [missing.map((n) => "{{item." + n + "}}").join(", ")])
+          : peMsg("msgCopied");
+      });
+      box.appendChild(b);
+    });
   }
 
   function init() {
@@ -123,6 +227,8 @@
     $("enabled").checked = !!state.enabled;
     $("tplCount").textContent = peCountTemplates(peBuildTemplateSections(state, syncCache));
     setupJump();
+    renderRecent();
+    setupCopy();
     updateDomainStatus();
 
     $("enabled").addEventListener("change", async () => {
@@ -247,12 +353,15 @@
       const tab = tabs && tabs[0];
       if (tab) {
         currentTabId = tab.id;
+        currentTabUrl = tab.url || "";
+        currentTabTitle = tab.title || "";
         if (tab.url) currentHost = new URL(tab.url).hostname;
       }
     } catch (_) {}
-    Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
+    Promise.all([peGetSettings(), peGetSyncCache(), peGetRecent()]).then(([s, c, r]) => {
       state = s;
       syncCache = c;
+      recent = r;
       init();
     });
   });

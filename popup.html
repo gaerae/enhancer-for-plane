@@ -12,6 +12,12 @@
         <strong data-i18n="extShort">Enhancer for Plane</strong>
       </header>
 
+      <!-- Everything between the header and the footer scrolls. A toolbar popup is capped at
+           600px by Chrome and this one measured 606 on an ordinary work item tab and 761 with
+           every block showing — so Settings, the one control that is always worth reaching,
+           was the part that fell off the bottom. macOS hides overlay scrollbars at rest, so
+           there was nothing on screen to say a bottom existed. -->
+      <div class="pop-scroll" id="popScroll">
       <!-- Three groups, in the order you reach for them: jumping to an item works anywhere
            and does not care about the switches; the extension's own on/off is global; the
            rest is about the tab you are looking at. The labels say which is which — an
@@ -23,6 +29,18 @@
           <select id="jumpTarget" class="pop-jump-target" hidden></select>
           <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
         </form>
+        <div class="pop-recent" id="recentList" hidden></div>
+        <hr class="pop-div" />
+      </div>
+
+      <!-- Copy reference, from the tab's own address and title. Nothing is injected and no
+           page is read, so this works on any tracker whose Quick open link is configured —
+           and when the tab is not a work item, the block is simply absent rather than a
+           button that cannot do anything. -->
+      <div class="pop-copy-block" id="copyBlock" hidden>
+        <div class="pop-label" id="copyLabel" data-i18n="popCopyLabel">Copy reference</div>
+        <div class="pop-copy-item" id="copyItem"></div>
+        <div class="pop-copy-formats" id="copyFormats"></div>
         <hr class="pop-div" />
       </div>
 
@@ -51,14 +69,16 @@
       </label>
       <button class="pop-btn ghost" id="pickEl" hidden data-i18n="popPick">🎯 Pick element → add rule</button>
       <button class="pop-btn ghost" id="rescan" hidden data-i18n="popRescan">↻ Re-scan this page</button>
-
-      <hr class="pop-div" />
-
-      <div class="pop-row">
-        <span class="pop-row-label" data-i18n="popTemplates">Templates</span>
-        <span class="pop-badge" id="tplCount">0</span>
       </div>
-      <button class="pop-btn primary" id="openOptions" data-i18n="popSettings">Settings · Manage templates</button>
+
+      <!-- Pinned, so the way out of the popup is never the thing that scrolled away. -->
+      <footer class="pop-foot">
+        <div class="pop-row">
+          <span class="pop-row-label" data-i18n="popTemplates">Templates</span>
+          <span class="pop-badge" id="tplCount">0</span>
+        </div>
+        <button class="pop-btn primary" id="openOptions" data-i18n="popSettings">Settings · Manage templates</button>
+      </footer>
     </div>
     <script src="common.js"></script>
     <script src="popup.js"></script>

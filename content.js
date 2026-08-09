@@ -95,6 +95,94 @@
   }
 
   /* ================================================================== */
+  /* 1a. Rule health — did each selector actually match anything?         */
+  /* ================================================================== */
+  // The answer that was always one call away and never asked for. See peRuleHealthUpdate
+  // in common.js for why this records "has it ever matched" rather than a per-page verdict.
+  //
+  // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
+  // names has mounted, and a count taken at navigation time would score every route a miss.
+  // The check is therefore keyed on the URL (once per route, however many mutation bursts
+  // that route causes) and delayed past the mount.
+  let healthUrl = null;
+  let healthTimer = null;
+  const PE_HEALTH_DELAY = 2500;
+
+  function scheduleRuleHealth() {
+    if (!settings || !isActive()) return;
+    if (location.href === healthUrl) return; // already counted this route
+    healthUrl = location.href;
+    clearTimeout(healthTimer);
+    healthTimer = setTimeout(() => {
+      try {
+        recordRuleHealth();
+      } catch (_) {}
+    }, PE_HEALTH_DELAY);
+  }
+
+  // A second sampling, taken after a click and counting hits only.
+  //
+  // The route-change sample assumes a rule points at something the page is already showing.
+  // Plenty do not: the shipped "search dropdown width" rule selects a popover that exists
+  // only while the dropdown is OPEN. Measured on self-hosted Plane 1.4, 2026-08-08 — closed:
+  // 0 matches, open: 1 — so every routine sample missed it and the settings page eventually
+  // called a working preset dead. Any rule aimed at a menu, a modal or a tooltip is the same
+  // shape.
+  //
+  // The instance matters, and getting it wrong cost a round trip: the same preset was ALSO
+  // reported dead on Plane Cloud, and this was assumed to be the same cause. It was not —
+  // there the selector matched nothing open or closed, because Cloud had moved these
+  // popovers to a different library. Two faults, one symptom. See PE_DROPDOWN_SELECTOR.
+  //
+  // Hits only, and that is what makes it safe: a click is when transient UI is on screen, so
+  // this can rescue a rule, but it can never accuse one. Sampling more often would otherwise
+  // make a route-specific rule reach the "never matched" threshold faster while telling us
+  // nothing new — the same page looked at twice is not more evidence.
+  let hitScanAt = 0;
+  const PE_HIT_SCAN_EVERY = 4000;
+
+  function scheduleHitScan() {
+    if (!settings || !isActive()) return;
+    const now = Date.now();
+    if (now - hitScanAt < PE_HIT_SCAN_EVERY) return;
+    hitScanAt = now;
+    // Long enough for the thing the click opened to have mounted, short enough that it is
+    // probably still open.
+    setTimeout(() => {
+      try {
+        recordRuleHealth(true);
+      } catch (_) {}
+    }, 400);
+  }
+
+  function recordRuleHealth(hitsOnly) {
+    if (!settings || !isActive()) return;
+    const rules = Array.isArray(settings.rules) ? settings.rules : [];
+    const counts = {};
+    rules.forEach((r) => {
+      // A disabled rule is not being applied, so counting it would be recording an
+      // observation about CSS nobody asked for. A selector the browser cannot read is
+      // already reported where it is typed, and is not this feature's news to break.
+      if (!r || typeof r !== "object" || !r.id || r.enabled === false) return;
+      const sel = String(r.selector == null ? "" : r.selector).trim();
+      if (!sel || !validSelector(sel)) return;
+      try {
+        const n = document.querySelectorAll(sel).length;
+        // Leaving a rule out of `counts` is what keeps a hit-only pass from recording a
+        // miss: peRuleHealthUpdate only touches the ids it is given.
+        if (n > 0 || !hitsOnly) counts[r.id] = n;
+      } catch (_) {}
+    });
+    if (!Object.keys(counts).length) return;
+    // Read-modify-write, and two tabs on two routes can interleave. The lost update costs
+    // one observation — never a wrong claim, because nothing here is ever decremented and
+    // the only direction a lost write moves the reader is toward "we do not know yet".
+    peGetRuleHealth().then((prev) =>
+      peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
+    );
+  }
+
+  /* ================================================================== */
   /* 1b. Focus mode — the rules marked "focus only", on for this tab      */
   /* ================================================================== */
   // Focus mode is a moment, not a setting, so it is deliberately not in chrome.storage.sync:
@@ -230,12 +318,30 @@
   const isCandidateButton = (b) =>
     !b.classList.contains("pe-body-tmpl-btn") && !(b.parentElement && b.parentElement.closest("button"));
 
+  // How far up from an editor the shared toolbar wrapper can be. Measured 2026-08-09 on a
+  // work item in each generation, from the editor to the ancestor that contains the attach
+  // button:
+  //
+  //   self-hosted 1.4   description → within 8
+  //   Plane Cloud       description → 10,  comment → 14
+  //
+  // It was 8, so on Cloud the walk gave up two levels short and the template button — the
+  // biggest thing this extension does — silently never appeared. Nothing said so: a button
+  // that is not injected looks exactly like a page that has not finished loading.
+  //
+  // 12 is chosen to sit between those two numbers, and both sides of that matter. It has to
+  // reach 10 or Cloud's description toolbar stays out of range; it has to stop short of 14
+  // or the COMMENT editor would find the description's attach button and put a template
+  // button on a box that has no title to fill. The scan widens one level at a time and takes
+  // the first hit, so 1.4 still matches at its own shorter distance and is unaffected.
+  const PE_TOOLBAR_WALK = 12;
+
   // Find a given editor's toolbar attach button by walking up to the shared wrapper.
   // Primary: a button wrapping a file input (any language). Fallback: attach/첨부 text.
   function findToolbarAnchor(editor) {
     const scan = (pred) => {
       let n = editor;
-      for (let i = 0; i < 8 && n; i++) {
+      for (let i = 0; i < PE_TOOLBAR_WALK && n; i++) {
         if (n.querySelectorAll) {
           const hit = [...n.querySelectorAll("button")].find(pred);
           if (hit) return hit;
@@ -618,6 +724,11 @@
     // needs nothing configured. It is offered wherever an item header is, which is the surface
     // it is about — and it stays out of a page that has no work item on it.
     ensureFocusButton();
+
+    // Last, and self-throttling: injectAll runs on every mutation burst, this runs once per
+    // route. Hanging it here rather than on a navigation event is what makes it work on an
+    // SPA that changes the URL without one.
+    scheduleRuleHealth();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -1184,10 +1295,31 @@
   }
 
   // From the clicked element, build candidate selectors (individual class / full / id / path) with each match count
+  // A value safe to put inside an attribute selector's quotes.
+  function attrValue(v) {
+    return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
+
+  // The selectors this element could be addressed by, best first. peSortPickCandidates
+  // decides the order and peLooksGenerated decides what gets flagged; both are in common.js
+  // because ranking is a judgement that can be argued with in a test, and only the counting
+  // needs a document.
   function buildCandidates(el) {
     const out = [];
     const seen = new Set();
-    const add = (sel, note) => {
+    // Every class on the page, so peHashNamespaces can spot a prefix that is a build
+    // artefact rather than a vocabulary. Done once per pick, which is a user gesture.
+    let namespaces = null;
+    try {
+      const all = [];
+      document.querySelectorAll("[class]").forEach((n) => {
+        if (typeof n.className === "string") all.push(...n.className.split(/\s+/));
+      });
+      namespaces = peHashNamespaces(all.filter(Boolean));
+    } catch (_) {
+      namespaces = null; // a page we cannot survey is one we judge by pattern alone
+    }
+    const add = (sel, kind, token) => {
       if (!sel || seen.has(sel)) return;
       let count = 0;
       try {
@@ -1195,28 +1327,43 @@
       } catch (_) {
         return;
       }
-      out.push({ sel, count, note });
+      out.push({ sel, count, kind, token, generated: peLooksGenerated(token, kind, namespaces) });
       seen.add(sel);
     };
-    if (el.id) add("#" + cssEsc(el.id), "id");
+
+    if (el.id) {
+      add("#" + cssEsc(el.id), "id", el.id);
+      // An id with a generated tail still has a usable head. This is not a clever extra: it
+      // is what the shipped dropdown preset does by hand for headlessui's counter, and what
+      // Plane's per-item `editor-container-{uuid}` needs to be addressable at all.
+      const head = peLooksGenerated(el.id, "id", namespaces) ? pePickIdPrefix(el.id) : "";
+      if (head) add("[id^=" + attrValue(head) + "]", "id-prefix", head);
+    }
+
+    // Attributes were missing entirely, which on a page whose classes are all hashes meant
+    // the list held no stable option at all — the picker could not reach `[data-view-id]` or
+    // `[aria-label="Issue description"]` however hard the user looked.
+    for (const a of el.attributes || []) {
+      const name = a.name;
+      const kind = name === "aria-label" ? "label" : name === "role" ? "role" : name.indexOf("data-") === 0 ? "data" : "";
+      if (!kind) continue;
+      const val = String(a.value == null ? "" : a.value);
+      // The value is part of the handle only when it is itself a handle. A uuid in
+      // `data-view-id` is this element today and a different element tomorrow, so there the
+      // useful selector is the attribute's presence.
+      const useValue = val && val.length <= 40 && !peLooksGenerated(val, "data", namespaces);
+      add("[" + name + (useValue ? "=" + attrValue(val) : "") + "]", kind, useValue ? name + "-" + val : name);
+    }
+
     const tag = el.tagName.toLowerCase();
     const cls =
       el.className && typeof el.className === "string"
         ? el.className.trim().split(/\s+/).filter(Boolean)
         : [];
-    // rank width-related classes first, then height, then the rest (the user picks from the list)
-    const score = (c) => {
-      if (/^(max-w|min-w|w)-/.test(c)) return 3;
-      if (/^(max-h|min-h|h)-/.test(c)) return 1;
-      return 0;
-    };
-    cls
-      .slice()
-      .sort((a, b) => score(b) - score(a))
-      .forEach((c) => add("." + cssEsc(c), "class"));
-    if (cls.length) add(tag + cls.slice(0, 6).map((c) => "." + cssEsc(c)).join(""), "tag + classes");
-    add(buildSelector(el), "auto");
-    return out.slice(0, 14);
+    cls.forEach((c) => add("." + cssEsc(c), "class", c));
+    if (cls.length) add(tag + cls.slice(0, 6).map((c) => "." + cssEsc(c)).join(""), "tag+classes", cls[0]);
+    add(buildSelector(el), "auto", "");
+    return peSortPickCandidates(out).slice(0, 14);
   }
 
   function toast(msg) {
@@ -1311,18 +1458,61 @@
     h.className = "pe-pick-header";
     h.textContent = peMsg("pickHeader");
     chooserEl.appendChild(h);
+    // What kind of handle each row is. buildCandidates has always known this and the list
+    // never showed it, which left the ordering to speak for itself — and an order speaks to
+    // nobody without something to compare against. These are the words that say why a row
+    // is where it is.
+    const KIND_LABEL = {
+      id: peMsg("pickKindId"),
+      "id-prefix": peMsg("pickKindIdPrefix"),
+      data: peMsg("pickKindData"),
+      label: peMsg("pickKindLabel"),
+      role: peMsg("pickKindRole"),
+      class: peMsg("pickKindClass"),
+      "tag+classes": peMsg("pickKindTagClasses"),
+      auto: peMsg("pickKindPath")
+    };
+    // Two groups under two headings — but a heading only separates when there are two of
+    // them, and on ordinary Plane markup there are not. Measured on a body element carrying
+    // nothing but Tailwind: four candidates, all durable, one heading, nothing to compare it
+    // against. Both earlier attempts at saying "this one expires" (a dimmed row, then an
+    // amber badge) were invisible for the same reason — they render only on a row that never
+    // appeared. So the verdict goes on every row, where it has a neighbour to differ from.
+    let group = null;
     cands.forEach((c) => {
+      const want = c.generated ? "expiring" : "durable";
+      if (group !== want) {
+        group = want;
+        const g = document.createElement("div");
+        g.className = "pe-pick-group";
+        // Two literal calls, not one with a ternary inside: check-i18n reads the key out of
+        // the call site, and an expression there hides it from the contract.
+        g.textContent = want === "durable" ? peMsg("pickGroupDurable") : peMsg("pickGroupExpiring");
+        chooserEl.appendChild(g);
+      }
       const it = document.createElement("button");
       it.type = "button";
       it.className = "pe-pick-item";
       const s = document.createElement("span");
       s.className = "pe-pick-sel";
       s.textContent = c.sel;
+      const k = document.createElement("span");
+      k.className = "pe-pick-kind";
+      k.textContent = KIND_LABEL[c.kind] || "";
+      const life = document.createElement("span");
+      life.className = "pe-pick-life" + (c.generated ? " expiring" : " lasting");
+      // Two literal calls again, for the same reason as the headings above: check-i18n reads
+      // the key out of the call site, so a key inside an expression is a key nothing verifies.
+      if (c.generated) life.textContent = peMsg("pickLifeChanges");
+      else life.textContent = peMsg("pickLifeLasts");
       const n = document.createElement("span");
       n.className = "pe-pick-count";
       n.textContent = peMsg("pickMatches", [String(c.count)]);
       it.appendChild(s);
+      it.appendChild(k);
+      it.appendChild(life);
       it.appendChild(n);
+      if (c.generated) it.classList.add("generated");
       it.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -1467,7 +1657,10 @@
   document.addEventListener(
     "click",
     () => {
-      if (isActive()) kickInject();
+      if (!isActive()) return;
+      kickInject();
+      // A click is also the moment transient UI exists — see scheduleHitScan.
+      scheduleHitScan();
     },
     true
   );
@@ -1562,6 +1755,10 @@
       // Read once per load, before the first applyStyles: on a settings change this
       // re-reads the same value, and nothing else in the browser writes that key.
       focusOn = readStoredFocus();
+      // Editing a rule is the one moment the reader is owed a fresh answer about it, and
+      // refresh() is what a settings change calls. Forget which route was counted so the
+      // edited selector is measured again on the page already in front of them.
+      healthUrl = null;
       applyFocusClass();
       applyStyles();
       announceFocusOnce();

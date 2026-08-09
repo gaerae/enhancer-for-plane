@@ -9,7 +9,8 @@
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
 open-source **project management, issues & wiki** tool and a self-hosted
-alternative to Jira. It fills the gaps every issue tracker leaves — reusable
+alternative to Jira — on **Plane Cloud and self-hosted alike**. It fills the gaps
+every issue tracker leaves — reusable
 **issue templates** for the tickets you file over and over, **quick open** to reach
 a ticket from its key, a one-click **copy reference**, and a **focus mode** that
 puts the side panels away — directly in the Plane UI, with **no changes to your
@@ -19,6 +20,31 @@ Plane server**, applied only on the domains you enable.
 > (And no — nothing to do with airplanes.)
 
 ![Typing a work item key in the address bar opens it — for Plane, Jira or Linear](store-assets/screenshot-1-open.png)
+
+## What it does, and where you use it
+
+| | Where you reach it | What it needs first |
+|---|---|---|
+| **Open an item by key** | Address bar: `issue` ␣ `PROJ-123` · toolbar popup · right-click a key in any text | one Quick open link |
+| **Come back to a recent one** | Same two places — they appear the moment you type the keyword | nothing, it fills itself |
+| **Search instead of opening** | Address bar: `issue` ␣ `login bug` | a search URL on that link |
+| **Copy a reference** | The button beside the item's key · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd> · the popup | nothing, three formats ship |
+| **Insert a title + body** | "Template" button in the description toolbar · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> | one template |
+| **Share templates with a team** | Settings ▸ Templates ▸ Template sync | one JSON URL |
+| **Hide the side panels** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> · the toggle beside the key · the popup | nothing, presets ship |
+| **Widen a truncated name** | Settings ▸ Appearance · or the element picker in the popup | nothing, presets ship |
+
+**Your first five minutes**
+
+1. Install, open your Plane tab, click the toolbar icon → **Enable on this site**.
+   Chrome asks once for that one site. Nothing runs anywhere else.
+2. Settings ▸ **Work items** ▸ **＋ Add quick link** → paste the address of any work
+   item you have open. That one paste sets up opening, searching and copying.
+3. Try it: type `issue` and a space in the address bar. Everything else on this page
+   is optional.
+
+Everything is off, empty, or inert until you do something — the extension ships with
+no active domain, no host access, and no quick-open links.
 
 ## Features
 
@@ -35,6 +61,45 @@ Plane server**, applied only on the domains you enable.
    - It **opens a URL and nothing more** — no host permission, no content script — so it
      works on any tab, including ones where the rest of the extension never runs. Ships with
      no targets; add yours in Settings, where each row previews where a sample key lands.
+   - **Adding one starts from a real address.** Open a work item in your tracker, copy the
+     address bar, paste it into the Add panel: a known shape is recognised and both URLs are
+     filled from it, search included, with nothing left to type. A tracker nobody listed
+     still works — the last key-shaped segment of the path becomes the token, so
+     `https://redmine.example.org/issues/45231` gives you `…/issues/{{key.num}}` and asks
+     only for a prefix to type before the number. An address with no key in it is refused
+     rather than guessed at.
+   - **Or start from an example**, if you do not have one open: a row per site you already
+     added (host filled in) and one per tracker — Plane, Jira, Linear, GitHub, GitLab. Each
+     row shows both addresses it will fill. Picking one selects the first part you have to
+     replace, `⟨workspace⟩` or `⟨site⟩`, and Tab walks the rest. Every shape was opened in a
+     browser and every search URL checked against a nonsense query too; the two that
+     underdeliver (Plane's search, Linear having none) say so on the row instead of being
+     left out.
+   - **The keys you opened last come back to you.** The one real barrier here was having to
+     already know the key; the address bar now offers your recent jumps the moment the
+     keyword is on screen, and narrows them as you type. The same list is in the popup.
+     Twelve entries, per device (`chrome.storage.local`) — waking up on another machine to
+     someone else's browsing in your address bar is not a feature.
+   - **Words search instead of opening.** Type `issue login bug` and it goes to the tracker's
+     search. Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is
+     not — so there is no prefix or mode to remember. Give a target a **search URL** with
+     `{{q}}` in Settings; a target without one simply does not answer a search.
+     - **How much this gets you depends on the tracker.** Jira and GitHub run the search from
+       the URL and land you on results. Plane, measured on app.plane.so (2026-08-08), does
+       not: `/{workspace}/search/?q=…` opens the search page with your words already in the
+       box, but still shows "Start typing to search" — so it saves the retyping and leaves
+       you a keystroke away, which is worth having but is not results.
+     - Whatever you use, give it the **page**, not the API behind it. Plane's
+       `/api/…/search/?search=…` is the request the app makes; opening it shows raw JSON.
+       Settings says so if what you paste looks like an API path.
+   - **The recent list and the search row are the extension's, not Chrome's history** — the
+     omnibox API has no way to put an icon on a row, so recents are labelled `Recent ·` and
+     the rest name what they will do (`Open PROJ-123 in Plane`). The only icon Chrome shows
+     is the extension's own, in the address bar, once the keyword is active.
+   - **A key in someone else's text.** A key almost never arrives as a key — it arrives in a
+     Slack message or a PR title, "blocked by PROJ-123 until Friday". Select it and
+     right-click → **Open work item from selection**. Chrome hands over the selected text;
+     the page itself is never read.
 2. **📝 Body templates (title + body)** — register reusable templates and insert
    them in one click. The biggest gain over stock Plane.
    - A native **"Template" button is added right next to "Attach"** in the
@@ -68,7 +133,7 @@ Plane server**, applied only on the domains you enable.
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
+![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 
 3. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
@@ -84,6 +149,12 @@ Plane server**, applied only on the domains you enable.
    - A value the page does not give us **stays visible as its token** rather than
      turning into an empty string, and the toast names it — you find out before you
      paste, not after.
+   - **Also in the toolbar popup**, when the tab you are on is a work item. That path reads
+     the tab's address and title and nothing else — no injection, no page access — so it
+     works wherever Quick open has a link, and when the tab is not a work item the block is
+     simply absent. It is the low-dependency half of the in-page button, not a replacement:
+     it cannot see into the panel a list opens, because there the address bar and the title
+     both still name the list.
    - Works both on a work item's own page and in the **panel a list opens**, which has
      the same header. On its own page the link is simply the address bar. The panel
      keeps the *list's* URL and holds no link to the item at all, so there the link is
@@ -92,7 +163,7 @@ Plane server**, applied only on the domains you enable.
      thing here that would break silently against a future Plane, and it is commented as
      such in the source.
 
-![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
 4. **📐 Style rules — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is
@@ -109,6 +180,26 @@ Plane server**, applied only on the domains you enable.
      same way — add a rule (or use the picker, which escapes bracketed classes
      like `max-w-[150px]` for you). If class names shift between versions, you
      only edit the selector.
+   - **Each rule says whether it is actually doing anything.** A selector that matches
+     nothing is a no-op — that is what stops a Plane redesign from breaking the extension —
+     but it also made a rule that had *stopped* matching look exactly like one nobody turned
+     on. So every row reads either when it last applied, or that it has never matched
+     anything, and a line above the list counts the second kind.
+     - It is **not** a per-page verdict, on purpose. Measured on Plane Cloud, `.max-w-40`
+       matches 35 elements on the work item list and none on the item page, the projects
+       list, the labels page or the states page — "no match here" is the normal state of a
+       healthy rule, and a warning that fires on it is one you learn to ignore. What is
+       recorded is whether a selector has **ever** matched and when it last did, so a
+       redesign shows up as one stale date beside rules that all read today.
+     - A rule needs 20 checks with no match before the page will say it has never worked,
+       and disabled rules are left out entirely. The record is per device
+       (`chrome.storage.local`), never synced.
+     - A rule can also watch something that is only there while a menu or a modal is open —
+       the shipped dropdown-width preset is one. Those are sampled again just after a click,
+       counting **hits only**, so being open once is enough and never being open at the
+       moment of a routine check is not held against them.
+![Cut-off names in the work item list, and the same list with a width rule applied](store-assets/screenshot-3-width.png)
+
 5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
    is what is left. There is also a toggle beside the work item's key, next to Copy reference,
    and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
@@ -132,12 +223,33 @@ Plane server**, applied only on the domains you enable.
    - Plane keeps a collapse flag for that panel in `localStorage`, but nothing in its UI
      reaches it and its own resize effect forces it back open above 768px — so this hides the
      panel with CSS instead of driving Plane's state, which would be a fight.
+![The same work item with the side panels shown and hidden](store-assets/screenshot-2-focus.png)
+
 6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
-   then click any element on the Plane page. A **candidate selector list**
-   appears (individual classes / full / id, each with a match count, width
-   classes ranked first) so you can choose the right one. The picked rule is
-   added to Settings (with an empty value → set the value there and apply). Build
-   width/style rules without DevTools.
+   then click any element on the page. A **candidate selector list** appears — attributes,
+   individual classes, id, each with a match count — so you can choose the right one. The
+   picked rule is added to Settings (with an empty value → set the value there and apply).
+   Build width/style rules without DevTools.
+   - **The list is ordered by what will still work next month, not by what is most
+     precise.** A handle a person wrote (`#main-sidebar`, `[data-view-id]`,
+     `[aria-label="Issue description"]`, `.max-w-40`) comes first; anything that looks
+     build-generated is pushed down — hashed classes (`sx-3nfvp2`), uuids
+     (`editor-container-d833e58d-…`), CSS-module names, counters, and React `useId` values
+     (`headlessui-menu-button-:r1b:`). Demoted, never hidden: it is a guess about someone
+     else's markup, so being wrong should cost a position, not an option.
+   - **Every row says so in words** — what kind of handle it is (id, id prefix, data
+     attribute, label, class, position) and whether it **lasts** or **may change**. On every
+     row, not only the doubtful ones: ordinary Plane markup yields four candidates that are
+     all durable, and a mark that shows up only on the exception says nothing on a list that
+     has no exception. Group headings sit above them; the per-row verdict is what survives
+     when there is only one group.
+   - For an id whose tail is generated, you also get the **`[id^="…"]` prefix form** — the
+     same shape the shipped dropdown preset had to be written by hand.
+   - Some hashes have no digit in them, and nothing tells `sx-euugli` from `bg-white` in
+     isolation. So one signal is measured from the page: a prefix carrying an implausible
+     number of distinct classes is a hash namespace. On real pages (2026-08-08) this flags
+     908 of Linear's 937 classes — leaving the 29 that really are authored — and **none** of
+     Plane Cloud's 515.
    - When the picker adds a rule, an open Settings page reflects it
      automatically (via `chrome.storage.onChanged`, unless you have unsaved
      edits).
@@ -148,7 +260,10 @@ Plane server**, applied only on the domains you enable.
    - Add a source in Settings → Chrome asks for access to that one origin →
      templates appear in the picker under a header for that source. **Not sure what
      a source looks like? Click "Try our example"** — it fills in this repo's own
-     `examples/team-templates.json`, so one Save shows the whole flow working.
+     26-template pack, so one Save shows the whole flow working. It picks the file by your
+     Chrome UI language, so a Korean reader gets `team-templates-ko.json` rather than a
+     picker full of English; either counts as "already added", so switching language cannot
+     leave you subscribed to two copies of one feed.
    - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
      `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
      independently with its own interval and on/off switch.
@@ -237,13 +352,22 @@ Working example: [`examples/team-templates.json`](examples/team-templates.json) 
 [`examples/team-templates-ko.json`](examples/team-templates-ko.json). Fork it, serve it
 from your own URL, and edit the templates to match how your team actually writes an issue.
 
-## Built for self-hosted Plane
+## Built for self-hosted Plane, and it works on Plane Cloud
 
-This extension targets **self-hosted Plane**. It ships with **no active domain and
-no host access**, so it does nothing until you add your instance (e.g.
-`plane.your-company.com`) via the popup's **Enable on this site** or the
-active-domains list in Settings — enabling a domain prompts Chrome for one-time
-access to that one site. It stays completely inert on every other site.
+This extension was written for **self-hosted Plane**, and the same build runs on
+**Plane Cloud** (`app.plane.so`). Either way it ships with **no active domain and no
+host access**, so it does nothing until you add your instance (e.g.
+`plane.your-company.com`, or `app.plane.so`) via the popup's **Enable on this site**
+or the active-domains list in Settings — enabling a domain prompts Chrome for
+one-time access to that one site. It stays completely inert on every other site.
+
+The two draw the same screens with different classes, which matters only for the
+presets that name one. Every preset that has needed a second shape now carries both,
+and each is checked against a live instance of each generation before release —
+because a rule that matches nothing is a no-op, which is indistinguishable from a
+rule you switched off, which is how one of them stayed broken for a release.
+Anything a preset misses is one selector edit, or one click of the element picker,
+away — that is what the generic rule engine is for.
 
 ## Install
 
@@ -260,10 +384,26 @@ then click the toolbar icon and **Enable on this site** on your Plane instance.
 4. Click the toolbar icon → **Settings · Manage templates** to adjust domains,
    widths, and templates.
 
-## Verified live (self-hosted Plane instance)
+## Verified live (on both generations)
+
+Each release is driven by hand on a self-hosted Plane 1.4 instance **and** on Plane
+Cloud, because the two do not write the same page and a rule that matches nothing
+fails silently. Measured 2026-08-09 unless noted.
 
 - Injecting CSS on `.max-w-40` changes max-width from 160px to the configured
-  value — confirmed applied.
+  value — confirmed applied. On Cloud it matches 35 elements on the work item list
+  and none on the item page, which is the normal shape of a healthy rule.
+- The **template button** appears beside the description toolbar's attach button on
+  both — the anchor is found by walking up from the editor, and Cloud puts that
+  button two levels further out than 1.4 did (10 vs within 8), which is why it was
+  missing there for a release. One button per item, and never on the comment box.
+- **Copy reference** resolves key, title and URL from the real page on both.
+- The **search dropdown** preset matches Headless UI on 1.4 and Base UI on Cloud;
+  the ⌘+K command palette and the create-work-item modal are deliberately not caught.
+- The focus-mode presets hide the properties panel and the left navigation, and the
+  description column takes the space back — confirmed on both self-hosted Plane 1.4
+  and Plane Cloud (2026-08-08: on Cloud the body column went 1056px → 1658px, and the
+  reading-width preset centred it at exactly `(1658 − 960) / 2` = 349px of gutter).
 - Values are inserted into React-controlled search inputs via a native setter +
   `input` event — confirmed.
 - The description editor is TipTap/ProseMirror (contenteditable) — confirmed, so
@@ -363,6 +503,9 @@ a missing browser is a failure rather than a quiet pass. Contributor rules live 
 - `activeTab` — when you click the toolbar icon, the popup reads the current
   tab's hostname to show status and offer "Enable on this site," and messages the
   tab to start the element picker. Limited to the tab you invoked it on.
+- `contextMenus` — adds one right-click entry, shown only when text is selected, that reads
+  a work item key out of the selection and opens it. Chrome hands over the selected text; the
+  page itself is never read, and the entry appears on no other kind of click.
 - `scripting` — registers/injects the content script on the specific origins you
   grant (see below).
 - **Optional host permissions, requested per site.** The extension ships with

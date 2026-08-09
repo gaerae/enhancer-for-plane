@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 7;
+const PE_SCHEMA = 8;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -36,6 +36,40 @@ const PE_FIELD_SEP = String.fromCharCode(0);
 // for the sync quota. Shape: { bySource: { <sourceId>: { version, fetchedAt, status,
 // lastError, count, dropped, templates: [ … ] } } }.
 const PE_SYNC_CACHE_KEY = "peSyncCache";
+
+// Rule health — whether a rule's selector has ever actually matched anything.
+//
+// A rule that matches nothing is a no-op by design: that is what keeps a Plane redesign
+// from breaking the extension. The cost is that a rule which has *stopped* matching looks
+// exactly like one nobody switched on, and two focus presets sat dead on Plane Cloud for a
+// whole release because nothing ever said so. The extension knew the whole time —
+// `querySelectorAll(sel).length` is one call — nobody asked it.
+//
+// What is deliberately NOT recorded is a per-page verdict. Measured on Plane Cloud
+// (2026-08-08): `.max-w-40` matches 35 elements on the work item list and zero on the item
+// detail page, the projects list, the labels page and the states page. "No match on this
+// page" is the normal case for a healthy rule, so any check that fires on it is noise, and
+// noise is what gets switched off. Two facts survive that: whether the selector has EVER
+// matched, and when it last did.
+//
+// Per rule id: { checks, hits, at } — page checks, checks where it matched, and the time of
+// the last match. Per device, so chrome.storage.local (see "Store config and state
+// separately"); losing it costs a few page loads of re-observation and nothing else.
+const PE_RULE_HEALTH_KEY = "peRuleHealth";
+// How many checks before silence becomes a claim. A rule added for a page the user has not
+// opened yet has genuinely never matched, and saying so after one page load would be right
+// but useless.
+//
+// 20 rather than a handful, and the measurement above is why: `.max-w-40` is a healthy rule
+// that matches on one route in five, so somebody who spends a morning in work item detail
+// pages can rack up a long run of honest misses. A threshold they can reach by working
+// normally would put a warning on a rule that is fine, and a warning that cries wolf is
+// one people learn to scroll past — which would cost more than the silence it replaced.
+// Twenty consecutive routes with no match is still under a day for a genuinely dead rule.
+const PE_RULE_HEALTH_MIN_CHECKS = 20;
+// A bound on the record for a settings file that churns rule ids. Pruning to the current
+// rules is what normally keeps this small; this is the backstop for whatever that misses.
+const PE_RULE_HEALTH_MAX = 500;
 
 // Custom template variables are written {{var.name}}. The prefix is what makes them
 // safe: a user cannot shadow {{date}} or {{week}} by naming a variable "date", so there
@@ -124,6 +158,34 @@ const PE_LOCAL_QUOTA_BYTES = 10485760;
 // share one string; tools/test.js checks it points at the file that actually ships.
 const PE_EXAMPLE_FEED_URL =
   "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates.json";
+// The same 26 templates in Korean, which ship alongside and were reaching nobody: the button
+// handed every reader the English file, so a Korean user's first look at sync was a picker
+// full of a language they had not chosen. The rest of the extension is translated; this was
+// the one surface still speaking only English.
+//
+// Picked from the UI language, not the page, the workspace, or the browser's Accept-Language:
+// the UI language is what the reader already told Chrome they want to read, and it is the
+// same source every other string here comes from. Anything that is not Korean gets English —
+// there is no third file, so no third answer to give.
+const PE_EXAMPLE_FEED_URL_KO =
+  "https://raw.githubusercontent.com/gaerae/enhancer-for-plane/refs/heads/main/examples/team-templates-ko.json";
+
+// Both URLs, so "you already added the example" recognises the other language's file too —
+// otherwise switching Chrome's language turns one source into two copies of one feed.
+const PE_EXAMPLE_FEED_URLS = [PE_EXAMPLE_FEED_URL, PE_EXAMPLE_FEED_URL_KO];
+
+function peExampleFeedUrl(lang) {
+  let l = lang;
+  if (l == null) {
+    try {
+      l = chrome.i18n.getUILanguage();
+    } catch (_) {
+      l = "";
+    }
+  }
+  // Prefix, not equality: Chrome reports ko, ko-KR, and on some builds ko-Kore-KR.
+  return /^ko\b/i.test(String(l || "")) ? PE_EXAMPLE_FEED_URL_KO : PE_EXAMPLE_FEED_URL;
+}
 
 // Count caps for an imported settings file: a bound on the work done for a file that is
 // hostile or simply corrupt, not a statement of how many templates a user may keep.
@@ -145,26 +207,78 @@ const PE_IMPORT_LIMITS = {
 
 // Focus mode: the rules that only apply while it is on. Shipped as data, like every other
 // rule, so a Plane release that renames a class costs a selector edit and nothing else —
-// and so a rule that stops matching is a no-op rather than a broken feature. Measured
-// against Plane 1.4:
+// and so a rule that stops matching is a no-op rather than a broken feature. That last
+// property is exactly what made the first version of these presets rot in silence:
+// measured against Plane 1.4 (self-hosted), two of the three stopped matching anything on
+// Plane Cloud, and a no-op looks identical to a feature nobody turned on. Each selector is
+// now a list — Plane 1.4's shape, then Cloud's — because one install can only ever be on
+// one of them and a union costs nothing on the other. Measured 2026-08-08 against both:
 //
-//   * A work item's own page puts properties in a right-hand div carrying
-//     `fixed right-0 … min-w-[300px] border-l`, a flex sibling of the description column —
-//     hiding it lets that column take the whole width with no second rule. The peek
-//     panel's sidebar is a different element (`!w-[400px]`, neither `fixed` nor `right-0`),
-//     so this leaves the peek alone. That is what makes one global selector enough: rules
-//     are plain CSS and know nothing about routes.
-//   * The left navigation carries `id="main-sidebar"`, so there is no class to guess.
+//   * A work item's own page puts properties in a right-hand div, a flex sibling of the
+//     description column — hiding it lets that column take the whole width with no second
+//     rule. Plane 1.4 writes it `fixed right-0 … min-w-[300px] border-l`; Cloud writes it
+//     `relative z-[5] h-full shrink-0 overflow-hidden bg-surface-1`. On Cloud, `.z-[5]` is
+//     what keeps the selector honest: `.shrink-0.bg-surface-1` alone also matches a 24x16
+//     element on the cycles route, and focus mode is global CSS, so a rule that overreaches
+//     hides things on pages that have no properties panel at all.
+//     Both shapes leave the peek panel alone, which is the point of matching on the panel
+//     rather than the route: rules are plain CSS and know nothing about routes. (1.4's peek
+//     sidebar is `!w-[400px]`, neither `fixed` nor `right-0`; on Cloud neither selector
+//     matches anything inside a peek.)
+//   * The left navigation carries `id="main-sidebar"` on both, so there is no class to guess.
+//     It is the one preset that never broke.
 //   * Reading width ships OFF. With both panels gone the description spans the entire
 //     window, which is worse to read rather than better — but it is a taste, so it is one
 //     checkbox away instead of on. `padding-inline` centres the column with a single
 //     property (`max-width` would need a second rule for the margins), and 2.25rem is the
-//     `px-9` Plane already applies there, so the value can only widen the gutter.
+//     `px-9` Plane 1.4 applies there, so the value can only widen the gutter. Cloud's column
+//     is `px-8` (2rem), so there the floor widens it by a quarter rem — still only widening,
+//     which is the direction that cannot make the page worse.
 //
 // Plane does hold a collapse state for that panel (`issue_detail_sidebar_collapsed` in
 // localStorage), but nothing in its UI reaches it, and on a work item's own page its own
 // resize effect forces it back to false above 768px. Driving Plane's state would mean
 // fighting that effect; CSS is the mechanism that stays.
+// The two selectors that had to grow a second shape, named because three places need the
+// same string: the presets below, the v7 → v8 migration that repoints installs already
+// carrying the old one, and the tests. Plane 1.4's shape comes first in each list, so the
+// order reads as the history it is.
+const PE_FOCUS_PROPS_SELECTOR = ".fixed.right-0.border-l.min-w-\\[300px\\], .z-\\[5\\].shrink-0.bg-surface-1";
+const PE_FOCUS_WIDTH_SELECTOR = ".overflow-y-auto.px-9.py-5, .overflow-y-auto.px-8.py-6";
+
+// The same story a second time, and the same fix. Plane Cloud has moved its property
+// dropdowns from Headless UI to Base UI; self-hosted 1.4 has not. Measured 2026-08-08 with
+// the module dropdown open on each:
+//
+//   plane.hectoai.co.kr (1.4)   [id^="headlessui-combobox-options"]  → 1, id ends `-:r6j:`
+//                               [data-base-ui-portal]                 → 0
+//   app.plane.so (Cloud)        [id^="headlessui-combobox-options"]  → 0
+//                               [data-base-ui-portal] [role=dialog]:has(input) → 1
+//
+// So the union, Plane 1.4 first, as with the focus selectors above.
+//
+// `:has(input)` is what keeps this a *search* dropdown rather than every popover: a plain
+// menu has no input. Two things it deliberately does not catch, both checked while open —
+// the create-work-item modal, and the ⌘K command palette, which is `[role="dialog"]` at the
+// full window width and sits outside the portal entirely. Widening either would be this
+// preset reaching well past what its name promises.
+const PE_DROPDOWN_SELECTOR =
+  '[id^="headlessui-combobox-options"] > div, [data-base-ui-portal] [role="dialog"]:has(input)';
+
+// What v7 — the last released version — shipped for the three selectors that stopped
+// matching Plane Cloud, kept only so the migration can tell an untouched preset from one the
+// user edited. Never widen this into "any selector we ever shipped": a value here is a
+// licence to overwrite what is in somebody's storage.
+//
+// The dropdown one arrived a day after the other two and got its own schema step at first,
+// which was churn: v8 has not been released, so no install is at 8 and a `from < 9` branch
+// could never have run for anybody. One unreleased version, one schema number.
+const PE_V7_FOCUS_SELECTORS = {
+  "rule-focus-item-properties": ".fixed.right-0.border-l.min-w-\\[300px\\]",
+  "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"
+};
+const PE_V7_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
+
 function peFocusPresetRules() {
   return [
     {
@@ -172,7 +286,7 @@ function peFocusPresetRules() {
       enabled: true,
       focus: true,
       label: peMsg("optPresetFocusProps") || "Focus: hide the work item properties panel",
-      selector: ".fixed.right-0.border-l.min-w-\\[300px\\]",
+      selector: PE_FOCUS_PROPS_SELECTOR,
       property: "display",
       value: "none"
     },
@@ -190,7 +304,7 @@ function peFocusPresetRules() {
       enabled: false,
       focus: true,
       label: peMsg("optPresetFocusWidth") || "Focus: centre the body at a reading width",
-      selector: ".overflow-y-auto.px-9.py-5",
+      selector: PE_FOCUS_WIDTH_SELECTOR,
       property: "padding-inline",
       value: "max(2.25rem, (100% - 60rem) / 2)"
     }
@@ -225,6 +339,231 @@ function peBuildRuleCss(rules, isValidSelector) {
   return { always: always.join("\n"), focus: focus.join("\n") };
 }
 
+// Fold one page's match counts into the stored record. `counts` is { ruleId: n } for the
+// rules that were checked — a rule missing from it was not checked (disabled, or the site
+// is not one we run on) and must not be counted as a miss, which is the difference between
+// "we looked and found nothing" and "we never looked".
+//
+// `now` is passed in rather than read here so the caller owns the clock and the tests do
+// not have to. Nothing is ever decremented: two tabs on different Plane routes both write,
+// and the honest merge of "35 here, 0 there" is one hit and two checks, in either order.
+function peRuleHealthUpdate(prev, counts, now) {
+  const out = Object.assign({}, prev && typeof prev === "object" ? prev : {});
+  const at = typeof now === "number" && isFinite(now) ? now : 0;
+  Object.keys(counts && typeof counts === "object" ? counts : {}).forEach((id) => {
+    const n = counts[id];
+    if (typeof n !== "number" || !isFinite(n) || n < 0) return;
+    const was = out[id] && typeof out[id] === "object" ? out[id] : {};
+    const checks = (typeof was.checks === "number" ? was.checks : 0) + 1;
+    const hits = (typeof was.hits === "number" ? was.hits : 0) + (n > 0 ? 1 : 0);
+    // The timestamp only moves forward, and only on a hit — it answers "when did this last
+    // work", which a miss has nothing to say about.
+    const prevAt = typeof was.at === "number" ? was.at : 0;
+    out[id] = { checks, hits, at: n > 0 ? Math.max(prevAt, at) : prevAt };
+  });
+  return out;
+}
+
+// Drop records for rules that no longer exist, and hard-cap what is left. Called on the
+// same write as the update: a deleted rule's history is not evidence about anything, and a
+// rule id that comes back is a new rule that happens to share a name.
+function peRuleHealthPrune(health, rules) {
+  const live = new Set(
+    (Array.isArray(rules) ? rules : []).map((r) => (r && typeof r === "object" ? r.id : null)).filter(Boolean)
+  );
+  const out = {};
+  let n = 0;
+  Object.keys(health && typeof health === "object" ? health : {}).forEach((id) => {
+    if (!live.has(id) || n >= PE_RULE_HEALTH_MAX) return;
+    out[id] = health[id];
+    n++;
+  });
+  return out;
+}
+
+// What a row may say about a rule. Three states, and the first is the important one:
+//   "unknown" — not looked at enough times to have an opinion. Says nothing.
+//   "ok"      — it has matched; `at` is when it last did. A redesign shows up here as a
+//               stale date beside rules that all read "just now", which is a comparison the
+//               reader makes better than a threshold would.
+//   "cold"    — checked enough times, never once matched. This is the shape of the Plane
+//               Cloud bug, and the one state worth a warning.
+// There is deliberately no "was working, stopped" state: it would need a threshold on
+// consecutive misses, and a rule for one route legitimately misses on every other one.
+function peRuleHealthState(entry) {
+  const e = entry && typeof entry === "object" ? entry : null;
+  const checks = e && typeof e.checks === "number" ? e.checks : 0;
+  const hits = e && typeof e.hits === "number" ? e.hits : 0;
+  if (hits > 0) return "ok";
+  if (checks >= PE_RULE_HEALTH_MIN_CHECKS) return "cold";
+  return "unknown";
+}
+
+// How many of these rules have been checked enough to say they have never matched. The
+// summary line above the rule list; the count is what turns one quiet row into something
+// the reader notices. Disabled rules are excluded — they are not being applied, so "it
+// never matched" is not news about them.
+function peRuleHealthColdCount(health, rules) {
+  return (Array.isArray(rules) ? rules : []).filter(
+    (r) => r && typeof r === "object" && r.enabled !== false && peRuleHealthState((health || {})[r.id]) === "cold"
+  ).length;
+}
+
+/* ================================================================== */
+/* The element picker's candidate ranking                              */
+/* ================================================================== */
+//
+// The picker offers the selectors an element could be addressed by, and the order it offers
+// them in is a recommendation. It used to rank on one axis — "is this a Tailwind width
+// class" — which was right for the feature's first purpose and says nothing about the
+// question that actually decides whether a rule survives: is this handle one a human wrote,
+// or one a build step generated?
+//
+// Measured on Linear (2026-08-08), every class on an issue page is a content hash:
+// `sx-3nfvp2 sx-16dsc37 sx-l56j7k`. They change when the CSS changes. Offering one first,
+// with no mark on it, is the picker recommending a rule that will be dead by the next
+// deploy. Plane has a milder version of the same thing — `editor-container-{uuid}`,
+// `headlessui-combobox-options-42` — and the shipped dropdown preset already works around
+// it by hand, with `[id^="headlessui-combobox-options"]`.
+//
+// So: rank by what kind of handle it is, demote anything that looks generated, and say so
+// in the list. Demote, not hide — this is a guess about someone else's markup, and the cost
+// of being wrong should be a worse position, never a missing option.
+
+// A hash namespace is a prefix that accounts for an implausible number of distinct classes
+// on one page. Measured 2026-08-08: Linear's `sx` covers 862 of the 937 classes on an issue
+// page, while the largest utility prefix on a Plane Cloud work item is `text` at 33, then
+// `h` and `border` at 17. Anything between those is a threshold; 120 sits an order of
+// magnitude clear of Plane and 7x clear of Linear, so it takes a page unlike either to make
+// this wrong — and being wrong costs a demotion, not a missing option.
+//
+// This exists because the patterns below cannot see it. Half of Linear's hashes have no
+// digit in them (`sx-hfnvfx`, `sx-euugli`), and nothing about `sx-euugli` in isolation
+// distinguishes it from `bg-white` — the tell is that there are eight hundred of its
+// siblings, which is a fact about the page and not about the token.
+const PE_PICK_NAMESPACE_MIN = 120;
+
+function peHashNamespaces(tokens) {
+  const counts = Object.create(null);
+  (Array.isArray(tokens) ? tokens : []).forEach((t) => {
+    const s = String(t == null ? "" : t);
+    const i = s.indexOf("-");
+    if (i <= 0) return;
+    const p = s.slice(0, i);
+    (counts[p] = counts[p] || new Set()).add(s);
+  });
+  const out = new Set();
+  Object.keys(counts).forEach((p) => {
+    if (counts[p].size >= PE_PICK_NAMESPACE_MIN) out.add(p);
+  });
+  return out;
+}
+
+// A handle a build step produced rather than a person. Each pattern is here because
+// something real matches it; the comment says what. `namespaces` is optional — the caller
+// passes what peHashNamespaces found on the page, which is the only way to catch a hash
+// that has no digit in it.
+function peLooksGenerated(token, kind, namespaces) {
+  const t = String(token == null ? "" : token);
+  if (!t) return false;
+  if (namespaces && typeof namespaces.has === "function") {
+    const i = t.indexOf("-");
+    if (i > 0 && namespaces.has(t.slice(0, i))) return true;
+  }
+  // CSS modules, the single-underscore flavour: Linear's `_draggableRegion_1ojkm_1`,
+  // `_menuOpenBg_ekx18_56`. A leading underscore, a name, a hash and a counter.
+  if (/^_[A-Za-z]\w*_[a-z0-9]{4,}_\d+$/.test(t)) return true;
+  // React's useId, which every headless UI library on Plane Cloud leans on:
+  // `headlessui-menu-button-:r1b:`, `radix-:r1e:`, `base-ui-:r1i:`, or the bare `:r1c:`.
+  // The value changes on every render, so a rule written against one is dead immediately.
+  //
+  // Ids only. A colon in a CLASS is a Tailwind variant, not a generated id — useId values
+  // never reach a class attribute. Applied to classes this matched every stacked variant
+  // Plane writes (`dark:hover:bg-custom-background-90`, `md:hover:underline`), demoting
+  // hand-written classes below the nth-child path fallback and badging them "may change".
+  if (kind !== "class" && /:[a-z0-9]+:/i.test(t)) return true;
+  // A uuid anywhere: Plane's `editor-container-d833e58d-d489-433e-9551-c2ab0768068d`.
+  if (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t)) return true;
+  // A run of 8+ hex containing a digit, as a whole segment: Linear's `sc2sx-Flex-d11c8f6e`,
+  // Plane's `theme-provider-399572923184751ace…`. The digit requirement keeps it off words
+  // that happen to be spelled in hex letters.
+  if (/(^|[-_])(?=[0-9a-f]*\d)[0-9a-f]{8,}([-_]|$)/i.test(t)) return true;
+  // A tiny prefix and an opaque tail mixing letters and digits: Linear's `sx-3nfvp2`. Both
+  // lookaheads are load-bearing — without the digit this also matches `bg-white` and
+  // `h-screen`, which are ordinary Tailwind and must not be demoted.
+  if (/^[a-z]{1,3}-(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{5,}$/i.test(t)) return true;
+  // CSS modules: `Button_root__x7f2a`.
+  if (/__[a-z0-9]{5,}$/i.test(t)) return true;
+  // A trailing counter, ids only. `headlessui-combobox-options-42`, `DndLiveRegion-0` — but
+  // NOT `max-w-40` or `px-9`, which is why this one does not apply to classes.
+  if (kind === "id" && /-\d+$/.test(t)) return true;
+  return false;
+}
+
+// For an id whose tail is generated, the part that is not. `headlessui-combobox-options-42`
+// → `headlessui-combobox-options`, which is exactly what the shipped dropdown preset
+// selects with `[id^="…"]`. Returns "" when there is no stable head worth offering.
+function pePickIdPrefix(id) {
+  const t = String(id == null ? "" : id);
+  const cut = t
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*$/i, "")
+    .replace(/:[a-z0-9]+:.*$/i, "")
+    .replace(/-\d+$/, "")
+    .replace(/[-_]+$/, "");
+  // Long enough to mean something, and it has to be a real prefix or there is nothing to say.
+  return cut.length >= 4 && cut.length < t.length ? cut : "";
+}
+
+// Higher is better. The kinds are ordered by how much of a promise they carry: an id or a
+// data attribute is something a developer named on purpose; a class may be either; the
+// generated path at the bottom is a description of where the element happens to sit today.
+const PE_PICK_KIND_SCORE = {
+  id: 100,
+  "id-prefix": 95,
+  data: 90,
+  label: 80,
+  role: 60,
+  class: 40,
+  "tag+classes": 20,
+  auto: 10
+};
+// Enough to sink a generated id below an ordinary class, and a generated class below the
+// path fallback — which is the honest order, because on a page where every class is a hash
+// the path is no worse a guess and at least does not look authored.
+const PE_PICK_GENERATED_PENALTY = 70;
+
+function pePickScore(cand) {
+  const c = cand && typeof cand === "object" ? cand : {};
+  let score = PE_PICK_KIND_SCORE[c.kind];
+  if (typeof score !== "number") score = 0;
+  // The original axis, kept: width is what this feature is most often used for, so among
+  // equals a width class is still the one to offer first.
+  if (c.kind === "class") {
+    if (/^(max-w|min-w|w)-/.test(String(c.token || ""))) score += 8;
+    else if (/^(max-h|min-h|h)-/.test(String(c.token || ""))) score += 4;
+  }
+  // The candidate carries the verdict rather than re-deriving it: buildCandidates knows the
+  // page's hash namespaces and this does not, and one of them having a different answer to
+  // the other is how a row gets demoted without the badge that explains it.
+  if (c.generated) score -= PE_PICK_GENERATED_PENALTY;
+  return score;
+}
+
+// Sorted best-first, ties keeping the order they were built in (the DOM's own order for
+// classes, which is the only order the page gives us and is stable between runs).
+// Generated candidates ALL sort after durable ones, then by score, then by discovery order.
+// The partition is first and separate on purpose: the chooser draws a heading wherever the
+// group changes, so a single generated row scoring above a durable one splits "Recommended"
+// into two headings with an expiring row between them. The penalty alone did not guarantee
+// it — a generated id scores 100-70=30, above tag+classes at 20 — and tying the layout to
+// whether two unrelated constants stay far enough apart is not a guarantee at all.
+function peSortPickCandidates(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((c, i) => ({ c, i, s: pePickScore(c) }))
+    .sort((a, b) => (a.c.generated ? 1 : 0) - (b.c.generated ? 1 : 0) || b.s - a.s || a.i - b.i)
+    .map((x) => x.c);
+}
+
 const PE_DEFAULTS = {
   schema: PE_SCHEMA,
   enabled: true,
@@ -248,7 +587,7 @@ const PE_DEFAULTS = {
       id: "rule-combobox-dropdown",
       enabled: true,
       label: peMsg("optPresetDropdown") || "Module search dropdown width",
-      selector: '[id^="headlessui-combobox-options"] > div',
+      selector: PE_DROPDOWN_SELECTOR,
       property: "width",
       value: "320px" // Plane default 192px (w-48) → widened to 320px
     },
@@ -308,7 +647,9 @@ const PE_DEFAULTS = {
   // Quick open targets — see PE_MAX_QUICK_LINKS. Ships empty like `domains`: a target's
   // url carries the user's own host and workspace ("https://plane.acme.com/team/browse/
   // {{key}}"), so a shipped preset would only open a broken address. The Settings section
-  // shows the shape and the omnibox keyword. Each: { id, name, prefix, url, enabled }.
+  // shows the shape and the omnibox keyword.
+  // Each: { id, name, prefix, url, searchUrl, enabled } — searchUrl is optional and carries
+  // {{q}}, so the same target answers "PROJ-123" and "the login bug" without a mode switch.
   quickLinks: [],
 
   // Template sync — pull shared templates from one or more URLs. Config only
@@ -402,6 +743,13 @@ function peDeepMerge(def, cur) {
 //            This is not the resurrection trap: these ids did not exist before v7, so
 //            nothing the user deleted comes back, and once the stamp reaches 7 deleting
 //            them is final.
+//   v7 → v8: two of the focus presets stopped matching anything on Plane Cloud (see
+//            peFocusPresetRules), so their selectors grow a second shape. Unlike v6 → v7
+//            this rewrites a value already in the user's storage, which is only allowed
+//            because it is guarded: a rule is repointed ONLY while its selector is still
+//            character-for-character what v7 shipped. Anyone who edited theirs — including
+//            anyone who already worked out Cloud's selector by hand — keeps it. A rule the
+//            user deleted stays deleted; this appends nothing.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -426,7 +774,7 @@ function peMigrate(raw) {
         id: "rule-combobox-dropdown",
         enabled: w.dropdown.enabled !== false,
         label: peMsg("optPresetDropdown") || "Module search dropdown width",
-        selector: '[id^="headlessui-combobox-options"] > div',
+        selector: PE_DROPDOWN_SELECTOR,
         property: "width",
         value: (w.dropdown.px || 320) + "px"
       });
@@ -440,6 +788,21 @@ function peMigrate(raw) {
       if (!have.has(r.id)) rules.push(r);
     });
     raw.rules = rules;
+  }
+  if (from < 8) {
+    // Three selectors that stopped matching Plane Cloud, repointed in one step because they
+    // are one release's worth of the same rot. Guarded the same way in each case: a rule is
+    // moved ONLY while its selector is character-for-character what v7 shipped. Anyone who
+    // edited theirs — including anyone who already worked Cloud's markup out by hand — keeps
+    // exactly what they typed, and a preset they deleted stays deleted.
+    const shipped = {};
+    peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+    shipped["rule-combobox-dropdown"] = PE_DROPDOWN_SELECTOR;
+    const was = Object.assign({ "rule-combobox-dropdown": PE_V7_DROPDOWN_SELECTOR }, PE_V7_FOCUS_SELECTORS);
+    (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
+      if (!r || typeof r !== "object") return;
+      if (was[r.id] && r.selector === was[r.id]) r.selector = shipped[r.id];
+    });
   }
   raw.schema = PE_SCHEMA;
   return raw;
@@ -529,6 +892,9 @@ function peSanitizeSettings(raw) {
       name: str(q.name, L.maxFieldLen),
       prefix: str(q.prefix, L.maxFieldLen),
       url: str(q.url, L.maxFieldLen).trim(),
+      // Optional. A target without one simply does not answer a search, which is what a
+      // tracker whose search URL the user has not filled in should do.
+      searchUrl: str(q.searchUrl, L.maxFieldLen).trim(),
       enabled: bool(q.enabled, true)
     }))
     // A quick link with no url opens nothing; a name or prefix on its own is not a target.
@@ -932,6 +1298,66 @@ function peSourceDisplayName(src, entry) {
   return peSourceLabel(src && src.url);
 }
 
+// Read the rule-health record (chrome.storage.local). Absent is the normal state on a
+// fresh install and reads as "nothing known yet", which is what peRuleHealthState says
+// about an id it does not find.
+// Read/write the recently-opened list (chrome.storage.local).
+function peGetRecent() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(PE_RECENT_KEY, (res) => {
+        const r = res && res[PE_RECENT_KEY];
+        resolve(Array.isArray(r) ? r : []);
+      });
+    } catch (_) {
+      resolve([]);
+    }
+  });
+}
+
+function peSaveRecent(list) {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.set({ [PE_RECENT_KEY]: list }, () => {
+        // A convenience list. A failed write costs one remembered jump, and there is nothing
+        // the reader could do about it, so it is swallowed rather than surfaced.
+        void (chrome.runtime && chrome.runtime.lastError);
+        resolve();
+      });
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
+function peGetRuleHealth() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(PE_RULE_HEALTH_KEY, (res) => {
+        const h = res && res[PE_RULE_HEALTH_KEY];
+        resolve(h && typeof h === "object" ? h : {});
+      });
+    } catch (_) {
+      resolve({});
+    }
+  });
+}
+
+function peSaveRuleHealth(health) {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.set({ [PE_RULE_HEALTH_KEY]: health }, () => {
+        // Advisory data. A write that fails costs a page's worth of observation, so it is
+        // swallowed rather than surfaced — there is nothing the reader could do about it.
+        void (chrome.runtime && chrome.runtime.lastError);
+        resolve();
+      });
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
 // Read/write the synced-template cache (chrome.storage.local).
 function peGetSyncCache() {
   return new Promise((resolve) => {
@@ -1058,7 +1484,12 @@ function peSplitKey(key) {
 function peRouteQuickLink(links, key) {
   const k = String(key == null ? "" : key).trim();
   if (!k) return null;
-  const usable = (links || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
+  // A link still holding a ⟨blank⟩ is half-configured, so it is not a target. Skipping it
+  // here is what makes the omnibox fall through to "no quick link set — Enter opens
+  // Settings", which is the honest answer and the behaviour before rows arrived pre-filled.
+  const usable = (links || []).filter(
+    (l) => l && l.enabled !== false && String(l.url || "").trim() && !/[⟨⟩]/.test(String(l.url))
+  );
   if (!usable.length) return null;
   let best = null;
   let bestLen = -1;
@@ -1091,11 +1522,504 @@ function peExpandQuickLink(link, key) {
   return url + enc(parts.key);
 }
 
+// Starting points for a quick link, so the first thing anyone sees is not an empty box.
+//
+// Every shape here was opened in a browser on 2026-08-08 and checked against a nonsense
+// query as well as a real one, because a search URL that quietly ignores its parameter and
+// shows the whole list looks identical to one that works. What was measured:
+//
+//   Jira    text ~ "배포 검증" → 4 results across two projects. Verified with the exact
+//           string the expander produces — the template's spaces and quotes raw, only the
+//           value percent-encoded — because that is what will actually be navigated to.
+//   GitHub  ?q= → filtered results; a nonsense word → the empty state.
+//   GitLab  ?search= → filtered results; a nonsense word → none. /-/issues/ redirects to
+//           /-/work_items and the parameter survives it.
+//   Plane   /{ws}/search/?q= → fills the search box but does NOT run the search; the page
+//           still says "Start typing to search". Kept, and labelled, because it still saves
+//           the retyping. See optQuickExampleNotePlane.
+//   Linear  no URL-addressable search found.
+//
+// GitHub and GitLab number their issues rather than keying them, and a bare "1234" is not a
+// key by PE_ITEM_KEY_RE — so those two carry a prefix and spend it: you type GH-1234 and
+// {{key.num}} puts 1234 in the URL. That is what the split tokens were always for.
+//
+// The parts a person has to replace are written {host}, {workspace} and so on; peQuickExample
+// swaps them for the reader's own language wrapped in ⟨⟩, which is deliberately not our
+// {{token}} syntax — one is a blank to fill, the other is a token the extension expands.
+const PE_QUICK_EXAMPLES = [
+  {
+    id: "plane",
+    name: "Plane",
+    prefix: "",
+    url: "https://{host}/{workspace}/browse/{{key}}",
+    searchUrl: "https://{host}/{workspace}/search/?q={{q}}",
+    note: "plane"
+  },
+  {
+    id: "jira",
+    name: "Jira",
+    prefix: "",
+    url: "https://{site}.atlassian.net/browse/{{key}}",
+    searchUrl: 'https://{site}.atlassian.net/issues/?jql=text ~ "{{q}}"'
+  },
+  {
+    id: "linear",
+    name: "Linear",
+    prefix: "",
+    url: "https://linear.app/{workspace}/issue/{{key}}",
+    searchUrl: "",
+    note: "linear"
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    prefix: "GH-",
+    url: "https://github.com/{owner}/{repo}/issues/{{key.num}}",
+    searchUrl: "https://github.com/{owner}/{repo}/issues?q={{q}}",
+    note: "numbered"
+  },
+  {
+    id: "gitlab",
+    name: "GitLab",
+    prefix: "GL-",
+    url: "https://gitlab.com/{group}/{project}/-/issues/{{key.num}}",
+    searchUrl: "https://gitlab.com/{group}/{project}/-/issues/?search={{q}}",
+    note: "numbered"
+  }
+];
+
+// The blanks an example leaves, in the order a reader meets them. Named here so the
+// catalogue, the filler and the tests cannot drift apart.
+const PE_QUICK_PARTS = ["host", "workspace", "site", "owner", "repo", "group", "project"];
+
+// Fill an example's blanks with the reader's own words. `labels` maps a part to its label;
+// `known` optionally supplies a real value for one — that is how a host the user has already
+// configured arrives pre-filled instead of as another blank to type.
+function peQuickExample(template, labels, known) {
+  const l = labels && typeof labels === "object" ? labels : {};
+  const k = known && typeof known === "object" ? known : {};
+  return String(template == null ? "" : template).replace(/\{([a-z]+)\}/g, (whole, part) => {
+    if (PE_QUICK_PARTS.indexOf(part) === -1) return whole; // not a blank — {{key}} survives
+    if (k[part]) return k[part];
+    return "⟨" + (l[part] || part) + "⟩";
+  });
+}
+
+// The next blank at or after `from`, as [start, end]. Returns null when there is none left,
+// which is the case worth distinguishing — a filled-in example should not send the caret
+// somewhere arbitrary, and Tab should go back to being Tab.
+function peNextBlank(url, from) {
+  const s = String(url == null ? "" : url);
+  const at = Math.max(0, Number(from) || 0);
+  const i = s.indexOf("⟨", at);
+  if (i === -1) return null;
+  const j = s.indexOf("⟩", i);
+  return j === -1 ? null : [i, j + 1];
+}
+
+// The last blank that ends at or before `before`. Shift+Tab's half of walking the blanks.
+function pePrevBlank(url, before) {
+  const s = String(url == null ? "" : url);
+  const at = Math.max(0, Number(before) || 0);
+  const i = s.lastIndexOf("⟨", Math.max(0, at - 1));
+  if (i === -1) return null;
+  const j = s.indexOf("⟩", i);
+  return j === -1 || j + 1 > at ? null : [i, j + 1];
+}
+
+// Where the caret should land when a row is first created.
+function peFirstBlank(url) {
+  return peNextBlank(url, 0);
+}
+
+/* ---- reading an address backwards into a quick link ---- */
+
+// The examples answer "what does a tracker's address look like" — but the reader already has
+// one open, and reciting its shape from memory is the hard part. So the shapes are read in
+// the other direction too: paste any work item's address and the template falls out of it.
+//
+// This covers the case the example list quietly cannot: a tracker we have never heard of.
+// The five examples are five, and a list of five reads as "these five are supported", which
+// is the opposite of what a generic quick link is for.
+
+// A template's blanks and key tokens as one regex. {{key}} tokens come first so the {…}
+// alternative cannot bite off the inner braces of a {{…}}.
+const peQuickShapeRe = () => /\{\{\s*key(?:\.(proj|num))?\s*\}\}|\{([a-z]+)\}/gi;
+
+// Fill a template's {part} blanks from a map. A part with no value is left as written, so a
+// caller that mismatched the map gets a visible {owner} rather than a silently broken URL.
+function peQuickFill(template, parts) {
+  const p = parts && typeof parts === "object" ? parts : {};
+  return String(template == null ? "" : template).replace(/\{([a-z]+)\}/g, (whole, part) => {
+    if (PE_QUICK_PARTS.indexOf(part) === -1) return whole; // {{key}} survives, as everywhere
+    return p[part] ? String(p[part]) : whole;
+  });
+}
+
+// Read a URL against one example's shape. Returns the captured {part} values, or null.
+// The key group is shape-checked: without it "linear.app/x/issue/settings" reads as a work
+// item, and a template built from that is wrong in a way nothing downstream can notice.
+function peQuickMatchExample(template, url) {
+  const t = String(template == null ? "" : template);
+  const u = String(url == null ? "" : url).trim();
+  if (!t || !u) return null;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A path segment. Narrower than peMatchQuickLink's SEG in one way (no "&" case to worry
+  // about — an example's blanks are all in the host or the path) and that is all it needs.
+  const SEG = "([^/?#]+)";
+  const TAIL = "(?:[/?#].*)?$";
+  const order = [];
+  let body = "";
+  let last = 0;
+  const re = peQuickShapeRe();
+  let m;
+  while ((m = re.exec(t))) {
+    body += esc(t.slice(last, m.index));
+    if (m[2] != null) {
+      if (PE_QUICK_PARTS.indexOf(m[2]) === -1) body += esc(m[0]);
+      else {
+        body += SEG;
+        order.push({ part: m[2] });
+      }
+    } else {
+      const which = (m[1] || "").toLowerCase();
+      body += which === "num" ? "(\\d+)" : SEG;
+      order.push({ key: which || "key" });
+    }
+    last = m.index + m[0].length;
+  }
+  body += esc(t.slice(last));
+  // The scheme is not part of the shape. A self-hosted Plane on plain http is the same
+  // template as one on https, and refusing to read it would be pedantry with a cost.
+  body = body.replace(/^https:\/\//i, "https?://");
+  let hit;
+  try {
+    hit = new RegExp("^" + body + TAIL, "i").exec(u);
+  } catch (_) {
+    return null;
+  }
+  if (!hit) return null;
+  const parts = {};
+  for (let i = 0; i < order.length; i++) {
+    const v = String(hit[i + 1] || "");
+    if (!v) return null;
+    if (order[i].key) {
+      if (order[i].key === "num" ? !/^\d+$/.test(v) : !PE_ITEM_KEY_RE.test(v)) return null;
+      continue;
+    }
+    if (v.indexOf("⟨") > -1 || v.indexOf("{") > -1) return null; // an unfilled example, not a URL
+    parts[order[i].part] = v;
+  }
+  return parts;
+}
+
+// Build a quick link out of a URL nobody recognised. The address still says where the key
+// goes — that is the one thing every tracker's item URL has in common — so the last
+// key-shaped segment becomes the token and everything after it is dropped, because a title
+// slug is decoration and Linear proved a bare key is enough to navigate.
+function peQuickGuessFromUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  let u;
+  try {
+    u = new URL(raw);
+  } catch (_) {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const segs = u.pathname.split("/");
+  let at = -1;
+  let kind = "";
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if (PE_ITEM_KEY_RE.test(segs[i])) {
+      at = i;
+      kind = "key";
+      break;
+    }
+  }
+  if (at === -1) {
+    for (let i = segs.length - 1; i >= 0; i--) {
+      if (/^\d+$/.test(segs[i])) {
+        at = i;
+        kind = "num";
+        break;
+      }
+    }
+  }
+  if (at === -1) return null;
+  segs[at] = kind === "key" ? "{{key}}" : "{{key.num}}";
+  return {
+    id: "",
+    name: u.hostname,
+    // A bare number is not a key by PE_ITEM_KEY_RE, so a numbered tracker needs a prefix to
+    // spend — the same bargain GitHub and GitLab make. We will not invent one: which letters
+    // stand for someone's tracker is theirs to choose, and a wrong guess sitting in the field
+    // looks like an answer.
+    prefix: "",
+    url: u.origin + segs.slice(0, at + 1).join("/"),
+    searchUrl: "",
+    note: "",
+    from: "guess",
+    kind: kind
+  };
+}
+
+// Paste an address, get a quick link. Tries the known shapes first — a hit there fills the
+// search address too, which is the half a reader is least likely to know — and falls back to
+// reading the key's position out of the path.
+function peQuickFromUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  if (!raw) return null;
+  // A template pasted back out of the settings page is not an address. Worth its own guard
+  // rather than relying on the shape checks: `new URL` punycodes "⟨host⟩" into the perfectly
+  // valid hostname "xn--host-fg5bk", so the guess path would build a link to a host that
+  // does not exist and say nothing was wrong.
+  if (/[⟨⟩{}]/.test(raw)) return null;
+  // A literal host is evidence; {host} is a wildcard that would happily read someone else's
+  // address if it were tried first. Order the examples so the specific ones go first.
+  const byHost = PE_QUICK_EXAMPLES.slice().sort(
+    (a, b) => (a.url.indexOf("{host}") > -1 ? 1 : 0) - (b.url.indexOf("{host}") > -1 ? 1 : 0)
+  );
+  for (const ex of byHost) {
+    const parts = peQuickMatchExample(ex.url, raw);
+    if (!parts) continue;
+    const http = /^http:\/\//i.test(raw);
+    const scheme = (s) => (http ? s.replace(/^https:\/\//i, "http://") : s);
+    return {
+      id: ex.id,
+      name: ex.name,
+      prefix: ex.prefix || "",
+      url: scheme(peQuickFill(ex.url, parts)),
+      searchUrl: scheme(peQuickFill(ex.searchUrl, parts)),
+      note: ex.note || "",
+      from: "example",
+      kind: ex.url.indexOf("{{key.num}}") > -1 ? "num" : "key"
+    };
+  }
+  return peQuickGuessFromUrl(raw);
+}
+
+// A quick link's search address, if it has one. Same idea as `url` and the same token
+// rules, with {{q}} where the words go — "https://app.plane.so/acme/search?q={{q}}". This
+// is what lets one target answer both "open PROJ-123" and "find the login bug": the omnibox
+// picks by shape (see peLooksLikeKey), so there is no syntax for the user to remember.
+const peSearchTokenRe = () => /\{\{\s*q\s*\}\}/gi;
+
+function peExpandSearchLink(link, query) {
+  const url = link && link.searchUrl ? String(link.searchUrl).trim() : "";
+  const q = String(query == null ? "" : query).trim();
+  if (!url || !q) return "";
+  const enc = encodeURIComponent(q);
+  if (peSearchTokenRe().test(url)) return url.replace(peSearchTokenRe(), enc);
+  return url + enc;
+}
+
+// Is what the user typed a key, or words to search for? The whole disambiguation, and it is
+// deliberately the same test the rest of the extension uses for a key — a thing that looks
+// like PROJ-123 is one, and anything else is a phrase. No prefix, no mode switch, nothing to
+// learn: the two cases cannot be confused because a key has no spaces and a phrase is not
+// <identifier>-<number>.
+function peLooksLikeKey(text) {
+  return PE_ITEM_KEY_RE.test(String(text == null ? "" : text).trim());
+}
+
+// The first work item key in a lump of text, or "". For the context menu: what gets selected
+// on a page is "blocked by PROJ-123 until Friday", not a bare key, and asking the reader to
+// select exactly the key would make the feature slower than typing it.
+//
+// Scanned by token rather than by a loose global regex so the same shape rule decides here
+// as everywhere else. Punctuation around a key is stripped (a trailing full stop, brackets
+// in a PR title) but the key itself is never guessed at.
+function peKeyFromText(text) {
+  const words = String(text == null ? "" : text).split(/[\s,;"'`()[\]{}<>]+/);
+  for (const w of words) {
+    const t = w.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "");
+    if (!peLooksLikeKey(t)) continue;
+    // A year-month gets past the key shape whenever the month is not zero-padded — "2026-10"
+    // is a valid key for a project whose identifier is "2026". PE_ITEM_KEY_RE lets it
+    // through on purpose (Plane does not hand out four-digit-year identifiers, so the cost
+    // there is theoretical), but this function reads prose, and prose is full of dates.
+    // Here the odds invert: "shipped 2026-10" is common and a project called 2026 is not.
+    if (/^(19|20)\d{2}-(1[0-2]|[1-9])$/.test(t)) continue;
+    return t;
+  }
+  return "";
+}
+
+// A quick link read backwards: which item, if any, does this URL name?
+//
+// The same template that builds a URL from a key describes which part of a URL IS the key,
+// so this needs nothing configured that Quick open has not already asked for. Its callers
+// are the popup and the service worker — never a content script. That distinction is the
+// point: this reads a tab's address and title, which every tab has, rather than a page's
+// markup, which is a different shape in every product.
+//
+// Literals are escaped, each {{key}} / {{key.proj}} / {{key.num}} becomes one segment, and a
+// template with no token at all is a base the key is appended to — the same three cases
+// peExpandQuickLink writes. Trailing path, query and hash are allowed after the match,
+// because a real address carries them: Linear redirects /issue/GAE-2 to
+// /issue/GAE-2/connect-your-tools and Plane's browse links end in a slash (both measured
+// 2026-08-08).
+function peMatchQuickLink(template, url) {
+  const t = String(template == null ? "" : template);
+  const u = String(url == null ? "" : url);
+  if (!t || !u) return "";
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // What a key may run up to. "&" is in there for a template that puts the key in the query:
+  // a greedy segment would swallow "ENG-42&view=grid" and then fail the shape check, so a
+  // perfectly good template would answer nothing. No key can contain any of these.
+  const SEG = "([^/?#&]+)";
+  const TAIL = "(?:[/?#&].*)?$";
+  const order = [];
+  let body = "";
+  let last = 0;
+  const re = peQuickTokenRe();
+  let m;
+  while ((m = re.exec(t))) {
+    body += esc(t.slice(last, m.index)) + SEG;
+    order.push(m[1] ? String(m[1]).toLowerCase() : "key");
+    last = m.index + m[0].length;
+  }
+  if (!order.length) {
+    body = esc(t) + SEG;
+    order.push("key");
+  } else {
+    body += esc(t.slice(last));
+  }
+  let hit;
+  try {
+    hit = new RegExp("^" + body + TAIL, "i").exec(u);
+  } catch (_) {
+    return ""; // a template that will not compile matches nothing, it does not throw
+  }
+  if (!hit) return "";
+  const parts = {};
+  order.forEach((name, i) => {
+    let v = hit[i + 1] || "";
+    try {
+      v = decodeURIComponent(v);
+    } catch (_) {
+      /* keep it raw rather than lose it */
+    }
+    parts[name] = v;
+  });
+  const key = (parts.key || (parts.proj && parts.num ? parts.proj + "-" + parts.num : "")).trim();
+  // The shape check is not politeness — it is what stops a template from claiming a page it
+  // has no business claiming. Without it "…/browse/{{key}}" answers "settings" for
+  // /browse/settings, and the popup offers to copy a reference to a word.
+  return peLooksLikeKey(key) ? key : "";
+}
+
+// The item this URL names as { key, link }, or null. The link comes back with the key
+// because the template that recognised the page is also the one that should compose a link
+// to it. The most specific template wins — "…/acme/browse/{{key}}" beats "…/{{key}}" —
+// because a shorter template is a prefix of the longer one's world and would otherwise
+// answer first by accident.
+function peMatchItemUrl(links, url) {
+  const usable = (Array.isArray(links) ? links : [])
+    .filter((l) => l && typeof l === "object" && l.enabled !== false && l.url)
+    .sort((a, b) => String(b.url).length - String(a.url).length);
+  for (const l of usable) {
+    const key = peMatchQuickLink(l.url, url);
+    if (key) return { key, link: l };
+  }
+  return null;
+}
+
+// The work item title out of a tab title, or "".
+//
+// Measured 2026-08-08, on three real workspaces:
+//   Plane   "GAERA-6 5. Use Cycles to time box tasks 🗓️"
+//   Linear  "GAE-2 Connect your tools"
+//   Jira    "[TRASHSWD-17] ArgoCD apps-of-apps 배포 패턴 확인 - Jira"
+// So the key leads, optionally in brackets. That is the whole shape accepted, and only when
+// the key is the one already established from the URL. Anything else returns "" rather than
+// a guess: an unresolved {{item.title}} stays visible and is reported, which is the contract
+// every other missing field follows — a wrong title looks right and gets pasted.
+//
+// What is deliberately NOT stripped is Jira's trailing " - Jira". Cutting a trailing
+// " - something" would be a guess about titles rather than about keys, and it would truncate
+// any title that genuinely ends that way. The suffix is visible in the popup before the copy
+// happens, which is the difference between noise the reader can see and a title quietly
+// losing its last three words.
+function peTitleFromDocTitle(docTitle, key) {
+  let t = String(docTitle == null ? "" : docTitle).trim();
+  const k = String(key == null ? "" : key).trim();
+  if (!t || !k) return "";
+  // A bracketed key is the same key, written the way Jira writes it.
+  if (t.slice(0, k.length + 2).toLowerCase() === "[" + k.toLowerCase() + "]") t = t.slice(k.length + 2);
+  else if (t.slice(0, k.length).toLowerCase() === k.toLowerCase()) t = t.slice(k.length);
+  else return "";
+  if (!/^\s/.test(t)) return ""; // "GAE-21 …" must not answer for the key "GAE-2"
+  return t.trim();
+}
+
+/* ================================================================== */
+/* Recently opened items                                               */
+/* ================================================================== */
+//
+// Quick open's one real barrier is that you have to already know the key. Everything else
+// about it is friction-free — no permission, no content script, works on any tab — so the
+// thing worth adding is not more power but a memory: the keys you opened last, offered back
+// to you in the same place you would have typed them.
+//
+// Per device (chrome.storage.local), because it is a record of what this browser did and
+// syncing it would put one machine's browsing in another's address bar. Capped small: this
+// is a shortlist you scan, not a history you search.
+const PE_RECENT_KEY = "peRecent";
+const PE_MAX_RECENT = 12;
+
+// Newest first, one entry per key, capped. An entry is { key, url, name, at } — `name` is
+// the quick link's, so a list spanning two trackers says which is which.
+function peRecentAdd(list, entry, now) {
+  const e = entry && typeof entry === "object" ? entry : {};
+  const key = String(e.key == null ? "" : e.key).trim();
+  const url = String(e.url == null ? "" : e.url).trim();
+  if (!key || !url) return Array.isArray(list) ? list.slice(0, PE_MAX_RECENT) : [];
+  const at = typeof now === "number" && isFinite(now) ? now : 0;
+  const kept = (Array.isArray(list) ? list : []).filter(
+    (r) => r && typeof r === "object" && String(r.key).toLowerCase() !== key.toLowerCase()
+  );
+  return [{ key, url, name: String(e.name == null ? "" : e.name), at }].concat(kept).slice(0, PE_MAX_RECENT);
+}
+
+// The recents worth offering for what has been typed so far. An empty box offers all of
+// them; anything else filters by prefix on the key, which is how you would narrow it by hand
+// — the key is what you half-remember. Order is preserved, so it stays newest-first.
+function peRecentMatches(list, text) {
+  const q = String(text == null ? "" : text).trim().toLowerCase();
+  return (Array.isArray(list) ? list : [])
+    .filter((r) => r && typeof r === "object" && r.key && r.url)
+    .filter((r) => !q || String(r.key).toLowerCase().indexOf(q) === 0);
+}
+
+// Does this look like an API endpoint rather than a page a person should land on?
+//
+// Opening one is not an error the code can detect — it is a URL, it loads, it returns 200 —
+// so the only place it can be caught is where it is typed. This happened: a Plane search URL
+// was filled in as `/api/workspaces/{ws}/search/?search={{q}}&workspace_search=true`, which
+// is the request the app makes, and opening it shows raw JSON. The page a person wants is
+// `/{ws}/search/?q={{q}}` (verified on app.plane.so, 2026-08-08: the search box comes up
+// pre-filled from that query).
+//
+// A hint, never a refusal: an /api/ path can be exactly what someone means to open, and this
+// function has no way to know. It says what it noticed and leaves the decision alone.
+function peLooksLikeApiUrl(url) {
+  const u = String(url == null ? "" : url).trim();
+  if (!u) return false;
+  return /^https?:\/\/[^/]+(\/[^?#]*)?\/api(\/|$)/i.test(u) || /[?&]format=json\b/i.test(u);
+}
+
 // Only ever navigate to an http(s) address from a quick link. A stored url is the user's
 // own, but this keeps a javascript:/data: value (from a hand-edited import) from being
 // opened as if it were a link.
 function peIsHttpUrl(u) {
-  return /^https?:\/\//i.test(String(u == null ? "" : u).trim());
+  const s = String(u == null ? "" : u).trim();
+  // A ⟨blank⟩ left in an example is not an address. `new URL` disagrees — it punycodes
+  // "⟨host⟩" into the perfectly valid hostname "xn--host-fg5bk" — so nothing downstream
+  // would have caught it, and the chooser now seeds rows that carry blanks by design.
+  // This is the gate every navigation passes, which is why the test belongs here.
+  if (/[⟨⟩]/.test(s)) return false;
+  return /^https?:\/\//i.test(s);
 }
 
 function peTemplateHasContent(t) {
