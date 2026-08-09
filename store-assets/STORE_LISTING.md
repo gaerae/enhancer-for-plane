@@ -40,7 +40,13 @@ Enhancer for Plane — Quick Open & Issue Templates
 Open any work item by key from the address bar — plus issue templates, copy reference and focus mode for Plane (makeplane).
 
 ## Category
-Developer Tools  (alternative: Workflow & Planning)
+Workflow & Planning
+
+> Not Developer Tools, which is where it started. That category is devtools panels —
+> React DevTools, JSON viewers, API clients — and a reader browsing it is not looking for
+> an issue-tracker add-on. What this does is project management: templates for tickets,
+> reaching a work item, reading a list. The audience happens to be developers; the job is
+> planning, and the category names the job.
 
 ## Language
 English
@@ -227,7 +233,7 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 주소창에서 키로 작업 항목 바로 열기. 여기에 Plane(makeplane)용 이슈 템플릿, 참조 복사, 집중 모드까지.
 
 ### 카테고리
-개발자 도구 (또는 워크플로 및 계획)
+워크플로 및 계획
 
 ### 상세 설명 (max 16,000)
 

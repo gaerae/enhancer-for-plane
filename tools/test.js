@@ -2614,17 +2614,25 @@ test("shortcuts: a key named in rendered copy is marked up as one", () => {
   eq(bad, [], "a key outside <kbd> in copy that renders as HTML: " + bad.join(", "));
 });
 
-test("store copy: a quoted UI label is one the matching locale actually shows", () => {
+test("copy: a quoted UI label is one the matching locale actually shows", () => {
   // The Korean listing told people to click "Pick element" and "Enable on this site" — the
   // English labels. A Korean reader sees "요소 선택 → 규칙 추가" and "이 사이트에서 사용", so the
   // instructions named buttons that are not on their screen. It reads as correct in review
   // because both halves are correct on their own; only holding the copy against the
   // catalogue catches it. Anything in double quotes that looks like a UI label has to be a
   // substring of some message in that locale.
+  //
+  // README.ko.md is here because it had the identical bug and this check did not reach it:
+  // it quoted "Pick element → add rule" in Korean prose, and pointed at "＋ 바로 열기 추가"
+  // for a button the catalogue calls "＋ 링크 추가" — a label that was renamed on one side
+  // only. A rule worth having for one file of translated copy is worth having for all of them.
   const doc = read("store-assets/STORE_LISTING.md");
   const koStart = doc.indexOf("## 한국어 (Korean listing)");
   ok(koStart > 0, "the Korean listing section is findable");
-  const sections = { en: doc.slice(0, koStart), ko: doc.slice(koStart) };
+  const sections = {
+    en: doc.slice(0, koStart) + "\n" + read("README.md"),
+    ko: doc.slice(koStart) + "\n" + read("README.ko.md")
+  };
   // Plane's own UI, quoted as it appears in Plane rather than in this extension.
   const FOREIGN = new Set(["Template", "Attach", "Create work item", "신규 작업항목 생성"]);
   for (const [loc, text] of Object.entries(sections)) {
@@ -2641,6 +2649,38 @@ test("store copy: a quoted UI label is one the matching locale actually shows", 
       }
     }
   }
+
+  // The half above only reads lines that tell the reader to click something, and that turned
+  // out to be most of the leftovers but not all of them: "팝업의 **Enable on this site** 또는"
+  // is a statement, not an instruction, and five English labels sat in the Korean README
+  // behind that gap. This half comes at it from the catalogue instead — a span that is
+  // *exactly* an English message we translated is a label someone forgot to carry across,
+  // whatever the sentence around it is doing. Multi-word only: a one-word span collides with
+  // ordinary prose (the file-format table's "group" field is also a message), and the check
+  // has to stay quiet enough to be believed.
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  const koCat = JSON.parse(read("_locales/ko/messages.json"));
+  const plain = (m) => String(m || "").replace(/<[^>]+>/g, "").trim();
+  const koText = Object.values(koCat).map((e) => plain(e.message));
+  const untranslated = new Map();
+  for (const key of Object.keys(en)) {
+    const label = plain(en[key].message);
+    // Skip anything Korean readers also see in English (an identical translation), and
+    // anything short or single-word.
+    if (label.length < 6 || !label.includes(" ")) continue;
+    if (koText.includes(label)) continue;
+    untranslated.set(label, key);
+  }
+  const strays = [];
+  read("README.ko.md")
+    .split("\n")
+    .forEach((line, i) => {
+      for (const m of line.matchAll(/\*\*([^*\n]{6,45})\*\*|"([^"\n]{6,45})"/g)) {
+        const span = (m[1] || m[2]).trim();
+        if (untranslated.has(span)) strays.push(`README.ko.md:${i + 1} "${span}" (${untranslated.get(span)})`);
+      }
+    });
+  eq(strays, [], "an English button label left in the Korean README: " + strays.join(", "));
 });
 
 test("example feeds: every template body is markdown the inserter can actually render", () => {
