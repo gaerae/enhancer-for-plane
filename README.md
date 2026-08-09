@@ -133,7 +133,7 @@ no active domain, no host access, and no quick-open links.
      instead of silently eating text. This pairs with sync — a shared template can
      say `{{var.team}}` and resolve differently for each person who inserts it,
      with no per-user data ever leaving the browser.
-![A native Template button fills a work item's title and body in one click](store-assets/screenshot-2-templates.png)
+![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 
 3. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
    button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
@@ -163,7 +163,7 @@ no active domain, no host access, and no quick-open links.
      thing here that would break silently against a future Plane, and it is commented as
      such in the source.
 
-![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-3-copy.png)
+![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
 4. **📐 Style rules — a generic engine**
    - Freely add / edit / delete `selector + property + value` rules. Each rule is

@@ -370,28 +370,22 @@ Chrome frames it, and the in-page buttons on a workspace whose contents are safe
 
 • Store icon 128×128 ............ icons/icon128.png ✓
 • Screenshot 1 (1280×800) ....... store-assets/screenshot-1-open.png ✓
-• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-templates.png ✓
-• Screenshot 3 (1280×800) ....... store-assets/screenshot-3-copy.png ✓
-• Screenshot 4 (1280×800) ....... store-assets/screenshot-4-width.png ✓
-• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-focus.png ✓
-    Focus mode took this slot from the element picker. The picker is a tool for making
-    a rule — it needs a paragraph before it means anything, and it sits behind the one
-    feature most people scroll past. Focus mode explains itself in two frames, and was
-    the only headline feature the set never showed. The picker is named in capture 4's
-    caption instead, beside the rule it exists to write.
-• The same five, Korean listing .. store-assets/screenshot-*.ko.png ✓
-  (Upload in file order — the number in the filename IS the carousel position, so
-  moving a capture means renumbering the file. Quick open opens the carousel: it is
-  the one feature that needs no setup, works on any Plane plan, and works next to
-  Jira and Linear too — so it is the thing that lands with a visitor who already
-  pays for Plane and has its templates built in. Templates follows, then the two
-  everyday actions, then the two that shape the page. The name, the description and
-  the carousel run in the same order — keep all three in step when one moves.)
-• Small promo tile 440×280 ...... store-assets/promo-small-440x280.png ✓
-  (Korean: promo-small-440x280.ko.png)
-• Marquee 1400×560 .............. store-assets/promo-marquee-1400x560.png ✓
-  (Optional for a listing, but the Featured badge is a review of listing quality among
-  other things, so it is worth having. Korean: promo-marquee-1400x560.ko.png)
+• Screenshot 2 (1280×800) ....... store-assets/screenshot-2-focus.png ✓
+• Screenshot 3 (1280×800) ....... store-assets/screenshot-3-width.png ✓
+• Screenshot 4 (1280×800) ....... store-assets/screenshot-4-copy.png ✓
+• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-templates.png ✓
+    Upload order is the order above, and the file numbers match it so the two cannot drift.
+    It is hook order, not workflow order: the store shows two or three before anyone decides,
+    so the captures that need no reading go first. Focus mode and the width rule are two
+    frames each — panels and no panels, cut names and whole ones — and neither needs a
+    sentence. Quick open leads because it is the one thing no other Plane extension does.
+    Templates last is deliberate, not a demotion: it is in the extension's NAME and its
+    summary, so it is the one feature whose discovery does not depend on a screenshot,
+    while "names are cut off in the list" is a pain nobody goes looking for and only a
+    picture can raise.
+    Focus mode took a slot from the element picker. The picker is a tool for making a rule —
+    it needs a paragraph before it means anything, and it sat where fewest people scroll. It
+    is named in capture 3's caption now, beside the rule it exists to write.
 
 The Korean listing gets its own set: `screenshot-N-*.ko.png`. The store keeps screenshots
 per language, so a Korean visitor sees Korean captures — which is the point of shipping
