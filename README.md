@@ -56,26 +56,29 @@ What each one does and how to reach it. Implementation notes are under
 
 ### ⚡ Quick open
 
-Type `issue` in the address bar, a space, then a key like `PROJ-123` — Enter opens it.
-The same input is in the toolbar popup.
+Three ways in: the address bar, the toolbar popup, and a right-click on a key you find in
+someone else's text.
 
-- **Any tracker, because it is only a URL.** Each target is a base link you configure with
-  `{{key}}` where the key belongs; Plane's is `/{workspace}/browse/{{key}}`. It needs no
-  host permission and no content script, so it works on any tab.
-- **Adding one is a paste.** Copy the address of a work item you have open and paste it
+- **Address bar.** Type `issue`, a space, then a key like `PROJ-123` — Enter opens it. The
+  same input is in the toolbar popup.
+- **Right-click.** A key almost never arrives as a key; it arrives inside a sentence, in a
+  Slack message or a PR title. Select it anywhere, right-click, and choose **Open work item
+  from selection**. Chrome hands over the selected text; the page is never read. This is the
+  one entry point that needs nothing typed.
+- **Adding a link is a paste.** Copy the address of a work item you have open and paste it
   into Settings ▸ **Work items** — a known tracker is recognised and both URLs are filled,
   search included. Nothing open? Start from an example row: Plane, Jira, Linear, GitHub,
   GitLab.
-- **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane. A
-  target with an empty prefix is the default.
+- **Any tracker, because it is only a URL.** Each target is a base link with `{{key}}` where
+  the key belongs; Plane's is `/{workspace}/browse/{{key}}`. It needs no host permission and
+  no content script, so it works on any tab. The key's prefix routes between targets — point
+  `ENG-` at Linear and leave the rest on Plane.
 - **The keys you opened last come back**, in the address bar and the popup. Twelve entries,
   per device, never synced.
 - **Words search instead of opening.** `issue login bug` goes to the tracker's search, if
   that target has a search URL with `{{q}}`. How far it gets you varies: Jira and GitHub
   land on results, while Plane opens its search page with your words already in the box and
   one keystroke still to go.
-- **A key in someone else's text.** Select it anywhere, right-click, and choose **Open work
-  item from selection**. Chrome hands over the selected text; the page is never read.
 
 ### 📝 Body templates (title + body)
 

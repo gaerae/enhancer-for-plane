@@ -50,14 +50,12 @@ English
 ## Detailed description  (max 16,000)
 
 Every issue tracker leaves the same gaps.
-No reusable templates for the tickets you file over and over, and no way to open an item from its key.
-Nothing hands one to a chat message without retyping it, and nothing puts the side panels away so you can read.
+No reusable templates for the tickets you file over and over, no way to open an item from its key, no way to hand one to a chat message without retyping it, and no way to put the side panels away and read.
 This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
-Works on Plane Cloud and on self-hosted Plane alike.
-The built-in rules carry both generations of Plane's markup, and each release is checked against a live instance of each — the two do not write the same page.
+Plane Cloud and self-hosted alike — each release is checked against a live instance of each.
 
 ✨ WHAT YOU GET — at a glance
-⚡ Quick open — reach a work item from its key, in the address bar
+⚡ Quick open — a work item from its key: address bar, popup, or right-click
 📝 Issue templates — fill a title and body in one click
 📋 Copy reference — hand an item to chat, a PR or a branch name
 📐 Width & style rules — read every name in full
@@ -67,78 +65,55 @@ The built-in rules carry both generations of Plane's markup, and each release is
 Every one of them is off, empty or inert until you ask for it.
 
 ⚡ Go straight to a work item — quick open
-Type "issue" in the address bar — Chrome's omnibox — then a space and a key like PROJ-142, and Enter opens it.
-The same box is on the toolbar popup, so a ticket is one keystroke away wherever you are.
-Setting one up is one paste: copy the address of any work item you have open, and the link falls out of it — search address included, nothing left to fill in.
-Plane, Jira, Linear, GitHub and GitLab are recognised by name; any other tracker is read from wherever the key sits in its address.
-Keep several and the key's prefix picks between them: point ENG- at Linear and leave everything else on Plane.
-The keys you opened last come back in the address bar, so you do not have to remember one.
-Type words instead of a key and it searches instead — "issue login bug" goes to the tracker's search.
+Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it — same box on the toolbar popup, and both offer the keys you opened last.
 A key almost never arrives on its own; it arrives inside a sentence, in a Slack message or a pull request title.
-Select it anywhere, right-click, and choose "Open work item from selection" — no key to retype, and nothing to set up beyond the link you already have.
+Select it anywhere, right-click, and choose "Open work item from selection" — nothing to type, nothing to set up.
+Setting the link up is one paste: copy the address of any work item you have open and it falls out of it, search address included.
+Plane, Jira, Linear, GitHub and GitLab are recognised by name, several can coexist (point ENG- at Linear, leave the rest on Plane), and words instead of a key run a search.
 It only opens a URL, so it asks for no site access at all and works on any tab.
 
 📝 Fill a work item in one click — issue templates (title + body)
 Register a template once, drop it into any work item with one click — title and description together.
-A native "Template" button sits in the description toolbar and in the "Create work item" dialog, so new items start fast.
-Bodies are Markdown: headings, lists, checkboxes.
-Variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}} — plus up to 5 of your own like {{var.team}}.
-Keyboard shortcut: Alt/⌥+T.
-Keep a bug report, a task and a spike ready to drop in.
-Plane's own work item templates are a Pro feature — these run on any instance, including a free self-hosted one, and they need no change to your server.
+A native "Template" button sits in the description toolbar and in the "Create work item" dialog (Alt/⌥+T).
+Bodies are Markdown, and variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}}, plus up to 5 of your own like {{var.team}}.
+Plane's own work item templates are a Pro feature; these run on any instance, including a free self-hosted one.
 
 📋 Hand off a work item in one click — copy reference
-Send a work item to a chat message, a pull request, or a branch name without retyping it.
-The button beside its ID (or Alt/⌥+C) copies it in the format you pick — plain text, a Markdown link, a branch name.
-Every format is a row you can edit into your own.
-The preview in Settings is exactly what lands on the clipboard.
-Works from the item's own page and from the preview panel a list opens, so you never leave the list.
-Also from the toolbar popup whenever the tab you are on is a work item — that path reads the tab, not the page, so it works on any tracker you have a link for.
+The button beside a work item's ID (or Alt/⌥+C) copies it to your clipboard as plain text, a Markdown link, or a branch name.
+Every format is a row you can edit into your own, previewed in Settings.
+It works on the item's own page, in the preview panel a list opens, and from the toolbar popup on any tracker you have a link for.
 
 📐 Read every name in full — width & style rules
-Plane cuts long names off in lists and dropdowns until you can't tell items apart.
-One "selector → property → value" rule forces any width (320px, 30rem) and names show completely.
-It's a generic CSS engine: target any element, and if Plane's class names change between versions, you just edit the selector.
-And Settings tells you when a rule has stopped matching anything, so a Plane redesign shows up as one line to fix instead of a feature that quietly went away.
+Plane cuts long names off in lists and dropdowns until you can't tell items apart; one "selector → property → value" rule forces any width and the names come back.
+It's a generic CSS engine, so if Plane's class names change between versions you just edit the selector.
+Settings tells you when a rule has stopped matching anything, so a redesign is one line to fix instead of a feature that quietly went away.
 
 🧘 Just the description — focus mode
-Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation so the work item's body is what is left.
-There is a toggle beside the work item's key too, and a switch in the toolbar popup.
-Plane pins properties to the right of a work item's own page with no way to collapse them; this collapses them.
+Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation so the work item's body is what is left — there is a toggle beside the item's key too, and a switch in the popup.
+Plane pins those properties to the right with no way to collapse them; this collapses them.
 Any rule can be marked "Only while focus mode is on", so what disappears is up to you.
-Two are ready to use, and one that centres the body at a reading width is one checkbox away.
 It applies to that tab, survives a reload there, and is never synced to your other devices.
 
 🎯 Build rules without DevTools — visual element picker
 Click "Pick element" in the popup, then click anything on the Plane page.
-You get candidate selectors ordered by what will still work next month.
-A handle a person wrote comes first, and anything the build generated is marked "may change" in words, not just in colour.
-Each row says how many elements it matches, and the rule lands in Settings ready for a value.
+Candidate selectors come back ordered by what will still work next month, each with a match count, and anything the build generated is marked "may change" in words rather than colour.
 
 🔄 One set of templates for the whole team — template sync
 Point everyone at one JSON file — your intranet, a Git host, any URL — and the whole team pulls the same templates.
-It refreshes on the schedule you choose or on demand.
-Off by default, and it fetches only the URL you add.
-Inserting reads from a local cache, so it works offline, and synced templates stay read-only so no one's edits get overwritten.
+Off by default; it fetches only the URL you add, on the schedule you choose or on demand.
+Inserting reads a local cache, so it works offline, and synced templates stay read-only so no one's edits get overwritten.
 New to it? "Try our example" fills in a live feed so you can watch it work.
 
 🏠 Your instance, wherever it runs
-Add the domain you use — plane.your-company.com, or app.plane.so.
+Add the domain you use — plane.your-company.com, or app.plane.so. Wildcards (*.example.com) supported.
 Self-hosted is where this started, and Plane Cloud is checked against a live instance every release, because the two do not draw the same page.
-It ships with no site access — enabling a domain asks Chrome for that one site — runs only where you allow it, and stays completely inert everywhere else.
-Wildcards (*.example.com) supported.
-
-💾 Yours to keep — import / export
-Back up your domains, rules, templates, variables, copy formats, and sync sources to a JSON file, and restore them on another machine.
-
-🌗 Dark mode and light
-The popup and Settings follow your system theme — dark mode included — and match Plane's monochrome look.
+It ships with no site access: enabling a domain asks Chrome for that one site, and it stays completely inert everywhere else.
+Your settings back up to a JSON file and restore on another machine.
 
 🔒 PRIVACY — nothing leaves your browser
 No accounts, no tracking, no analytics, no server.
-Your settings live in Chrome's own storage (synced to your Google account only if you use Chrome Sync).
+Your settings live in Chrome's own storage, synced to your Google account only if you use Chrome Sync.
 The one request this extension can make is downloading the team-template file from a URL you added yourself — and it carries none of your data.
-See the privacy policy for details.
 
 🚀 GET STARTED
 1. Open your Plane instance — self-hosted or Plane Cloud.
@@ -247,16 +222,12 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 ### 상세 설명 (max 16,000)
 
 어느 이슈 트래커든 비어 있는 곳은 같습니다.
-반복해 등록하는 티켓에 쓸 템플릿이 없고, 키로 항목을 바로 열 방법이 없습니다.
-남에게 넘기려면 매번 다시 타이핑해야 하고, 측면 패널을 치워 본문만 볼 방법도 없습니다.
-그 빈 곳을 Plane UI 안에서 채웁니다.
-어느 플랜에서든 되고, Plane 서버는 전혀 건드리지 않습니다.
-Plane Cloud와 자체 호스팅 Plane 모두에서 동작합니다.
-기본 규칙이 두 세대의 마크업을 함께 담고 있고, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다.
-둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
+반복해 등록하는 티켓에 쓸 템플릿이 없고, 키로 항목을 바로 열 방법이 없고, 남에게 넘기려면 매번 다시 타이핑해야 하고, 측면 패널을 치워 본문만 볼 방법도 없습니다.
+그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든 되고, Plane 서버는 전혀 건드리지 않습니다.
+Plane Cloud와 자체 호스팅 모두에서 동작하며, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다.
 
 ✨ 무엇을 제공하나 — 한눈에
-⚡ 바로 열기 — 주소창에서 키로 작업 항목에 닿기
+⚡ 바로 열기 — 키로 작업 항목에 닿기: 주소창, 팝업, 우클릭
 📝 이슈 템플릿 — 제목과 본문을 한 번에 채우기
 📋 참조 복사 — 메신저, PR, 브랜치명으로 항목 넘기기
 📐 폭·스타일 규칙 — 잘린 이름을 온전히 보기
@@ -266,92 +237,55 @@ Plane Cloud와 자체 호스팅 Plane 모두에서 동작합니다.
 전부 요청하기 전까지는 꺼져 있거나, 비어 있거나, 아무 일도 하지 않습니다.
 
 ⚡ 키만 입력해 작업 항목 열기 — 바로 열기
-주소창(Chrome 옴니박스)에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 입력하면 Enter로 열립니다.
-같은 입력칸이 툴바 팝업에도 있어, 어디에 있든 티켓 하나가 키 입력 한 번 거리입니다.
-설정은 붙여넣기 한 번입니다.
-열어 둔 작업 항목의 주소를 복사해 붙여넣으면 링크가 그대로 나옵니다 — 검색 주소까지, 채워 넣을 빈칸 없이.
-Plane, Jira, Linear, GitHub, GitLab은 이름으로 알아봅니다.
-그 밖의 트래커는 주소에서 키가 놓인 자리를 보고 읽어 냅니다.
-여러 개를 두면 키의 접두사가 골라 줍니다.
-ENG-는 Linear로 보내고 나머지는 Plane에 두는 식입니다.
-최근에 연 항목이 주소창에 다시 나와, 키를 외우고 있지 않아도 됩니다.
-키 대신 낱말을 입력하면 검색으로 갑니다 — "issue login bug"는 트래커의 검색으로 이어집니다.
-키는 키의 모습으로 오지 않습니다.
-Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
-그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요.
-키를 다시 입력할 일도, 링크 말고 따로 준비할 것도 없습니다.
+주소창에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 넣으면 Enter로 열립니다. 같은 입력칸이 툴바 팝업에도 있고, 두 곳 모두 최근에 연 항목을 보여 줍니다.
+키는 키의 모습으로 오지 않습니다. Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
+그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요 — 입력할 것도, 따로 준비할 것도 없습니다.
+링크 설정은 붙여넣기 한 번입니다. 열어 둔 작업 항목의 주소를 복사해 붙여넣으면 검색 주소까지 그대로 나옵니다.
+Plane, Jira, Linear, GitHub, GitLab은 이름으로 알아보고, 여러 개를 함께 둘 수 있으며(ENG-는 Linear로, 나머지는 Plane으로), 키 대신 낱말을 넣으면 검색으로 갑니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
 
 📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
-템플릿을 한 번 등록해 두면 어떤 작업 항목에도 한 번의 클릭으로 넣습니다 — 제목과 본문을 함께.
-설명 툴바의 네이티브 "Template" 버튼과 "신규 작업항목 생성" 창에서 동작해 새 항목을 빠르게 시작합니다.
-본문은 마크다운입니다: 제목, 목록, 체크박스.
-삽입 시 변수가 알아서 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}}.
-{{var.team}}처럼 직접 만든 변수도 5개까지 쓸 수 있습니다.
-단축키는 Alt/⌥+T.
-버그 리포트, 태스크, 스파이크를 미리 준비해 두고 바로 꺼내 쓰세요.
-Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
-이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작하고, 서버를 손댈 필요가 없습니다.
+템플릿을 한 번 등록해 두면 어떤 작업 항목에도 클릭 한 번으로 넣습니다 — 제목과 본문을 함께.
+설명 툴바와 "신규 작업항목 생성" 창에 네이티브 "Template" 버튼이 붙습니다(Alt/⌥+T).
+본문은 마크다운이고, 삽입할 때 변수가 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}}, 그리고 {{var.team}}처럼 직접 만든 변수 5개까지.
+Plane 자체의 작업 항목 템플릿은 Pro 기능입니다. 이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작합니다.
 
 📋 작업 항목을 한 번에 넘기기 — 참조 복사
-작업 항목을 메신저, 풀 리퀘스트, 브랜치명으로 다시 타이핑 없이 넘기세요.
-번호 옆 버튼(또는 Alt/⌥+C)이 원하는 형식으로 복사합니다 — 일반 텍스트, 마크다운 링크, 브랜치명.
-모든 형식은 직접 고쳐 쓸 수 있는 줄입니다.
-설정의 미리보기가 곧 클립보드에 담길 내용입니다.
-항목 자신의 화면에서도, 목록에서 열리는 미리보기 패널에서도 동작하므로 목록을 벗어날 필요가 없습니다.
-지금 탭이 작업 항목이면 툴바 팝업에서도 됩니다.
-이 경로는 페이지가 아니라 탭을 읽기 때문에, 링크를 등록해 둔 트래커라면 어디서든 동작합니다.
+작업 항목 번호 옆 버튼(또는 Alt/⌥+C)이 일반 텍스트, 마크다운 링크, 브랜치명 중 원하는 형식으로 클립보드에 담습니다.
+모든 형식은 직접 고쳐 쓸 수 있는 줄이고, 설정의 미리보기가 곧 클립보드에 담길 내용입니다.
+항목 자신의 화면에서도, 목록에서 열리는 미리보기 패널에서도, 링크를 등록해 둔 트래커라면 툴바 팝업에서도 됩니다.
 
 📐 이름을 온전히 보기 — 스타일 규칙
-Plane은 목록과 드롭다운에서 긴 이름을 잘라, 어느 항목인지 구분하기 어렵게 만듭니다.
-"선택자 → 속성 → 값" 규칙 하나로 원하는 폭(320px, 30rem)을 지정하면 이름이 온전히 보입니다.
-범용 CSS 엔진이라 어떤 요소든 대상이 되고, 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
-규칙이 아무것도 찾지 못하게 되면 설정이 알려 줍니다.
-Plane이 개편돼도 기능이 조용히 사라지지 않고, 고칠 줄 하나로 드러납니다.
+Plane은 목록과 드롭다운에서 긴 이름을 잘라 어느 항목인지 구분하기 어렵게 만듭니다. "선택자 → 속성 → 값" 규칙 하나로 원하는 폭을 지정하면 이름이 돌아옵니다.
+범용 CSS 엔진이라 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
+규칙이 아무것도 찾지 못하게 되면 설정이 알려 줍니다. 개편이 있어도 기능이 조용히 사라지지 않고 고칠 줄 하나로 드러납니다.
 
 🧘 본문만 남기기 — 집중 모드
-Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 작업 항목의 본문만 남습니다.
-작업 항목 번호 옆의 토글 버튼과 툴바 팝업의 스위치로도 됩니다.
-Plane은 작업 항목 전용 페이지에서 속성을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
+Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 본문만 남습니다. 작업 항목 번호 옆 토글과 팝업 스위치로도 됩니다.
+Plane은 그 속성 패널을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
 어떤 규칙이든 "집중 모드에서만 적용"으로 표시할 수 있어 무엇을 숨길지는 직접 정합니다.
-두 개는 바로 쓸 수 있게 들어 있고, 본문을 읽기 좋은 폭으로 가운데 두는 규칙도 체크 한 번 거리입니다.
 켠 탭에서만 적용되고 그 탭에서는 새로 고쳐도 유지되며, 다른 기기로는 동기화되지 않습니다.
 
 🎯 DevTools 없이 규칙 만들기 — 비주얼 요소 피커
 팝업에서 "요소 선택 → 규칙 추가"를 누르고 Plane 화면의 요소를 클릭하세요.
-후보 선택자는 "다음 달에도 살아 있을까" 순서로 뜹니다.
-사람이 붙인 이름이 먼저 오고, 빌드가 만든 것은 "곧 바뀜"이라고 색이 아니라 말로 적힙니다.
-줄마다 몇 개와 매칭되는지 함께 보여 주고, 규칙은 값만 넣으면 되는 상태로 설정에 담깁니다.
+후보 선택자가 "다음 달에도 살아 있을까" 순서로, 매칭 개수와 함께 나옵니다. 빌드가 만든 것은 색이 아니라 "곧 바뀜"이라는 말로 적힙니다.
 
 🔄 팀 전체가 한 벌의 템플릿을 — 팀 템플릿 동기화
 JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키면 팀 전체가 같은 템플릿을 씁니다.
-선택한 주기로, 또는 즉시 갱신됩니다.
-기본은 꺼져 있고, 직접 등록한 URL에서만 받아 옵니다.
-삽입은 로컬 캐시에서 읽으므로 오프라인에서도 됩니다.
-동기화된 템플릿은 읽기 전용이라 누구의 편집도 덮이지 않습니다.
+기본은 꺼져 있고, 직접 등록한 URL만 선택한 주기로 또는 즉시 받아 옵니다.
+삽입은 로컬 캐시에서 읽으므로 오프라인에서도 되고, 동기화된 템플릿은 읽기 전용이라 누구의 편집도 덮이지 않습니다.
 처음이라면 "예시 사용해 보기"가 살아 있는 피드를 채워 넣어 바로 확인할 수 있습니다.
 
 🏠 쓰는 곳이 어디든
-쓰는 도메인을 추가하세요 — plane.your-company.com도, app.plane.so도 됩니다.
-자체 호스팅에서 출발했고, Plane Cloud도 릴리스마다 실제 인스턴스에서 확인합니다.
-둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
-설치 시점에는 사이트 접근 권한이 하나도 없습니다.
-도메인을 켜면 Chrome이 그 사이트 하나를 묻고, 허용한 곳에서만 동작합니다.
-그 외의 사이트에서는 완전히 비활성입니다.
-와일드카드(*.example.com)도 지원합니다.
-
-💾 내 것으로 보관 — 가져오기 / 내보내기
-도메인, 규칙, 템플릿, 변수, 복사 형식, 동기화 소스를 JSON 파일로 백업하고 다른 기기에서 복원합니다.
-
-🌗 다크 모드와 라이트
-팝업과 설정이 시스템 테마를 따르며 Plane의 모노크롬 톤과 어울립니다.
+쓰는 도메인을 추가하세요 — plane.your-company.com도, app.plane.so도 됩니다. 와일드카드(*.example.com)도 지원합니다.
+자체 호스팅에서 출발했고, Plane Cloud도 릴리스마다 실제 인스턴스에서 확인합니다. 둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
+설치 시점에는 사이트 접근 권한이 하나도 없습니다. 도메인을 켜면 Chrome이 그 사이트 하나를 묻고, 그 외의 사이트에서는 완전히 비활성입니다.
+설정은 JSON 파일로 백업해 다른 기기에서 되돌릴 수 있습니다.
 
 🔒 개인정보 — 브라우저 밖으로 나가지 않습니다
 계정도, 추적도, 분석도, 서버도 없습니다.
-설정은 브라우저 자체 저장소(chrome.storage)에 보관되고, Chrome 동기화를 쓰는 경우에만 본인 Google 계정으로 동기화됩니다.
-익스텐션이 보내는 요청은 하나뿐입니다 — 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것.
-그 요청에도 사용자의 데이터는 담기지 않습니다.
-자세한 내용은 개인정보 처리방침을 참고하세요.
+설정은 브라우저 자체 저장소에 보관되고, Chrome 동기화를 쓰는 경우에만 본인 Google 계정으로 동기화됩니다.
+익스텐션이 보내는 요청은 하나뿐입니다 — 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것. 그 요청에도 사용자의 데이터는 담기지 않습니다.
 
 🚀 시작하기
 1. 쓰는 Plane을 엽니다 — 자체 호스팅이든 Plane Cloud든.
