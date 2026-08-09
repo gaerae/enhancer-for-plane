@@ -2661,22 +2661,28 @@ test("copy: a quoted UI label is one the matching locale actually shows", () => 
   const en = JSON.parse(read("_locales/en/messages.json"));
   const koCat = JSON.parse(read("_locales/ko/messages.json"));
   const plain = (m) => String(m || "").replace(/<[^>]+>/g, "").trim();
-  const koText = Object.values(koCat).map((e) => plain(e.message));
+  // Prose names a button without its icon — "press Sync now", not "press ↻ Sync now" — so
+  // both spellings count as the label. Without this the check missed "Sync now" sitting in
+  // the Korean README while the catalogue read "↻ 지금 동기화".
+  const bare = (m) => plain(m).replace(/^[^A-Za-z0-9가-힣]+/, "").trim();
+  const koText = new Set(Object.values(koCat).flatMap((e) => [plain(e.message), bare(e.message)]));
   const untranslated = new Map();
   for (const key of Object.keys(en)) {
-    const label = plain(en[key].message);
-    // Skip anything Korean readers also see in English (an identical translation), and
-    // anything short or single-word.
-    if (label.length < 6 || !label.includes(" ")) continue;
-    if (koText.includes(label)) continue;
-    untranslated.set(label, key);
+    for (const label of [plain(en[key].message), bare(en[key].message)]) {
+      // Skip anything Korean readers also see in English (an identical translation), and
+      // anything short or single-word.
+      if (label.length < 6 || !label.includes(" ")) continue;
+      if (koText.has(label)) continue;
+      untranslated.set(label, key);
+    }
   }
   const strays = [];
   read("README.ko.md")
     .split("\n")
     .forEach((line, i) => {
-      for (const m of line.matchAll(/\*\*([^*\n]{6,45})\*\*|"([^"\n]{6,45})"/g)) {
-        const span = (m[1] || m[2]).trim();
+      // Backticks too: the picker's "(untitled)" placeholder was written as code, not quoted.
+      for (const m of line.matchAll(/\*\*([^*\n]{6,45})\*\*|"([^"\n]{6,45})"|`([^`\n]{6,45})`/g)) {
+        const span = (m[1] || m[2] || m[3]).trim();
         if (untranslated.has(span)) strays.push(`README.ko.md:${i + 1} "${span}" (${untranslated.get(span)})`);
       }
     });
