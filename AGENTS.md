@@ -379,6 +379,11 @@ lies:
 
 ## Conventions
 
+- **Copy goes straight to `main`; behaviour goes through a PR.** `check.yml` runs on pushes
+  to `main` too and nobody else reviews this repo, so a PR for a wording change is ceremony.
+  Open one when behaviour, the schema, permissions or `manifest.json` change — a manifest
+  change makes the merge a store release, and that deserves a last look.
+
 - **Zero dependencies.** No `package.json`, no build step. Plain scripts loaded by the
   browser; `tools/` runs on stock node. Adding the first dependency is a project
   decision, not a drive-by.
