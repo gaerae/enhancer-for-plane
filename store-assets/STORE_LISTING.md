@@ -373,7 +373,12 @@ Chrome frames it, and the in-page buttons on a workspace whose contents are safe
 • Screenshot 2 (1280×800) ....... store-assets/screenshot-2-templates.png ✓
 • Screenshot 3 (1280×800) ....... store-assets/screenshot-3-copy.png ✓
 • Screenshot 4 (1280×800) ....... store-assets/screenshot-4-width.png ✓
-• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-picker.png ✓
+• Screenshot 5 (1280×800) ....... store-assets/screenshot-5-focus.png ✓
+    Focus mode took this slot from the element picker. The picker is a tool for making
+    a rule — it needs a paragraph before it means anything, and it sits behind the one
+    feature most people scroll past. Focus mode explains itself in two frames, and was
+    the only headline feature the set never showed. The picker is named in capture 4's
+    caption instead, beside the rule it exists to write.
 • The same five, Korean listing .. store-assets/screenshot-*.ko.png ✓
   (Upload in file order — the number in the filename IS the carousel position, so
   moving a capture means renumbering the file. Quick open opens the carousel: it is

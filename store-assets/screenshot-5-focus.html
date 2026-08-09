@@ -1,0 +1,182 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Store capture 5 — focus mode</title>
+<link rel="stylesheet" href="shot.css" />
+<style>
+  /* Focus mode replaced the element picker in this slot. The picker is how you MAKE a rule
+     — a tool, and one that needs a paragraph before it means anything. Focus mode is the
+     opposite: two frames side by side and the feature has explained itself, which is the
+     only kind of explaining a store screenshot gets to do. It was also the one headline
+     feature the set never showed at all. */
+  .left { top: 224px; }
+  .win { top: 196px; width: 624px; }
+  .page { padding: 0; }
+
+  /* Two miniature work item pages, before and after. Everything is scaled down: this is a
+     diagram of a layout, so what has to read is the SHAPE — a body squeezed between two
+     panels, then the same body with the panels gone. */
+  .pair { display: flex; }
+  .half { flex: 1 1 50%; min-width: 0; }
+  .half + .half { border-left: 1px solid #eceef1; }
+  .half h4 {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+    padding: 11px 14px 9px; color: #9aa1aa;
+  }
+  .half.before h4 .x { color: #b6bcc4; }
+  .half.after h4 { color: #3f4650; }
+  .half.after h4 .v { color: #16a34a; }
+
+  .mini { display: flex; gap: 6px; padding: 0 12px 16px; height: 232px; }
+  .nav, .props {
+    flex: 0 0 52px; border-radius: 6px; background: #f1f2f4;
+    display: flex; flex-direction: column; gap: 5px; padding: 7px 6px;
+  }
+  .nav i, .props i { display: block; height: 5px; border-radius: 3px; background: #dcdfe3; }
+  .nav i:nth-child(1) { width: 78%; }
+  .nav i:nth-child(2) { width: 58%; }
+  .nav i:nth-child(3) { width: 70%; }
+  .nav i:nth-child(4) { width: 46%; }
+  .props i:nth-child(odd) { width: 64%; }
+  .props i:nth-child(even) { width: 82%; }
+
+  .body { flex: 1 1 auto; min-width: 0; border-radius: 6px; padding: 9px 10px; }
+  .body .t { height: 9px; width: 62%; border-radius: 4px; background: #121212; }
+  .body p { margin-top: 9px; display: flex; flex-direction: column; gap: 6px; }
+  .body p i { display: block; height: 5px; border-radius: 3px; background: #dcdfe3; }
+  /* The line lengths are the argument. Squeezed, the body wraps every few words; with the
+     panels gone the same text runs long, which is what "just the description" buys. */
+  .half.before .body p i:nth-child(3n) { width: 54%; }
+  .half.before .body p i { width: 92%; }
+  .half.after .body p i { width: 97%; }
+  .half.after .body p i:nth-child(4n) { width: 68%; }
+  .half.after .body { background: #fbfcfd; box-shadow: 0 0 0 1px #f1f2f4; }
+  .half.after .body .t { width: 46%; }
+
+  /* The toggle beside the key, which is one of the three ways in and the one you can see. */
+  .keyrow { display: flex; align-items: center; gap: 7px; padding: 0 12px 8px; }
+  .keyrow .k { font-size: 10.5px; color: #9aa1aa; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .keyrow .tg {
+    width: 17px; height: 17px; border-radius: 5px; display: flex; align-items: center;
+    justify-content: center; color: #79818c;
+  }
+  .half.after .keyrow .tg { background: #121212; color: #fff; }
+
+  .panel.keys { left: 700px; top: 556px; width: 306px; }
+  .panel.keys .head {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #9aa1aa; padding: 11px 15px 0;
+  }
+  .waysrow { display: flex; flex-direction: column; gap: 8px; padding: 10px 15px 14px; }
+  .way { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #3f4650; }
+  .way .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    border: 1px solid #e3e5e9; border-radius: 5px; padding: 2px 6px; color: #121212;
+  }
+</style>
+
+<div class="left">
+  <div class="brand"></div>
+  <h1 data-t="head"></h1>
+  <p class="lede" data-t="lede"></p>
+  <div class="pill">Alt+Shift+F<span class="dot">·</span>⌥+⇧+F</div>
+</div>
+
+<div class="win">
+  <div class="bar">
+    <span class="url">plane.example.com <span class="sep">/</span> <span class="path">browse / PROJ-142</span></span>
+  </div>
+  <div class="page">
+    <div class="pair">
+      <div class="half before">
+        <h4><span class="x">✕</span> <span data-t="before"></span></h4>
+        <div class="keyrow">
+          <span class="k">PROJ-142</span>
+          <span class="tg">
+            <svg viewBox="0 0 16 16" width="11" height="11">
+              <rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
+          </span>
+        </div>
+        <div class="mini">
+          <div class="nav"><i></i><i></i><i></i><i></i></div>
+          <div class="body">
+            <div class="t"></div>
+            <p><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></p>
+          </div>
+          <div class="props"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+      <div class="half after">
+        <h4><span class="v">✓</span> <span data-t="after"></span></h4>
+        <div class="keyrow">
+          <span class="k">PROJ-142</span>
+          <span class="tg">
+            <svg viewBox="0 0 16 16" width="11" height="11">
+              <rect x="2.2" y="3.4" width="11.6" height="9.2" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M5.9 3.6v8.8M10.1 3.6v8.8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
+          </span>
+        </div>
+        <div class="mini">
+          <div class="body">
+            <div class="t"></div>
+            <p><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel keys">
+  <div class="head" data-t="waysHead"></div>
+  <div class="waysrow">
+    <div class="way"><span class="kbd">Alt+Shift+F</span><span data-t="way1"></span></div>
+    <div class="way"><span class="kbd">▥</span><span data-t="way2"></span></div>
+    <div class="way"><span class="kbd">◉</span><span data-t="way3"></span></div>
+  </div>
+</div>
+
+<div class="caption" data-t="caption"></div>
+
+<script>
+  // Three ways in, because a feature reachable one way exists for whoever already knows it
+  // exists — the same argument AGENTS.md makes about the popup. The shortcut is the one
+  // declared in manifest.commands; the toggle glyph is the one content.js injects.
+  window.T = {
+    en: {
+      head: "Put the panels away.<br />Read the ticket.",
+      lede:
+        "Plane pins the properties panel to the right of a work item with no way to collapse " +
+        "it. <b>Focus mode</b> hides it and the left navigation, and the description takes " +
+        "back the width.",
+      before: "Normally",
+      after: "Focus mode",
+      waysHead: "Three ways in",
+      way1: "anywhere it runs",
+      way2: "the toggle beside the key",
+      way3: "the switch in the popup",
+      caption:
+        "It applies to that tab, survives a reload there, and is <b>never synced</b> to your " +
+        "other devices — and any rule of yours can be marked focus-only"
+    },
+    ko: {
+      head: "패널을 치우고<br />본문만 읽으세요.",
+      lede:
+        "Plane은 작업 항목 오른쪽에 속성 패널을 접을 방법 없이 고정해 둡니다. " +
+        "<b>집중 모드</b>가 그것과 왼쪽 내비게이션을 숨기면 설명이 그 폭을 되찾습니다.",
+      before: "평소",
+      after: "집중 모드",
+      waysHead: "켜는 길 셋",
+      way1: "동작하는 어디서나",
+      way2: "번호 옆 토글 버튼",
+      way3: "팝업의 스위치",
+      caption:
+        "켠 탭에서만 적용되고 새로 고쳐도 유지되며 <b>다른 기기로는 동기화되지 않습니다</b> — " +
+        "직접 만든 규칙도 집중 모드 전용으로 표시할 수 있습니다"
+    }
+  };
+</script>
+<script src="shot.js"></script>
