@@ -3,6 +3,12 @@
 Rules for anyone changing this extension — human or AI. Everything mechanically
 checkable already lives in `tools/`; this file only covers what a script cannot judge.
 
+**This is the only file of rules.** `CLAUDE.md` is one line — an import of this one — so
+Claude Code inlines it rather than leaving it to be found, and every other tool reads
+`AGENTS.md` natively. Nothing goes in `CLAUDE.md` but that import: prose there is loaded on
+every session for no one's benefit, and two files that almost agree are how they start
+disagreeing. If you want to say something to whoever changes this repo, say it here.
+
 ## Before you claim it works
 
 ```bash
