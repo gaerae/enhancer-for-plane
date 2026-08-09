@@ -430,8 +430,9 @@ carries none of your data. See [PRIVACY.md](PRIVACY.md).
 ## Limits & constraints
 
 - **Chrome / Chromium, Manifest V3** — not built for Firefox or Safari.
-- **Self-hosted Plane, inactive by default** — no domain ships enabled; add yours
-  in the popup or Settings. It never touches non-Plane sites.
+- **Plane only, inactive by default** — it runs on self-hosted Plane and on Plane
+  Cloud, but no domain ships enabled; add yours in the popup or Settings. It never
+  touches non-Plane sites.
 - **Sync storage cap (~100 KB total, ~8 KB per item).** Both numbers are Chrome's
   and neither can be raised. Settings used to occupy a single item, so the 8 KB was
   the ceiling for everything; templates are now packed into their own items
