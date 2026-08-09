@@ -8,13 +8,15 @@
 
 A lightweight, unofficial Chrome extension (Manifest V3) for
 [Plane](https://github.com/makeplane/plane) (makeplane / plane.so) — the
-open-source **project management, issues & wiki** tool and a self-hosted
-alternative to Jira — on **Plane Cloud and self-hosted alike**. It fills the gaps
-every issue tracker leaves — reusable
-**issue templates** for the tickets you file over and over, **quick open** to reach
-a ticket from its key, a one-click **copy reference**, and a **focus mode** that
-puts the side panels away — directly in the Plane UI, with **no changes to your
-Plane server**, applied only on the domains you enable.
+open-source project management, issues and wiki tool, and a self-hosted
+alternative to Jira.
+
+It fills the gaps every issue tracker leaves: **issue templates** for the tickets
+you file over and over, **quick open** to reach a ticket from its key, a one-click
+**copy reference**, and a **focus mode** that puts the side panels away.
+
+All of it inside the Plane UI, with no changes to your Plane server. It works on
+Plane Cloud and self-hosted alike, and only on the domains you enable.
 
 > Not affiliated with or endorsed by Plane. "Plane" is a trademark of its owner.
 > (And no — nothing to do with airplanes.)
