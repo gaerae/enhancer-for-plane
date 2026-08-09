@@ -3,6 +3,11 @@
 [English](README.md) · **한국어**
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/dicjfphghjfljkifogkplgdeefjdkhbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=121212)](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)
+[![GitHub Release](https://img.shields.io/github/v/release/gaerae/enhancer-for-plane?label=GitHub%20Release&logo=github&logoColor=white&color=121212)](https://github.com/gaerae/enhancer-for-plane/releases/latest)
+
+<sup>배지가 둘인 이유는 서로 다른 시점에 움직이기 때문입니다. `main`에 버전을 올리면 GitHub
+Release는 1분 안에 만들어지고, 같은 버전이 스토어에 닿으려면 심사를 거쳐 며칠이 걸립니다.
+둘이 다른 동안 실제로 설치되어 있는 것은 스토어 쪽입니다.</sup>
 
 **➜ [Chrome 웹 스토어에서 설치](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)** — 또는 [소스에서 직접 로드](#설치).
 

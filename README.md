@@ -3,6 +3,11 @@
 **English** · [한국어](README.ko.md)
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/dicjfphghjfljkifogkplgdeefjdkhbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=121212)](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)
+[![GitHub Release](https://img.shields.io/github/v/release/gaerae/enhancer-for-plane?label=GitHub%20Release&logo=github&logoColor=white&color=121212)](https://github.com/gaerae/enhancer-for-plane/releases/latest)
+
+<sup>Two badges because they move at different times. A version bump on `main` cuts the
+GitHub Release within a minute; the same version reaches the store only after review, which
+takes days. While they differ, the store is the one you have installed.</sup>
 
 **➜ [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/dicjfphghjfljkifogkplgdeefjdkhbo)** — or [load unpacked from source](#install).
 
