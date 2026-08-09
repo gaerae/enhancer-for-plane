@@ -3356,6 +3356,79 @@ test("feed: a published feed is not mistaken for a settings backup", () => {
   ok(Array.isArray(feed.templates) && !feed.rules && !feed.domains, "…and looks like a feed, not a backup");
 });
 
+// The store's description field keeps the line breaks it is given, which is the whole reason
+// this file is written one sentence per line — paste it and it stays scannable. Nothing
+// enforced that, so it drifted: the Korean opening reached 127 characters in one sentence with
+// four clauses hung off a dash, and eleven other lines carried two sentences. In the store
+// those do not stay one line, they wrap mid-sentence, which is the exact thing the format was
+// chosen to avoid. The cap is a width, not a character count, because a Hangul syllable
+// occupies two columns and `.length` would let a Korean line run twice as wide as an English
+// one that fails. 140 is a little over 1.5x the median line in either language (86 and 87 when
+// this was written), so it does not police ordinary sentences — it catches the line that is
+// visibly the odd one out.
+const COLS = (s) =>
+  // East Asian Wide and Fullwidth take two terminal columns; everything else takes one. Node
+  // has no width table, and the ranges below are the CJK blocks this file can actually
+  // contain (Hangul syllables and jamo, CJK ideographs, kana, fullwidth forms).
+  [...s].reduce(
+    (n, ch) =>
+      n + (/[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹯＀-｠￠-￦]/.test(ch) ? 2 : 1),
+    0
+  );
+
+test("store copy: no description line is wide enough to wrap in the middle of a sentence", () => {
+  const doc = read("store-assets/STORE_LISTING.md");
+  // Only the two description blocks. The review-form answers below them (single purpose,
+  // permission justifications) are one paragraph per textarea and are meant to be one long
+  // line; so is this file's own prose about itself, which GitHub reflows. A check that
+  // policed those would be telling the truth about the wrong text.
+  const BLOCKS = ["## Detailed description", "### 상세 설명"];
+  const bad = [];
+  for (const heading of BLOCKS) {
+    const at = doc.indexOf(heading);
+    ok(at > 0, `the ${heading} block is findable`);
+    const from = doc.indexOf("\n\n", at) + 2;
+    const body = doc.slice(from, doc.indexOf("\n---\n", from));
+    body.split("\n").forEach((line, i) => {
+      if (COLS(line) > 140) bad.push(`${heading} +${i + 1} (${COLS(line)} cols)`);
+    });
+  }
+  eq(bad, [], "a description line past 140 columns — split it at a sentence end: " + bad.join(", "));
+});
+
+test("copy: Korean prose enumerates with commas, not a chain of middots", () => {
+  // 가운뎃점 is correct Korean and almost nobody types it, so a run of three or more in a
+  // sentence reads as machine-written — it is one of the clearest tells. AGENTS.md has said
+  // so since the UI copy was written, but only the catalogue was ever read against it, and
+  // the rule quietly rotted everywhere else: ten chains in README.ko.md and four in the store
+  // listing, including "프로젝트 관리·이슈·위키" in the first paragraph a reader sees. Two
+  // items with no spaces is a compound and stays allowed ("폭·스타일 규칙"), as does the
+  // spaced separator a UI uses between two independent things ("설정 · 템플릿 관리").
+  const FILES = [
+    "README.ko.md",
+    "README.md",
+    "store-assets/STORE_LISTING.md",
+    "_locales/ko/messages.json",
+    "_locales/en/messages.json",
+    "options.html",
+    "popup.html"
+    // Not AGENTS.md: it quotes "영문·숫자·하이픈·밑줄" as the example of what not to write,
+    // and a check that cannot tell a rule from a violation of it would push the rule toward
+    // being stated in a way that does not demonstrate itself. Same reasoning as the
+    // shortcut-spelling test above.
+  ];
+  const CHAIN = /[가-힣A-Za-z0-9)\]]+·[가-힣A-Za-z0-9([]+·/;
+  const bad = [];
+  for (const f of FILES) {
+    read(f)
+      .split("\n")
+      .forEach((line, i) => {
+        if (CHAIN.test(line)) bad.push(`${f}:${i + 1}`);
+      });
+  }
+  eq(bad, [], "three or more items chained with 가운뎃점 — use commas or 와/과: " + bad.join(", "));
+});
+
 /* ---------- run ---------- */
 
 // A test that awaits something which never settles does not fail — node runs out of work

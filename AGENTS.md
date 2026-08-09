@@ -414,7 +414,10 @@ lies:
   - 가운뎃점 is correct Korean and almost nobody types it. In prose, enumerate with commas or
     와/과 — `영문, 숫자, 하이픈, 밑줄`, not `영문·숫자·하이픈·밑줄`. Keep it only where it
     separates two independent things with spaces around it, which is a UI separator rather
-    than prose: `설정 · 템플릿 관리`, `참조 복사  ·  Alt/⌥+C`.
+    than prose: `설정 · 템플릿 관리`, `참조 복사  ·  Alt/⌥+C`. This one is now a rule in
+    `test.js` across every prose file, because writing it down was not enough on its own:
+    the catalogue stayed clean for a year while the README grew ten chains and the store
+    listing four, one of them in the first paragraph.
 - **Only `background.js` may touch the network.** The picker reads the cache, so inserting
   a template costs no request and works offline.
 - `examples/` and `tools/` are not shipped: `release.yml` zips an explicit allowlist.
@@ -465,7 +468,12 @@ lies:
   readers to click "Pick element" and "Enable on this site" — the English buttons. `test.js`
   now holds every quoted label in an imperative sentence against that locale's catalogue.
   The same file's detailed description is one sentence per line on purpose: the store keeps
-  the newlines literally, so that is what makes it scannable.
+  the newlines literally, so that is what makes it scannable. Saying so in prose held for
+  about one edit — a later pass merged clauses back onto one line and the opening reached 205
+  columns — so `test.js` caps a description line at 140 **columns**, not characters: a Hangul
+  syllable is two columns wide, and a `.length` cap would let a Korean line run twice as wide
+  as an English one that failed. Only the two description blocks are measured. The review-form
+  answers under them are one paragraph per textarea and are supposed to be a single long line.
 - **Template bodies are only as rich as `mdToHtml`.** It handles headings, `-`/`1.` lists,
   `- [ ]` task lists, `---`, and inline bold/italic/code — nothing else. Everything it does
   not know becomes a paragraph of literal characters, so a markdown table pastes as rows of
