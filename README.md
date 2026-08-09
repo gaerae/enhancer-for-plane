@@ -50,242 +50,141 @@ no active domain, no host access, and no quick-open links.
 
 ## Features
 
-1. **⚡ Quick open** — type a work item key and go straight to it. In the address bar type
-   `issue`, a space, then a key like `PROJ-123`; Enter opens it. The same input is on the
-   toolbar popup.
-   - **Works across Plane, Jira and Linear**, because it is just a URL. Each target is a base
-     link you configure, with `{{key}}` where the key belongs (`{{key.proj}}` / `{{key.num}}`
-     are its two halves), or the key appended when the link has no token. Plane's is
-     `/{workspace}/browse/{{key}}` — the same canonical short link Copy reference composes.
-   - **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane; a
-     target with an empty prefix is the default. The popup shows a target picker once you
-     have more than one, and the address bar suggests the other targets as you type.
-   - It **opens a URL and nothing more** — no host permission, no content script — so it
-     works on any tab, including ones where the rest of the extension never runs. Ships with
-     no targets; add yours in Settings, where each row previews where a sample key lands.
-   - **Adding one starts from a real address.** Open a work item in your tracker, copy the
-     address bar, paste it into the Add panel: a known shape is recognised and both URLs are
-     filled from it, search included, with nothing left to type. A tracker nobody listed
-     still works — the last key-shaped segment of the path becomes the token, so
-     `https://redmine.example.org/issues/45231` gives you `…/issues/{{key.num}}` and asks
-     only for a prefix to type before the number. An address with no key in it is refused
-     rather than guessed at.
-   - **Or start from an example**, if you do not have one open: a row per site you already
-     added (host filled in) and one per tracker — Plane, Jira, Linear, GitHub, GitLab. Each
-     row shows both addresses it will fill. Picking one selects the first part you have to
-     replace, `⟨workspace⟩` or `⟨site⟩`, and Tab walks the rest. Every shape was opened in a
-     browser and every search URL checked against a nonsense query too; the two that
-     underdeliver (Plane's search, Linear having none) say so on the row instead of being
-     left out.
-   - **The keys you opened last come back to you.** The one real barrier here was having to
-     already know the key; the address bar now offers your recent jumps the moment the
-     keyword is on screen, and narrows them as you type. The same list is in the popup.
-     Twelve entries, per device (`chrome.storage.local`) — waking up on another machine to
-     someone else's browsing in your address bar is not a feature.
-   - **Words search instead of opening.** Type `issue login bug` and it goes to the tracker's
-     search. Which one it is gets decided by shape — `PROJ-123` is a key and `login bug` is
-     not — so there is no prefix or mode to remember. Give a target a **search URL** with
-     `{{q}}` in Settings; a target without one simply does not answer a search.
-     - **How much this gets you depends on the tracker.** Jira and GitHub run the search from
-       the URL and land you on results. Plane, measured on app.plane.so (2026-08-08), does
-       not: `/{workspace}/search/?q=…` opens the search page with your words already in the
-       box, but still shows "Start typing to search" — so it saves the retyping and leaves
-       you a keystroke away, which is worth having but is not results.
-     - Whatever you use, give it the **page**, not the API behind it. Plane's
-       `/api/…/search/?search=…` is the request the app makes; opening it shows raw JSON.
-       Settings says so if what you paste looks like an API path.
-   - **The recent list and the search row are the extension's, not Chrome's history** — the
-     omnibox API has no way to put an icon on a row, so recents are labelled `Recent ·` and
-     the rest name what they will do (`Open PROJ-123 in Plane`). The only icon Chrome shows
-     is the extension's own, in the address bar, once the keyword is active.
-   - **A key in someone else's text.** A key almost never arrives as a key — it arrives in a
-     Slack message or a PR title, "blocked by PROJ-123 until Friday". Select it and
-     right-click → **Open work item from selection**. Chrome hands over the selected text;
-     the page itself is never read.
-2. **📝 Body templates (title + body)** — register reusable templates and insert
-   them in one click. The biggest gain over stock Plane.
-   - A native **"Template" button is added right next to "Attach"** in the
-     description toolbar (last item in the row, equal spacing, document icon).
-   - Works in the **"Create work item" modal** too — that editor has no toolbar,
-     so the "Template" button appears in the modal header, next to the project
-     selector (an item-level spot, since a template fills title + body).
-     `Alt/⌥+T` works in both places.
-   - Selecting one fills the **work-item title** (`#title-input` textarea in the
-     detail view, or the modal's `#name` title input) and the **body**
-     (ProseMirror) together. The title is optional.
-   - Template bodies are **Markdown, rendered into the editor** — `##` headings,
-     `-`/`1.` lists, `- [ ]` checkboxes, `**bold**`, `` `code` ``. Because Plane's
-     editor is WYSIWYG, the markdown is converted to HTML and inserted via a
-     synthetic paste (ProseMirror parses it into real nodes); if the editor
-     doesn't accept it, it falls back to literal text.
-   - Even when Plane re-renders the toolbar, a `MutationObserver` (plus a short
-     bootstrap poll) re-inserts the button. The button is cloned from Attach so
-     it always looks native. (Comment templates are not provided.)
-   - **🔤 Variables are substituted on insert** — `{{date}}` (today,
-     `YYYY-MM-DD`), `{{date+N}}` / `{{date-N}}` (N days from today, e.g.
-     `{{date+7}}` for a deadline), `{{week}}` (this week's range,
-     `YYYY-MM-DD ~ YYYY-MM-DD`, Monday–Sunday), and `{{month}}` (`YYYY-MM`). On
-     macOS, Option+T changes `e.key` to a special character, so `Alt/⌥+T` is
-     detected via `e.code === "KeyT"`.
-   - **Your own variables (up to 5)** — define `name` → `value` pairs in Settings
-     and use them as `{{var.name}}`, e.g. `{{var.team}}` → `Platform`. The `var.`
-     prefix is what keeps them from ever colliding with a built-in: a future
-     `{{quarter}}` can be added without breaking anyone's `{{var.quarter}}`.
-     Unknown names are left untouched rather than blanked, so a typo is visible
-     instead of silently eating text. This pairs with sync — a shared template can
-     say `{{var.team}}` and resolve differently for each person who inserts it,
-     with no per-user data ever leaving the browser.
+What each one does and how to reach it. Implementation notes are under
+[How it works](#how-it-works-notes); the reasoning behind the design choices is in
+[AGENTS.md](AGENTS.md).
+
+### ⚡ Quick open
+
+Type `issue` in the address bar, a space, then a key like `PROJ-123` — Enter opens it.
+The same input is in the toolbar popup.
+
+- **Any tracker, because it is only a URL.** Each target is a base link you configure with
+  `{{key}}` where the key belongs; Plane's is `/{workspace}/browse/{{key}}`. It needs no
+  host permission and no content script, so it works on any tab.
+- **Adding one is a paste.** Copy the address of a work item you have open and paste it
+  into Settings ▸ **Work items** — a known tracker is recognised and both URLs are filled,
+  search included. Nothing open? Start from an example row: Plane, Jira, Linear, GitHub,
+  GitLab.
+- **The key's prefix routes it.** Point `ENG-` at Linear and leave the rest on Plane. A
+  target with an empty prefix is the default.
+- **The keys you opened last come back**, in the address bar and the popup. Twelve entries,
+  per device, never synced.
+- **Words search instead of opening.** `issue login bug` goes to the tracker's search, if
+  that target has a search URL with `{{q}}`. How far it gets you varies: Jira and GitHub
+  land on results, while Plane opens its search page with your words already in the box and
+  one keystroke still to go.
+- **A key in someone else's text.** Select it anywhere, right-click, and choose **Open work
+  item from selection**. Chrome hands over the selected text; the page is never read.
+
+### 📝 Body templates (title + body)
+
+Register a template once and drop it into any work item in one click — title and
+description together. A native **"Template"** button sits in the description toolbar and
+in the "Create work item" dialog; `Alt/⌥+T` works in both.
+
+- Bodies are **Markdown** — headings, `-`/`1.` lists, `- [ ]` checkboxes, bold, inline code.
+- **Variables fill themselves in on insert**: `{{date}}`, `{{date+N}}` / `{{date-N}}` (e.g.
+  `{{date+7}}` for a deadline), `{{week}}`, `{{month}}`.
+- **Up to 5 of your own** — define `name` → `value` in Settings and write `{{var.name}}`.
+  A shared template can say `{{var.team}}` and resolve differently for each person who
+  inserts it, with no per-user data leaving the browser. An unknown name is left as its
+  token rather than blanked, so a typo is visible instead of eating text.
+
 ![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 
-3. **📋 Copy reference** — on a work item — its own page, or the panel a list opens — the
-   button beside its ID (or `Alt/⌥+C`) copies that item to your clipboard, so handing it
-   to a chat message, a pull request body, or a branch name is one click instead of three
-   selections.
-   - **The formats are yours to write.** Three ship as a starting point — plain text,
-     a markdown link, a branch name — and each is an ordinary editable row. A format is
-     copied out exactly as typed: the markdown one carries its own `[…](…)`, because the
-     thing you edit has to be the thing you get. Settings previews each row.
-   - Three values are filled in: `{{item.key}}`, `{{item.title}}`, `{{item.url}}`. There
-     is deliberately no "title slug" for branch names — a Korean or emoji title would
-     slug to nothing, and half a feature is worse than none.
-   - A value the page does not give us **stays visible as its token** rather than
-     turning into an empty string, and the toast names it — you find out before you
-     paste, not after.
-   - **Also in the toolbar popup**, when the tab you are on is a work item. That path reads
-     the tab's address and title and nothing else — no injection, no page access — so it
-     works wherever Quick open has a link, and when the tab is not a work item the block is
-     simply absent. It is the low-dependency half of the in-page button, not a replacement:
-     it cannot see into the panel a list opens, because there the address bar and the title
-     both still name the list.
-   - Works both on a work item's own page and in the **panel a list opens**, which has
-     the same header. On its own page the link is simply the address bar. The panel
-     keeps the *list's* URL and holds no link to the item at all, so there the link is
-     composed as `/{workspace}/browse/{KEY}` — Plane's own canonical short link, which
-     the `/projects/{uuid}/issues/{uuid}` form redirects to. That composition is the one
-     thing here that would break silently against a future Plane, and it is commented as
-     such in the source.
+### 📋 Copy reference
+
+The button beside a work item's ID (or `Alt/⌥+C`) copies that item to your clipboard, so
+handing it to a chat message, a pull request body, or a branch name is one click instead of
+three selections. It works on the item's own page and in the panel a list opens.
+
+- **The formats are yours to write.** Plain text, a markdown link and a branch name ship as
+  a starting point, and each is an editable row that copies out exactly as typed. Settings
+  previews every row.
+- Three values are filled in: `{{item.key}}`, `{{item.title}}`, `{{item.url}}`. A value the
+  page does not give us stays visible as its token rather than turning into an empty string,
+  and the toast names it — you find out before you paste.
+- **Also in the toolbar popup**, when the tab you are on is a work item. That path reads the
+  tab's address and title and nothing else, so it works wherever Quick open has a link.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
-4. **📐 Style rules — a generic engine**
-   - Freely add / edit / delete `selector + property + value` rules. Each rule is
-     injected as `selector { property: value !important; }`.
-   - Type the full value with units, e.g. `320px`, `30rem`, `55ch`. Selector
-     validity is checked live.
-   - Built-in default: module / item name width `.max-w-40` → 320px. "Quick add"
-     chips seed two more in one click: the module search dropdown, and the
-     cycle / breadcrumb name width (`.max-w-[150px].truncate` → 320px).
-   - The same truncation isn't module-only. Plane reuses one Tailwind
-     "max-width + `truncate`" pattern across **modules, cycles, labels, and the
-     breadcrumb path**, just with different caps (`max-w-40` / `max-w-48` /
-     `max-w-[150px]`). Because it's a generic engine, you widen any of them the
-     same way — add a rule (or use the picker, which escapes bracketed classes
-     like `max-w-[150px]` for you). If class names shift between versions, you
-     only edit the selector.
-   - **Each rule says whether it is actually doing anything.** A selector that matches
-     nothing is a no-op — that is what stops a Plane redesign from breaking the extension —
-     but it also made a rule that had *stopped* matching look exactly like one nobody turned
-     on. So every row reads either when it last applied, or that it has never matched
-     anything, and a line above the list counts the second kind.
-     - It is **not** a per-page verdict, on purpose. Measured on Plane Cloud, `.max-w-40`
-       matches 35 elements on the work item list and none on the item page, the projects
-       list, the labels page or the states page — "no match here" is the normal state of a
-       healthy rule, and a warning that fires on it is one you learn to ignore. What is
-       recorded is whether a selector has **ever** matched and when it last did, so a
-       redesign shows up as one stale date beside rules that all read today.
-     - A rule needs 20 checks with no match before the page will say it has never worked,
-       and disabled rules are left out entirely. The record is per device
-       (`chrome.storage.local`), never synced.
-     - A rule can also watch something that is only there while a menu or a modal is open —
-       the shipped dropdown-width preset is one. Those are sampled again just after a click,
-       counting **hits only**, so being open once is enough and never being open at the
-       moment of a routine check is not held against them.
+### 📐 Style rules — a generic engine
+
+Plane cuts long names off in lists and dropdowns until you cannot tell items apart. One
+`selector + property + value` rule forces any width and the names come back.
+
+- Write the full value with units — `320px`, `30rem`, `55ch`. Selector validity is checked
+  as you type.
+- Two rules ship switched on — the item name width and the search dropdown — and a
+  **Quick add** chip seeds the cycle / breadcrumb width in one click. Because the engine is
+  generic, anything else Plane truncates is the same one-rule fix, and a class name that
+  shifts between versions is one selector to edit.
+- **Each rule says whether it is actually doing anything.** A selector that matches nothing
+  is a no-op — that is what stops a Plane redesign from breaking the extension — so every
+  row reads when it last applied, or that it has never matched anything. A redesign shows up
+  as one stale date beside rules that all read today.
+
 ![Cut-off names in the work item list, and the same list with a width rule applied](store-assets/screenshot-3-width.png)
 
-5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
-   is what is left. There is also a toggle beside the work item's key, next to Copy reference,
-   and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
-   knew it existed. On a work item's own page Plane pins properties to the right
-   with no way to collapse them; in the panel a list opens they sit under the body, which is
-   already out of the way — so this is about the full page.
-   - It is the **rules engine with a switch on it**: any rule can be marked *"Only while
-     focus mode is on"*, which is what makes it yours. Two presets ship ready — the work
-     item's properties panel, and the left navigation — and a third, capping the reading
-     width, ships switched off because with both panels gone the description otherwise
-     spans the whole window.
-   - **Per tab, and only for that tab.** It survives a reload there, disappears when the tab
-     closes, and is never synced — waking up on another machine to a hidden properties panel,
-     with no idea what hid it, is not a feature. The toast names the shortcut both when you
-     turn it on and once per load while it is still on, so the way back is never a guess.
-   - The shortcut is a **browser command, not a page key handler**, so it fires while you are
-     typing a description (where you want it most) without eating a character — on macOS every
-     `⌥`+letter *is* a character. Rebind it at `chrome://extensions/shortcuts`; Settings ▸
-     **Shortcuts** lists every key the extension answers to, for both platforms, since until
-     now each one was written down only in the section of the feature that owned it.
-   - Plane keeps a collapse flag for that panel in `localStorage`, but nothing in its UI
-     reaches it and its own resize effect forces it back open above 768px — so this hides the
-     panel with CSS instead of driving Plane's state, which would be a fight.
+### 🧘 Focus mode
+
+`Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description is what is left.
+There is a toggle beside the work item's key and a switch in the toolbar popup too.
+
+- It is **the rules engine with a switch on it**: mark any rule *"Only while focus mode is
+  on"* and it joins in. Two presets ship ready — the properties panel and the left
+  navigation — and a third, capping the reading width, ships switched off.
+- **Per tab, and only for that tab.** It survives a reload there, disappears when the tab
+  closes, and is never synced.
+- The shortcut is a **browser command**, so it fires while you are typing a description
+  without eating a character. Rebind it at `chrome://extensions/shortcuts`; Settings ▸
+  **Shortcuts** lists every key the extension answers to.
+
 ![The same work item with the side panels shown and hidden](store-assets/screenshot-2-focus.png)
 
-6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
-   then click any element on the page. A **candidate selector list** appears — attributes,
-   individual classes, id, each with a match count — so you can choose the right one. The
-   picked rule is added to Settings (with an empty value → set the value there and apply).
-   Build width/style rules without DevTools.
-   - **The list is ordered by what will still work next month, not by what is most
-     precise.** A handle a person wrote (`#main-sidebar`, `[data-view-id]`,
-     `[aria-label="Issue description"]`, `.max-w-40`) comes first; anything that looks
-     build-generated is pushed down — hashed classes (`sx-3nfvp2`), uuids
-     (`editor-container-d833e58d-…`), CSS-module names, counters, and React `useId` values
-     (`headlessui-menu-button-:r1b:`). Demoted, never hidden: it is a guess about someone
-     else's markup, so being wrong should cost a position, not an option.
-   - **Every row says so in words** — what kind of handle it is (id, id prefix, data
-     attribute, label, class, position) and whether it **lasts** or **may change**. On every
-     row, not only the doubtful ones: ordinary Plane markup yields four candidates that are
-     all durable, and a mark that shows up only on the exception says nothing on a list that
-     has no exception. Group headings sit above them; the per-row verdict is what survives
-     when there is only one group.
-   - For an id whose tail is generated, you also get the **`[id^="…"]` prefix form** — the
-     same shape the shipped dropdown preset had to be written by hand.
-   - Some hashes have no digit in them, and nothing tells `sx-euugli` from `bg-white` in
-     isolation. So one signal is measured from the page: a prefix carrying an implausible
-     number of distinct classes is a hash namespace. On real pages (2026-08-08) this flags
-     908 of Linear's 937 classes — leaving the 29 that really are authored — and **none** of
-     Plane Cloud's 515.
-   - When the picker adds a rule, an open Settings page reflects it
-     automatically (via `chrome.storage.onChanged`, unless you have unsaved
-     edits).
-   - During picking, press events are suppressed with `stopPropagation` only
-     (not `preventDefault`, which would cancel the click and break the picker).
-7. **🔄 Team template sync** — point the extension at a JSON file (your intranet, a
-   Git host, any URL) and everyone pulls the same templates. Off by default.
-   - Add a source in Settings → Chrome asks for access to that one origin →
-     templates appear in the picker under a header for that source. **Not sure what
-     a source looks like? Click "Try our example"** — it fills in this repo's own
-     26-template pack, so one Save shows the whole flow working. It picks the file by your
-     Chrome UI language, so a Korean reader gets `team-templates-ko.json` rather than a
-     picker full of English; either counts as "already added", so switching language cannot
-     leave you subscribed to two copies of one feed.
-   - **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily, via
-     `chrome.alarms`), plus **Sync now**. Up to **10 sources**, each fetched
-     independently with its own interval and on/off switch.
-   - **Synced templates are read-only** — they're edited at the source, not here.
-     What is local is the *view*: hide any group you don't need (per source), and
-     it stays hidden across syncs without touching the file.
-   - **The picker reads the cache, never the network.** Inserting a template costs
-     no request and works offline. A failed sync keeps the last good copy.
-   - **Remote data is treated as untrusted**: size-capped, rendered as text only
-     (never markup), ids namespaced per source so they can't collide with your own.
-   - See [the file format](#team-template-file-format) and `examples/`.
-8. **🏠 Active domains** — runs only on the domains you specify. Wildcards
-   (`*.example.com`) and a "run on all sites" switch are supported.
-9. **💾 Backup (Import / Export)** — export your settings to a JSON file from the
-   "Backup" section, and import them back. It carries everything you configured:
-   domains, rules, templates, variables, copy formats, quick open links, and sync sources
-   (URLs, intervals, hidden groups). It does **not** carry downloaded templates or sync status — those are a
-   per-device cache that the next sync refetches, so a backup stays a backup of
-   your settings rather than a snapshot of someone else's file. Imported settings
-   load into the form — review, then `Save` to apply.
+### 🎯 Visual element picker
+
+Click **"Pick element → add rule"** in the popup, then click any element on the page. You
+get a list of candidate selectors, each with a match count, and the one you choose lands in
+Settings ready for a value. No DevTools.
+
+- **The list is ordered by what will still work next month, not by what is most precise.**
+  A handle a person wrote comes first; hashed classes, uuids and other build-generated names
+  are pushed down. Demoted, never hidden — it is a guess about someone else's markup.
+- **Every row says so in words** — what kind of handle it is, and whether it **lasts** or
+  **may change**.
+- For an id whose tail is generated you also get the `[id^="…"]` prefix form.
+
+### 🔄 Team template sync
+
+Point the extension at a JSON file — your intranet, a Git host, any URL — and everyone pulls
+the same templates. Off by default.
+
+- Add a source in Settings, Chrome asks for access to that one origin, and its templates
+  appear in the picker under their own heading. **Not sure what a source looks like?** Click
+  **"Try our example"** to fill in this repo's own 26-template pack in your language.
+- **Refreshed on a schedule you pick** (hourly / 6h / 12h / daily) plus **Sync now**, for up
+  to 10 sources, each with its own interval and switch.
+- **Synced templates are read-only** — they are edited at the source. What is local is the
+  view: hide any group you do not need and it stays hidden across syncs.
+- **The picker reads the cache, never the network**, so inserting costs no request and works
+  offline. A failed sync keeps the last good copy.
+- Remote data is treated as untrusted: size-capped, rendered as text only, ids namespaced per
+  source. See [the file format](#team-template-file-format).
+
+### 🏠 Active domains
+
+Runs only on the domains you add. Wildcards (`*.example.com`) and a "run on all sites"
+switch are supported.
+
+### 💾 Backup (import / export)
+
+Export everything you configured to a JSON file and import it back: domains, rules,
+templates, variables, copy formats, quick open links, and sync sources. Downloaded templates
+and sync status stay out — those are a per-device cache the next sync refetches. An import
+loads into the form; `Save` applies it.
 
 ## Team template file format
 
