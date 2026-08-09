@@ -198,6 +198,8 @@ no active domain, no host access, and no quick-open links.
        the shipped dropdown-width preset is one. Those are sampled again just after a click,
        counting **hits only**, so being open once is enough and never being open at the
        moment of a routine check is not held against them.
+![Cut-off names in the work item list, and the same list with a width rule applied](store-assets/screenshot-3-width.png)
+
 5. **🧘 Focus mode** — `Alt+Shift+F` (macOS `⌥+⇧+F`) hides the side panels so the description
    is what is left. There is also a toggle beside the work item's key, next to Copy reference,
    and a switch in the toolbar popup — the shortcut alone would only exist for whoever already
@@ -221,6 +223,8 @@ no active domain, no host access, and no quick-open links.
    - Plane keeps a collapse flag for that panel in `localStorage`, but nothing in its UI
      reaches it and its own resize effect forces it back open above 768px — so this hides the
      panel with CSS instead of driving Plane's state, which would be a fight.
+![The same work item with the side panels shown and hidden](store-assets/screenshot-2-focus.png)
+
 6. **🎯 Visual element picker** — click **"Pick element → add rule"** in the popup,
    then click any element on the page. A **candidate selector list** appears — attributes,
    individual classes, id, each with a match count — so you can choose the right one. The
