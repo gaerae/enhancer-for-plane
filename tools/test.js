@@ -2382,6 +2382,62 @@ test("copy: no title field on the page means the token stays, not an empty strin
   eq(ctx.peMissingItemFields("{{item.title}}", ref).join(","), "title");
 });
 
+// Reported in review, and all three reproduce in a vm before they reproduce anywhere else.
+test("pick: every generated candidate sorts after every durable one", () => {
+  const ctx = loadCommon();
+  // The mix that exposed it: a generated id (100 - 70 = 30) outscores tag+classes (20) and
+  // the nth-child path (10), so it landed mid-list and split the durable group in two.
+  const cands = [
+    { sel: '[aria-label="x"]', kind: "label", count: 1, generated: false },
+    { sel: ".max-w-40", kind: "class", count: 2, generated: false },
+    { sel: "#editor-container-d833e58d-d489-433e-9551-c2ab0768068d", kind: "id", count: 1, generated: true },
+    { sel: "div.a.b.c", kind: "tag+classes", count: 1, generated: false },
+    { sel: "body > div:nth-child(2)", kind: "auto", count: 1, generated: false }
+  ];
+  const out = ctx.peSortPickCandidates(cands);
+  const firstGen = out.findIndex((c) => c.generated);
+  ok(firstGen > -1, "the fixture has to contain one");
+  ok(out.slice(firstGen).every((c) => c.generated),
+    "durable rows after a generated one: " + out.map((c) => (c.generated ? "G" : "d")).join(""));
+  // Which is what the chooser needs: it draws a heading wherever the group changes, so two
+  // changes means the "Recommended" heading appears twice.
+  let changes = 0;
+  for (let i = 1; i < out.length; i++) if (!!out[i].generated !== !!out[i - 1].generated) changes++;
+  ok(changes <= 1, changes + " group changes, so " + (changes + 1) + " headings");
+  // And the partition must not scramble the ranking inside each group.
+  eq(out[0].sel, '[aria-label="x"]', "the best durable one still leads");
+});
+
+test("pick: a Tailwind variant stack is not a generated name", () => {
+  const ctx = loadCommon();
+  // A colon in a CLASS is a Tailwind variant. React's useId values never reach a class
+  // attribute, so applying that pattern here demoted hand-written classes Plane writes
+  // everywhere — below even the nth-child path — and badged them as expiring.
+  for (const t of ["dark:hover:bg-custom-background-90", "md:hover:underline", "group-hover:focus:text-white"]) {
+    eq(ctx.peLooksGenerated(t, "class", null), false, t);
+  }
+  // The pattern still has to do its job on ids, which is where useId actually lands.
+  for (const t of ["headlessui-menu-button-:r1b:", "radix-:r1e:", ":r1c:"]) {
+    eq(ctx.peLooksGenerated(t, "id", null), true, t);
+  }
+});
+
+test("quick: a link still holding a blank is not an address", () => {
+  const ctx = loadCommon();
+  // `new URL` reads "⟨host⟩" as the valid hostname "xn--host-fg5bk", so nothing downstream
+  // would have refused it — and the chooser seeds rows carrying blanks by design.
+  const url = "https://⟨host⟩/⟨workspace⟩/browse/{{key}}";
+  eq(ctx.peIsHttpUrl(url), false, "the gate every navigation passes");
+  eq(ctx.peIsHttpUrl(ctx.peExpandQuickLink({ url }, "PROJ-1")), false, "and after expansion");
+  eq(ctx.peIsHttpUrl("https://plane.example.com/acme/browse/PROJ-1"), true, "a real one still passes");
+  // Half-configured is not a target: routing skips it, which is what makes the omnibox say
+  // "no quick link set — Enter opens Settings" instead of opening a nonsense host.
+  const links = [{ id: "a", enabled: true, prefix: "", url }];
+  eq(ctx.peRouteQuickLink(links, "PROJ-1"), null, "an unfilled link is not routed to");
+  links.push({ id: "b", enabled: true, prefix: "", url: "https://plane.example.com/acme/browse/{{key}}" });
+  eq(ctx.peRouteQuickLink(links, "PROJ-1").id, "b", "and a filled one beside it still is");
+});
+
 test("example feed: every URL the button can use points at a file that ships", () => {
   const ctx = loadCommon();
   const urls = ctx.__EXAMPLE_FEED_URLS;

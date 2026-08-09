@@ -121,7 +121,14 @@
         if (peIsHttpUrl(surl)) {
           chrome.tabs.create({ url: surl });
           window.close();
+          return;
         }
+        // Nothing here can search — no target has a search URL, which is the default for a
+        // hand-added one and for Linear, whose search is not addressable at all. Returning
+        // in silence made Enter look broken. The omnibox answers this case by opening
+        // Settings, and two entry points for one feature may not disagree about it.
+        chrome.runtime.openOptionsPage();
+        window.close();
         return;
       }
       jumpTo(key, link ? peExpandQuickLink(link, key) : "", link);

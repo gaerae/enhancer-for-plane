@@ -476,6 +476,10 @@
     });
     el.quickExamples.hidden = true;
     renderQuickLinks();
+    // Pushed programmatically, so no input event fired to mark the form dirty — and an
+    // unmarked form adopts the next foreign storage change, taking the new row with it.
+    // Same reason the example-feed button sets this by hand.
+    dirty = true;
     // Put the caret on the first thing left to replace, selected, so the next keystroke
     // overwrites it. With nothing left, send it to whichever field still needs a decision:
     // a numbered tracker needs a prefix to spend, and everything else needs a name.
@@ -1392,8 +1396,13 @@
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       knownDomains = (state.domains || []).slice();
       render();
-      if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
-      else flash(permOk ? peMsg("msgSaved") : peMsg("msgSavedNoPerm"), !permOk);
+      // A failed grant outranks the good news. These two can happen together — and when
+      // they do it is not a coincidence: the origin Chrome refused is the one that was just
+      // carried across, so reporting only "kept it" would be reporting the opposite of what
+      // happened.
+      if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
+      else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
+      else flash(peMsg("msgSaved"));
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
         try {

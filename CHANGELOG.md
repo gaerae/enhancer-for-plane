@@ -66,6 +66,26 @@ Schema 7 → 8.
   is one you cannot have meant to remove, so the save carries it across and says so. Removing
   a domain you *can* see still removes it, and Restore defaults still clears the list it just
   showed you.
+- **A half-filled quick link could navigate somewhere real.** The chooser seeds a row holding
+  `⟨host⟩` blanks by design, and nothing refused one: `new URL` reads `⟨host⟩` as the
+  perfectly valid hostname `xn--host-fg5bk`, so saving without filling it in and pressing
+  Enter opened that. `peIsHttpUrl` — the gate every navigation passes — now rejects a blank,
+  and a link still holding one is not routed to at all, so the omnibox says "no quick link
+  set" instead.
+- **Searching from the popup with no search URL did nothing at all.** No tab, no message, no
+  close — Enter simply looked broken, and that is the default state for a hand-added target
+  and for Linear, whose search is not addressable. It opens Settings now, which is what the
+  omnibox has always done in the same situation.
+- **Two picker bugs, both cosmetic and both misleading.** A generated candidate could outscore
+  a durable one and land mid-list, splitting "Recommended" into two headings with an expiring
+  row between them; the sort now partitions on that flag before it looks at any score. And
+  the React `useId` pattern was applied to class names, where a colon means a Tailwind
+  variant — `dark:hover:bg-custom-background-90` was being demoted below the nth-child
+  fallback and badged "may change". useId never reaches a class attribute, so that test is
+  ids only.
+- **Saving could swallow a permission failure.** When a save both carried across a domain
+  enabled elsewhere and failed to get Chrome's grant for it, only the good news was shown —
+  and the origin Chrome refused is exactly the one that was carried across.
 - **The template button never appeared on Plane Cloud.** The biggest thing this extension
   does, missing on one of the two places it runs, for a release. It anchors on the
   description toolbar's attach button, found by walking up from the editor, and the walk

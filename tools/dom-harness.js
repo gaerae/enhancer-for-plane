@@ -111,6 +111,7 @@ window.__SEED = ${JSON.stringify(seed)};
 window.__LOCAL = ${JSON.stringify(local || {})};
 window.__localWrites = 0;
 window.__written = [];
+window.__optionsOpened = false;
 window.__opened = null;
 window.__closed = false;
 window.chrome = {
@@ -137,7 +138,7 @@ window.chrome = {
   runtime: {
     lastError: null,
     getManifest: () => ({ version: "test", action: {} }),
-    openOptionsPage: () => {},
+    openOptionsPage: () => { window.__optionsOpened = true; },
     sendMessage: () => {},
     // Captured, not discarded: this is how the popup and the keyboard command reach the
     // content script, so a page that hosts content.js has to be able to knock on it.
@@ -519,9 +520,15 @@ const suites = [
         ok(h <= 600, "the popup is " + h + "px and Chrome will cut " + (h - 600) + " of it");
         return h + "px";
       });
-      // The state that makes all of this necessary. If a seed stops overflowing, the checks
-      // below start passing for the wrong reason.
-      check("this content really is taller than the box", () => {
+      // Overflow has to be FORCED, not seeded. The seed overflowed on macOS and did not on
+      // CI's Linux, because how tall this content is depends on font metrics — so the check
+      // was really asserting which machine it ran on. Everything below is about what holds
+      // WHEN it overflows, so the box is squeezed until it does and the question becomes
+      // deterministic. The real content's height is asserted above, against Chrome's cap,
+      // which is the part that genuinely depends on the seed.
+      scroll().closest(".pop").style.maxHeight = "300px";
+      await sleep(50);
+      check("the box now overflows, which is the state the rest of this is about", () => {
         ok(scroll().scrollHeight > scroll().clientHeight + 4,
            "content " + scroll().scrollHeight + " fits in " + scroll().clientHeight);
       });
@@ -1593,6 +1600,35 @@ const suites = [
       check("dark: the toggle knob is visible when on", () => { const r = knobVsTrack(); ok(r >= 3, "contrast " + r.toFixed(2)); return r.toFixed(2); });
       box.checked = false; await sleep(400);
       check("dark: the toggle knob is visible when off", () => { const r = knobVsTrack(); ok(r >= 3, "contrast " + r.toFixed(2)); return r.toFixed(2); });`
+  },
+  {
+    // Enter on words when nothing can search. Reported as a silent no-op: no tab, no
+    // message, no close, and Enter looking broken. The omnibox answers this by opening
+    // Settings, and two ways into one feature may not disagree about what happens.
+    name: "popup · searching with no search URL anywhere",
+    page: {
+      name: "pop-nosearch",
+      ...POPUP,
+      seed: seedOf({
+        quickLinks: [{ id: "q1", name: "Plane", prefix: "", enabled: true, url: "https://plane.example.com/acme/browse/{{key}}" }]
+      })
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const submit = (v) => {
+        document.getElementById("jumpKey").value = v;
+        document.getElementById("jumpForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      };
+      check("a key still opens, so the seed is not simply broken", () => {
+        submit("PROJ-9");
+        eq(window.__opened, "https://plane.example.com/acme/browse/PROJ-9");
+      });
+      check("words with nowhere to search open Settings rather than nothing", () => {
+        window.__opened = null;
+        submit("login bug");
+        eq(window.__opened, null, "it navigated somewhere it has no address for");
+        ok(window.__optionsOpened, "Enter did nothing at all");
+      });`
   },
   {
     // Recents and the copy block: the two things the popup can do from a tab alone. Neither

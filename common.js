@@ -476,7 +476,12 @@ function peLooksGenerated(token, kind, namespaces) {
   // React's useId, which every headless UI library on Plane Cloud leans on:
   // `headlessui-menu-button-:r1b:`, `radix-:r1e:`, `base-ui-:r1i:`, or the bare `:r1c:`.
   // The value changes on every render, so a rule written against one is dead immediately.
-  if (/:[a-z0-9]+:/i.test(t)) return true;
+  //
+  // Ids only. A colon in a CLASS is a Tailwind variant, not a generated id — useId values
+  // never reach a class attribute. Applied to classes this matched every stacked variant
+  // Plane writes (`dark:hover:bg-custom-background-90`, `md:hover:underline`), demoting
+  // hand-written classes below the nth-child path fallback and badging them "may change".
+  if (kind !== "class" && /:[a-z0-9]+:/i.test(t)) return true;
   // A uuid anywhere: Plane's `editor-container-d833e58d-d489-433e-9551-c2ab0768068d`.
   if (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t)) return true;
   // A run of 8+ hex containing a digit, as a whole segment: Linear's `sc2sx-Flex-d11c8f6e`,
@@ -546,10 +551,16 @@ function pePickScore(cand) {
 
 // Sorted best-first, ties keeping the order they were built in (the DOM's own order for
 // classes, which is the only order the page gives us and is stable between runs).
+// Generated candidates ALL sort after durable ones, then by score, then by discovery order.
+// The partition is first and separate on purpose: the chooser draws a heading wherever the
+// group changes, so a single generated row scoring above a durable one splits "Recommended"
+// into two headings with an expiring row between them. The penalty alone did not guarantee
+// it — a generated id scores 100-70=30, above tag+classes at 20 — and tying the layout to
+// whether two unrelated constants stay far enough apart is not a guarantee at all.
 function peSortPickCandidates(list) {
   return (Array.isArray(list) ? list : [])
     .map((c, i) => ({ c, i, s: pePickScore(c) }))
-    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .sort((a, b) => (a.c.generated ? 1 : 0) - (b.c.generated ? 1 : 0) || b.s - a.s || a.i - b.i)
     .map((x) => x.c);
 }
 
@@ -1473,7 +1484,12 @@ function peSplitKey(key) {
 function peRouteQuickLink(links, key) {
   const k = String(key == null ? "" : key).trim();
   if (!k) return null;
-  const usable = (links || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
+  // A link still holding a ⟨blank⟩ is half-configured, so it is not a target. Skipping it
+  // here is what makes the omnibox fall through to "no quick link set — Enter opens
+  // Settings", which is the honest answer and the behaviour before rows arrived pre-filled.
+  const usable = (links || []).filter(
+    (l) => l && l.enabled !== false && String(l.url || "").trim() && !/[⟨⟩]/.test(String(l.url))
+  );
   if (!usable.length) return null;
   let best = null;
   let bestLen = -1;
@@ -1997,7 +2013,13 @@ function peLooksLikeApiUrl(url) {
 // own, but this keeps a javascript:/data: value (from a hand-edited import) from being
 // opened as if it were a link.
 function peIsHttpUrl(u) {
-  return /^https?:\/\//i.test(String(u == null ? "" : u).trim());
+  const s = String(u == null ? "" : u).trim();
+  // A ⟨blank⟩ left in an example is not an address. `new URL` disagrees — it punycodes
+  // "⟨host⟩" into the perfectly valid hostname "xn--host-fg5bk" — so nothing downstream
+  // would have caught it, and the chooser now seeds rows that carry blanks by design.
+  // This is the gate every navigation passes, which is why the test belongs here.
+  if (/[⟨⟩]/.test(s)) return false;
+  return /^https?:\/\//i.test(s);
 }
 
 function peTemplateHasContent(t) {
