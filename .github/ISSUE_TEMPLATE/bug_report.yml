@@ -1,0 +1,86 @@
+name: Bug report
+description: Something in the extension does not work on your Plane
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most of what makes a report actionable here is which Plane you are on.
+        Plane Cloud and self-hosted Plane draw the same screens with different class
+        names, and a rule that matches nothing is a no-op rather than an error — so a
+        feature that "does nothing" looks identical to one nobody switched on.
+        The fields below are the ones that have actually distinguished those cases.
+
+  - type: dropdown
+    id: plane
+    attributes:
+      label: Which Plane?
+      options:
+        - Plane Cloud (app.plane.so)
+        - Self-hosted
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: plane-version
+    attributes:
+      label: Plane version (self-hosted only)
+      description: Bottom of the sidebar, or your deploy tag. Leave blank for Cloud.
+      placeholder: "1.4.0"
+
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Which feature?
+      options:
+        - Quick open (address bar / popup / right-click)
+        - Body templates (the Template button)
+        - Copy reference
+        - Width & style rules
+        - Focus mode
+        - Element picker
+        - Team template sync
+        - Settings page or popup itself
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: The page you were on, what you clicked, and what you saw instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rule-health
+    attributes:
+      label: For a style rule or focus mode — what does Settings say about the rule?
+      description: >
+        Settings ▸ Appearance lists, per rule, when it last applied or that it has never
+        matched anything. "Never matched" and "last applied three weeks ago" are different
+        bugs: the first is a selector that does not fit your Plane, the second is one that
+        stopped fitting. Paste the line, or say which it is.
+
+  - type: input
+    id: versions
+    attributes:
+      label: Extension version and Chrome version
+      description: chrome://extensions shows the first, chrome://version the second.
+      placeholder: "1.8.0 / Chrome 141"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: reloaded
+    attributes:
+      label: Before reporting
+      options:
+        - label: >
+            I reloaded the Plane tab after enabling the domain (a tab opened before the
+            domain was enabled has no content script in it).
+        - label: >
+            For a missing Template button — I tried the popup's "Re-scan this page", which
+            reports whether the content script is running at all.

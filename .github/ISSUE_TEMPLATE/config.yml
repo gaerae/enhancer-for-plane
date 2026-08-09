@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/gaerae/enhancer-for-plane/security/advisories/new
+    about: Report privately instead of opening an issue. See SECURITY.md.
+  - name: A problem with Plane itself
+    url: https://github.com/makeplane/plane/issues
+    about: This is an unofficial add-on. Bugs in Plane belong in Plane's tracker.

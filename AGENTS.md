@@ -384,6 +384,17 @@ lies:
   Open one when behaviour, the schema, permissions or `manifest.json` change — a manifest
   change makes the merge a store release, and that deserves a last look.
 
+  Batch the commits. A wording pass is one commit, not one per file you touched — eleven
+  commits in a day for a single editing session is a history nobody can read back.
+
+- **`.github/CONTRIBUTING.md` is a pointer to this file and must stay one.** GitHub links
+  it from the New Issue and New PR pages, which is the only reason it exists; the rules are
+  here. If you find yourself explaining a rule there, you are writing the second rulebook
+  this file opens by warning about. Same for the PR template: it may list what to check,
+  not why. The issue forms are the exception — they ask for Plane generation, extension and
+  Chrome versions, and what Settings says about the rule, because those are the fields that
+  actually separated "your selector does not fit Cloud" from "you never turned it on".
+
 - **Zero dependencies.** No `package.json`, no build step. Plain scripts loaded by the
   browser; `tools/` runs on stock node. Adding the first dependency is a project
   decision, not a drive-by.
