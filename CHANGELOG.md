@@ -10,7 +10,7 @@ first read, never rewritten by hand.
 
 ---
 
-## v1.8.0 — 2026-08-08
+## v1.8.0 — 2026-08-09
 
 Schema 7 → 8.
 
@@ -503,7 +503,7 @@ Schema 2 → 3. Adds the `alarms` permission, for which Chrome shows no install 
 
 ---
 
-## v1.0.0 — 2026-07-09
+## v1.0.0 — 2026-07-10
 
 First public release. An unofficial Manifest V3 extension for Plane, self-hosted or hosted.
 

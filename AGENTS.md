@@ -387,6 +387,13 @@ lies:
   Batch the commits. A wording pass is one commit, not one per file you touched — eleven
   commits in a day for a single editing session is a history nobody can read back.
 
+- **A CHANGELOG date is the release's date, not the day you wrote the entry.** The entry
+  gets written before the version bump is pushed, and `release.yml` cuts the release
+  whenever that push lands — so an evening's writing released the next morning leaves a
+  heading that is off by one. Two of nine were, both by exactly that. Nothing can check it
+  (the truth is on GitHub and `tools/` has no network), so read it back off the releases
+  page after the release exists rather than guessing before it does.
+
 - **`.github/` holds two files besides the workflows, and everything else GitHub's
   community checklist asks for is absent on purpose.** All of it was written and then
   removed rather than left to rot; the reasoning is here so the next empty row on the
