@@ -125,6 +125,12 @@ Schema 7 → 8.
   right-click → **Open work item from selection**. Chrome hands over the selected text; the
   page itself is never read, and the entry appears on no other kind of click. This adds the
   `contextMenus` permission, which shows no install warning.
+
+  Documented on the Quick open card as well as the Shortcuts tab. It shipped explained
+  only on Shortcuts, which is a different tab from the one you are on while setting
+  Quick open up — so the way in that needs no key at all was the one you had to go
+  looking for. The card now names all four: the address bar, the popup, the recents
+  both offer, and the right-click.
 - **Copy reference from the toolbar popup**, when the tab you are on is a work item. It reads
   the tab's address and title and nothing else — no injection, no page access — so it works
   wherever Quick open has a link, and the block is absent rather than inert when the tab is

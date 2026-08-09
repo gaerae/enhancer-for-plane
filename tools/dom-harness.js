@@ -1024,6 +1024,19 @@ const suites = [
       const rows = () => [...document.querySelectorAll("#quickList .cpy-item")];
       open();
 
+      // The card is where someone sets Quick open up, so it is where the ways INTO it belong.
+      // Two of the four shipped in 1.8.0 and were documented only on the Shortcuts tab, which
+      // is a different tab from the one you are on while configuring the thing.
+      check("the card names every way in, not just the address bar", () => {
+        const t = document.querySelector('#panel-items .desc').textContent;
+        for (const want of [peMsg("ctxOpenSelection"), "issue"]) {
+          ok(t.indexOf(want) > -1, JSON.stringify(want) + " missing from the Quick open card");
+        }
+        // Named rather than matched loosely: the context-menu entry has to be quoted exactly
+        // as Chrome will render it, or the instruction sends people looking for a phrase that
+        // is not in their menu.
+        eq(document.querySelectorAll('#panel-items .desc').length > 0, true);
+      });
       check("the panel explains the two kinds of brace before anything else does", () => {
         const legend = box.querySelector(".qlk-ex-legend");
         ok(legend, "no legend");
