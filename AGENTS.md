@@ -387,6 +387,12 @@ lies:
   Batch the commits. A wording pass is one commit, not one per file you touched — eleven
   commits in a day for a single editing session is a history nobody can read back.
 
+- **A release body is now a user-facing surface, not a nicety.** The version number in
+  Settings links to `/releases`, so whatever is written there is what someone clicking their
+  own version reads. All nine so far are hand-written; `release.yml` passes
+  `--generate-notes`, so forgetting leaves a commit list under a version number in somebody's
+  Settings. Write the body when the release is cut, or point that link somewhere else.
+
 - **A CHANGELOG date is the release's date, not the day you wrote the entry.** The entry
   gets written before the version bump is pushed, and `release.yml` cuts the release
   whenever that push lands — so an evening's writing released the next morning leaves a

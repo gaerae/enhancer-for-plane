@@ -15,10 +15,12 @@ first read, never rewritten by hand.
 Schema unchanged.
 
 ### Improved
-- **The version number in Settings is now the link to this file.** A version raises exactly
+- **The version number in Settings is now a link to the releases.** A version raises exactly
   one question — what is in it — and until now the answer was not reachable from inside the
   extension at all. It is the number itself rather than a fourth link in that row, because
-  the row's own check says to trade something out rather than add one more.
+  the row's own check says to trade something out rather than add one more. It lands on the
+  releases list, where each entry is dated and titled with the number just clicked, rather
+  than on this file, which is one long page to scroll before you reach your own release.
 
 ### Fixed
 - **A copy out of a description no longer leaves a stray `\` at every line break.** Plane

@@ -1571,10 +1571,12 @@ const suites = [
         const labels = links.map((a) => a.textContent.trim());
         // The version is a link because a version number's own question is "what is in it".
         // It is first, it is not hidden (which is what a manifest we could not read leaves),
-        // and it goes to the changelog rather than anywhere else in the repo.
+        // and it goes to the releases list — the version-shaped answer — rather than to the
+        // repo root or to CHANGELOG.md, which is one long page you have to scroll to reach
+        // the release you are running.
         ok(/^v\\d+\\.\\d+\\.\\d+$/.test(labels[0]), "the version reads " + JSON.stringify(labels[0]));
         ok(!links[0].hidden && !document.getElementById("appVersionSep").hidden, "shown with its separator");
-        ok(/\\/CHANGELOG\\.md$/.test(links[0].getAttribute("href") || ""), "the version points at the changelog");
+        ok(/\\/releases$/.test(links[0].getAttribute("href") || ""), "the version points at the releases page");
         ok(links[0].title.trim().length > 0, "and it says where it goes");
         eq(labels.slice(1).join(" · "), "GitHub · Send feedback · Rate it");
         return labels.join(" · ");
