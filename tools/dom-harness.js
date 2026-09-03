@@ -137,7 +137,11 @@ window.chrome = {
   },
   runtime: {
     lastError: null,
-    getManifest: () => ({ version: "test", action: {} }),
+    // A version shaped like a real one, not "test": the header renders it as the link to the
+    // changelog, and a stub that hands back a word lets a page that renders nothing sensible
+    // pass anyway. It is deliberately not the shipping number — nothing here should have to
+    // be edited on a release.
+    getManifest: () => ({ version: "9.9.9", action: {} }),
     openOptionsPage: () => { window.__optionsOpened = true; },
     sendMessage: () => {},
     // Captured, not discarded: this is how the popup and the keyboard command reach the
@@ -1562,10 +1566,17 @@ const suites = [
         ok(quick < copy, "Quick open is at " + quick + ", Copy reference at " + copy);
         return "quick " + quick + " · copy " + copy;
       });
-      check("the header links read GitHub → feedback → rating", () => {
-        const labels = [...document.querySelectorAll(".about .about-link")]
-          .map((a) => a.textContent.trim());
-        eq(labels.join(" · "), "GitHub · Send feedback · Rate it");
+      check("the header links read version → GitHub → feedback → rating", () => {
+        const links = [...document.querySelectorAll(".about .about-link")];
+        const labels = links.map((a) => a.textContent.trim());
+        // The version is a link because a version number's own question is "what is in it".
+        // It is first, it is not hidden (which is what a manifest we could not read leaves),
+        // and it goes to the changelog rather than anywhere else in the repo.
+        ok(/^v\\d+\\.\\d+\\.\\d+$/.test(labels[0]), "the version reads " + JSON.stringify(labels[0]));
+        ok(!links[0].hidden && !document.getElementById("appVersionSep").hidden, "shown with its separator");
+        ok(/\\/CHANGELOG\\.md$/.test(links[0].getAttribute("href") || ""), "the version points at the changelog");
+        ok(links[0].title.trim().length > 0, "and it says where it goes");
+        eq(labels.slice(1).join(" · "), "GitHub · Send feedback · Rate it");
         return labels.join(" · ");
       });`
   },

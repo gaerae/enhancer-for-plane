@@ -14,6 +14,12 @@ first read, never rewritten by hand.
 
 Schema unchanged.
 
+### Improved
+- **The version number in Settings is now the link to this file.** A version raises exactly
+  one question — what is in it — and until now the answer was not reachable from inside the
+  extension at all. It is the number itself rather than a fourth link in that row, because
+  the row's own check says to trade something out rather than add one more.
+
 ### Fixed
 - **A copy out of a description no longer leaves a stray `\` at every line break.** Plane
   rewrites the plain-text side of the clipboard with Markdown
