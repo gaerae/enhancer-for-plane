@@ -1636,6 +1636,35 @@
     if (menuOpen && menuOwnerBtn) positionMenu(menuOwnerBtn);
   }
 
+  // Take the stray "\" out of what a copy from the description editor leaves on the
+  // clipboard — see peTidyCopiedText for what it is and why it is dropped rather than
+  // respelled. This is the DOM half of it, and the phase is the whole trick: Plane's own
+  // plugin listens for "copy" on the editor node and calls preventDefault(), which does
+  // not stop propagation, so a bubble-phase listener up here runs after it with the
+  // DataTransfer still writable — the clipboard is written from it once the dispatch ends.
+  // Only text/plain is rewritten. text/html and Plane's private flavour are left exactly
+  // as they were, which is what keeps a paste back into Plane on its normal path.
+  //
+  // "cut" is deliberately NOT handled, and it looks like an oversight, so: Plane's plugin
+  // hooks "copy" alone, and with tiptap-markdown's own serializer switched off a cut falls
+  // back to ProseMirror's plain text — which has no Markdown in it, and so no hard-break
+  // backslash to take out. Every backslash a cut can present is therefore one the author
+  // typed. Listening for it could only ever delete one, out of the only remaining copy of
+  // text that has just been removed from the page. Symmetry is not worth that; if Plane
+  // ever hooks cut too, add it then and the tests will say so.
+  const onCopy = (e) => {
+    if (!isActive()) return;
+    const t = e.target;
+    if (!t || !t.closest || !t.closest(".ProseMirror, .tiptap")) return;
+    const dt = e.clipboardData;
+    if (!dt) return;
+    try {
+      const next = peTidyCopiedText(dt.getData("text/plain"), dt.getData("text/html"));
+      if (next !== null) dt.setData("text/plain", next);
+    } catch (_) {}
+  };
+  document.addEventListener("copy", onCopy);
+
   document.addEventListener("mousedown", onDocClick, true);
   document.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("scroll", onScrollResize, true);

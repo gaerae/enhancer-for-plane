@@ -1465,6 +1465,84 @@ function peMissingItemFields(format, item) {
   return out;
 }
 
+// Take the stray "\" out of text copied from Plane's description editor.
+//
+// Plane rewrites the clipboard's plain-text flavour with Markdown built by
+// rehype→remark (packages/editor/src/plugins/markdown-clipboard.ts). remark spells a hard
+// break as a backslash before the newline, so selecting part of a table cell that holds a
+// Shift+Enter and copying it puts "첫째 줄\" on the clipboard — visible in every plain-text
+// target: a form field, a spreadsheet cell, Slack, an IDE. Measured against the same
+// library versions Plane uses; turndown, the other HTML→Markdown ecosystem, spells the
+// same break as two invisible trailing spaces, which is why this shows up here and not in
+// products built on that side.
+//
+// Dropping the backslash rather than replacing it with those two spaces is deliberate.
+// Plane parses the clipboard back with `breaks: true`, so a bare newline still comes back
+// as a line break — measured, no round-trip loss. Trailing spaces would survive one more
+// case (a strict CommonMark renderer, where a bare newline degrades to a space) at the
+// price of putting invisible whitespace into every form field and spreadsheet cell, which
+// is exactly what the people who asked for this copy into.
+//
+// `html` is the text/html flavour of the SAME copy, and it is the evidence that the
+// backslash is Plane's and not the author's. Plane disables Markdown escaping, so a
+// backslash somebody typed reaches the clipboard bare and looks identical to a hard break;
+// two things separate them, and both were needed.
+//
+// One: a hard break is never the last thing in its block, so the line after it is never
+// empty. An authored "경로는 C:\" ending a paragraph is followed by a blank line, and that
+// is the shape this refuses.
+//
+// Two: a budget. Plane writes at most one backslash per <br>, so more candidates than <br>s
+// means at least one was typed and there is no telling which — leave the whole copy alone.
+// "At most" is doing work there: a <br> in a table cell becomes a space and a <br> ending a
+// block is dropped, so the count is a ceiling, never a quota to spend. Both failures point
+// the same way — a leftover "\" is what happens today, while deleting a character the author
+// wrote is a new harm. Returns the new plain text, or null for "leave the clipboard alone".
+function peTidyCopiedText(plain, html) {
+  const text = typeof plain === "string" ? plain : "";
+  if (text.indexOf("\\\n") === -1) return null;
+  const breaks = (String(html == null ? "" : html).match(/<br\b/gi) || []).length;
+  if (!breaks) return null;
+
+  // Fence tracking reads the line with its container prefixes taken off. remark indents a
+  // fence by whatever encloses it — measured on Plane's own pipeline, a code block inside a
+  // nested list arrives as "  * ```" and one inside a quote as "> ```" — and a pattern
+  // anchored at the line start sees neither, then takes the "\" off "    docker run \" as
+  // if it were prose. Only fence detection is normalized; the backslash itself is judged on
+  // the line as written.
+  const bare = (line) => line.replace(/^(?:\s*>)*\s*(?:[-*+]|\d+[.)])?\s*/, "");
+  const lines = text.split("\n");
+  let fenceChar = ""; // the fence currently open, "`" or "~"
+  let fenceLen = 0;
+  const hits = [];
+  // The last line is not followed by a newline, so a backslash there is not a hard break.
+  for (let i = 0; i < lines.length - 1; i++) {
+    const f = /^(`{3,}|~{3,})(.*)$/.exec(bare(lines[i]));
+    if (f) {
+      const char = f[1][0];
+      if (!fenceChar) {
+        fenceChar = char;
+        fenceLen = f[1].length;
+      } else if (char === fenceChar && f[1].length >= fenceLen && !f[2].trim()) {
+        fenceChar = "";
+        fenceLen = 0;
+      }
+      continue;
+    }
+    // Inside a fence "docker run \" is a shell line continuation, not a hard break.
+    // Code always arrives fenced (measured: remark fences even a block with no language),
+    // so tracking fences is the whole of it — there is no indented-code case to miss.
+    if (fenceChar) continue;
+    // A block never ends on a hard break, so the line after one always has something on it.
+    if (!lines[i + 1].trim()) continue;
+    // A lone trailing backslash only. "a\\" is an escaped backslash the author wrote.
+    if (/(?:^|[^\\])\\$/.test(lines[i])) hits.push(i);
+  }
+  if (!hits.length || hits.length > breaks) return null;
+  for (const i of hits) lines[i] = lines[i].slice(0, -1);
+  return lines.join("\n");
+}
+
 // Split a typed key on its LAST "-" into { proj, num } for the {{key.proj}} / {{key.num}}
 // tokens. A key is "<identifier>-<number>" and the identifier itself can hold a "-", so the
 // last "-" is the true split. A key with no usable "-" has no split — proj/num come back

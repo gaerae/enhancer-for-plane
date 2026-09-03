@@ -118,6 +118,19 @@ three selections. It works on the item's own page and in the panel a list opens.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
+### 🧹 Copied text — the stray `\`
+
+Plane replaces the plain-text side of the clipboard with Markdown whenever you copy inside a
+description, and its Markdown spells a line break as a trailing `\`. Select part of a table
+cell that holds a Shift+Enter, copy it, and that backslash follows you into the form field,
+the spreadsheet cell, the chat message. This takes it back off.
+
+Nothing to configure, and nothing else is touched: the rich-text flavours go to the clipboard
+exactly as Plane wrote them, so pasting back into Plane is unchanged. A backslash you typed
+yourself stays — whether there was a line break there at all is read off the same copy's HTML
+— and so does a line continuation inside a code block. When Plane fixes the serialization
+there is nothing left to take off and this goes quiet on its own.
+
 ### 📐 Style rules — a generic engine
 
 Plane cuts long names off in lists and dropdowns until you cannot tell items apart. One

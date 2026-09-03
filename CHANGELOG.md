@@ -10,6 +10,56 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.9.0 — 2026-09-04
+
+Schema unchanged.
+
+### Fixed
+- **A copy out of a description no longer leaves a stray `\` at every line break.** Plane
+  rewrites the plain-text side of the clipboard with Markdown
+  (`packages/editor/src/plugins/markdown-clipboard.ts`), and the library it builds that
+  Markdown with spells a hard break as a backslash before the newline. So selecting part of a
+  table cell that holds a Shift+Enter and copying it put `첫째 줄\` into whatever you pasted
+  into: a form field, a spreadsheet cell, a chat message. The extension now takes that
+  backslash back off, and only that — `text/html` and Plane's own private flavour reach the
+  clipboard exactly as Plane wrote them, so a paste back into Plane runs its normal path and
+  is unchanged.
+
+  Measured against the same libraries Plane uses, which is also the answer to "why here and
+  nowhere else": remark writes the break as `\` + newline, while turndown — the other
+  HTML→Markdown ecosystem — writes two invisible trailing spaces. Same policy, different
+  spelling, and only one of them is visible in a paste.
+
+  Dropping the backslash rather than respelling it as those two spaces is deliberate. Plane
+  parses the clipboard back with `breaks: true`, so a bare newline still returns as a line
+  break — no round-trip loss. Trailing spaces would additionally survive a strict CommonMark
+  renderer, at the price of putting invisible whitespace into every form field and
+  spreadsheet cell, which is exactly what the people who hit this are pasting into.
+
+  Two things it will not do. A backslash **you** typed is left where you typed it: Plane
+  disables Markdown escaping, so a typed one reaches the clipboard looking identical to a
+  hard break, and two things separate them. A hard break is never the last thing in its
+  block, so a backslash with a blank line under it is yours. And the `<br>`s in the same
+  copy's HTML are a ceiling on how many Plane can have written — more candidates than that
+  and the whole copy is left alone rather than guessed at, because being wrong there deletes
+  something you wrote, while being cautious leaves what Plane does today. A line
+  continuation inside a code fence is left alone too —
+  `docker run \` is not a line break, including when the fence sits inside a list or a quote
+  and so never starts at the line's first column. All of it is asserted from each end: the
+  browser suite fails if the fix stops reaching the clipboard, and fails again if the
+  evidence check is dropped.
+
+  There is no setting. The transform is lossless for a Plane round trip and narrow enough
+  that "turn it off" is not a question worth asking anyone, and when Plane fixes the
+  serialization upstream there is nothing left to take off — the feature goes quiet on its
+  own rather than leaving a dead switch on the settings page.
+
+  Not fixed, because it is not ours to fix cheaply: copying a **whole cell or column** loses
+  the line break entirely (GFM has no way to put a newline inside a table cell, and Plane's
+  serializer drops it to a space rather than writing `<br>`). That one needs a fix in Plane.
+
+---
+
 ## v1.8.0 — 2026-08-09
 
 Schema 7 → 8.

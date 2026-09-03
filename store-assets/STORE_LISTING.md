@@ -175,7 +175,7 @@ Optional host permissions (requested per site at runtime, NOT at install)
   The same mechanism covers team-template sync: a source URL can be on any host (an intranet server, a Git host), so adding a source prompts for that one origin, and the extension refuses to fetch any origin the user has not granted.
 
 Clipboard
-  No clipboard permission is requested or needed. "Copy reference" writes one string during the user's own click, using the standard page API; the extension never reads the clipboard.
+  No clipboard permission is requested or needed, and the clipboard's existing contents are never read. Two things happen, both inside a gesture the user made and both through the standard page API. "Copy reference" writes one string during the user's own click. And when the user copies inside a Plane description, the extension edits the plain-text version of THAT copy before it lands — Plane replaces it with Markdown whose line breaks carry a trailing backslash, and the backslash is removed. It reads only the data the page just put into that copy event, on granted origins only, and nothing is stored or sent anywhere.
 
 Remote code
   None. All JavaScript and CSS is bundled in the package; nothing is eval'd, injected as markup, or executed from the network at runtime.
