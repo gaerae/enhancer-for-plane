@@ -30,6 +30,9 @@
   "optRate": {
     "message": "별점 남기기"
   },
+  "optChangelog": {
+    "message": "변경 이력"
+  },
   "optEnabled": {
     "message": "확장 프로그램 사용"
   },

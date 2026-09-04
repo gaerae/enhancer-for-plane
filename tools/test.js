@@ -1155,6 +1155,122 @@ test("copy: substitution is single-pass, so a title cannot inject a token", () =
   eq(ctx.peExpandCopyFormat("{{item.title}}", item), "{{item.url}}", "the value is inserted as written");
 });
 
+// Plane rewrites the clipboard's plain text with Markdown, and remark spells a hard break
+// as a backslash — so a Shift+Enter inside a table cell arrives as "첫째 줄\". Every payload
+// below came out of Plane's own pipeline (rehype-parse → rehype-remark → remark-gfm →
+// remark-stringify, its `text` handler overridden the way Plane overrides it), not out of
+// a guess at what that pipeline emits.
+test("copy: the backslash Plane spells a line break with comes off the clipboard", () => {
+  const ctx = loadCommon();
+  const html = "<p>첫째 줄<br>둘째 줄</p>";
+  eq(ctx.peTidyCopiedText("첫째 줄\\\n둘째 줄\n", html), "첫째 줄\n둘째 줄\n");
+  // A list item and a blockquote carry the break the same way; the continuation line's
+  // own indent or "> " is none of our business.
+  eq(ctx.peTidyCopiedText("* 첫째\\\n  둘째\n", html), "* 첫째\n  둘째\n");
+  eq(ctx.peTidyCopiedText("> 첫째\\\n> 둘째\n", html), "> 첫째\n> 둘째\n");
+});
+
+test("copy: a shell continuation inside a code fence is not a line break", () => {
+  const ctx = loadCommon();
+  // Both halves in one payload, because that is how it arrives: the fence has to survive
+  // in the same pass that cleans the paragraph under it. Measured — remark fences code
+  // even with no language, so there is no indented-code form to miss.
+  const plain = "```bash\ndocker run \\\n  --rm \\\n  alpine\n```\n\n다음 줄\\\n또 한 줄\n";
+  eq(
+    ctx.peTidyCopiedText(plain, "<pre><code>…</code></pre><p>다음 줄<br>또 한 줄</p>"),
+    "```bash\ndocker run \\\n  --rm \\\n  alpine\n```\n\n다음 줄\n또 한 줄\n"
+  );
+  // A fenced block that documents Markdown holds lines that look like fences themselves.
+  // Only an opener may carry a list marker — remark writes "  * ```" to open and "    ```"
+  // to close, because the marker is not repeated on a list item's later lines — so reading
+  // a marker off a line while a fence is open ends the block on its own contents, and the
+  // stripping resumes over the rest of somebody's shell script.
+  eq(
+    ctx.peTidyCopiedText("```bash\n* ```\ndocker run \\\n  --rm\n```\n\n다음\n", "<p>a<br>b</p>"),
+    null,
+    "a fence line inside a fence does not close it"
+  );
+  // And the close still works, so a real break after the block is still cleaned.
+  eq(
+    ctx.peTidyCopiedText("```bash\n* ```\ndocker run \\\n```\n\n다음\\\n줄\n", "<p>a<br>b</p>"),
+    "```bash\n* ```\ndocker run \\\n```\n\n다음\n줄\n"
+  );
+  // An unterminated fence keeps everything after it as code rather than guessing.
+  eq(ctx.peTidyCopiedText("```\na \\\nb\\\n", "<pre><code>a \\\nb\\</code></pre><br>"), null);
+});
+
+test("copy: a fence is found under whatever encloses it, not only at the line start", () => {
+  const ctx = loadCommon();
+  // remark indents a fence by its container, so the opener is never at column 0 in a list
+  // or a quote — both payloads below are what Plane's pipeline actually emitted. A fence
+  // test anchored at the line start sees neither and then strips the continuation off
+  // "    docker run \", handing over a broken command.
+  const nested = "* 바깥\n\n  * ```\n    docker run \\\n      --rm\n    ```\n\n다음\\\n줄\n";
+  eq(
+    ctx.peTidyCopiedText(nested, "<ul><li><pre><code>…</code></pre></li></ul><p>다음<br>줄</p>"),
+    "* 바깥\n\n  * ```\n    docker run \\\n      --rm\n    ```\n\n다음\n줄\n"
+  );
+  const quoted = "> ```\n> docker run \\\n>   --rm\n> ```\n\n다음\\\n줄\n";
+  eq(
+    ctx.peTidyCopiedText(quoted, "<blockquote><pre><code>…</code></pre></blockquote><p>다음<br>줄</p>"),
+    "> ```\n> docker run \\\n>   --rm\n> ```\n\n다음\n줄\n"
+  );
+});
+
+test("copy: a backslash that ends a block is the author's — nothing ends on a hard break", () => {
+  const ctx = loadCommon();
+  // The payload that showed why the <br> count is not enough on its own: a table and a
+  // paragraph copied together. Both cells hold a Shift+Enter, so the HTML has two <br>s —
+  // and both serialize to a space, contributing no backslash at all. The only backslash is
+  // one the author typed at the end of a paragraph, and the count would happily pay for it.
+  // What refuses it is the shape: a hard break is never the last thing in its block, so a
+  // blank line follows an authored backslash and never follows a real one.
+  const plain = "|       |\n| ----- |\n| a1 a2 |\n| b1 b2 |\n\n경로는 C:\\\n\n다음\n";
+  const html =
+    "<table><tbody><tr><td><p>a1<br>a2</p></td></tr><tr><td><p>b1<br>b2</p></td></tr></tbody></table>" +
+    "<p>경로는 C:\\</p><p>다음</p>";
+  eq(ctx.peTidyCopiedText(plain, html), null);
+  // And it is a per-line judgement, not a verdict on the copy: a real break in the same
+  // payload is still cleaned while the authored one is left standing.
+  eq(ctx.peTidyCopiedText("경로는 C:\\\n\n다음\\\n줄\n", "<p>a<br>b</p><p>c<br>d</p>"), "경로는 C:\\\n\n다음\n줄\n");
+});
+
+test("copy: more backslashes than the HTML accounts for means hands off, not a guess", () => {
+  const ctx = loadCommon();
+  // One <br> in the selection licenses one backslash. A second one is a character somebody
+  // typed — and nothing in the text says which of the two it is, so neither is touched.
+  // Being wrong here deletes the author's writing; being cautious leaves what Plane does
+  // today, which is the failure everyone already lives with.
+  eq(ctx.peTidyCopiedText("경로 C:\\\n다음 줄\\\n또 한 줄\n", "<p>a<br>b</p>"), null);
+  eq(
+    ctx.peTidyCopiedText("경로 C:\\\n다음 줄\\\n또 한 줄\n", "<p>a<br>b<br>c</p>"),
+    "경로 C:\n다음 줄\n또 한 줄\n",
+    "two breaks in the HTML account for both"
+  );
+});
+
+test("copy: without a <br> in the HTML flavour, a trailing backslash is the author's", () => {
+  const ctx = loadCommon();
+  // Plane disables Markdown escaping, so a backslash somebody typed reaches the clipboard
+  // bare and looks exactly like the one remark writes. The other flavour of the same copy
+  // is the only thing that tells them apart: no <br>, no hard break, hands off.
+  eq(ctx.peTidyCopiedText("경로는 C:\\\n입니다\n", "<p>경로는 C:\\</p><p>입니다</p>"), null);
+  eq(ctx.peTidyCopiedText("경로는 C:\\\n입니다\n", ""), null, "and with no HTML flavour at all");
+});
+
+test("copy: a payload with nothing to fix is left alone, not rewritten", () => {
+  const ctx = loadCommon();
+  const br = "<p>a<br>b</p>";
+  // null is "do not touch the clipboard" — distinct from a string that happens to equal
+  // what was there, so the caller never writes a flavour it had no reason to write.
+  eq(ctx.peTidyCopiedText("첫째 줄\n둘째 줄\n", br), null, "already clean");
+  eq(ctx.peTidyCopiedText("| a1 a2 |\n| ----- |\n", br), null, "a copied table has no hard breaks left");
+  eq(ctx.peTidyCopiedText("경로 C:\\\\\n다음\n", br), null, "an escaped backslash is a character, not a break");
+  eq(ctx.peTidyCopiedText("끝은 백슬래시\\", br), null, "the last line is not followed by a newline");
+  eq(ctx.peTidyCopiedText("", br), null);
+  eq(ctx.peTidyCopiedText(null, br), null);
+});
+
 test("copy: the presets are three ordinary rows", () => {
   const ctx = loadCommon();
   const list = ctx.__DEFAULTS.copyFormats;

@@ -1501,10 +1501,24 @@
     flashTimer = setTimeout(() => (el.status.textContent = ""), 3000);
   }
 
-  // header "about" line: show the version straight from the manifest (never goes stale)
+  // header "about" line: show the version straight from the manifest (never goes stale).
+  // The number is the link — the question a version raises is "what is in it", and
+  // answering that with a fourth item in this row would cost the row a line. It points at
+  // the releases list, not at CHANGELOG.md: each release is one dated entry titled with the
+  // number the reader just clicked, newest first, so their version is what they land on
+  // instead of the top of a 600-line file. Not at /releases/tag/v<version> either — that is
+  // exact, and 404s for anyone running an unpacked build whose version was never released,
+  // which is precisely whoever is working on this. Both the number and its separator start
+  // hidden, so a manifest that cannot be read leaves no empty link and no leading "·"
+  // rather than a gap in the middle of the row.
   try {
     const av = $("appVersion");
-    if (av) av.textContent = "v" + chrome.runtime.getManifest().version + " · ";
+    const sep = $("appVersionSep");
+    if (av) {
+      av.textContent = "v" + chrome.runtime.getManifest().version;
+      av.hidden = false;
+      if (sep) sep.hidden = false;
+    }
   } catch (_) {}
 
   // Storage meter. Settings occupy several chrome.storage.sync items now (the core one

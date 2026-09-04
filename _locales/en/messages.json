@@ -32,6 +32,10 @@
   "optRate": {
     "message": "Rate it"
   },
+  "optChangelog": {
+    "message": "Changelog",
+    "description": "Tooltip on the version number in the Settings header, which links to CHANGELOG.md. The number itself is the link because \"what is in this version\" is the question a version number raises, and a fourth named link in that row would cost the row a line."
+  },
   "optEnabled": {
     "message": "Extension enabled"
   },

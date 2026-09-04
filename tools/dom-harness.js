@@ -137,7 +137,11 @@ window.chrome = {
   },
   runtime: {
     lastError: null,
-    getManifest: () => ({ version: "test", action: {} }),
+    // A version shaped like a real one, not "test": the header renders it as the link to the
+    // changelog, and a stub that hands back a word lets a page that renders nothing sensible
+    // pass anyway. It is deliberately not the shipping number — nothing here should have to
+    // be edited on a release.
+    getManifest: () => ({ version: "9.9.9", action: {} }),
     openOptionsPage: () => { window.__optionsOpened = true; },
     sendMessage: () => {},
     // Captured, not discarded: this is how the popup and the keyboard command reach the
@@ -1003,6 +1007,82 @@ const suites = [
       });`
   },
   {
+    // The value-level half of this lives in test.js; what only a browser can prove is the
+    // phase. Plane's own plugin listens for "copy" on the editor node and calls
+    // preventDefault() + clearData() before writing Markdown — so this page registers a
+    // handler that does exactly that, and asks whether ours still gets to the DataTransfer
+    // afterwards. Get the phase wrong (capture, or the editor node) and every assertion in
+    // test.js still passes while nothing reaches the clipboard.
+    name: "content · the copy that leaves no backslash",
+    page: {
+      name: "ct-copy-text",
+      plane:
+        `<div id="box"><div><div><div><div>` +
+        `<div class="ProseMirror" id="ed"><p id="cell">첫째 줄<br>둘째 줄</p></div>` +
+        `</div></div></div></div>` +
+        `<button type="button" aria-label="Attach"><input type="file" /></button></div>` +
+        `<div id="outside"><p id="plain">첫째 줄</p></div>`,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      // The template button is the page's only visible sign that settings have arrived.
+      // Until they have, isActive() is false and a copy is left alone for the same reason
+      // an unenabled site would leave it alone — so a suite that fired before this point
+      // could not tell a refusal from a slow start.
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "settings to arrive");
+
+      // Written with a named backslash rather than an escape thicket: this string is a
+      // JS literal inside a JS template literal inside a generated page.
+      const BS = String.fromCharCode(92);
+      const HTML = "<p>첫째 줄<br>둘째 줄</p>";
+      let payload = { plain: "첫째 줄" + BS + "\\n둘째 줄\\n", html: HTML };
+      document.getElementById("ed").addEventListener("copy", (e) => {
+        e.preventDefault();
+        e.clipboardData.clearData();
+        e.clipboardData.setData("text/plain", payload.plain);
+        e.clipboardData.setData("text/html", payload.html);
+        e.clipboardData.setData("text/plane-editor-html", payload.html);
+      });
+      const fire = (id, preload, type) => {
+        const dt = new DataTransfer();
+        if (preload) for (const k of Object.keys(preload)) dt.setData(k, preload[k]);
+        document.getElementById(id).dispatchEvent(
+          new ClipboardEvent(type || "copy", { clipboardData: dt, bubbles: true, cancelable: true })
+        );
+        return dt;
+      };
+
+      const inside = fire("cell");
+      check("a copy out of the editor reaches the clipboard without the backslash", () => {
+        eq(inside.getData("text/plain"), "첫째 줄\\n둘째 줄\\n", "the plain-text flavour");
+      });
+      check("and the other flavours are exactly what Plane wrote", () => {
+        eq(inside.getData("text/html"), HTML, "text/html");
+        eq(inside.getData("text/plane-editor-html"), HTML, "Plane's own flavour");
+      });
+
+      // A cut is left alone on purpose, and this is the tripwire for adding it "for
+      // symmetry": Plane hooks "copy" alone, so a cut carries ProseMirror's own text, which
+      // has no hard-break backslash in it. Anything we found there would be a character the
+      // author typed — in the only remaining copy of text just deleted from the page.
+      const cut = fire("cell", { "text/plain": "첫째 줄" + BS + "\\n둘째 줄\\n", "text/html": HTML }, "cut");
+      check("a cut is left alone — there is nothing of Plane's in its plain text", () => {
+        eq(cut.getData("text/plain"), "첫째 줄" + BS + "\\n둘째 줄\\n");
+      });
+
+      payload = { plain: "경로는 C:" + BS + "\\n입니다\\n", html: "<p>경로는 C:" + BS + "</p><p>입니다</p>" };
+      const typed = fire("cell");
+      check("a backslash the author typed is left where they typed it", () => {
+        eq(typed.getData("text/plain"), "경로는 C:" + BS + "\\n입니다\\n");
+      });
+
+      const outside = fire("plain", { "text/plain": "첫째 줄" + BS + "\\n둘째 줄\\n", "text/html": HTML });
+      check("a copy from outside any editor is none of our business", () => {
+        eq(outside.getData("text/plain"), "첫째 줄" + BS + "\\n둘째 줄\\n");
+      });`
+  },
+  {
     // Paste beats a list of five, and the list of five is what the chooser was. Everything
     // here is a question about the assembled page: whether the box reports what it read
     // before anything is committed, whether refusing looks like refusing, and where the caret
@@ -1486,10 +1566,19 @@ const suites = [
         ok(quick < copy, "Quick open is at " + quick + ", Copy reference at " + copy);
         return "quick " + quick + " · copy " + copy;
       });
-      check("the header links read GitHub → feedback → rating", () => {
-        const labels = [...document.querySelectorAll(".about .about-link")]
-          .map((a) => a.textContent.trim());
-        eq(labels.join(" · "), "GitHub · Send feedback · Rate it");
+      check("the header links read version → GitHub → feedback → rating", () => {
+        const links = [...document.querySelectorAll(".about .about-link")];
+        const labels = links.map((a) => a.textContent.trim());
+        // The version is a link because a version number's own question is "what is in it".
+        // It is first, it is not hidden (which is what a manifest we could not read leaves),
+        // and it goes to the releases list — the version-shaped answer — rather than to the
+        // repo root or to CHANGELOG.md, which is one long page you have to scroll to reach
+        // the release you are running.
+        ok(/^v\\d+\\.\\d+\\.\\d+$/.test(labels[0]), "the version reads " + JSON.stringify(labels[0]));
+        ok(!links[0].hidden && !document.getElementById("appVersionSep").hidden, "shown with its separator");
+        ok(/\\/releases$/.test(links[0].getAttribute("href") || ""), "the version points at the releases page");
+        ok(links[0].title.trim().length > 0, "and it says where it goes");
+        eq(labels.slice(1).join(" · "), "GitHub · Send feedback · Rate it");
         return labels.join(" · ");
       });`
   },

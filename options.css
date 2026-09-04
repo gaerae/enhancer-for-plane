@@ -81,9 +81,11 @@ body {
 .about-link:hover {
   text-decoration-color: currentColor;
 }
-/* Every about-link is icon-then-label, so there is one rule and no side-specific variant.
-   Two of the three used to trail their icon, which made the row read as three different
-   kinds of link when they are all just links. */
+/* Every about-link that names a destination is icon-then-label, so there is one rule and no
+   side-specific variant. Two of the three used to trail their icon, which made the row read
+   as three different kinds of link when they are all just links. The version (.about-ver) is
+   the exception and carries no icon: it is a number, not a destination name, and a fourth
+   icon in this row is decoration on something already legible. */
 .about-ico {
   width: 12px;
   height: 12px;
