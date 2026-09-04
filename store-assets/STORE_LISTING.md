@@ -174,7 +174,13 @@ Optional host permissions (requested per site at runtime, NOT at install)
   Plane can be self-hosted on ANY domain, so the target host is not known at build time and cannot be a fixed match list. The extension therefore declares optional host permissions and requests access to a single origin only when the user enables that domain (via the popup's "Enable on this site" or Settings) — Chrome shows a per-site prompt. It requests no host access at install, holds access only for the domains the user granted, and releases it when a domain is removed. This is the least-privilege way to support arbitrary user-provided self-hosted Plane hosts.
   The same mechanism covers team-template sync: a source URL can be on any host (an intranet server, a Git host), so adding a source prompts for that one origin, and the extension refuses to fetch any origin the user has not granted.
 
-Clipboard
+Clipboard (NOT a dashboard field — there is no box to paste this into)
+  The form generates one box per permission the manifest actually requests, so there is no
+  Clipboard field and there never will be: none is requested. This entry is here to be
+  answerable — in a reply to a reviewer, or to whoever reads this file next and wonders
+  whether the clipboard needed disclosing. It did not, and nothing about it changes the
+  Data usage answers below: what is read is read locally, in the user's own gesture, and
+  never leaves the device.
   No clipboard permission is requested or needed, and the clipboard's existing contents are never read. Two things happen, both inside a gesture the user made and both through the standard page API. "Copy reference" writes one string during the user's own click. And when the user copies inside a Plane description, the extension edits the plain-text version of THAT copy before it lands — Plane replaces it with Markdown whose line breaks carry a trailing backslash, and the backslash is removed. It reads only the data the page just put into that copy event, on granted origins only, and nothing is stored or sent anywhere.
 
 Remote code
@@ -185,7 +191,7 @@ Remote code
 
 ## Data usage disclosures  (Privacy practices tab — check these)
 
-• Does your extension collect or use user data? → Only "Website content" is read locally to apply styling on matched Plane pages; it is NOT collected, transmitted, or stored off-device.
+• Does your extension collect or use user data? → Only "Website content" is read locally — to apply styling on matched Plane pages, and to take Plane's stray backslash out of the text of a copy the user is making. It is NOT collected, transmitted, or stored off-device.
 • Personally identifiable information — NO
 • Health, financial, authentication, personal communications, location, web history, user activity — NO
   On "web history", which is worth being able to answer out loud rather than just ticking:
