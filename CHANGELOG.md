@@ -27,7 +27,7 @@ Schema unchanged.
   rewrites the plain-text side of the clipboard with Markdown
   (`packages/editor/src/plugins/markdown-clipboard.ts`), and the library it builds that
   Markdown with spells a hard break as a backslash before the newline. So selecting part of a
-  table cell that holds a Shift+Enter and copying it put `첫째 줄\` into whatever you pasted
+  table cell that holds a Shift+Enter and copying it put `line one\` into whatever you pasted
   into: a form field, a spreadsheet cell, a chat message. The extension now takes that
   backslash back off, and only that — `text/html` and Plane's own private flavour reach the
   clipboard exactly as Plane wrote them, so a paste back into Plane runs its normal path and

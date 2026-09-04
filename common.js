@@ -1470,7 +1470,7 @@ function peMissingItemFields(format, item) {
 // Plane rewrites the clipboard's plain-text flavour with Markdown built by
 // rehype→remark (packages/editor/src/plugins/markdown-clipboard.ts). remark spells a hard
 // break as a backslash before the newline, so selecting part of a table cell that holds a
-// Shift+Enter and copying it puts "첫째 줄\" on the clipboard — visible in every plain-text
+// Shift+Enter and copying it puts "line one\" on the clipboard — visible in every plain-text
 // target: a form field, a spreadsheet cell, Slack, an IDE. Measured against the same
 // library versions Plane uses; turndown, the other HTML→Markdown ecosystem, spells the
 // same break as two invisible trailing spaces, which is why this shows up here and not in
@@ -1489,7 +1489,7 @@ function peMissingItemFields(format, item) {
 // two things separate them, and both were needed.
 //
 // One: a hard break is never the last thing in its block, so the line after it is never
-// empty. An authored "경로는 C:\" ending a paragraph is followed by a blank line, and that
+// empty. An authored "C:\" ending a paragraph is followed by a blank line, and that
 // is the shape this refuses.
 //
 // Two: a budget. Plane writes at most one backslash per <br>, so more candidates than <br>s
