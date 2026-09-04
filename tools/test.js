@@ -1180,6 +1180,21 @@ test("copy: a shell continuation inside a code fence is not a line break", () =>
     ctx.peTidyCopiedText(plain, "<pre><code>…</code></pre><p>다음 줄<br>또 한 줄</p>"),
     "```bash\ndocker run \\\n  --rm \\\n  alpine\n```\n\n다음 줄\n또 한 줄\n"
   );
+  // A fenced block that documents Markdown holds lines that look like fences themselves.
+  // Only an opener may carry a list marker — remark writes "  * ```" to open and "    ```"
+  // to close, because the marker is not repeated on a list item's later lines — so reading
+  // a marker off a line while a fence is open ends the block on its own contents, and the
+  // stripping resumes over the rest of somebody's shell script.
+  eq(
+    ctx.peTidyCopiedText("```bash\n* ```\ndocker run \\\n  --rm\n```\n\n다음\n", "<p>a<br>b</p>"),
+    null,
+    "a fence line inside a fence does not close it"
+  );
+  // And the close still works, so a real break after the block is still cleaned.
+  eq(
+    ctx.peTidyCopiedText("```bash\n* ```\ndocker run \\\n```\n\n다음\\\n줄\n", "<p>a<br>b</p>"),
+    "```bash\n* ```\ndocker run \\\n```\n\n다음\n줄\n"
+  );
   // An unterminated fence keeps everything after it as code rather than guessing.
   eq(ctx.peTidyCopiedText("```\na \\\nb\\\n", "<pre><code>a \\\nb\\</code></pre><br>"), null);
 });

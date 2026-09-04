@@ -1510,29 +1510,38 @@ function peTidyCopiedText(plain, html) {
   // anchored at the line start sees neither, then takes the "\" off "    docker run \" as
   // if it were prose. Only fence detection is normalized; the backslash itself is judged on
   // the line as written.
-  const bare = (line) => line.replace(/^(?:\s*>)*\s*(?:[-*+]|\d+[.)])?\s*/, "");
+  //
+  // Opening and closing are not normalized the same way, and the difference is the point.
+  // An opener may carry a list marker, because that is where remark puts one; a closer never
+  // does — the marker is not repeated on the continuation lines of a list item, measured as
+  // "  * ```" open and "    ```" closed. Strip a marker while looking for the close and a
+  // line of code that happens to read "* ```" — a fenced block documenting Markdown — ends
+  // the block early, and the stripping resumes over what is still somebody's shell script.
+  const quoted = (line) => line.replace(/^(?:\s*>)*\s*/, "");
+  const bare = (line) => quoted(line).replace(/^(?:[-*+]|\d+[.)])\s+/, "");
   const lines = text.split("\n");
   let fenceChar = ""; // the fence currently open, "`" or "~"
   let fenceLen = 0;
   const hits = [];
   // The last line is not followed by a newline, so a backslash there is not a hard break.
   for (let i = 0; i < lines.length - 1; i++) {
-    const f = /^(`{3,}|~{3,})(.*)$/.exec(bare(lines[i]));
-    if (f) {
-      const char = f[1][0];
-      if (!fenceChar) {
-        fenceChar = char;
-        fenceLen = f[1].length;
-      } else if (char === fenceChar && f[1].length >= fenceLen && !f[2].trim()) {
+    // Inside a fence "docker run \" is a shell line continuation, not a hard break.
+    // Code always arrives fenced (measured: remark fences even a block with no language),
+    // so tracking fences is the whole of it — there is no indented-code case to miss.
+    if (fenceChar) {
+      const c = /^(`{3,}|~{3,})\s*$/.exec(quoted(lines[i]));
+      if (c && c[1][0] === fenceChar && c[1].length >= fenceLen) {
         fenceChar = "";
         fenceLen = 0;
       }
       continue;
     }
-    // Inside a fence "docker run \" is a shell line continuation, not a hard break.
-    // Code always arrives fenced (measured: remark fences even a block with no language),
-    // so tracking fences is the whole of it — there is no indented-code case to miss.
-    if (fenceChar) continue;
+    const f = /^(`{3,}|~{3,})/.exec(bare(lines[i]));
+    if (f) {
+      fenceChar = f[1][0];
+      fenceLen = f[1].length;
+      continue;
+    }
     // A block never ends on a hard break, so the line after one always has something on it.
     if (!lines[i + 1].trim()) continue;
     // A lone trailing backslash only. "a\\" is an escaped backslash the author wrote.
