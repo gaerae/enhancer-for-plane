@@ -1271,6 +1271,112 @@ test("copy: a payload with nothing to fix is left alone, not rewritten", () => {
   eq(ctx.peTidyCopiedText(null, br), null);
 });
 
+// The two DOM anchors get the rule-health treatment: what one page is evidence of is a
+// small decision table, and it is the whole feature, so it is pinned here rather than left
+// to the content script. The record itself reuses peRuleHealthUpdate / peRuleHealthState,
+// which have their own tests above.
+test("anchors: the Template button is accused only on a work item address with an editor", () => {
+  const ctx = loadCommon();
+  // A hit counts wherever it happens — the create modal, the peek panel over a list.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: false, editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed off an item: a hit");
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed on an item: a hit");
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 2, placed: 0 } }, false), { toolbar: 0 }, "item, editor, no button: a miss");
+  // Plane's Pages: an editable editor on a route that is not a work item, and no attach
+  // toolbar by design. The first version called this a miss.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: false, editors: 1, placed: 0 } }, false), {}, "an editor off an item: no opinion");
+  // An item page with no editable editor — a read-only view.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 0, placed: 0 } }, false), {}, "nothing to type into: no opinion");
+  // Nothing configured: the feature placed no button on purpose, and that is not a miss.
+  eq(ctx.peAnchorCounts({}, false), {}, "no templates, nothing observed");
+});
+
+test("anchors: the copy button is accused only where the address says there is an item", () => {
+  const ctx = loadCommon();
+  // A hit counts wherever it happens — the peek panel over a list keeps the list's URL.
+  eq(ctx.peAnchorCounts({ header: { itemPage: false, placed: 1 } }, false), { header: 1 }, "placed on a peek: a hit");
+  eq(ctx.peAnchorCounts({ header: { itemPage: true, placed: 1 } }, false), { header: 1 }, "placed on the item page: a hit");
+  // The opportunity signal is the URL, because the header is the thing that would vanish.
+  eq(ctx.peAnchorCounts({ header: { itemPage: true, placed: 0 } }, false), { header: 0 }, "item address, no button: a miss");
+  eq(ctx.peAnchorCounts({ header: { itemPage: false, placed: 0 } }, false), {}, "a list route: no opinion");
+});
+
+test("anchors: a hits-only pass can promote either anchor and accuse neither", () => {
+  const ctx = loadCommon();
+  const obs = { toolbar: { itemPage: true, editors: 1, placed: 0 }, header: { itemPage: true, placed: 0 } };
+  eq(ctx.peAnchorCounts(obs, true), {}, "two misses, nothing recorded");
+  const placed = { toolbar: { itemPage: false, editors: 1, placed: 1 }, header: { itemPage: false, placed: 1 } };
+  eq(ctx.peAnchorCounts(placed, true), { toolbar: 1, header: 1 }, "two hits, both recorded");
+  // And the record it feeds behaves like a rule's: one hit settles it, misses never unsettle it.
+  // The click scan here finds the Template button in a modal it just opened, and nothing
+  // for the copy button — so one anchor is promoted and the other is left to its misses.
+  const modal = { toolbar: { itemPage: false, editors: 1, placed: 1 }, header: { itemPage: false, placed: 0 } };
+  let h = ctx.peRuleHealthUpdate({}, ctx.peAnchorCounts(obs, false), 1000);
+  eq(ctx.peRuleHealthState(h.toolbar), "unknown", "one miss says nothing");
+  h = ctx.peRuleHealthUpdate(h, ctx.peAnchorCounts(modal, true), 2000);
+  eq(ctx.peRuleHealthState(h.toolbar), "ok", "a click-scan hit settles it");
+  eq(h.toolbar.at, 2000, "stamped with when");
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, ctx.peAnchorCounts(obs, false), 3000);
+  eq(ctx.peRuleHealthState(h.toolbar), "ok", "and stays settled");
+  eq(ctx.peRuleHealthState(h.header), "cold", "while the one never placed goes cold on schedule");
+});
+
+test("anchors: a work item page is Plane's address shape, not Jira's", () => {
+  const ctx = loadCommon();
+  ok(ctx.peIsItemPath("/acme/browse/PROJ-142"), "Plane");
+  ok(ctx.peIsItemPath("/acme/browse/PROJ-142/"), "with a trailing slash");
+  ok(ctx.peIsItemPath("/acme/browse/42-7"), "an all-digit identifier");
+  // The extension runs on Jira for style rules, and Jira's issue view is /browse/{KEY} with
+  // no workspace in front. Reading that as a Plane item page recorded every Jira issue as a
+  // place both buttons failed.
+  ok(!ctx.peIsItemPath("/browse/PROJ-142"), "Jira Cloud");
+  ok(!ctx.peIsItemPath("/acme/projects/abc/issues/"), "a list route");
+  ok(!ctx.peIsItemPath("/acme/browse/"), "browse with nothing after it");
+  ok(!ctx.peIsItemPath("/acme/browse/PROJ-1/activity"), "something below an item");
+  ok(!ctx.peIsItemPath(""), "nothing");
+});
+
+test("anchors: a button that worked and then stopped is reported, not settled forever", () => {
+  const ctx = loadCommon();
+  const N = ctx.__HEALTH_MIN;
+  const hit = { toolbar: 1 };
+  const miss = { toolbar: 0 };
+  // The scenario this record exists for: placed many times, then a Plane release.
+  let h = {};
+  for (let i = 0; i < 50; i++) h = ctx.peAnchorHealthUpdate(h, hit, 1000 + i);
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok");
+  eq(h.toolbar.streak, 0, "no misses yet");
+  for (let i = 0; i < N - 1; i++) h = ctx.peAnchorHealthUpdate(h, miss, 5000);
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok", "one short of the bar, still quiet");
+  h = ctx.peAnchorHealthUpdate(h, miss, 5000);
+  eq(ctx.peAnchorHealthState(h.toolbar), "lost", "and on the " + N + "th in a row it speaks up");
+  eq(h.toolbar.at, 1049, "with the time it was last placed, which is the useful half");
+  // One placement — a click scan on a slow page, say — ends the run.
+  h = ctx.peAnchorHealthUpdate(h, hit, 9000);
+  eq(h.toolbar.streak, 0, "the run ends");
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok", "and so does the warning");
+});
+
+test("anchors: misses broken up by placements never add up to lost", () => {
+  const ctx = loadCommon();
+  const N = ctx.__HEALTH_MIN;
+  let h = ctx.peAnchorHealthUpdate({}, { header: 1 }, 1);
+  // Three times the bar in misses — but never N in a row.
+  for (let i = 0; i < N * 3; i++) h = ctx.peAnchorHealthUpdate(h, { header: i % (N - 1) === 0 ? 1 : 0 }, 2);
+  eq(ctx.peAnchorHealthState(h.header), "ok");
+  // And "lost" needs a placement first: a button that never worked is "cold", which says so
+  // in words that do not claim it once did.
+  let never = {};
+  for (let i = 0; i < N; i++) never = ctx.peAnchorHealthUpdate(never, { header: 0 }, 3);
+  eq(ctx.peAnchorHealthState(never.header), "cold");
+});
+
+test("anchors: garbage in the record is read as nothing known", () => {
+  const ctx = loadCommon();
+  eq(ctx.peAnchorCounts(null, false), {});
+  eq(ctx.peAnchorCounts({ toolbar: "yes", header: 3 }, false), {});
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: "2", placed: NaN } }, false), {}, "non-numbers count as zero");
+});
+
 test("copy: the presets are three ordinary rows", () => {
   const ctx = loadCommon();
   const list = ctx.__DEFAULTS.copyFormats;

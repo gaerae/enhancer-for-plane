@@ -114,6 +114,36 @@
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "optTplAnchorOk": {
+    "message": "템플릿 버튼 마지막 표시 $TIME$",
+    "description": "In the templates card, when the button has found a description toolbar to sit on. Same shape as optRuleHealthOk.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optTplAnchorCold": {
+    "message": "작업 항목 페이지 $COUNT$곳에서 템플릿 버튼이 놓일 툴바를 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optTplAnchorLost": {
+    "message": "템플릿 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
+  "optCopyAnchorOk": {
+    "message": "복사 버튼 마지막 표시 $TIME$",
+    "description": "In the copy reference card, when the button has found a work item header to sit beside.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optCopyAnchorCold": {
+    "message": "작업 항목 페이지 $COUNT$곳에서 복사 버튼이 놓일 머리글을 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optCopyAnchorLost": {
+    "message": "복사 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
   "optRuleLabelPh": {
     "message": "설명 (예: 모듈 이름 폭)"
   },
@@ -457,7 +487,7 @@
     "placeholders": { "sites": { "content": "$1" } }
   },
   "msgResetConfirm": {
-    "message": "모든 설정을 기본값으로 되돌립니다. 실행 중인 사이트 목록도 함께 비워집니다.\n저장을 누르기 전까지는 아무것도 바뀌지 않습니다. 저장하면 해당 사이트에 대한 Chrome 접근 권한도 함께 반납되므로, 다시 켜려면 승인을 새로 받아야 합니다.\n계속할까요?"
+    "message": "모든 설정을 기본값으로 되돌립니다. 실행 중인 사이트 목록도 함께 비워집니다.\n최근에 연 작업 항목 목록도 지워집니다.\n저장을 누르기 전까지는 아무것도 바뀌지 않습니다. 저장하면 해당 사이트에 대한 Chrome 접근 권한도 함께 반납되므로, 다시 켜려면 승인을 새로 받아야 합니다.\n계속할까요?"
   },
   "msgResetDone": {
     "message": "기본값을 복원했습니다. “저장”을 눌러 적용하세요."
@@ -1052,6 +1082,14 @@
   },
   "popJumpGo": {
     "message": "열기"
+  },
+  "popRecentClear": {
+    "message": "지우기",
+    "description": "Popup, at the end of the row of recently opened work items. Forgets them; nothing else."
+  },
+  "popRecentClearTitle": {
+    "message": "최근에 연 작업 항목 목록을 지웁니다",
+    "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
   },
   "popJumpAuto": {
     "message": "자동"

@@ -79,7 +79,7 @@ someone else's text.
   no content script, so it works on any tab. The key's prefix routes between targets — point
   `ENG-` at Linear and leave the rest on Plane.
 - **The keys you opened last come back**, in the address bar and the popup. Twelve entries,
-  per device, never synced.
+  per device, never synced. **Clear** at the end of the popup's row forgets them.
 - **Words search instead of opening.** `issue login bug` goes to the tracker's search, if
   that target has a search URL with `{{q}}`. How far it gets you varies: Jira and GitHub
   land on results, while Plane opens its search page with your words already in the box and
@@ -98,6 +98,9 @@ in the "Create work item" dialog; `Alt/⌥+T` works in both.
   A shared template can say `{{var.team}}` and resolve differently for each person who
   inserts it, with no per-user data leaving the browser. An unknown name is left as its
   token rather than blanked, so a typo is visible instead of eating text.
+- **Settings says when the Template button last found a toolbar to sit on** — and, after
+  enough work item pages without it, that it has stopped finding one. It went missing on
+  Plane Cloud for a whole release once, and nothing said so.
 
 ![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 
@@ -115,6 +118,10 @@ three selections. It works on the item's own page and in the panel a list opens.
   and the toast names it — you find out before you paste.
 - **Also in the toolbar popup**, when the tab you are on is a work item. That path reads the
   tab's address and title and nothing else, so it works wherever Quick open has a link.
+
+- **Settings says when the button last found its place** — and, after enough work item
+  pages without it, that it has not. A Plane release can move the header the button sits
+  beside, and a button that is simply absent looks like a feature nobody used.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
@@ -492,19 +499,23 @@ Screenshots and the promo tile are in `store-assets/`.
 tag by hand.** The workflow
 [.github/workflows/release.yml](.github/workflows/release.yml) reads the version,
 packages only the shipping files (store assets, docs, and `icons/icon.svg` source
-are excluded), and publishes the Release.
+are excluded), and creates the Release as a **draft**.
 
 To ship a new version:
 
 1. Bump `"version"` in `manifest.json` (e.g. `1.1.0` → `1.1.1`).
 2. Commit and push to `main`.
-3. CI creates the `v<version>` tag and a GitHub Release with
-   `enhancer-for-plane-<version>.zip` attached. If that version was already
-   released, it skips — so an unrelated push never makes a duplicate.
+3. CI creates a draft GitHub Release with `enhancer-for-plane-<version>.zip`
+   attached. If that version already has a release, draft or published, it
+   skips — so an unrelated push never makes a duplicate.
+4. Write the release notes over the generated commit list, then **Publish**.
+   That is when the `v<version>` tag is created. The notes are what Settings
+   links to from the version number, which is why nothing goes public before
+   someone has written them.
 
 You can also trigger it from **Actions ▸ Release extension ▸ Run workflow**.
-Then download the zip from the Release and upload it in the Chrome Web Store
-dashboard.
+Then download the zip from the Release (a draft's assets are downloadable to you)
+and upload it in the Chrome Web Store dashboard.
 
 > If the release step fails with a 403, enable **Settings ▸ Actions ▸ General ▸
 > Workflow permissions ▸ Read and write permissions** so the workflow can create

@@ -163,7 +163,23 @@ presets sat matching nothing on Plane Cloud for a whole release because of it. T
 not to make failure loud in the page — the whole point is that it does not break anything —
 but to record what was observed and show it where the thing is configured. Anything else that
 degrades quietly (a selector, an anchor, a token that cannot be resolved) owes the reader the
-same: not an error, a fact about whether it did anything.
+same: not an error, a fact about whether it did anything. The two button anchors have it now
+(`PE_ANCHOR_HEALTH_KEY`, the same record shape and state function as a rule's), and the one
+thing to get right when adding a third is the *opportunity* signal: it has to be more durable
+than the anchor, because the anchor is the thing that vanishes — and narrower than "anything
+that looks related". Both buttons key it on the address (`/browse/{KEY}`), the Template button
+with an editable description on top. "Any editor" was the first draft and it would have
+accused the button on Plane's Pages, which has an editor and no attach toolbar by design.
+Anything that keys "should have been here" on the anchor itself can never notice the anchor
+going; anything broader than the feature's own surface will cry wolf.
+
+That precision is also what licenses the one state a rule is denied. Rule health records
+whether a rule has *ever* matched and never a per-page verdict, because a rule for one route
+legitimately misses on every other one — true, and it does not transfer: on a work item's own page a button should
+be there every time, so a run of misses there *is* evidence (`streak`, `peAnchorHealthState`'s
+"lost"). Leaving it out was the first draft, and it meant the scenario the record was built for
+— a working button, then a Plane release — showed one stale date and never a warning. If you
+add an anchor whose opportunity is not that precise, it does not get "lost" either.
 
 And it must not assume the thing being watched is on screen. The first version sampled once
 per route, which quietly accused every rule aimed at transient UI: the shipped "search
@@ -389,16 +405,18 @@ lies:
 
 - **A release body is now a user-facing surface, not a nicety.** The version number in
   Settings links to `/releases`, so whatever is written there is what someone clicking their
-  own version reads. All nine so far are hand-written; `release.yml` passes
-  `--generate-notes`, so forgetting leaves a commit list under a version number in somebody's
-  Settings. Write the body when the release is cut, or point that link somewhere else.
+  own version reads. `release.yml` can only write a commit list (`--generate-notes`), and
+  v1.9.0 went public with one before the real notes existed — so it now cuts the release as a
+  **draft**. Write the body, then publish; the tag is created on publish. Do not take the
+  `--draft` back out to save the click: the click is the point.
 
 - **A CHANGELOG date is the release's date, not the day you wrote the entry.** The entry
   gets written before the version bump is pushed, and `release.yml` cuts the release
   whenever that push lands — so an evening's writing released the next morning leaves a
   heading that is off by one. Two of nine were, both by exactly that. Nothing can check it
   (the truth is on GitHub and `tools/` has no network), so read it back off the releases
-  page after the release exists rather than guessing before it does.
+  page after the release exists rather than guessing before it does. With drafts, "exists"
+  means published: the date that counts is the day someone pressed Publish.
 
 - **`.github/` holds two files besides the workflows, and everything else GitHub's
   community checklist asks for is absent on purpose.** All of it was written and then

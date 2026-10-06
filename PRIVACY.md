@@ -52,10 +52,16 @@ by Chrome Sync):
   the one thing here that says anything about what you have been working on, which
   is exactly why it stays on the device it happened on: waking up at another
   machine to your own browsing in the address bar is not a feature, and there is
-  no server for it to go to. Clearing settings clears it.
+  no server for it to go to. **Clear**, at the end of the list in the popup, forgets it;
+  "Restore defaults" also clears it, on the save that follows.
 - **How often each style rule matched** — a count per rule and the time it last
   matched anything, which is how Settings can tell you a rule has quietly stopped
   working. Numbers and timestamps only; no page content and no addresses.
+- **Whether the two buttons found their place** — the same count and timestamp for
+  the Template button (did it find a description toolbar) and the copy button (did it
+  find a work item header), plus how many work item pages in a row have gone by without
+  it, so Settings can tell you when a Plane update has moved either one. Numbers and
+  timestamps only, the same as above.
 
 ## What is accessed
 

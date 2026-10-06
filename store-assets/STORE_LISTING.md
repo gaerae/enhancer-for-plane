@@ -153,7 +153,7 @@ Enhancer for Plane has one purpose: to let users customize the Plane (makeplane)
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds three device-only caches: the team templates downloaded from the user's own source URL, so the picker reads from disk instead of the network; the last few work item keys the user opened, so the address bar can offer them again; and a per-rule tally of how often each style rule has matched anything, so Settings can say when a rule has stopped working. None of it is sent to the developer, and the device-only items are deliberately kept out of Chrome Sync — recent work items are not something to push to a user's other machines.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds four device-only caches: the team templates downloaded from the user's own source URL, so the picker reads from disk instead of the network; the last few work item keys the user opened, so the address bar can offer them again; a per-rule tally of how often each style rule has matched anything, so Settings can say when a rule has stopped working; and the same tally for the two buttons the extension places (the Template button and the copy button), so Settings can say when a Plane update has moved what they hang off. None of it is sent to the developer, and the device-only items are deliberately kept out of Chrome Sync — recent work items are not something to push to a user's other machines.
 
 alarms
   Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
@@ -198,7 +198,7 @@ Remote code
   the extension keeps the last few work item keys and URLs the user opened through it, in
   storage.local on that device. Chrome's policy defines collection as transmitting data off
   the user's device, and nothing here leaves it — there is no server to send it to, it is
-  excluded from Chrome Sync on purpose, and "Restore defaults" clears it. So NO is correct,
+  excluded from Chrome Sync on purpose, and the user can clear it from the popup in one click (or with "Restore defaults"). So NO is correct,
   and PRIVACY.md says the same thing in the same words.
 • I do NOT sell or transfer user data to third parties (except approved cases) — attest
 • I do NOT use or transfer user data for purposes unrelated to the item's single purpose — attest

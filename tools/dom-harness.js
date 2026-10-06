@@ -255,6 +255,10 @@ function buildPlanePage({ name, seed, local, lang, plane, body }) {
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n` +
     `</body></html>\n`;
   const out = path.join(OUT, name + ".html");
+  // A name may carry a directory: a page whose own path has to look like a Plane route
+  // ("browse/PROJ-142") is written there, because a file:// document has a null origin and
+  // pushState may change its query and fragment but never its path.
+  fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, src);
   return out;
 }
@@ -426,6 +430,40 @@ const PLANE = `
     <a href="/acme/browse/PROJ-77"><button type="button" disabled>PROJ-77</button></a>
   </div>
 </div>`;
+
+// A description editor with an attach button six levels up — self-hosted Plane 1.4's shape,
+// the same one ct-tmpl's "shallow" case builds. Appended to PLANE for the anchor suites, so
+// the page has both anchors: this toolbar, and the item header PLANE already carries.
+const ANCHOR_EDITOR =
+  `<div id="editors"><div id="box"><div><div><div><div>` +
+  `<div class="ProseMirror" id="ed"><p>description</p></div>` +
+  `</div></div></div></div>` +
+  `<button type="button" aria-label="Attach" id="attach"><input type="file" /></button></div></div>`;
+
+// Both anchor suites open the same way: both buttons placed, then the first route sample
+// written. Waiting for the buttons first is what makes the sample's numbers mean something.
+const ANCHOR_READY = `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await waitFor(
+        () => document.querySelector(".pe-copy-ref-btn") && document.querySelector(".pe-body-tmpl-btn"),
+        "both buttons to be placed"
+      );
+      const rec = () => window.__LOCAL.peAnchorHealth || {};
+      // The style rule's record moves on every sample, full or hits-only, because its
+      // selector always matches PLANE — so it is the proof that a sample ran even when the
+      // anchor record, correctly, did not move.
+      const sampled = () => ((window.__LOCAL.peRuleHealth || {}).r1 || {}).checks || 0;
+      await waitFor(() => rec().toolbar && rec().header, "the first route sample");`;
+
+// And both have the same release happen to them: the attach button and the whole item
+// header go, the editor stays, and the route changes — by query, the one part of a file://
+// document's address that pushState may touch.
+const ANCHOR_RELEASE = `
+      document.getElementById("attach").remove();
+      document.querySelectorAll(".pe-body-tmpl-btn").forEach((b) => b.remove());
+      document.getElementById("probe-header").remove();
+      history.pushState({}, "", location.pathname + "?route=2");
+      document.body.appendChild(document.createElement("div"));`;
 
 /* ------------------------------------------------------------------ */
 /* Suites                                                             */
@@ -629,6 +667,60 @@ const suites = [
         document.getElementById("reset").click();
         eq(document.getElementById("domains").value.trim(), "", "the textarea still lists a site");
         eq(window.__localWrites, before, "reset wrote to storage before Save");
+      });`
+  },
+  {
+    // The recently-opened list is the one thing on the device that says what somebody has been
+    // working on, and PRIVACY.md and the store's "web history" answer both said Restore
+    // defaults clears it. It did not — it is not a setting, so resetting the form never reached
+    // it. All three paths are here, because each is a way to get it wrong: a plain save must
+    // not clear it, a reset that is never saved must not clear it, and reset-then-save must.
+    name: "options · restore defaults forgets the recent work items",
+    page: {
+      name: "opt-reset-recent",
+      ...OPTIONS,
+      seed: seedOf(),
+      local: { peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }] }
+    },
+    body: `
+      ${TAB_READY}
+      const recent = () => window.__LOCAL.peRecent;
+      const save = async () => {
+        const n = window.__written.length;
+        document.getElementById("status").textContent = "";
+        document.getElementById("save").click();
+        await waitFor(() => window.__written.length > n, "the save to write");
+        await waitFor(() => (document.getElementById("status").textContent || "").length > 0, "the save to report");
+      };
+
+      await save();
+      check("an ordinary save leaves the list alone", () => eq(recent().length, 1));
+
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      await sleep(100);
+      check("a reset nobody saved leaves it alone too", () => eq(recent().length, 1));
+
+      await save();
+      check("reset, then save, forgets it", () => eq(recent().length, 0, "still remembered: " + JSON.stringify(recent())));
+      check("and the confirm said it would", () => {
+        ok(peMsg("msgResetConfirm").indexOf("recently") > -1, "the confirm does not mention it");
+      });
+
+      // A reset, then settings arriving from another surface before Save. The page adopts
+      // them (a reset leaves the form clean), so the reset is gone — and an unrelated Save
+      // afterwards must not carry out the clearing it was waiting for.
+      window.__LOCAL.peRecent = [{ key: "PROJ-2", url: "https://plane.example.com/acme/browse/PROJ-2", name: "Plane", at: 2 }];
+      document.getElementById("reset").click();
+      await sleep(100);
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.domains = ["elsewhere.example.com"];
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await waitFor(() => document.getElementById("domains").value.indexOf("elsewhere.example.com") > -1, "the change to be adopted");
+      await save();
+      check("a reset replaced by settings from elsewhere clears nothing on the next save", () => {
+        eq(recent().length, 1, "the list was wiped by a reset that no longer existed");
       });`
   },
   {
@@ -1329,6 +1421,64 @@ const suites = [
       });`
   },
   {
+    // The anchor record, as the two cards show it. Same three states as a rule's badge and
+    // the same gate: the copy formats are seeded empty here, so a record saying the copy
+    // button has never found a header must show nothing — the user deleted the feature, and
+    // "has not found" would read as an accusation about that choice.
+    name: "options · anchor health",
+    page: {
+      name: "opt-anchor",
+      ...OPTIONS,
+      seed: seedOf({ copyFormats: [] }),
+      local: {
+        peAnchorHealth: {
+          toolbar: { checks: 40, hits: 0, at: 0 },
+          header: { checks: 40, hits: 0, at: 0 }
+        }
+      }
+    },
+    body: `
+      ${TAB_READY}
+      const tpl = document.getElementById("tplAnchorHealth");
+      const copy = document.getElementById("copyAnchorHealth");
+      await waitFor(() => !tpl.hidden, "the templates card's line");
+      check("the templates card says its button has found no toolbar, and how often it looked", () => {
+        ok(tpl.classList.contains("cold"), "in the warning style");
+        ok(tpl.textContent.indexOf("40") > -1, "40 pages: " + tpl.textContent);
+        ok(tpl.textContent.indexOf("Plane") > -1, "and what to suspect");
+      });
+      check("with no copy formats, the copy card says nothing about its button", () => {
+        ok(copy.hidden, "hidden");
+        eq(copy.textContent, "", "and no text behind the attribute");
+      });
+      // Against the card, not the line: the line has no background of its own, and reading
+      // a transparent one back gives black, which is a number about nothing on screen.
+      check("the warning is legible against the card", () => {
+        const c = contrast(getComputedStyle(tpl).color, bg(tpl.closest("section.card")));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      // A Plane tab places the button: the line turns quiet in place and names the time.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 41, hits: 1, at: 1754600000000 } } } }, "local");
+      await waitFor(() => !tpl.classList.contains("cold"), "the line to update");
+      check("one placement settles it, with a date", () => {
+        ok(!tpl.hidden, "still shown");
+        ok(/\\d{4}-\\d{2}-\\d{2}/.test(tpl.textContent), "a date: " + tpl.textContent);
+      });
+      // Worked before, and has not been on the last 25 work item pages: the case this whole
+      // record is for. Same warning style, and both numbers in the words.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 80, hits: 30, at: 1754600000000, streak: 25 } } } }, "local");
+      await waitFor(() => tpl.classList.contains("cold"), "the line to turn into a warning");
+      check("a button that was placed and then stopped says so, with when and for how long", () => {
+        ok(!tpl.hidden, "shown");
+        ok(/\\d{4}-\\d{2}-\\d{2}/.test(tpl.textContent), "the last time it was placed: " + tpl.textContent);
+        ok(tpl.textContent.indexOf("25") > -1, "and the run since: " + tpl.textContent);
+      });
+      // Too little evidence: silence, not a verdict.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 2, hits: 0, at: 0 } } } }, "local");
+      await waitFor(() => tpl.hidden, "the line to go quiet");
+      check("a record with too few checks says nothing at all", () => eq(tpl.textContent, ""));`
+  },
+  {
     // Seeded as a pre-focus install, so the v6 → v7 migration runs for real and the presets
     // arrive through the same path a user's upgrade takes. tools/test.js proves the append;
     // only a browser can say the rows render, the switches land the right way round, and the
@@ -1876,6 +2026,20 @@ const suites = [
       check("clicking a recent chip opens it", () => {
         chips()[1].click();
         eq(window.__opened, "https://linear.app/acme/issue/ENG-9");
+      });
+      // Forgetting the list used to take Restore defaults: every setting, and every site's
+      // access. It is the last thing in the row, it is not a chip, and it removes only this.
+      check("the list can be forgotten from where it is shown", () => {
+        const clear = document.querySelector("#recentList .pop-recent-clear");
+        ok(clear, "no way to clear it here");
+        eq(document.querySelector("#recentList").lastElementChild, clear, "at the end of the row");
+        ok(!clear.classList.contains("pop-recent-item"), "dressed as one of the keys");
+        ok(clear.getAttribute("aria-label"), "and it says what it does");
+        const writes = window.__written.length;
+        clear.click();
+        ok(document.getElementById("recentList").hidden, "the row is still shown");
+        eq((window.__LOCAL.peRecent || []).length, 0, "and still stored");
+        eq(window.__written.length, writes, "a settings write, for clearing a list that is not a setting");
       });`
   },
   {
@@ -2156,6 +2320,148 @@ const suites = [
         eq(health()["r-live"].checks, beforeRoute.live + 1, "the matching rule counted once more");
         eq(health()["r-dead"].checks, beforeRoute.dead + 1, "and so did the one that misses");
         eq(health()["r-dead"].hits, 1, "whose single sighting still stands");
+      });
+
+      // A jump to a comment: only the fragment moves. Keyed on the whole address, every such
+      // click was another page, and a rule that misses on item pages reached "never matched"
+      // off one item. Then a real route, to show the sampler did not simply stop.
+      const atFragment = dead();
+      location.hash = "comment-1";
+      document.body.appendChild(document.createElement("div"));
+      await sleep(3000);
+      check("a change to the fragment alone is not another page", () => {
+        eq(dead(), atFragment, "a miss was counted for the same page twice");
+      });
+      history.pushState({}, "", location.pathname + "?route=3");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => dead() === atFragment + 1, "the next real route to be measured");
+      check("and the next real route is still measured", () => eq(dead(), atFragment + 1));`
+  },
+  {
+    // The third band of fragility, measured. A Plane release does not make the template or
+    // the copy button a no-op, it makes them vanish — and for a whole release nothing noticed
+    // the template button was absent on Plane Cloud, because absence looks like a feature
+    // nobody used. This page starts healthy (both anchors present, both buttons placed), then
+    // has a release happen to it: the toolbar and the header are taken away and the route
+    // changes. The record has to say "placed once, then not" — and has to say nothing about
+    // the copy button on a route whose address never claimed to be a work item.
+    name: "content · anchor health on a work item's own page",
+    // The page's own path is the route: a file:// document cannot pushState to another path,
+    // so the address that says "this is a work item" has to be the file's. The release that
+    // takes the anchors away is then a query change, which is all a route sample keys on.
+    page: {
+      name: "browse/PROJ-142",
+      plane: PLANE + ANCHOR_EDITOR,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      ${ANCHOR_READY}
+      check("a healthy page records a hit for each anchor", () => {
+        eq(rec().toolbar.checks, 1, "toolbar checked once");
+        eq(rec().toolbar.hits, 1, "and the Template button was there");
+        ok(rec().toolbar.at > 0, "stamped");
+        eq(rec().header.checks, 1, "header checked once");
+        eq(rec().header.hits, 1, "and the copy button was there");
+      });
+
+      // A release. The attach button and the whole item header go; the editor stays, and
+      // the address still says this is a work item's own page.
+      ${ANCHOR_RELEASE}
+      await waitFor(() => rec().toolbar.checks === 2, "the second route sample");
+      check("an editor with no toolbar to sit on is a miss for the Template button", () => {
+        eq(rec().toolbar.checks, 2);
+        eq(rec().toolbar.hits, 1, "the one placement still stands");
+        eq(rec().toolbar.streak, 1, "and the run of misses since it has begun");
+        eq(document.querySelectorAll(".pe-body-tmpl-btn").length, 0, "and no button is on the page");
+      });
+      check("a work item address with no header is a miss for the copy button", () => {
+        eq(rec().header.checks, 2);
+        eq(rec().header.hits, 1);
+        eq(document.querySelectorAll(".pe-copy-ref-btn").length, 0, "no button on the page");
+      });
+
+      // A read-only view: same address, same editor class, but nothing can be typed into it,
+      // so a template has nowhere to go and the missing button is not a miss. The header's
+      // record moving on the same sample is what proves the sample ran.
+      document.getElementById("ed").setAttribute("contenteditable", "false");
+      history.pushState({}, "", location.pathname + "?route=3");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => rec().header.checks === 3, "the third route sample");
+      check("a read-only description is no opportunity for the Template button", () => {
+        eq(rec().toolbar.checks, 2, "counted a miss on an editor nobody can type into");
+        eq(rec().header.streak, 2, "while the copy button's run went on");
+      });
+
+      // A settings change forgets the counted route on purpose, so an edited rule is measured
+      // again on the page in front of the reader — the rule's record moves. Nothing about the
+      // anchors changed, so theirs must not: a second miss for the same item is not evidence
+      // about another one, and enough of them would reach "lost" from one page.
+      let before = sampled();
+      window.__onChanged({ peSettings: { newValue: window.__SEED.peSettings } }, "sync");
+      await waitFor(() => sampled() === before + 1, "the re-measurement a settings change asks for");
+      await sleep(100);
+      check("a settings change re-measures the rules and not the anchors", () => {
+        eq(rec().header.checks, 3, "a second check for the same item");
+      });
+
+      // The create-work-item modal: no toolbar anywhere on the page, so the Template button
+      // goes into the dialog's fallback spot. That is precisely the placement made when the
+      // toolbar walk fails — counting it would end the run of misses above on the strength
+      // of a dialog, and a failing walk would read as healthy. The run is open (streak 1),
+      // so a counted hit here would show.
+      const dlg = document.createElement("div");
+      dlg.setAttribute("role", "dialog");
+      dlg.innerHTML = '<div style="position: relative"><div class="ProseMirror" id="ed-modal"><p>new item</p></div></div>';
+      document.body.appendChild(dlg);
+      await waitFor(() => dlg.querySelector(".pe-tmpl-floating"), "the dialog fallback to be placed");
+      before = sampled();
+      document.body.click();
+      await waitFor(() => sampled() > before, "a click scan to have run");
+      await sleep(100);
+      check("a fallback button in a dialog is not a toolbar placement", () => {
+        eq(rec().toolbar.hits, 1, "the dialog counted as finding the toolbar");
+        eq(rec().toolbar.streak, 1, "and ended the run of misses");
+      });`
+  },
+  {
+    // The same release off a work item address — the peek panel's situation, and Plane
+    // Pages'. Both buttons are placed at first (a panel over the list), and that counts as a
+    // hit even though the address names the list. Then the toolbar and the header go, and
+    // neither button can be accused: nothing in the address said there was an item here. An
+    // editable editor with no attach toolbar is exactly what a Pages document looks like,
+    // and the first version called that a miss. The style rule's record moving on the same
+    // sample is what proves the sample ran at all.
+    name: "content · anchor health off a work item address",
+    page: {
+      name: "ct-anchor-list",
+      plane: PLANE + ANCHOR_EDITOR,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      ${ANCHOR_READY}
+      check("buttons placed over a list route are hits all the same", () => {
+        eq(rec().header.checks, 1);
+        eq(rec().header.hits, 1, "the peek-panel case");
+        eq(rec().toolbar.hits, 1, "and the toolbar's");
+      });
+      // A click scan on a healthy page finds both buttons, and on a busy page it runs every
+      // few seconds. A record already at "placed, no run of misses" cannot be moved by that,
+      // so it is not written — otherwise every click is a storage event in every tab.
+      let scanned = sampled();
+      document.body.click();
+      await waitFor(() => sampled() > scanned, "a click scan to have run");
+      await sleep(100);
+      check("a click scan on a healthy page leaves a settled record alone", () => {
+        eq(rec().header.checks, 1, "written anyway");
+        eq(rec().toolbar.checks, 1, "written anyway");
+      });
+      const before = sampled();
+      ${ANCHOR_RELEASE}
+      await waitFor(() => sampled() === before + 1, "the second route sample");
+      check("off a work item address, nothing missing accuses anybody", () => {
+        eq(rec().header.checks, 1, "the copy button was counted on a list route");
+        eq(rec().toolbar.checks, 1, "the Template button was counted beside an editor with no toolbar");
+        eq(rec().header.hits, 1, "the one placement still stands");
       });`
   },
   {

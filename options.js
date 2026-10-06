@@ -8,6 +8,8 @@
   // Whether each rule's selector has ever matched anything, as observed by the content
   // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
   let ruleHealth = {};
+  let anchorHealth = {}; // { toolbar, header } — see PE_ANCHOR_HEALTH_KEY
+  let resetPending = false; // a confirmed Restore defaults not yet saved — see resetAll
   let dirty = false; // whether the user has edited the form
   // The active domains as they stood the last time this page took its state FROM storage.
   // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
@@ -46,6 +48,8 @@
     ruleList: $("ruleList"),
     ruleEmpty: $("ruleEmpty"),
     ruleHealthSummary: $("ruleHealthSummary"),
+    tplAnchorHealth: $("tplAnchorHealth"),
+    copyAnchorHealth: $("copyAnchorHealth"),
     addRule: $("addRule"),
     ruleRow: $("ruleRow"),
     templateList: $("templateList"),
@@ -199,6 +203,50 @@
     dirty = false; // just re-rendered the form from state, so it's clean
   }
 
+  // What the templates card and the copy card say about whether their button has been
+  // finding its place on the page. The same three states as a rule's badge, read off the
+  // same record shape, with the same silence for "not enough evidence yet". And the same
+  // gate as a disabled rule: a feature with nothing configured places no button on purpose,
+  // so whatever the record says about it is not something to show — a user who deleted
+  // every copy format must not read that the copy button "has not found a header".
+  function renderAnchorHealth() {
+    // One row per anchor, and the message for each state written out as its own peMsg call:
+    // check-i18n counts a key as used only where it sees it inside peMsg(...), so a table of
+    // key names would read to it as four dead keys. The thunks keep the table and the check.
+    let hasTemplates = false;
+    try {
+      hasTemplates = peCountTemplates(peBuildTemplateSections(state || {}, syncCache)) > 0;
+    } catch (_) {}
+    const rows = [
+      {
+        node: el.tplAnchorHealth,
+        entry: anchorHealth.toolbar,
+        configured: hasTemplates,
+        ok: (e) => peMsg("optTplAnchorOk", [fmtTime(e.at)]),
+        cold: (e) => peMsg("optTplAnchorCold", [String(e.checks)]),
+        lost: (e) => peMsg("optTplAnchorLost", [fmtTime(e.at), String(e.streak)])
+      },
+      {
+        node: el.copyAnchorHealth,
+        entry: anchorHealth.header,
+        configured: !!((state && state.copyFormats) || []).length,
+        ok: (e) => peMsg("optCopyAnchorOk", [fmtTime(e.at)]),
+        cold: (e) => peMsg("optCopyAnchorCold", [String(e.checks)]),
+        lost: (e) => peMsg("optCopyAnchorLost", [fmtTime(e.at), String(e.streak)])
+      }
+    ];
+    for (const r of rows) {
+      if (!r.node) continue;
+      const e = r.entry && typeof r.entry === "object" ? r.entry : {};
+      const st = r.configured ? peAnchorHealthState(e) : "unknown";
+      const text = st === "unknown" ? "" : r[st](e);
+      // "lost" wears the warning style too: it is the same news as "cold", arriving later.
+      r.node.classList.toggle("cold", st === "cold" || st === "lost");
+      r.node.textContent = text;
+      r.node.hidden = !text;
+    }
+  }
+
   function renderRules() {
     el.ruleList.innerHTML = "";
     const list = state.rules || [];
@@ -311,6 +359,7 @@
 
   function renderTemplates() {
     el.templateList.innerHTML = "";
+    renderAnchorHealth(); // its gate is whether this list has anything in it
     const list = state.templates || [];
     el.templateEmpty.hidden = list.length > 0;
     list.forEach((tpl, idx) => {
@@ -388,6 +437,7 @@
 
   function renderCopyFormats() {
     if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+    renderAnchorHealth(); // its gate is whether this list has anything in it
     el.copyList.innerHTML = "";
     const list = state.copyFormats;
     el.copyEmpty.hidden = list.length > 0;
@@ -1072,6 +1122,7 @@
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
           syncCache = { bySource: (nv && nv.bySource) || {} };
           renderSources();
+          renderAnchorHealth(); // templates that arrive only from a source change its gate
           return;
         }
         // A Plane tab just measured the rules. Badges only — see refreshRuleHealthBadges.
@@ -1079,6 +1130,13 @@
           const nv = changes[PE_RULE_HEALTH_KEY].newValue;
           ruleHealth = nv && typeof nv === "object" ? nv : {};
           refreshRuleHealthBadges();
+          return;
+        }
+        // Same for the anchors: two lines, updated in place, no rebuild of the lists.
+        if (area === "local" && changes[PE_ANCHOR_HEALTH_KEY]) {
+          const nv = changes[PE_ANCHOR_HEALTH_KEY].newValue;
+          anchorHealth = nv && typeof nv === "object" ? nv : {};
+          renderAnchorHealth();
           return;
         }
         if (!peSettingsChanged(changes, area)) return;
@@ -1103,6 +1161,7 @@
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
+          resetPending = false; // the reset this was waiting to save is gone
           knownDomains = (s.domains || []).slice();
           render();
           if (grew) showTab("appearance");
@@ -1203,6 +1262,7 @@
       }
       try {
         state = peDeepMerge(PE_DEFAULTS, peSanitizeSettings(peMigrate(raw)));
+        resetPending = false; // an import replaces the reset, so its save must not clear anything
         render();
         // An import replaces every tab's contents, and the message it flashes asks the user
         // to review before saving — but Import lives on the Backup tab, which shows none of
@@ -1393,6 +1453,12 @@
     try {
       savingSelf = true;
       await peSaveSettings(state);
+      // Only after the settings write succeeded: a failed save leaves the flag set, so the
+      // save that does go through is the one that clears it.
+      if (resetPending) {
+        resetPending = false;
+        await peSaveRecent([]);
+      }
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       knownDomains = (state.domains || []).slice();
       render();
@@ -1486,9 +1552,16 @@
     }
   }
 
+  // The recently-opened list is not a setting — it lives in chrome.storage.local and no form
+  // field holds it — so resetting `state` alone never touched it, while PRIVACY.md and the
+  // store's "web history" answer both said Restore defaults clears it. That answer is what
+  // NO rests on. Remembered here and acted on by the next successful save, because the
+  // confirm promises nothing changes until Save, and a reset that is never saved has to
+  // leave the list exactly where it was.
   function resetAll() {
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});
+    resetPending = true;
     render();
     flash(peMsg("msgResetDone"));
   }
@@ -1561,12 +1634,13 @@
   }
 
   peApplyI18n(document);
-  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth()]).then(([s, c, h]) => {
+  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth(), peGetAnchorHealth()]).then(([s, c, h, a]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     knownDomains = (s.domains || []).slice();
     syncCache = c;
     ruleHealth = h;
+    anchorHealth = a;
     render();
     bind();
     bindTabs();

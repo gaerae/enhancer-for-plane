@@ -10,6 +10,79 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.10.0 — 2026-10-06
+
+Schema unchanged.
+
+### New
+- **Settings now says whether the Template button and the copy button have been finding
+  their place.** Both hang off DOM anchors — the description toolbar, the work item header —
+  and a Plane release does not make them no-ops, it makes them vanish; the Template button was
+  absent on Plane Cloud for a whole release while every check stayed green, because a button
+  that is not there looks exactly like a feature nobody used. Each card now carries one line:
+  *last placed* with a time; or, once enough work item pages have gone by without it, that it
+  has not found its anchor; or — the case this exists for — that it **was** placed until a
+  given time and has not been on the last N work item pages since.
+
+  That last state is the one thing here a style rule deliberately does not have. A rule for
+  one route misses on every other route, so a run of misses means nothing; a button's
+  opportunity is precise, so on a work item page it should be there every time and twenty in a
+  row without it is evidence. Without it, a button that had ever been placed read "ok" forever,
+  and a working button followed by a Plane release produced a stale date on one line and no
+  warning at all.
+
+  What counts as a page it *should* have been on is the other design point: the signal has to
+  outlive the anchor, because the anchor is the thing that vanishes, and be no broader than
+  the feature, or it cries wolf. So it is the **address** — `/{workspace}/browse/{KEY}`, with
+  the workspace segment required, because Jira's issue view is `/browse/{KEY}` and the
+  extension runs there for style rules — plus, for the Template button, an *editable*
+  description on it. A placement counts wherever it happens, so the peek panel over a list
+  can never be accused and never needs to be; but only a toolbar placement counts for the
+  Template button, because the dialog fallbacks are exactly what gets placed when the toolbar
+  walk fails. A change to the fragment alone is the same page. A click scan on a healthy page
+  does not write a record it cannot change.
+
+  Measured from both ends, on two pages: one whose own path is a work item route, one on a
+  list route, each having a release happen to it. Every guard above fails a check of its own
+  when knocked out — the record, both address gates, the Jira shape, the read-only filter, the
+  dialog fallback, the "was placed, then stopped" state, the fragment, the write throttle, and
+  the Settings-side gate.
+
+- **The popup can forget the work items you opened recently.** **Clear**, at the end of the
+  row of recent keys, empties it — and only it. Until now the one way to clear that list was
+  Restore defaults, which resets every setting and hands back every site's access to remove
+  six chips. No confirm: the list rebuilds itself from the next jump, so a mistaken click
+  costs nothing a confirm would have been worth.
+
+### Fixed
+- **A jump to a comment no longer counts as another page for rule health.** The route
+  sample was keyed on the whole address, fragment included, so every click on a comment
+  link was a fresh measurement of the same page — and a rule that misses on work item pages
+  piled up misses from one item and reached "has never matched" without twenty pages ever
+  having been looked at. Found on the new anchor record during review; the rules had the
+  same fault from the start. The route is now the path and the query.
+- **"Restore defaults" now forgets the work items you opened recently, as the privacy
+  policy said it did.** The recents list lives in `chrome.storage.local` and no form field
+  holds it, so resetting the form never reached it — while PRIVACY.md said "clearing settings
+  clears it" and the store's *web history* answer, the one that says NO, rested on "Restore
+  defaults clears it". There was no other way to clear it short of removing the extension.
+  It is cleared by the save that follows a reset, not by the reset itself, because the confirm
+  promises nothing changes until Save; the confirm now also says the list goes.
+
+  All four ways to get that wrong fail a check of their own: clearing on every save, clearing
+  on the reset before Save, clearing on a save after the reset was replaced by settings adopted
+  from another surface, and — what shipped — not clearing at all.
+
+### Internal
+- **Releases are cut as drafts.** The release body is what Settings shows when someone
+  clicks their own version number, and `release.yml` can only write a commit list — v1.9.0
+  went public with one before the real notes were written. Now the commit list is a private
+  starting point: write the notes, then publish, which is also when the tag is created. The
+  "already released" check lists releases rather than looking one up by tag, because the
+  by-tag endpoint does not return drafts and would let a second run cut a second draft.
+
+---
+
 ## v1.9.0 — 2026-09-04
 
 Schema unchanged.

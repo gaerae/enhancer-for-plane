@@ -118,6 +118,36 @@
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "optTplAnchorOk": {
+    "message": "Template button last placed $TIME$",
+    "description": "In the templates card, when the button has found a description toolbar to sit on. Same shape as optRuleHealthOk.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optTplAnchorCold": {
+    "message": "The Template button has not found a toolbar to sit on yet, on $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optTplAnchorLost": {
+    "message": "The Template button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
+  "optCopyAnchorOk": {
+    "message": "Copy button last placed $TIME$",
+    "description": "In the copy reference card, when the button has found a work item header to sit beside.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optCopyAnchorCold": {
+    "message": "The copy button has not found a work item header yet, on $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optCopyAnchorLost": {
+    "message": "The copy button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
   },
@@ -461,7 +491,7 @@
     "placeholders": { "sites": { "content": "$1" } }
   },
   "msgResetConfirm": {
-    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
+    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nThe work items you opened recently are forgotten too.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
   },
   "msgResetDone": {
     "message": "Restored defaults. Click “Save” to apply."
@@ -1056,6 +1086,14 @@
   },
   "popJumpGo": {
     "message": "Open"
+  },
+  "popRecentClear": {
+    "message": "Clear",
+    "description": "Popup, at the end of the row of recently opened work items. Forgets them; nothing else."
+  },
+  "popRecentClearTitle": {
+    "message": "Forget the work items you opened recently",
+    "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
   },
   "popJumpAuto": {
     "message": "Auto"

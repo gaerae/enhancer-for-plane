@@ -70,6 +70,14 @@ const PE_RULE_HEALTH_MIN_CHECKS = 20;
 // A bound on the record for a settings file that churns rule ids. Pruning to the current
 // rules is what normally keeps this small; this is the backstop for whatever that misses.
 const PE_RULE_HEALTH_MAX = 500;
+// The same record, for the two DOM anchors the buttons hang off — { toolbar, header }, each
+// { checks, hits, at } exactly as a rule's. The style rules are the second band of fragility
+// (a Plane release makes them no-ops); these are the third, where a release makes the
+// feature vanish — and the template button did exactly that on Plane Cloud for a whole
+// release while every check stayed green. "toolbar" is the description toolbar the Template
+// button sits on; "header" is the work item header the copy button (and the focus toggle)
+// sits beside. Same storage area, same reasons, same state function.
+const PE_ANCHOR_HEALTH_KEY = "peAnchorHealth";
 
 // Custom template variables are written {{var.name}}. The prefix is what makes them
 // safe: a user cannot shadow {{date}} or {{week}} by naming a variable "date", so there
@@ -397,6 +405,99 @@ function peRuleHealthState(entry) {
   if (hits > 0) return "ok";
   if (checks >= PE_RULE_HEALTH_MIN_CHECKS) return "cold";
   return "unknown";
+}
+
+// What one page says about the two anchors, in the shape peRuleHealthUpdate takes:
+// { toolbar?: n, header?: n }, where n is how many buttons were placed and a key left out
+// means "this page was no evidence either way". The decision is small and it is the whole
+// feature, so it lives here where test.js can pin it rather than in the content script.
+//
+// Is this a Plane work item's own page, by address alone? /{workspace}/browse/{KEY}.
+//
+// Not the same question peKeyFromPath answers, and the difference is one segment. Jira's
+// issue view is /browse/{KEY} with nothing in front — and the extension does run on Jira,
+// for style rules — so "a key after browse" would have recorded every Jira issue page as a
+// page where both buttons failed, and told a user whose Plane is fine that its layout had
+// changed. Plane always has a workspace before "browse". (Jira Data Center under a context
+// path, /jira/browse/{KEY}, still reads as Plane-shaped here; that is the residual, and a
+// narrow one: it needs the buttons configured on a Jira host they were never built for.)
+function peIsItemPath(pathname) {
+  const seg = String(pathname || "")
+    .split("/")
+    .filter(Boolean);
+  const i = seg.indexOf("browse");
+  return i >= 1 && seg.length === i + 2;
+}
+
+// Both anchors follow one rule: a hit counts wherever it happens, and a miss is counted only
+// where the ADDRESS says this is a work item's own page (/{workspace}/browse/{KEY}). The
+// opportunity signal has to outlive the anchor, because the anchor is the thing that would
+// have vanished — so it cannot be the header, and it cannot be "any editor" either:
+//
+//   toolbar — a hit is a Template button on the page. A miss is a work item address with an
+//             editable description editor on it and no button. "Any editor anywhere" was the
+//             first version and it accused the button on Plane's Pages, a wiki whose editor
+//             has no attach toolbar and was never meant to get one, and on read-only views;
+//             someone who spent their first day in Pages would have been told Plane's layout
+//             had changed. The create-work-item modal and the peek panel still count, as
+//             hits — the click scan sees the modal, and a placement anywhere settles it.
+//   header  — a hit is a copy button on the page, including the peek panel over a list,
+//             which keeps the list's URL and so can never be accused and never needs to be.
+//             A miss is a work item address with no button.
+//
+// `hitsOnly` is the click scan's pass (see recordRuleHealth): it may promote either anchor
+// and may accuse neither, which is what makes extra sampling safe to add.
+function peAnchorCounts(obs, hitsOnly) {
+  const o = obs && typeof obs === "object" ? obs : {};
+  const t = o.toolbar && typeof o.toolbar === "object" ? o.toolbar : null;
+  const h = o.header && typeof o.header === "object" ? o.header : null;
+  const num = (v) => (typeof v === "number" && isFinite(v) && v > 0 ? v : 0);
+  const out = {};
+  if (t) {
+    const placed = num(t.placed);
+    if (placed > 0) out.toolbar = placed;
+    else if (!hitsOnly && t.itemPage === true && num(t.editors) > 0) out.toolbar = 0;
+  }
+  if (h) {
+    const placed = num(h.placed);
+    if (placed > 0) out.header = placed;
+    else if (!hitsOnly && h.itemPage === true) out.header = 0;
+  }
+  return out;
+}
+
+// The anchor record is a rule's record plus one number: `streak`, the misses in a row since
+// the last placement. A rule deliberately has no "was working, stopped" state — a rule for
+// one route legitimately misses on every other one, so a run of misses means nothing. An
+// anchor's opportunity is precise in a way a rule's is not: on a work item's own page the
+// button should be there every single time, so a run of misses there is evidence. And it
+// is the evidence that matters most. Without it, a button that had ever been placed read
+// "ok" forever — so the scenario this record exists for (a working button, then a Plane
+// release, then nothing) produced a stale date on one line and no warning at all.
+function peAnchorHealthUpdate(prev, counts, now) {
+  const before = prev && typeof prev === "object" ? prev : {};
+  const out = peRuleHealthUpdate(before, counts, now);
+  Object.keys(counts && typeof counts === "object" ? counts : {}).forEach((id) => {
+    const n = counts[id];
+    if (!out[id] || typeof n !== "number" || !isFinite(n) || n < 0) return;
+    const was = before[id] && typeof before[id] === "object" ? before[id] : {};
+    const streak = typeof was.streak === "number" && was.streak > 0 ? was.streak : 0;
+    out[id] = Object.assign({}, out[id], { streak: n > 0 ? 0 : streak + 1 });
+  });
+  return out;
+}
+
+// A rule's three states, plus "lost": it has been placed before, and has not been on the
+// last PE_RULE_HEALTH_MIN_CHECKS work item pages. The same bar as "cold", for the same
+// reason — a warning people learn to scroll past costs more than the silence it replaced —
+// and the click scan still rescues a slow page, because any click while the button is
+// there is a placement and resets the run.
+function peAnchorHealthState(entry) {
+  const e = entry && typeof entry === "object" ? entry : null;
+  const hits = e && typeof e.hits === "number" ? e.hits : 0;
+  const streak = e && typeof e.streak === "number" ? e.streak : 0;
+  if (hits > 0 && streak >= PE_RULE_HEALTH_MIN_CHECKS) return "lost";
+  return peRuleHealthState(entry);
 }
 
 // How many of these rules have been checked enough to say they have never matched. The
@@ -1330,12 +1431,15 @@ function peSaveRecent(list) {
   });
 }
 
-function peGetRuleHealth() {
+// One object or array in chrome.storage.local, read and written the way every device-only
+// record here is: a read that fails is "nothing known yet", and a write that fails is
+// swallowed — these are advisory, and there is nothing the reader could do about it.
+function peGetLocalObject(key) {
   return new Promise((resolve) => {
     try {
-      chrome.storage.local.get(PE_RULE_HEALTH_KEY, (res) => {
-        const h = res && res[PE_RULE_HEALTH_KEY];
-        resolve(h && typeof h === "object" ? h : {});
+      chrome.storage.local.get(key, (res) => {
+        const v = res && res[key];
+        resolve(v && typeof v === "object" ? v : {});
       });
     } catch (_) {
       resolve({});
@@ -1343,12 +1447,10 @@ function peGetRuleHealth() {
   });
 }
 
-function peSaveRuleHealth(health) {
+function peSetLocal(key, value) {
   return new Promise((resolve) => {
     try {
-      chrome.storage.local.set({ [PE_RULE_HEALTH_KEY]: health }, () => {
-        // Advisory data. A write that fails costs a page's worth of observation, so it is
-        // swallowed rather than surfaced — there is nothing the reader could do about it.
+      chrome.storage.local.set({ [key]: value }, () => {
         void (chrome.runtime && chrome.runtime.lastError);
         resolve();
       });
@@ -1356,6 +1458,19 @@ function peSaveRuleHealth(health) {
       resolve();
     }
   });
+}
+
+function peGetRuleHealth() {
+  return peGetLocalObject(PE_RULE_HEALTH_KEY);
+}
+function peSaveRuleHealth(health) {
+  return peSetLocal(PE_RULE_HEALTH_KEY, health);
+}
+function peGetAnchorHealth() {
+  return peGetLocalObject(PE_ANCHOR_HEALTH_KEY);
+}
+function peSaveAnchorHealth(health) {
+  return peSetLocal(PE_ANCHOR_HEALTH_KEY, health);
 }
 
 // Read/write the synced-template cache (chrome.storage.local).

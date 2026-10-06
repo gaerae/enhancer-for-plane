@@ -102,16 +102,25 @@
   //
   // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
   // names has mounted, and a count taken at navigation time would score every route a miss.
-  // The check is therefore keyed on the URL (once per route, however many mutation bursts
+  // The check is therefore keyed on the route (once per route, however many mutation bursts
   // that route causes) and delayed past the mount.
+  //
+  // The route is the path and the query, not the whole address. A jump to a comment changes
+  // only the fragment, and keying on location.href counted every such click as another page:
+  // a rule that misses on work item pages piled up misses from one item and reached "never
+  // matched" without twenty pages ever having been looked at. The same page looked at twice
+  // is not more evidence. Found on the anchor record first (see recordRuleHealth); the rules
+  // had the same fault from the start.
   let healthUrl = null;
   let healthTimer = null;
+  let anchorPage = null; // the route the anchors were last sampled on — see recordRuleHealth
   const PE_HEALTH_DELAY = 2500;
 
   function scheduleRuleHealth() {
     if (!settings || !isActive()) return;
-    if (location.href === healthUrl) return; // already counted this route
-    healthUrl = location.href;
+    const route = location.pathname + location.search;
+    if (route === healthUrl) return; // already counted this route
+    healthUrl = route;
     clearTimeout(healthTimer);
     healthTimer = setTimeout(() => {
       try {
@@ -173,13 +182,67 @@
         if (n > 0 || !hitsOnly) counts[r.id] = n;
       } catch (_) {}
     });
-    if (!Object.keys(counts).length) return;
     // Read-modify-write, and two tabs on two routes can interleave. The lost update costs
     // one observation — never a wrong claim, because nothing here is ever decremented and
     // the only direction a lost write moves the reader is toward "we do not know yet".
-    peGetRuleHealth().then((prev) =>
-      peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
-    );
+    if (Object.keys(counts).length) {
+      peGetRuleHealth().then((prev) =>
+        peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
+      );
+    }
+    // The two DOM anchors, on the same schedule and under the same rules. Taken after the
+    // inject bursts have had their say (this runs 2.5s past the route change; the last
+    // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
+    //
+    // Once per route. The route sample already ignores the fragment; what is left is a
+    // settings change, which forgets the counted route on purpose so an edited rule is
+    // measured again on the page in front of the reader. That is right for a rule and
+    // wrong for an anchor — nothing about the anchor changed, and a second miss for the
+    // same page is not evidence about another one.
+    const page = location.pathname + location.search;
+    if (!hitsOnly && page === anchorPage) return;
+    if (!hitsOnly) anchorPage = page;
+    const anchors = peAnchorCounts(observeAnchors(), hitsOnly);
+    if (!Object.keys(anchors).length) return;
+    peGetAnchorHealth().then((prev) => {
+      // A click scan runs every few seconds while someone is clicking, and on most work
+      // item pages it finds both buttons. Writing that every time is a storage event in
+      // every tab and an open Settings page for a record whose state cannot change, so a
+      // hits-only pass writes only when it moves something: a first placement, or the end
+      // of a run of misses. The route sample still stamps "last placed" on its own.
+      if (hitsOnly && Object.keys(anchors).every((id) => prev[id] && prev[id].hits > 0 && !(prev[id].streak > 0))) {
+        return;
+      }
+      return peSaveAnchorHealth(peAnchorHealthUpdate(prev, anchors, Date.now()));
+    });
+  }
+
+  // What this page offers each anchor, and what got placed. Only looking — peAnchorCounts
+  // decides what it is evidence of. A feature with nothing configured places no button on
+  // purpose, so it is left out entirely rather than counted as a miss, the same way a
+  // disabled rule is.
+  function observeAnchors() {
+    const obs = {};
+    const itemPage = peIsItemPath(location.pathname);
+    if (hasAnyTemplates()) {
+      // Editable ones only: a read-only view (no permission, an archived item) shows the
+      // description in the same editor class with contenteditable="false", and a template
+      // has nowhere to go there — the button is right not to appear.
+      const editors = [...document.querySelectorAll(".ProseMirror, .tiptap")].filter(
+        (ed) => !isCommentArea(ed) && ed.getAttribute("contenteditable") !== "false"
+      );
+      // Toolbar placements only. The modal-header and floating fallbacks are what
+      // ensureFloatingButton puts down precisely when no toolbar was found — counting them
+      // would let one "Create work item" dialog settle the record as healthy while the
+      // toolbar walk failed on every work item page, which is the bug this record exists
+      // to catch.
+      const placed = document.querySelectorAll(".pe-body-tmpl-btn:not(.pe-tmpl-header):not(.pe-tmpl-floating)").length;
+      obs.toolbar = { itemPage, editors: editors.length, placed };
+    }
+    if (hasCopyFormats()) {
+      obs.header = { itemPage, placed: document.querySelectorAll(".pe-copy-ref-btn").length };
+    }
+    return obs;
   }
 
   /* ================================================================== */
