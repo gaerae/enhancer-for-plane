@@ -405,16 +405,18 @@ lies:
 
 - **A release body is now a user-facing surface, not a nicety.** The version number in
   Settings links to `/releases`, so whatever is written there is what someone clicking their
-  own version reads. All nine so far are hand-written; `release.yml` passes
-  `--generate-notes`, so forgetting leaves a commit list under a version number in somebody's
-  Settings. Write the body when the release is cut, or point that link somewhere else.
+  own version reads. `release.yml` can only write a commit list (`--generate-notes`), and
+  v1.9.0 went public with one before the real notes existed — so it now cuts the release as a
+  **draft**. Write the body, then publish; the tag is created on publish. Do not take the
+  `--draft` back out to save the click: the click is the point.
 
 - **A CHANGELOG date is the release's date, not the day you wrote the entry.** The entry
   gets written before the version bump is pushed, and `release.yml` cuts the release
   whenever that push lands — so an evening's writing released the next morning leaves a
   heading that is off by one. Two of nine were, both by exactly that. Nothing can check it
   (the truth is on GitHub and `tools/` has no network), so read it back off the releases
-  page after the release exists rather than guessing before it does.
+  page after the release exists rather than guessing before it does. With drafts, "exists"
+  means published: the date that counts is the day someone pressed Publish.
 
 - **`.github/` holds two files besides the workflows, and everything else GitHub's
   community checklist asks for is absent on purpose.** All of it was written and then

@@ -234,6 +234,22 @@ input:checked + .switch::after {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 600;
 }
+/* Forget the list. A word, not a chip: it is not one of the keys, and it should not be
+   mistaken for one at a glance. Muted until hovered, because it is the least-used thing in
+   the row and the only one that removes anything. */
+.pop-recent-clear {
+  padding: 3px 4px;
+  border: 0;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.pop-recent-clear:hover {
+  color: var(--text);
+}
 /* The target's name, for a list spanning two trackers. Truncated rather than wrapped: it is
    the disambiguator, not the label. */
 .pop-recent-name {

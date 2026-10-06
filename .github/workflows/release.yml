@@ -2,8 +2,14 @@ name: Release extension
 
 # Cuts a release straight from the version in manifest.json — no manual tagging.
 # Bump "version" in manifest.json and push to main: CI reads it, and if that
-# version has no release yet, it packages the zip, creates the v<version> tag,
-# and publishes a GitHub Release with the zip attached. Unchanged version = skip.
+# version has no release yet, it packages the zip and creates a DRAFT GitHub
+# Release with the zip attached. Unchanged version = skip.
+#
+# A draft, because the release body is what Settings shows when someone clicks
+# their own version number, and --generate-notes can only write a commit list.
+# v1.9.0 went public with one before anybody had written the real notes. Now the
+# commit list is a private starting point: write the body, then publish — which
+# is also when GitHub creates the v<version> tag.
 on:
   push:
     branches: [main]
@@ -29,7 +35,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+          # Listed rather than looked up by tag: a draft has no tag until it is
+          # published, and the by-tag endpoint does not return drafts, so a lookup
+          # would miss the draft this workflow made on the last run and cut another.
+          # The list does include drafts for a token that can push, which this one can.
+          tag="v${{ steps.ver.outputs.version }}"
+          if gh api "repos/${{ github.repository }}/releases" --paginate --jq ".[].tag_name" | grep -qx "$tag"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "::notice::v${{ steps.ver.outputs.version }} already released — skipping."
           else
@@ -59,7 +70,8 @@ jobs:
           gh release create "v${VERSION}" "$ZIP" \
             --target "${{ github.sha }}" \
             --title "Enhancer for Plane v${VERSION}" \
-            --generate-notes
+            --generate-notes \
+            --draft
 
       - name: Upload build artifact
         if: steps.check.outputs.exists == 'false'

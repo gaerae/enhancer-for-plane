@@ -174,6 +174,23 @@
       b.addEventListener("click", () => jumpTo(r.key, r.url, { name: r.name }));
       box.appendChild(b);
     });
+    if (!rows.length) return;
+    // Forgetting the list used to take Restore defaults — every setting reset and every
+    // site's access handed back, to clear six chips. It sits at the end of the row, where
+    // the list ends, and asks nothing: the list rebuilds itself from the next jump, so a
+    // mistaken click costs nothing a confirm would have been worth.
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "pop-recent-clear";
+    clear.textContent = peMsg("popRecentClear");
+    clear.title = peMsg("popRecentClearTitle");
+    clear.setAttribute("aria-label", peMsg("popRecentClearTitle"));
+    clear.addEventListener("click", () => {
+      recent = [];
+      renderRecent();
+      peSaveRecent([]);
+    });
+    box.appendChild(clear);
   }
 
   // Copy reference, from the tab's address and title — no injection, no page read. This is

@@ -48,7 +48,19 @@ Schema unchanged.
   dialog fallback, the "was placed, then stopped" state, the fragment, the write throttle, and
   the Settings-side gate.
 
+- **The popup can forget the work items you opened recently.** **Clear**, at the end of the
+  row of recent keys, empties it — and only it. Until now the one way to clear that list was
+  Restore defaults, which resets every setting and hands back every site's access to remove
+  six chips. No confirm: the list rebuilds itself from the next jump, so a mistaken click
+  costs nothing a confirm would have been worth.
+
 ### Fixed
+- **A jump to a comment no longer counts as another page for rule health.** The route
+  sample was keyed on the whole address, fragment included, so every click on a comment
+  link was a fresh measurement of the same page — and a rule that misses on work item pages
+  piled up misses from one item and reached "has never matched" without twenty pages ever
+  having been looked at. Found on the new anchor record during review; the rules had the
+  same fault from the start. The route is now the path and the query.
 - **"Restore defaults" now forgets the work items you opened recently, as the privacy
   policy said it did.** The recents list lives in `chrome.storage.local` and no form field
   holds it, so resetting the form never reached it — while PRIVACY.md said "clearing settings
@@ -60,6 +72,14 @@ Schema unchanged.
   All four ways to get that wrong fail a check of their own: clearing on every save, clearing
   on the reset before Save, clearing on a save after the reset was replaced by settings adopted
   from another surface, and — what shipped — not clearing at all.
+
+### Internal
+- **Releases are cut as drafts.** The release body is what Settings shows when someone
+  clicks their own version number, and `release.yml` can only write a commit list — v1.9.0
+  went public with one before the real notes were written. Now the commit list is a private
+  starting point: write the notes, then publish, which is also when the tag is created. The
+  "already released" check lists releases rather than looking one up by tag, because the
+  by-tag endpoint does not return drafts and would let a second run cut a second draft.
 
 ---
 

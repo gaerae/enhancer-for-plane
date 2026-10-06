@@ -1087,6 +1087,14 @@
   "popJumpGo": {
     "message": "Open"
   },
+  "popRecentClear": {
+    "message": "Clear",
+    "description": "Popup, at the end of the row of recently opened work items. Forgets them; nothing else."
+  },
+  "popRecentClearTitle": {
+    "message": "Forget the work items you opened recently",
+    "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
+  },
   "popJumpAuto": {
     "message": "Auto"
   },

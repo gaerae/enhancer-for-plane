@@ -102,17 +102,25 @@
   //
   // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
   // names has mounted, and a count taken at navigation time would score every route a miss.
-  // The check is therefore keyed on the URL (once per route, however many mutation bursts
+  // The check is therefore keyed on the route (once per route, however many mutation bursts
   // that route causes) and delayed past the mount.
+  //
+  // The route is the path and the query, not the whole address. A jump to a comment changes
+  // only the fragment, and keying on location.href counted every such click as another page:
+  // a rule that misses on work item pages piled up misses from one item and reached "never
+  // matched" without twenty pages ever having been looked at. The same page looked at twice
+  // is not more evidence. Found on the anchor record first (see recordRuleHealth); the rules
+  // had the same fault from the start.
   let healthUrl = null;
   let healthTimer = null;
-  let anchorPage = null; // pathname + search the anchors were last sampled on — see recordRuleHealth
+  let anchorPage = null; // the route the anchors were last sampled on — see recordRuleHealth
   const PE_HEALTH_DELAY = 2500;
 
   function scheduleRuleHealth() {
     if (!settings || !isActive()) return;
-    if (location.href === healthUrl) return; // already counted this route
-    healthUrl = location.href;
+    const route = location.pathname + location.search;
+    if (route === healthUrl) return; // already counted this route
+    healthUrl = route;
     clearTimeout(healthTimer);
     healthTimer = setTimeout(() => {
       try {
@@ -186,10 +194,11 @@
     // inject bursts have had their say (this runs 2.5s past the route change; the last
     // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
     //
-    // Once per page, not once per address: a route sample fires on any change to the URL,
-    // and a jump to a comment on the same item changes only the fragment. Counting that
-    // would add a miss per click on a page where the button is missing, and a "lost"
-    // verdict reached by clicking around one item is not evidence about twenty of them.
+    // Once per route. The route sample already ignores the fragment; what is left is a
+    // settings change, which forgets the counted route on purpose so an edited rule is
+    // measured again on the page in front of the reader. That is right for a rule and
+    // wrong for an anchor — nothing about the anchor changed, and a second miss for the
+    // same page is not evidence about another one.
     const page = location.pathname + location.search;
     if (!hitsOnly && page === anchorPage) return;
     if (!hitsOnly) anchorPage = page;

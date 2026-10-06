@@ -1083,6 +1083,14 @@
   "popJumpGo": {
     "message": "열기"
   },
+  "popRecentClear": {
+    "message": "지우기",
+    "description": "Popup, at the end of the row of recently opened work items. Forgets them; nothing else."
+  },
+  "popRecentClearTitle": {
+    "message": "최근에 연 작업 항목 목록을 지웁니다",
+    "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
+  },
   "popJumpAuto": {
     "message": "자동"
   },

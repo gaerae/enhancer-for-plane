@@ -198,7 +198,7 @@ Remote code
   the extension keeps the last few work item keys and URLs the user opened through it, in
   storage.local on that device. Chrome's policy defines collection as transmitting data off
   the user's device, and nothing here leaves it — there is no server to send it to, it is
-  excluded from Chrome Sync on purpose, and "Restore defaults" clears it on the save that follows. So NO is correct,
+  excluded from Chrome Sync on purpose, and the user can clear it from the popup in one click (or with "Restore defaults"). So NO is correct,
   and PRIVACY.md says the same thing in the same words.
 • I do NOT sell or transfer user data to third parties (except approved cases) — attest
 • I do NOT use or transfer user data for purposes unrelated to the item's single purpose — attest

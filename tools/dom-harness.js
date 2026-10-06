@@ -2026,6 +2026,20 @@ const suites = [
       check("clicking a recent chip opens it", () => {
         chips()[1].click();
         eq(window.__opened, "https://linear.app/acme/issue/ENG-9");
+      });
+      // Forgetting the list used to take Restore defaults: every setting, and every site's
+      // access. It is the last thing in the row, it is not a chip, and it removes only this.
+      check("the list can be forgotten from where it is shown", () => {
+        const clear = document.querySelector("#recentList .pop-recent-clear");
+        ok(clear, "no way to clear it here");
+        eq(document.querySelector("#recentList").lastElementChild, clear, "at the end of the row");
+        ok(!clear.classList.contains("pop-recent-item"), "dressed as one of the keys");
+        ok(clear.getAttribute("aria-label"), "and it says what it does");
+        const writes = window.__written.length;
+        clear.click();
+        ok(document.getElementById("recentList").hidden, "the row is still shown");
+        eq((window.__LOCAL.peRecent || []).length, 0, "and still stored");
+        eq(window.__written.length, writes, "a settings write, for clearing a list that is not a setting");
       });`
   },
   {
@@ -2306,7 +2320,22 @@ const suites = [
         eq(health()["r-live"].checks, beforeRoute.live + 1, "the matching rule counted once more");
         eq(health()["r-dead"].checks, beforeRoute.dead + 1, "and so did the one that misses");
         eq(health()["r-dead"].hits, 1, "whose single sighting still stands");
-      });`
+      });
+
+      // A jump to a comment: only the fragment moves. Keyed on the whole address, every such
+      // click was another page, and a rule that misses on item pages reached "never matched"
+      // off one item. Then a real route, to show the sampler did not simply stop.
+      const atFragment = dead();
+      location.hash = "comment-1";
+      document.body.appendChild(document.createElement("div"));
+      await sleep(3000);
+      check("a change to the fragment alone is not another page", () => {
+        eq(dead(), atFragment, "a miss was counted for the same page twice");
+      });
+      history.pushState({}, "", location.pathname + "?route=3");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => dead() === atFragment + 1, "the next real route to be measured");
+      check("and the next real route is still measured", () => eq(dead(), atFragment + 1));`
   },
   {
     // The third band of fragility, measured. A Plane release does not make the template or
@@ -2363,15 +2392,15 @@ const suites = [
         eq(rec().header.streak, 2, "while the copy button's run went on");
       });
 
-      // A jump to a comment on the same item: only the fragment changes, and the route sample
-      // fires on any URL change. Counting it would let somebody reach "lost" by clicking
-      // around one item, which is not evidence about twenty of them.
+      // A settings change forgets the counted route on purpose, so an edited rule is measured
+      // again on the page in front of the reader — the rule's record moves. Nothing about the
+      // anchors changed, so theirs must not: a second miss for the same item is not evidence
+      // about another one, and enough of them would reach "lost" from one page.
       let before = sampled();
-      location.hash = "comment-1";
-      document.body.appendChild(document.createElement("div"));
-      await waitFor(() => sampled() === before + 1, "the fragment-only sample");
+      window.__onChanged({ peSettings: { newValue: window.__SEED.peSettings } }, "sync");
+      await waitFor(() => sampled() === before + 1, "the re-measurement a settings change asks for");
       await sleep(100);
-      check("a change to the fragment alone is the same page, not another one", () => {
+      check("a settings change re-measures the rules and not the anchors", () => {
         eq(rec().header.checks, 3, "a second check for the same item");
       });
 

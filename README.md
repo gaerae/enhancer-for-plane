@@ -79,7 +79,7 @@ someone else's text.
   no content script, so it works on any tab. The key's prefix routes between targets — point
   `ENG-` at Linear and leave the rest on Plane.
 - **The keys you opened last come back**, in the address bar and the popup. Twelve entries,
-  per device, never synced.
+  per device, never synced. **Clear** at the end of the popup's row forgets them.
 - **Words search instead of opening.** `issue login bug` goes to the tracker's search, if
   that target has a search URL with `{{q}}`. How far it gets you varies: Jira and GitHub
   land on results, while Plane opens its search page with your words already in the box and
@@ -499,19 +499,23 @@ Screenshots and the promo tile are in `store-assets/`.
 tag by hand.** The workflow
 [.github/workflows/release.yml](.github/workflows/release.yml) reads the version,
 packages only the shipping files (store assets, docs, and `icons/icon.svg` source
-are excluded), and publishes the Release.
+are excluded), and creates the Release as a **draft**.
 
 To ship a new version:
 
 1. Bump `"version"` in `manifest.json` (e.g. `1.1.0` → `1.1.1`).
 2. Commit and push to `main`.
-3. CI creates the `v<version>` tag and a GitHub Release with
-   `enhancer-for-plane-<version>.zip` attached. If that version was already
-   released, it skips — so an unrelated push never makes a duplicate.
+3. CI creates a draft GitHub Release with `enhancer-for-plane-<version>.zip`
+   attached. If that version already has a release, draft or published, it
+   skips — so an unrelated push never makes a duplicate.
+4. Write the release notes over the generated commit list, then **Publish**.
+   That is when the `v<version>` tag is created. The notes are what Settings
+   links to from the version number, which is why nothing goes public before
+   someone has written them.
 
 You can also trigger it from **Actions ▸ Release extension ▸ Run workflow**.
-Then download the zip from the Release and upload it in the Chrome Web Store
-dashboard.
+Then download the zip from the Release (a draft's assets are downloadable to you)
+and upload it in the Chrome Web Store dashboard.
 
 > If the release step fails with a 403, enable **Settings ▸ Actions ▸ General ▸
 > Workflow permissions ▸ Read and write permissions** so the workflow can create
