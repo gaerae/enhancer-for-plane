@@ -99,8 +99,8 @@ in the "Create work item" dialog; `Alt/⌥+T` works in both.
   inserts it, with no per-user data leaving the browser. An unknown name is left as its
   token rather than blanked, so a typo is visible instead of eating text.
 - **Settings says when the Template button last found a toolbar to sit on** — and, after
-  enough pages with a description editor and no button, that it has stopped finding one. It
-  went missing on Plane Cloud for a whole release once, and nothing said so.
+  enough work item pages without it, that it has stopped finding one. It went missing on
+  Plane Cloud for a whole release once, and nothing said so.
 
 ![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 

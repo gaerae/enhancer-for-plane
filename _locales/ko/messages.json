@@ -120,8 +120,8 @@
     "placeholders": { "time": { "content": "$1" } }
   },
   "optTplAnchorCold": {
-    "message": "본문 편집기가 있는 페이지 $COUNT$곳에서 템플릿 버튼이 놓일 툴바를 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
-    "description": "In the templates card, once enough pages with an editor have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
+    "message": "작업 항목 페이지 $COUNT$곳에서 템플릿 버튼이 놓일 툴바를 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
   "optCopyAnchorOk": {

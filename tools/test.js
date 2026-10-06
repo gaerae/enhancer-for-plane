@@ -1275,12 +1275,17 @@ test("copy: a payload with nothing to fix is left alone, not rewritten", () => {
 // small decision table, and it is the whole feature, so it is pinned here rather than left
 // to the content script. The record itself reuses peRuleHealthUpdate / peRuleHealthState,
 // which have their own tests above.
-test("anchors: a page with an editor is the Template button's opportunity, and only that", () => {
+test("anchors: the Template button is accused only on a work item address with an editor", () => {
   const ctx = loadCommon();
-  eq(ctx.peAnchorCounts({ toolbar: { editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed: a hit");
-  eq(ctx.peAnchorCounts({ toolbar: { editors: 2, placed: 0 } }, false), { toolbar: 0 }, "editors, no button: a miss");
-  // A list page has no editor; the button did not fail there, it had nowhere to go.
-  eq(ctx.peAnchorCounts({ toolbar: { editors: 0, placed: 0 } }, false), {}, "no editor: no opinion");
+  // A hit counts wherever it happens — the create modal, the peek panel over a list.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: false, editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed off an item: a hit");
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed on an item: a hit");
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 2, placed: 0 } }, false), { toolbar: 0 }, "item, editor, no button: a miss");
+  // Plane's Pages: an editable editor on a route that is not a work item, and no attach
+  // toolbar by design. The first version called this a miss.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: false, editors: 1, placed: 0 } }, false), {}, "an editor off an item: no opinion");
+  // An item page with no editable editor — a read-only view.
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: 0, placed: 0 } }, false), {}, "nothing to type into: no opinion");
   // Nothing configured: the feature placed no button on purpose, and that is not a miss.
   eq(ctx.peAnchorCounts({}, false), {}, "no templates, nothing observed");
 });
@@ -1297,14 +1302,14 @@ test("anchors: the copy button is accused only where the address says there is a
 
 test("anchors: a hits-only pass can promote either anchor and accuse neither", () => {
   const ctx = loadCommon();
-  const obs = { toolbar: { editors: 1, placed: 0 }, header: { itemPage: true, placed: 0 } };
+  const obs = { toolbar: { itemPage: true, editors: 1, placed: 0 }, header: { itemPage: true, placed: 0 } };
   eq(ctx.peAnchorCounts(obs, true), {}, "two misses, nothing recorded");
-  const placed = { toolbar: { editors: 1, placed: 1 }, header: { itemPage: false, placed: 1 } };
+  const placed = { toolbar: { itemPage: false, editors: 1, placed: 1 }, header: { itemPage: false, placed: 1 } };
   eq(ctx.peAnchorCounts(placed, true), { toolbar: 1, header: 1 }, "two hits, both recorded");
   // And the record it feeds behaves like a rule's: one hit settles it, misses never unsettle it.
   // The click scan here finds the Template button in a modal it just opened, and nothing
   // for the copy button — so one anchor is promoted and the other is left to its misses.
-  const modal = { toolbar: { editors: 1, placed: 1 }, header: { itemPage: false, placed: 0 } };
+  const modal = { toolbar: { itemPage: false, editors: 1, placed: 1 }, header: { itemPage: false, placed: 0 } };
   let h = ctx.peRuleHealthUpdate({}, ctx.peAnchorCounts(obs, false), 1000);
   eq(ctx.peRuleHealthState(h.toolbar), "unknown", "one miss says nothing");
   h = ctx.peRuleHealthUpdate(h, ctx.peAnchorCounts(modal, true), 2000);
@@ -1319,7 +1324,7 @@ test("anchors: garbage in the record is read as nothing known", () => {
   const ctx = loadCommon();
   eq(ctx.peAnchorCounts(null, false), {});
   eq(ctx.peAnchorCounts({ toolbar: "yes", header: 3 }, false), {});
-  eq(ctx.peAnchorCounts({ toolbar: { editors: "2", placed: NaN } }, false), {}, "non-numbers count as zero");
+  eq(ctx.peAnchorCounts({ toolbar: { itemPage: true, editors: "2", placed: NaN } }, false), {}, "non-numbers count as zero");
 });
 
 test("copy: the presets are three ordinary rows", () => {

@@ -2319,15 +2319,28 @@ const suites = [
         eq(rec().header.checks, 2);
         eq(rec().header.hits, 1);
         eq(document.querySelectorAll(".pe-copy-ref-btn").length, 0, "no button on the page");
+      });
+
+      // A read-only view: same address, same editor class, but nothing can be typed into it,
+      // so a template has nowhere to go and the missing button is not a miss. The header's
+      // record moving on the same sample is what proves the sample ran.
+      document.getElementById("ed").setAttribute("contenteditable", "false");
+      history.pushState({}, "", location.pathname + "?route=3");
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => rec().header.checks === 3, "the third route sample");
+      check("a read-only description is no opportunity for the Template button", () => {
+        eq(rec().toolbar.checks, 2, "counted a miss on an editor nobody can type into");
       });`
   },
   {
-    // The same release on a list route — the peek panel's situation. The header is there at
-    // first (a panel over the list), so the copy button is placed and that counts as a hit
-    // even though the address names the list. Then the header goes, and this time the copy
-    // button cannot be accused, because nothing in the address said there was an item here.
-    // The toolbar record moving on the same sample is what proves the sample ran at all.
-    name: "content · anchor health on a list route",
+    // The same release off a work item address — the peek panel's situation, and Plane
+    // Pages'. Both buttons are placed at first (a panel over the list), and that counts as a
+    // hit even though the address names the list. Then the toolbar and the header go, and
+    // neither button can be accused: nothing in the address said there was an item here. An
+    // editable editor with no attach toolbar is exactly what a Pages document looks like,
+    // and the first version called that a miss. The style rule's record moving on the same
+    // sample is what proves the sample ran at all.
+    name: "content · anchor health off a work item address",
     page: {
       name: "ct-anchor-list",
       plane: PLANE + ANCHOR_EDITOR,
@@ -2335,17 +2348,19 @@ const suites = [
     },
     body: `
       ${ANCHOR_READY}
-      check("a copy button placed over a list route is a hit all the same", () => {
+      const sampled = () => ((window.__LOCAL.peRuleHealth || {}).r1 || {}).checks || 0;
+      check("buttons placed over a list route are hits all the same", () => {
         eq(rec().header.checks, 1);
         eq(rec().header.hits, 1, "the peek-panel case");
         eq(rec().toolbar.hits, 1, "and the toolbar's");
       });
+      const before = sampled();
       ${ANCHOR_RELEASE}
-      await waitFor(() => rec().toolbar.checks === 2, "the second route sample");
-      check("off a work item address, the missing header accuses nobody", () => {
-        eq(rec().header.checks, 1, "not counted on a list route");
+      await waitFor(() => sampled() === before + 1, "the second route sample");
+      check("off a work item address, nothing missing accuses anybody", () => {
+        eq(rec().header.checks, 1, "the copy button was counted on a list route");
+        eq(rec().toolbar.checks, 1, "the Template button was counted beside an editor with no toolbar");
         eq(rec().header.hits, 1, "the one placement still stands");
-        eq(rec().toolbar.checks, 2, "while the editor was counted — the sample did run");
       });`
   },
   {

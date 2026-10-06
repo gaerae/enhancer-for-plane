@@ -196,15 +196,18 @@
   // disabled rule is.
   function observeAnchors() {
     const obs = {};
+    const itemPage = !!peKeyFromPath(location.pathname);
     if (hasAnyTemplates()) {
-      const editors = [...document.querySelectorAll(".ProseMirror, .tiptap")].filter((ed) => !isCommentArea(ed));
-      obs.toolbar = { editors: editors.length, placed: document.querySelectorAll(".pe-body-tmpl-btn").length };
+      // Editable ones only: a read-only view (no permission, an archived item) shows the
+      // description in the same editor class with contenteditable="false", and a template
+      // has nowhere to go there — the button is right not to appear.
+      const editors = [...document.querySelectorAll(".ProseMirror, .tiptap")].filter(
+        (ed) => !isCommentArea(ed) && ed.getAttribute("contenteditable") !== "false"
+      );
+      obs.toolbar = { itemPage, editors: editors.length, placed: document.querySelectorAll(".pe-body-tmpl-btn").length };
     }
     if (hasCopyFormats()) {
-      obs.header = {
-        itemPage: !!peKeyFromPath(location.pathname),
-        placed: document.querySelectorAll(".pe-copy-ref-btn").length
-      };
+      obs.header = { itemPage, placed: document.querySelectorAll(".pe-copy-ref-btn").length };
     }
     return obs;
   }

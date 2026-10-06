@@ -412,15 +412,21 @@ function peRuleHealthState(entry) {
 // means "this page was no evidence either way". The decision is small and it is the whole
 // feature, so it lives here where test.js can pin it rather than in the content script.
 //
-//   toolbar — an opportunity is a page with a description editor on it. A hit is a Template
-//             button on the page. No editor, no opinion: a list page with no editor is not a
-//             page the button failed on.
-//   header  — a hit is a copy button on the page, counted wherever it happens, including
-//             the peek panel over a list. A miss is only counted where the ADDRESS says this
-//             is a work item's own page (/{workspace}/browse/{KEY}) and no button was placed:
-//             the opportunity signal is the URL, not the header, because the header is the
-//             very thing that would have vanished. A peek panel keeps the list's URL, so it
-//             can never be accused — and never needs to be, since a hit there still counts.
+// Both anchors follow one rule: a hit counts wherever it happens, and a miss is counted only
+// where the ADDRESS says this is a work item's own page (/{workspace}/browse/{KEY}). The
+// opportunity signal has to outlive the anchor, because the anchor is the thing that would
+// have vanished — so it cannot be the header, and it cannot be "any editor" either:
+//
+//   toolbar — a hit is a Template button on the page. A miss is a work item address with an
+//             editable description editor on it and no button. "Any editor anywhere" was the
+//             first version and it accused the button on Plane's Pages, a wiki whose editor
+//             has no attach toolbar and was never meant to get one, and on read-only views;
+//             someone who spent their first day in Pages would have been told Plane's layout
+//             had changed. The create-work-item modal and the peek panel still count, as
+//             hits — the click scan sees the modal, and a placement anywhere settles it.
+//   header  — a hit is a copy button on the page, including the peek panel over a list,
+//             which keeps the list's URL and so can never be accused and never needs to be.
+//             A miss is a work item address with no button.
 //
 // `hitsOnly` is the click scan's pass (see recordRuleHealth): it may promote either anchor
 // and may accuse neither, which is what makes extra sampling safe to add.
@@ -430,9 +436,10 @@ function peAnchorCounts(obs, hitsOnly) {
   const h = o.header && typeof o.header === "object" ? o.header : null;
   const num = (v) => (typeof v === "number" && isFinite(v) && v > 0 ? v : 0);
   const out = {};
-  if (t && num(t.editors) > 0) {
+  if (t) {
     const placed = num(t.placed);
-    if (placed > 0 || !hitsOnly) out.toolbar = placed;
+    if (placed > 0) out.toolbar = placed;
+    else if (!hitsOnly && t.itemPage === true && num(t.editors) > 0) out.toolbar = 0;
   }
   if (h) {
     const placed = num(h.placed);

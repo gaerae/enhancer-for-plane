@@ -166,10 +166,12 @@ degrades quietly (a selector, an anchor, a token that cannot be resolved) owes t
 same: not an error, a fact about whether it did anything. The two button anchors have it now
 (`PE_ANCHOR_HEALTH_KEY`, the same record shape and state function as a rule's), and the one
 thing to get right when adding a third is the *opportunity* signal: it has to be more durable
-than the anchor, because the anchor is the thing that vanishes. The copy button's is the
-address (`/browse/{KEY}`); the Template button's is the editor class the whole stack shares.
+than the anchor, because the anchor is the thing that vanishes — and narrower than "anything
+that looks related". Both buttons key it on the address (`/browse/{KEY}`), the Template button
+with an editable description on top. "Any editor" was the first draft and it would have
+accused the button on Plane's Pages, which has an editor and no attach toolbar by design.
 Anything that keys "should have been here" on the anchor itself can never notice the anchor
-going.
+going; anything broader than the feature's own surface will cry wolf.
 
 And it must not assume the thing being watched is on screen. The first version sampled once
 per route, which quietly accused every rule aimed at transient UI: the shipped "search
