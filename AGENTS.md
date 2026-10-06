@@ -163,7 +163,13 @@ presets sat matching nothing on Plane Cloud for a whole release because of it. T
 not to make failure loud in the page — the whole point is that it does not break anything —
 but to record what was observed and show it where the thing is configured. Anything else that
 degrades quietly (a selector, an anchor, a token that cannot be resolved) owes the reader the
-same: not an error, a fact about whether it did anything.
+same: not an error, a fact about whether it did anything. The two button anchors have it now
+(`PE_ANCHOR_HEALTH_KEY`, the same record shape and state function as a rule's), and the one
+thing to get right when adding a third is the *opportunity* signal: it has to be more durable
+than the anchor, because the anchor is the thing that vanishes. The copy button's is the
+address (`/browse/{KEY}`); the Template button's is the editor class the whole stack shares.
+Anything that keys "should have been here" on the anchor itself can never notice the anchor
+going.
 
 And it must not assume the thing being watched is on screen. The first version sampled once
 per route, which quietly accused every rule aimed at transient UI: the shipped "search

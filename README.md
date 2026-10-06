@@ -98,6 +98,9 @@ in the "Create work item" dialog; `Alt/⌥+T` works in both.
   A shared template can say `{{var.team}}` and resolve differently for each person who
   inserts it, with no per-user data leaving the browser. An unknown name is left as its
   token rather than blanked, so a typo is visible instead of eating text.
+- **Settings says when the Template button last found a toolbar to sit on** — and, after
+  enough pages with a description editor and no button, that it has stopped finding one. It
+  went missing on Plane Cloud for a whole release once, and nothing said so.
 
 ![A native Template button fills a work item's title and body in one click](store-assets/screenshot-5-templates.png)
 
@@ -115,6 +118,10 @@ three selections. It works on the item's own page and in the panel a list opens.
   and the toast names it — you find out before you paste.
 - **Also in the toolbar popup**, when the tab you are on is a work item. That path reads the
   tab's address and title and nothing else, so it works wherever Quick open has a link.
+
+- **Settings says when the button last found its place** — and, after enough work item
+  pages without it, that it has not. A Plane release can move the header the button sits
+  beside, and a button that is simply absent looks like a feature nobody used.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 

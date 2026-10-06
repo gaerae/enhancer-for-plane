@@ -8,6 +8,7 @@
   // Whether each rule's selector has ever matched anything, as observed by the content
   // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
   let ruleHealth = {};
+  let anchorHealth = {}; // { toolbar, header } — see PE_ANCHOR_HEALTH_KEY
   let dirty = false; // whether the user has edited the form
   // The active domains as they stood the last time this page took its state FROM storage.
   // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
@@ -46,6 +47,8 @@
     ruleList: $("ruleList"),
     ruleEmpty: $("ruleEmpty"),
     ruleHealthSummary: $("ruleHealthSummary"),
+    tplAnchorHealth: $("tplAnchorHealth"),
+    copyAnchorHealth: $("copyAnchorHealth"),
     addRule: $("addRule"),
     ruleRow: $("ruleRow"),
     templateList: $("templateList"),
@@ -194,9 +197,55 @@
     renderCopyFormats();
     renderQuickLinks();
     renderSources();
+    renderAnchorHealth();
     updateStorageMeter();
     refreshPermGap(); // async; the banner updates when it resolves
     dirty = false; // just re-rendered the form from state, so it's clean
+  }
+
+  // What the templates card and the copy card say about whether their button has been
+  // finding its place on the page. The same three states as a rule's badge, read off the
+  // same record shape, with the same silence for "not enough evidence yet". And the same
+  // gate as a disabled rule: a feature with nothing configured places no button on purpose,
+  // so whatever the record says about it is not something to show — a user who deleted
+  // every copy format must not read that the copy button "has not found a header".
+  function renderAnchorHealth() {
+    // The keys are spelled out at each call rather than passed in: check-i18n counts a key
+    // as used only where it sees it inside peMsg(...), and a key it cannot see is one it
+    // reports as dead.
+    const show = (node, st, text) => {
+      if (!node) return;
+      node.classList.toggle("cold", st === "cold");
+      node.textContent = text;
+      node.hidden = !text;
+    };
+    let hasTemplates = false;
+    try {
+      hasTemplates = peCountTemplates(peBuildTemplateSections(state || {}, syncCache)) > 0;
+    } catch (_) {}
+    const hasFormats = !!((state && state.copyFormats) || []).length;
+    const t = anchorHealth.toolbar || {};
+    const h = anchorHealth.header || {};
+    const stT = hasTemplates ? peRuleHealthState(t) : "unknown";
+    const stH = hasFormats ? peRuleHealthState(h) : "unknown";
+    show(
+      el.tplAnchorHealth,
+      stT,
+      stT === "cold"
+        ? peMsg("optTplAnchorCold", [String(t.checks)])
+        : stT === "ok"
+          ? peMsg("optTplAnchorOk", [fmtTime(t.at)])
+          : ""
+    );
+    show(
+      el.copyAnchorHealth,
+      stH,
+      stH === "cold"
+        ? peMsg("optCopyAnchorCold", [String(h.checks)])
+        : stH === "ok"
+          ? peMsg("optCopyAnchorOk", [fmtTime(h.at)])
+          : ""
+    );
   }
 
   function renderRules() {
@@ -1081,6 +1130,13 @@
           refreshRuleHealthBadges();
           return;
         }
+        // Same for the anchors: two lines, updated in place, no rebuild of the lists.
+        if (area === "local" && changes[PE_ANCHOR_HEALTH_KEY]) {
+          const nv = changes[PE_ANCHOR_HEALTH_KEY].newValue;
+          anchorHealth = nv && typeof nv === "object" ? nv : {};
+          renderAnchorHealth();
+          return;
+        }
         if (!peSettingsChanged(changes, area)) return;
         if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
@@ -1561,12 +1617,13 @@
   }
 
   peApplyI18n(document);
-  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth()]).then(([s, c, h]) => {
+  Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth(), peGetAnchorHealth()]).then(([s, c, h, a]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     knownDomains = (s.domains || []).slice();
     syncCache = c;
     ruleHealth = h;
+    anchorHealth = a;
     render();
     bind();
     bindTabs();

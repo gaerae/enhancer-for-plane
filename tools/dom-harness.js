@@ -255,6 +255,10 @@ function buildPlanePage({ name, seed, local, lang, plane, body }) {
     `<script>\n${PREAMBLE}\n(async () => {\ntry {\n${body}\n} catch (e) { __out.push({ name: "harness", pass: false, detail: String(e && e.message || e) }); }\nreport();\n})();\n</script>\n` +
     `</body></html>\n`;
   const out = path.join(OUT, name + ".html");
+  // A name may carry a directory: a page whose own path has to look like a Plane route
+  // ("browse/PROJ-142") is written there, because a file:// document has a null origin and
+  // pushState may change its query and fragment but never its path.
+  fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, src);
   return out;
 }
@@ -426,6 +430,36 @@ const PLANE = `
     <a href="/acme/browse/PROJ-77"><button type="button" disabled>PROJ-77</button></a>
   </div>
 </div>`;
+
+// A description editor with an attach button six levels up — self-hosted Plane 1.4's shape,
+// the same one ct-tmpl's "shallow" case builds. Appended to PLANE for the anchor suites, so
+// the page has both anchors: this toolbar, and the item header PLANE already carries.
+const ANCHOR_EDITOR =
+  `<div id="editors"><div id="box"><div><div><div><div>` +
+  `<div class="ProseMirror" id="ed"><p>description</p></div>` +
+  `</div></div></div></div>` +
+  `<button type="button" aria-label="Attach" id="attach"><input type="file" /></button></div></div>`;
+
+// Both anchor suites open the same way: both buttons placed, then the first route sample
+// written. Waiting for the buttons first is what makes the sample's numbers mean something.
+const ANCHOR_READY = `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await waitFor(
+        () => document.querySelector(".pe-copy-ref-btn") && document.querySelector(".pe-body-tmpl-btn"),
+        "both buttons to be placed"
+      );
+      const rec = () => window.__LOCAL.peAnchorHealth || {};
+      await waitFor(() => rec().toolbar && rec().header, "the first route sample");`;
+
+// And both have the same release happen to them: the attach button and the whole item
+// header go, the editor stays, and the route changes — by query, the one part of a file://
+// document's address that pushState may touch.
+const ANCHOR_RELEASE = `
+      document.getElementById("attach").remove();
+      document.querySelectorAll(".pe-body-tmpl-btn").forEach((b) => b.remove());
+      document.getElementById("probe-header").remove();
+      history.pushState({}, "", location.pathname + "?route=2");
+      document.body.appendChild(document.createElement("div"));`;
 
 /* ------------------------------------------------------------------ */
 /* Suites                                                             */
@@ -1329,6 +1363,55 @@ const suites = [
       });`
   },
   {
+    // The anchor record, as the two cards show it. Same three states as a rule's badge and
+    // the same gate: the copy formats are seeded empty here, so a record saying the copy
+    // button has never found a header must show nothing — the user deleted the feature, and
+    // "has not found" would read as an accusation about that choice.
+    name: "options · anchor health",
+    page: {
+      name: "opt-anchor",
+      ...OPTIONS,
+      seed: seedOf({ copyFormats: [] }),
+      local: {
+        peAnchorHealth: {
+          toolbar: { checks: 40, hits: 0, at: 0 },
+          header: { checks: 40, hits: 0, at: 0 }
+        }
+      }
+    },
+    body: `
+      ${TAB_READY}
+      const tpl = document.getElementById("tplAnchorHealth");
+      const copy = document.getElementById("copyAnchorHealth");
+      await waitFor(() => !tpl.hidden, "the templates card's line");
+      check("the templates card says its button has found no toolbar, and how often it looked", () => {
+        ok(tpl.classList.contains("cold"), "in the warning style");
+        ok(tpl.textContent.indexOf("40") > -1, "40 pages: " + tpl.textContent);
+        ok(tpl.textContent.indexOf("Plane") > -1, "and what to suspect");
+      });
+      check("with no copy formats, the copy card says nothing about its button", () => {
+        ok(copy.hidden, "hidden");
+        eq(copy.textContent, "", "and no text behind the attribute");
+      });
+      // Against the card, not the line: the line has no background of its own, and reading
+      // a transparent one back gives black, which is a number about nothing on screen.
+      check("the warning is legible against the card", () => {
+        const c = contrast(getComputedStyle(tpl).color, bg(tpl.closest("section.card")));
+        ok(c >= 4.5, "contrast " + c.toFixed(2));
+      });
+      // A Plane tab places the button: the line turns quiet in place and names the time.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 41, hits: 1, at: 1754600000000 } } } }, "local");
+      await waitFor(() => !tpl.classList.contains("cold"), "the line to update");
+      check("one placement settles it, with a date", () => {
+        ok(!tpl.hidden, "still shown");
+        ok(/\\d{4}-\\d{2}-\\d{2}/.test(tpl.textContent), "a date: " + tpl.textContent);
+      });
+      // Too little evidence: silence, not a verdict.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 2, hits: 0, at: 0 } } } }, "local");
+      await waitFor(() => tpl.hidden, "the line to go quiet");
+      check("a record with too few checks says nothing at all", () => eq(tpl.textContent, ""));`
+  },
+  {
     // Seeded as a pre-focus install, so the v6 → v7 migration runs for real and the presets
     // arrive through the same path a user's upgrade takes. tools/test.js proves the append;
     // only a browser can say the rows render, the switches land the right way round, and the
@@ -2156,6 +2239,75 @@ const suites = [
         eq(health()["r-live"].checks, beforeRoute.live + 1, "the matching rule counted once more");
         eq(health()["r-dead"].checks, beforeRoute.dead + 1, "and so did the one that misses");
         eq(health()["r-dead"].hits, 1, "whose single sighting still stands");
+      });`
+  },
+  {
+    // The third band of fragility, measured. A Plane release does not make the template or
+    // the copy button a no-op, it makes them vanish — and for a whole release nothing noticed
+    // the template button was absent on Plane Cloud, because absence looks like a feature
+    // nobody used. This page starts healthy (both anchors present, both buttons placed), then
+    // has a release happen to it: the toolbar and the header are taken away and the route
+    // changes. The record has to say "placed once, then not" — and has to say nothing about
+    // the copy button on a route whose address never claimed to be a work item.
+    name: "content · anchor health on a work item's own page",
+    // The page's own path is the route: a file:// document cannot pushState to another path,
+    // so the address that says "this is a work item" has to be the file's. The release that
+    // takes the anchors away is then a query change, which is all a route sample keys on.
+    page: {
+      name: "browse/PROJ-142",
+      plane: PLANE + ANCHOR_EDITOR,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      ${ANCHOR_READY}
+      check("a healthy page records a hit for each anchor", () => {
+        eq(rec().toolbar.checks, 1, "toolbar checked once");
+        eq(rec().toolbar.hits, 1, "and the Template button was there");
+        ok(rec().toolbar.at > 0, "stamped");
+        eq(rec().header.checks, 1, "header checked once");
+        eq(rec().header.hits, 1, "and the copy button was there");
+      });
+
+      // A release. The attach button and the whole item header go; the editor stays, and
+      // the address still says this is a work item's own page.
+      ${ANCHOR_RELEASE}
+      await waitFor(() => rec().toolbar.checks === 2, "the second route sample");
+      check("an editor with no toolbar to sit on is a miss for the Template button", () => {
+        eq(rec().toolbar.checks, 2);
+        eq(rec().toolbar.hits, 1, "the one placement still stands");
+        eq(document.querySelectorAll(".pe-body-tmpl-btn").length, 0, "and no button is on the page");
+      });
+      check("a work item address with no header is a miss for the copy button", () => {
+        eq(rec().header.checks, 2);
+        eq(rec().header.hits, 1);
+        eq(document.querySelectorAll(".pe-copy-ref-btn").length, 0, "no button on the page");
+      });`
+  },
+  {
+    // The same release on a list route — the peek panel's situation. The header is there at
+    // first (a panel over the list), so the copy button is placed and that counts as a hit
+    // even though the address names the list. Then the header goes, and this time the copy
+    // button cannot be accused, because nothing in the address said there was an item here.
+    // The toolbar record moving on the same sample is what proves the sample ran at all.
+    name: "content · anchor health on a list route",
+    page: {
+      name: "ct-anchor-list",
+      plane: PLANE + ANCHOR_EDITOR,
+      seed: seedOf({ allDomains: true })
+    },
+    body: `
+      ${ANCHOR_READY}
+      check("a copy button placed over a list route is a hit all the same", () => {
+        eq(rec().header.checks, 1);
+        eq(rec().header.hits, 1, "the peek-panel case");
+        eq(rec().toolbar.hits, 1, "and the toolbar's");
+      });
+      ${ANCHOR_RELEASE}
+      await waitFor(() => rec().toolbar.checks === 2, "the second route sample");
+      check("off a work item address, the missing header accuses nobody", () => {
+        eq(rec().header.checks, 1, "not counted on a list route");
+        eq(rec().header.hits, 1, "the one placement still stands");
+        eq(rec().toolbar.checks, 2, "while the editor was counted — the sample did run");
       });`
   },
   {

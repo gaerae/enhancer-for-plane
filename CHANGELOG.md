@@ -10,6 +10,39 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.10.0 — 2026-10-06
+
+Schema unchanged.
+
+### New
+- **Settings now says whether the Template button and the copy button have been finding
+  their place.** Both hang off DOM anchors — the description toolbar, the work item header —
+  and a Plane release does not make them no-ops, it makes them vanish; the Template button
+  was absent on Plane Cloud for a whole release while every check stayed green, because a button
+  that is not there looks exactly like a feature nobody used. The rules got a record of
+  "has it ever matched, and when did it last" in v1.8; the two anchors now have the same one,
+  shown in the Templates card and the Copy reference card: *last placed* with a time, or,
+  once enough pages have gone by without a placement, that it has not found its anchor and
+  Plane's layout may have changed.
+
+  What counts as a page it *should* have been on is the design point, and the answer is
+  different for the two. The Template button's opportunity is a page with a description
+  editor — the one class the whole editor stack shares. The copy button's is the **address**:
+  `/{workspace}/browse/{KEY}` says this is a work item's own page, and the header is the very
+  thing that would have vanished, so it cannot be the thing that says "look here". A
+  placement counts as a hit wherever it happens — the peek panel over a list keeps the list's
+  address and can never be accused, and never needs to be. Same threshold as the rules
+  (twenty pages before silence becomes a claim), same hits-only click scan that can promote
+  an anchor and never accuse one, same silence for a feature with nothing configured.
+
+  Measured from both ends, on two pages: one whose own path is a work item route, where a
+  release that removes the toolbar and the header is recorded as one miss each; and one on a
+  list route, where the same release is a miss for the toolbar and nothing at all for the
+  copy button. Switching the record off, dropping the address gate, or dropping the
+  Settings-side gate each fails a check of its own.
+
+---
+
 ## v1.9.0 — 2026-09-04
 
 Schema unchanged.

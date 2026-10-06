@@ -118,6 +118,26 @@
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "optTplAnchorOk": {
+    "message": "Template button last placed $TIME$",
+    "description": "In the templates card, when the button has found a description toolbar to sit on. Same shape as optRuleHealthOk.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optTplAnchorCold": {
+    "message": "The Template button has not found a toolbar to sit on yet, on $COUNT$ pages with a description editor. Plane's layout may have changed.",
+    "description": "In the templates card, once enough pages with an editor have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optCopyAnchorOk": {
+    "message": "Copy button last placed $TIME$",
+    "description": "In the copy reference card, when the button has found a work item header to sit beside.",
+    "placeholders": { "time": { "content": "$1" } }
+  },
+  "optCopyAnchorCold": {
+    "message": "The copy button has not found a work item header yet, on $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
   },

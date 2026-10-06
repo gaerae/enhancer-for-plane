@@ -70,6 +70,14 @@ const PE_RULE_HEALTH_MIN_CHECKS = 20;
 // A bound on the record for a settings file that churns rule ids. Pruning to the current
 // rules is what normally keeps this small; this is the backstop for whatever that misses.
 const PE_RULE_HEALTH_MAX = 500;
+// The same record, for the two DOM anchors the buttons hang off — { toolbar, header }, each
+// { checks, hits, at } exactly as a rule's. The style rules are the second band of fragility
+// (a Plane release makes them no-ops); these are the third, where a release makes the
+// feature vanish — and the template button did exactly that on Plane Cloud for a whole
+// release while every check stayed green. "toolbar" is the description toolbar the Template
+// button sits on; "header" is the work item header the copy button (and the focus toggle)
+// sits beside. Same storage area, same reasons, same state function.
+const PE_ANCHOR_HEALTH_KEY = "peAnchorHealth";
 
 // Custom template variables are written {{var.name}}. The prefix is what makes them
 // safe: a user cannot shadow {{date}} or {{week}} by naming a variable "date", so there
@@ -397,6 +405,41 @@ function peRuleHealthState(entry) {
   if (hits > 0) return "ok";
   if (checks >= PE_RULE_HEALTH_MIN_CHECKS) return "cold";
   return "unknown";
+}
+
+// What one page says about the two anchors, in the shape peRuleHealthUpdate takes:
+// { toolbar?: n, header?: n }, where n is how many buttons were placed and a key left out
+// means "this page was no evidence either way". The decision is small and it is the whole
+// feature, so it lives here where test.js can pin it rather than in the content script.
+//
+//   toolbar — an opportunity is a page with a description editor on it. A hit is a Template
+//             button on the page. No editor, no opinion: a list page with no editor is not a
+//             page the button failed on.
+//   header  — a hit is a copy button on the page, counted wherever it happens, including
+//             the peek panel over a list. A miss is only counted where the ADDRESS says this
+//             is a work item's own page (/{workspace}/browse/{KEY}) and no button was placed:
+//             the opportunity signal is the URL, not the header, because the header is the
+//             very thing that would have vanished. A peek panel keeps the list's URL, so it
+//             can never be accused — and never needs to be, since a hit there still counts.
+//
+// `hitsOnly` is the click scan's pass (see recordRuleHealth): it may promote either anchor
+// and may accuse neither, which is what makes extra sampling safe to add.
+function peAnchorCounts(obs, hitsOnly) {
+  const o = obs && typeof obs === "object" ? obs : {};
+  const t = o.toolbar && typeof o.toolbar === "object" ? o.toolbar : null;
+  const h = o.header && typeof o.header === "object" ? o.header : null;
+  const num = (v) => (typeof v === "number" && isFinite(v) && v > 0 ? v : 0);
+  const out = {};
+  if (t && num(t.editors) > 0) {
+    const placed = num(t.placed);
+    if (placed > 0 || !hitsOnly) out.toolbar = placed;
+  }
+  if (h) {
+    const placed = num(h.placed);
+    if (placed > 0) out.header = placed;
+    else if (!hitsOnly && h.itemPage === true) out.header = 0;
+  }
+  return out;
 }
 
 // How many of these rules have been checked enough to say they have never matched. The
@@ -1349,6 +1392,33 @@ function peSaveRuleHealth(health) {
       chrome.storage.local.set({ [PE_RULE_HEALTH_KEY]: health }, () => {
         // Advisory data. A write that fails costs a page's worth of observation, so it is
         // swallowed rather than surfaced — there is nothing the reader could do about it.
+        void (chrome.runtime && chrome.runtime.lastError);
+        resolve();
+      });
+    } catch (_) {
+      resolve();
+    }
+  });
+}
+
+// The anchor record, read and written the same way and for the same reasons.
+function peGetAnchorHealth() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(PE_ANCHOR_HEALTH_KEY, (res) => {
+        const h = res && res[PE_ANCHOR_HEALTH_KEY];
+        resolve(h && typeof h === "object" ? h : {});
+      });
+    } catch (_) {
+      resolve({});
+    }
+  });
+}
+
+function peSaveAnchorHealth(health) {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.set({ [PE_ANCHOR_HEALTH_KEY]: health }, () => {
         void (chrome.runtime && chrome.runtime.lastError);
         resolve();
       });

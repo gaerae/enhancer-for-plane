@@ -384,6 +384,11 @@ input[type="number"]:focus {
   color: #b45309;
   font-weight: 600;
 }
+/* The same line, standing above a card's list rather than inside a row: it needs room
+   below it, and none above, because the description paragraphs carry their own. */
+.anchor-health {
+  margin: 0 0 10px;
+}
 .rule-health-summary {
   margin: 0 0 10px;
   padding: 8px 10px;

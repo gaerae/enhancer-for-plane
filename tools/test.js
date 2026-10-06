@@ -1271,6 +1271,57 @@ test("copy: a payload with nothing to fix is left alone, not rewritten", () => {
   eq(ctx.peTidyCopiedText(null, br), null);
 });
 
+// The two DOM anchors get the rule-health treatment: what one page is evidence of is a
+// small decision table, and it is the whole feature, so it is pinned here rather than left
+// to the content script. The record itself reuses peRuleHealthUpdate / peRuleHealthState,
+// which have their own tests above.
+test("anchors: a page with an editor is the Template button's opportunity, and only that", () => {
+  const ctx = loadCommon();
+  eq(ctx.peAnchorCounts({ toolbar: { editors: 1, placed: 1 } }, false), { toolbar: 1 }, "placed: a hit");
+  eq(ctx.peAnchorCounts({ toolbar: { editors: 2, placed: 0 } }, false), { toolbar: 0 }, "editors, no button: a miss");
+  // A list page has no editor; the button did not fail there, it had nowhere to go.
+  eq(ctx.peAnchorCounts({ toolbar: { editors: 0, placed: 0 } }, false), {}, "no editor: no opinion");
+  // Nothing configured: the feature placed no button on purpose, and that is not a miss.
+  eq(ctx.peAnchorCounts({}, false), {}, "no templates, nothing observed");
+});
+
+test("anchors: the copy button is accused only where the address says there is an item", () => {
+  const ctx = loadCommon();
+  // A hit counts wherever it happens — the peek panel over a list keeps the list's URL.
+  eq(ctx.peAnchorCounts({ header: { itemPage: false, placed: 1 } }, false), { header: 1 }, "placed on a peek: a hit");
+  eq(ctx.peAnchorCounts({ header: { itemPage: true, placed: 1 } }, false), { header: 1 }, "placed on the item page: a hit");
+  // The opportunity signal is the URL, because the header is the thing that would vanish.
+  eq(ctx.peAnchorCounts({ header: { itemPage: true, placed: 0 } }, false), { header: 0 }, "item address, no button: a miss");
+  eq(ctx.peAnchorCounts({ header: { itemPage: false, placed: 0 } }, false), {}, "a list route: no opinion");
+});
+
+test("anchors: a hits-only pass can promote either anchor and accuse neither", () => {
+  const ctx = loadCommon();
+  const obs = { toolbar: { editors: 1, placed: 0 }, header: { itemPage: true, placed: 0 } };
+  eq(ctx.peAnchorCounts(obs, true), {}, "two misses, nothing recorded");
+  const placed = { toolbar: { editors: 1, placed: 1 }, header: { itemPage: false, placed: 1 } };
+  eq(ctx.peAnchorCounts(placed, true), { toolbar: 1, header: 1 }, "two hits, both recorded");
+  // And the record it feeds behaves like a rule's: one hit settles it, misses never unsettle it.
+  // The click scan here finds the Template button in a modal it just opened, and nothing
+  // for the copy button — so one anchor is promoted and the other is left to its misses.
+  const modal = { toolbar: { editors: 1, placed: 1 }, header: { itemPage: false, placed: 0 } };
+  let h = ctx.peRuleHealthUpdate({}, ctx.peAnchorCounts(obs, false), 1000);
+  eq(ctx.peRuleHealthState(h.toolbar), "unknown", "one miss says nothing");
+  h = ctx.peRuleHealthUpdate(h, ctx.peAnchorCounts(modal, true), 2000);
+  eq(ctx.peRuleHealthState(h.toolbar), "ok", "a click-scan hit settles it");
+  eq(h.toolbar.at, 2000, "stamped with when");
+  for (let i = 0; i < ctx.__HEALTH_MIN; i++) h = ctx.peRuleHealthUpdate(h, ctx.peAnchorCounts(obs, false), 3000);
+  eq(ctx.peRuleHealthState(h.toolbar), "ok", "and stays settled");
+  eq(ctx.peRuleHealthState(h.header), "cold", "while the one never placed goes cold on schedule");
+});
+
+test("anchors: garbage in the record is read as nothing known", () => {
+  const ctx = loadCommon();
+  eq(ctx.peAnchorCounts(null, false), {});
+  eq(ctx.peAnchorCounts({ toolbar: "yes", header: 3 }, false), {});
+  eq(ctx.peAnchorCounts({ toolbar: { editors: "2", placed: NaN } }, false), {}, "non-numbers count as zero");
+});
+
 test("copy: the presets are three ordinary rows", () => {
   const ctx = loadCommon();
   const list = ctx.__DEFAULTS.copyFormats;

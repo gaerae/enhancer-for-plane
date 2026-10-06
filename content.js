@@ -173,13 +173,40 @@
         if (n > 0 || !hitsOnly) counts[r.id] = n;
       } catch (_) {}
     });
-    if (!Object.keys(counts).length) return;
     // Read-modify-write, and two tabs on two routes can interleave. The lost update costs
     // one observation — never a wrong claim, because nothing here is ever decremented and
     // the only direction a lost write moves the reader is toward "we do not know yet".
-    peGetRuleHealth().then((prev) =>
-      peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
-    );
+    if (Object.keys(counts).length) {
+      peGetRuleHealth().then((prev) =>
+        peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
+      );
+    }
+    // The two DOM anchors, on the same schedule and under the same rules. Taken after the
+    // inject bursts have had their say (this runs 2.5s past the route change; the last
+    // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
+    const anchors = peAnchorCounts(observeAnchors(), hitsOnly);
+    if (Object.keys(anchors).length) {
+      peGetAnchorHealth().then((prev) => peSaveAnchorHealth(peRuleHealthUpdate(prev, anchors, Date.now())));
+    }
+  }
+
+  // What this page offers each anchor, and what got placed. Only looking — peAnchorCounts
+  // decides what it is evidence of. A feature with nothing configured places no button on
+  // purpose, so it is left out entirely rather than counted as a miss, the same way a
+  // disabled rule is.
+  function observeAnchors() {
+    const obs = {};
+    if (hasAnyTemplates()) {
+      const editors = [...document.querySelectorAll(".ProseMirror, .tiptap")].filter((ed) => !isCommentArea(ed));
+      obs.toolbar = { editors: editors.length, placed: document.querySelectorAll(".pe-body-tmpl-btn").length };
+    }
+    if (hasCopyFormats()) {
+      obs.header = {
+        itemPage: !!peKeyFromPath(location.pathname),
+        placed: document.querySelectorAll(".pe-copy-ref-btn").length
+      };
+    }
+    return obs;
   }
 
   /* ================================================================== */
