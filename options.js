@@ -1553,11 +1553,10 @@
   }
 
   // The recently-opened list is not a setting — it lives in chrome.storage.local and no form
-  // field holds it — so resetting `state` alone never touched it, while PRIVACY.md and the
-  // store's "web history" answer both said Restore defaults clears it. That answer is what
-  // NO rests on. Remembered here and acted on by the next successful save, because the
-  // confirm promises nothing changes until Save, and a reset that is never saved has to
-  // leave the list exactly where it was.
+  // field holds it — so resetting `state` alone never touched it, while PRIVACY.md says
+  // Restore defaults clears it. Remembered here and acted on by the next successful save,
+  // because the confirm promises nothing changes until Save, and a reset that is never saved
+  // has to leave the list exactly where it was.
   function resetAll() {
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});
