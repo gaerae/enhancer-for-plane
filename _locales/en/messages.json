@@ -481,7 +481,7 @@
     "placeholders": { "sites": { "content": "$1" } }
   },
   "msgResetConfirm": {
-    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
+    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nThe work items you opened recently are forgotten too.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
   },
   "msgResetDone": {
     "message": "Restored defaults. Click “Save” to apply."

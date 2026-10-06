@@ -41,6 +41,18 @@ Schema unchanged.
   copy button. Switching the record off, dropping the address gate, or dropping the
   Settings-side gate each fails a check of its own.
 
+### Fixed
+- **"Restore defaults" now forgets the work items you opened recently, as the privacy
+  policy said it did.** The recents list lives in `chrome.storage.local` and no form field
+  holds it, so resetting the form never reached it — while PRIVACY.md said "clearing settings
+  clears it" and the store's *web history* answer, the one that says NO, rested on "Restore
+  defaults clears it". There was no other way to clear it short of removing the extension.
+  It is cleared by the save that follows a reset, not by the reset itself, because the confirm
+  promises nothing changes until Save; the confirm now also says the list goes.
+
+  All three ways to get that wrong fail a check of their own: clearing on every save, clearing
+  on the reset before Save, and — what shipped — not clearing at all.
+
 ---
 
 ## v1.9.0 — 2026-09-04

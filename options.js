@@ -1449,6 +1449,12 @@
     try {
       savingSelf = true;
       await peSaveSettings(state);
+      // Only after the settings write succeeded: a failed save leaves the flag set, so the
+      // save that does go through is the one that clears it.
+      if (resetPending) {
+        resetPending = false;
+        await peSaveRecent([]);
+      }
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       knownDomains = (state.domains || []).slice();
       render();
@@ -1542,9 +1548,17 @@
     }
   }
 
+  // The recently-opened list is not a setting — it lives in chrome.storage.local and no form
+  // field holds it — so resetting `state` alone never touched it, while PRIVACY.md and the
+  // store's "web history" answer both said Restore defaults clears it. That answer is what
+  // NO rests on. Remembered here and acted on by the next successful save, because the
+  // confirm promises nothing changes until Save, and a reset that is never saved has to
+  // leave the list exactly where it was.
+  let resetPending = false;
   function resetAll() {
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});
+    resetPending = true;
     render();
     flash(peMsg("msgResetDone"));
   }

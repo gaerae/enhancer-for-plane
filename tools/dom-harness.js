@@ -666,6 +666,44 @@ const suites = [
       });`
   },
   {
+    // The recently-opened list is the one thing on the device that says what somebody has been
+    // working on, and PRIVACY.md and the store's "web history" answer both said Restore
+    // defaults clears it. It did not — it is not a setting, so resetting the form never reached
+    // it. All three paths are here, because each is a way to get it wrong: a plain save must
+    // not clear it, a reset that is never saved must not clear it, and reset-then-save must.
+    name: "options · restore defaults forgets the recent work items",
+    page: {
+      name: "opt-reset-recent",
+      ...OPTIONS,
+      seed: seedOf(),
+      local: { peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }] }
+    },
+    body: `
+      ${TAB_READY}
+      const recent = () => window.__LOCAL.peRecent;
+      const save = async () => {
+        const n = window.__written.length;
+        document.getElementById("status").textContent = "";
+        document.getElementById("save").click();
+        await waitFor(() => window.__written.length > n, "the save to write");
+        await waitFor(() => (document.getElementById("status").textContent || "").length > 0, "the save to report");
+      };
+
+      await save();
+      check("an ordinary save leaves the list alone", () => eq(recent().length, 1));
+
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      await sleep(100);
+      check("a reset nobody saved leaves it alone too", () => eq(recent().length, 1));
+
+      await save();
+      check("reset, then save, forgets it", () => eq(recent().length, 0, "still remembered: " + JSON.stringify(recent())));
+      check("and the confirm said it would", () => {
+        ok(peMsg("msgResetConfirm").indexOf("recently") > -1, "the confirm does not mention it");
+      });`
+  },
+  {
     // A site switched on from the popup while this page sits open with unsaved edits. The
     // page refuses to adopt the change (correctly — it would discard what is being typed),
     // so its own list has never held that domain, and saving used to write the old list AND
