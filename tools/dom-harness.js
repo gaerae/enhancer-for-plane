@@ -449,6 +449,10 @@ const ANCHOR_READY = `
         "both buttons to be placed"
       );
       const rec = () => window.__LOCAL.peAnchorHealth || {};
+      // The style rule's record moves on every sample, full or hits-only, because its
+      // selector always matches PLANE — so it is the proof that a sample ran even when the
+      // anchor record, correctly, did not move.
+      const sampled = () => ((window.__LOCAL.peRuleHealth || {}).r1 || {}).checks || 0;
       await waitFor(() => rec().toolbar && rec().header, "the first route sample");`;
 
 // And both have the same release happen to them: the attach button and the whole item
@@ -701,6 +705,22 @@ const suites = [
       check("reset, then save, forgets it", () => eq(recent().length, 0, "still remembered: " + JSON.stringify(recent())));
       check("and the confirm said it would", () => {
         ok(peMsg("msgResetConfirm").indexOf("recently") > -1, "the confirm does not mention it");
+      });
+
+      // A reset, then settings arriving from another surface before Save. The page adopts
+      // them (a reset leaves the form clean), so the reset is gone — and an unrelated Save
+      // afterwards must not carry out the clearing it was waiting for.
+      window.__LOCAL.peRecent = [{ key: "PROJ-2", url: "https://plane.example.com/acme/browse/PROJ-2", name: "Plane", at: 2 }];
+      document.getElementById("reset").click();
+      await sleep(100);
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.domains = ["elsewhere.example.com"];
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await waitFor(() => document.getElementById("domains").value.indexOf("elsewhere.example.com") > -1, "the change to be adopted");
+      await save();
+      check("a reset replaced by settings from elsewhere clears nothing on the next save", () => {
+        eq(recent().length, 1, "the list was wiped by a reset that no longer existed");
       });`
   },
   {
@@ -1443,6 +1463,15 @@ const suites = [
       check("one placement settles it, with a date", () => {
         ok(!tpl.hidden, "still shown");
         ok(/\\d{4}-\\d{2}-\\d{2}/.test(tpl.textContent), "a date: " + tpl.textContent);
+      });
+      // Worked before, and has not been on the last 25 work item pages: the case this whole
+      // record is for. Same warning style, and both numbers in the words.
+      window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 80, hits: 30, at: 1754600000000, streak: 25 } } } }, "local");
+      await waitFor(() => tpl.classList.contains("cold"), "the line to turn into a warning");
+      check("a button that was placed and then stopped says so, with when and for how long", () => {
+        ok(!tpl.hidden, "shown");
+        ok(/\\d{4}-\\d{2}-\\d{2}/.test(tpl.textContent), "the last time it was placed: " + tpl.textContent);
+        ok(tpl.textContent.indexOf("25") > -1, "and the run since: " + tpl.textContent);
       });
       // Too little evidence: silence, not a verdict.
       window.__onChanged({ peAnchorHealth: { newValue: { toolbar: { checks: 2, hits: 0, at: 0 } } } }, "local");
@@ -2313,6 +2342,7 @@ const suites = [
       check("an editor with no toolbar to sit on is a miss for the Template button", () => {
         eq(rec().toolbar.checks, 2);
         eq(rec().toolbar.hits, 1, "the one placement still stands");
+        eq(rec().toolbar.streak, 1, "and the run of misses since it has begun");
         eq(document.querySelectorAll(".pe-body-tmpl-btn").length, 0, "and no button is on the page");
       });
       check("a work item address with no header is a miss for the copy button", () => {
@@ -2330,6 +2360,38 @@ const suites = [
       await waitFor(() => rec().header.checks === 3, "the third route sample");
       check("a read-only description is no opportunity for the Template button", () => {
         eq(rec().toolbar.checks, 2, "counted a miss on an editor nobody can type into");
+        eq(rec().header.streak, 2, "while the copy button's run went on");
+      });
+
+      // A jump to a comment on the same item: only the fragment changes, and the route sample
+      // fires on any URL change. Counting it would let somebody reach "lost" by clicking
+      // around one item, which is not evidence about twenty of them.
+      let before = sampled();
+      location.hash = "comment-1";
+      document.body.appendChild(document.createElement("div"));
+      await waitFor(() => sampled() === before + 1, "the fragment-only sample");
+      await sleep(100);
+      check("a change to the fragment alone is the same page, not another one", () => {
+        eq(rec().header.checks, 3, "a second check for the same item");
+      });
+
+      // The create-work-item modal: no toolbar anywhere on the page, so the Template button
+      // goes into the dialog's fallback spot. That is precisely the placement made when the
+      // toolbar walk fails — counting it would end the run of misses above on the strength
+      // of a dialog, and a failing walk would read as healthy. The run is open (streak 1),
+      // so a counted hit here would show.
+      const dlg = document.createElement("div");
+      dlg.setAttribute("role", "dialog");
+      dlg.innerHTML = '<div style="position: relative"><div class="ProseMirror" id="ed-modal"><p>new item</p></div></div>';
+      document.body.appendChild(dlg);
+      await waitFor(() => dlg.querySelector(".pe-tmpl-floating"), "the dialog fallback to be placed");
+      before = sampled();
+      document.body.click();
+      await waitFor(() => sampled() > before, "a click scan to have run");
+      await sleep(100);
+      check("a fallback button in a dialog is not a toolbar placement", () => {
+        eq(rec().toolbar.hits, 1, "the dialog counted as finding the toolbar");
+        eq(rec().toolbar.streak, 1, "and ended the run of misses");
       });`
   },
   {
@@ -2348,11 +2410,21 @@ const suites = [
     },
     body: `
       ${ANCHOR_READY}
-      const sampled = () => ((window.__LOCAL.peRuleHealth || {}).r1 || {}).checks || 0;
       check("buttons placed over a list route are hits all the same", () => {
         eq(rec().header.checks, 1);
         eq(rec().header.hits, 1, "the peek-panel case");
         eq(rec().toolbar.hits, 1, "and the toolbar's");
+      });
+      // A click scan on a healthy page finds both buttons, and on a busy page it runs every
+      // few seconds. A record already at "placed, no run of misses" cannot be moved by that,
+      // so it is not written — otherwise every click is a storage event in every tab.
+      let scanned = sampled();
+      document.body.click();
+      await waitFor(() => sampled() > scanned, "a click scan to have run");
+      await sleep(100);
+      check("a click scan on a healthy page leaves a settled record alone", () => {
+        eq(rec().header.checks, 1, "written anyway");
+        eq(rec().toolbar.checks, 1, "written anyway");
       });
       const before = sampled();
       ${ANCHOR_RELEASE}

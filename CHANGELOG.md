@@ -17,30 +17,36 @@ Schema unchanged.
 ### New
 - **Settings now says whether the Template button and the copy button have been finding
   their place.** Both hang off DOM anchors — the description toolbar, the work item header —
-  and a Plane release does not make them no-ops, it makes them vanish; the Template button
-  was absent on Plane Cloud for a whole release while every check stayed green, because a button
-  that is not there looks exactly like a feature nobody used. The rules got a record of
-  "has it ever matched, and when did it last" in v1.8; the two anchors now have the same one,
-  shown in the Templates card and the Copy reference card: *last placed* with a time, or,
-  once enough pages have gone by without a placement, that it has not found its anchor and
-  Plane's layout may have changed.
+  and a Plane release does not make them no-ops, it makes them vanish; the Template button was
+  absent on Plane Cloud for a whole release while every check stayed green, because a button
+  that is not there looks exactly like a feature nobody used. Each card now carries one line:
+  *last placed* with a time; or, once enough work item pages have gone by without it, that it
+  has not found its anchor; or — the case this exists for — that it **was** placed until a
+  given time and has not been on the last N work item pages since.
 
-  What counts as a page it *should* have been on is the design point: the signal has to
-  outlive the anchor, because the anchor is the thing that vanishes. So it is the **address**
-  for both — `/{workspace}/browse/{KEY}` says this is a work item's own page — plus, for the
-  Template button, an editable description on it. A placement counts as a hit wherever it
-  happens: the peek panel over a list keeps the list's address and can never be accused, and
-  never needs to be. The first draft counted any editor as an opportunity, and would have told
-  someone who spent their first day in Plane's Pages — an editor with no attach toolbar, by
-  design — that Plane's layout had changed. Read-only views are excluded for the same reason. Same threshold as the rules
-  (twenty pages before silence becomes a claim), same hits-only click scan that can promote
-  an anchor and never accuse one, same silence for a feature with nothing configured.
+  That last state is the one thing here a style rule deliberately does not have. A rule for
+  one route misses on every other route, so a run of misses means nothing; a button's
+  opportunity is precise, so on a work item page it should be there every time and twenty in a
+  row without it is evidence. Without it, a button that had ever been placed read "ok" forever,
+  and a working button followed by a Plane release produced a stale date on one line and no
+  warning at all.
 
-  Measured from both ends, on two pages: one whose own path is a work item route, where a
-  release that removes the toolbar and the header is recorded as one miss each; and one on a
-  list route, where the same release accuses neither button. Switching the record off,
-  dropping either address gate, counting a read-only editor, or dropping the Settings-side
-  gate each fails a check of its own.
+  What counts as a page it *should* have been on is the other design point: the signal has to
+  outlive the anchor, because the anchor is the thing that vanishes, and be no broader than
+  the feature, or it cries wolf. So it is the **address** — `/{workspace}/browse/{KEY}`, with
+  the workspace segment required, because Jira's issue view is `/browse/{KEY}` and the
+  extension runs there for style rules — plus, for the Template button, an *editable*
+  description on it. A placement counts wherever it happens, so the peek panel over a list
+  can never be accused and never needs to be; but only a toolbar placement counts for the
+  Template button, because the dialog fallbacks are exactly what gets placed when the toolbar
+  walk fails. A change to the fragment alone is the same page. A click scan on a healthy page
+  does not write a record it cannot change.
+
+  Measured from both ends, on two pages: one whose own path is a work item route, one on a
+  list route, each having a release happen to it. Every guard above fails a check of its own
+  when knocked out — the record, both address gates, the Jira shape, the read-only filter, the
+  dialog fallback, the "was placed, then stopped" state, the fragment, the write throttle, and
+  the Settings-side gate.
 
 ### Fixed
 - **"Restore defaults" now forgets the work items you opened recently, as the privacy
@@ -51,8 +57,9 @@ Schema unchanged.
   It is cleared by the save that follows a reset, not by the reset itself, because the confirm
   promises nothing changes until Save; the confirm now also says the list goes.
 
-  All three ways to get that wrong fail a check of their own: clearing on every save, clearing
-  on the reset before Save, and — what shipped — not clearing at all.
+  All four ways to get that wrong fail a check of their own: clearing on every save, clearing
+  on the reset before Save, clearing on a save after the reset was replaced by settings adopted
+  from another surface, and — what shipped — not clearing at all.
 
 ---
 

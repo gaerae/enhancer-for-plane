@@ -9,6 +9,7 @@
   // script (chrome.storage.local). Read-only here: this page has no Plane page to measure.
   let ruleHealth = {};
   let anchorHealth = {}; // { toolbar, header } — see PE_ANCHOR_HEALTH_KEY
+  let resetPending = false; // a confirmed Restore defaults not yet saved — see resetAll
   let dirty = false; // whether the user has edited the form
   // The active domains as they stood the last time this page took its state FROM storage.
   // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
@@ -197,7 +198,6 @@
     renderCopyFormats();
     renderQuickLinks();
     renderSources();
-    renderAnchorHealth();
     updateStorageMeter();
     refreshPermGap(); // async; the banner updates when it resolves
     dirty = false; // just re-rendered the form from state, so it's clean
@@ -210,42 +210,41 @@
   // so whatever the record says about it is not something to show — a user who deleted
   // every copy format must not read that the copy button "has not found a header".
   function renderAnchorHealth() {
-    // The keys are spelled out at each call rather than passed in: check-i18n counts a key
-    // as used only where it sees it inside peMsg(...), and a key it cannot see is one it
-    // reports as dead.
-    const show = (node, st, text) => {
-      if (!node) return;
-      node.classList.toggle("cold", st === "cold");
-      node.textContent = text;
-      node.hidden = !text;
-    };
+    // One row per anchor, and the message for each state written out as its own peMsg call:
+    // check-i18n counts a key as used only where it sees it inside peMsg(...), so a table of
+    // key names would read to it as four dead keys. The thunks keep the table and the check.
     let hasTemplates = false;
     try {
       hasTemplates = peCountTemplates(peBuildTemplateSections(state || {}, syncCache)) > 0;
     } catch (_) {}
-    const hasFormats = !!((state && state.copyFormats) || []).length;
-    const t = anchorHealth.toolbar || {};
-    const h = anchorHealth.header || {};
-    const stT = hasTemplates ? peRuleHealthState(t) : "unknown";
-    const stH = hasFormats ? peRuleHealthState(h) : "unknown";
-    show(
-      el.tplAnchorHealth,
-      stT,
-      stT === "cold"
-        ? peMsg("optTplAnchorCold", [String(t.checks)])
-        : stT === "ok"
-          ? peMsg("optTplAnchorOk", [fmtTime(t.at)])
-          : ""
-    );
-    show(
-      el.copyAnchorHealth,
-      stH,
-      stH === "cold"
-        ? peMsg("optCopyAnchorCold", [String(h.checks)])
-        : stH === "ok"
-          ? peMsg("optCopyAnchorOk", [fmtTime(h.at)])
-          : ""
-    );
+    const rows = [
+      {
+        node: el.tplAnchorHealth,
+        entry: anchorHealth.toolbar,
+        configured: hasTemplates,
+        ok: (e) => peMsg("optTplAnchorOk", [fmtTime(e.at)]),
+        cold: (e) => peMsg("optTplAnchorCold", [String(e.checks)]),
+        lost: (e) => peMsg("optTplAnchorLost", [fmtTime(e.at), String(e.streak)])
+      },
+      {
+        node: el.copyAnchorHealth,
+        entry: anchorHealth.header,
+        configured: !!((state && state.copyFormats) || []).length,
+        ok: (e) => peMsg("optCopyAnchorOk", [fmtTime(e.at)]),
+        cold: (e) => peMsg("optCopyAnchorCold", [String(e.checks)]),
+        lost: (e) => peMsg("optCopyAnchorLost", [fmtTime(e.at), String(e.streak)])
+      }
+    ];
+    for (const r of rows) {
+      if (!r.node) continue;
+      const e = r.entry && typeof r.entry === "object" ? r.entry : {};
+      const st = r.configured ? peAnchorHealthState(e) : "unknown";
+      const text = st === "unknown" ? "" : r[st](e);
+      // "lost" wears the warning style too: it is the same news as "cold", arriving later.
+      r.node.classList.toggle("cold", st === "cold" || st === "lost");
+      r.node.textContent = text;
+      r.node.hidden = !text;
+    }
   }
 
   function renderRules() {
@@ -360,6 +359,7 @@
 
   function renderTemplates() {
     el.templateList.innerHTML = "";
+    renderAnchorHealth(); // its gate is whether this list has anything in it
     const list = state.templates || [];
     el.templateEmpty.hidden = list.length > 0;
     list.forEach((tpl, idx) => {
@@ -437,6 +437,7 @@
 
   function renderCopyFormats() {
     if (!Array.isArray(state.copyFormats)) state.copyFormats = [];
+    renderAnchorHealth(); // its gate is whether this list has anything in it
     el.copyList.innerHTML = "";
     const list = state.copyFormats;
     el.copyEmpty.hidden = list.length > 0;
@@ -1121,6 +1122,7 @@
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
           syncCache = { bySource: (nv && nv.bySource) || {} };
           renderSources();
+          renderAnchorHealth(); // templates that arrive only from a source change its gate
           return;
         }
         // A Plane tab just measured the rules. Badges only — see refreshRuleHealthBadges.
@@ -1159,6 +1161,7 @@
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
+          resetPending = false; // the reset this was waiting to save is gone
           knownDomains = (s.domains || []).slice();
           render();
           if (grew) showTab("appearance");
@@ -1259,6 +1262,7 @@
       }
       try {
         state = peDeepMerge(PE_DEFAULTS, peSanitizeSettings(peMigrate(raw)));
+        resetPending = false; // an import replaces the reset, so its save must not clear anything
         render();
         // An import replaces every tab's contents, and the message it flashes asks the user
         // to review before saving — but Import lives on the Backup tab, which shows none of
@@ -1554,7 +1558,6 @@
   // NO rests on. Remembered here and acted on by the next successful save, because the
   // confirm promises nothing changes until Save, and a reset that is never saved has to
   // leave the list exactly where it was.
-  let resetPending = false;
   function resetAll() {
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});

@@ -173,6 +173,14 @@ accused the button on Plane's Pages, which has an editor and no attach toolbar b
 Anything that keys "should have been here" on the anchor itself can never notice the anchor
 going; anything broader than the feature's own surface will cry wolf.
 
+That precision is also what licenses the one state a rule is denied. Rule health records
+whether a rule has *ever* matched and never a per-page verdict, because a rule for one route
+legitimately misses on every other one — true, and it does not transfer: on a work item's own page a button should
+be there every time, so a run of misses there *is* evidence (`streak`, `peAnchorHealthState`'s
+"lost"). Leaving it out was the first draft, and it meant the scenario the record was built for
+— a working button, then a Plane release — showed one stale date and never a warning. If you
+add an anchor whose opportunity is not that precise, it does not get "lost" either.
+
 And it must not assume the thing being watched is on screen. The first version sampled once
 per route, which quietly accused every rule aimed at transient UI: the shipped "search
 dropdown width" preset selects `[id^="headlessui-combobox-options"] > div`, measured on Plane

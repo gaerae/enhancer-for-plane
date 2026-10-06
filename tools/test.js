@@ -1320,6 +1320,56 @@ test("anchors: a hits-only pass can promote either anchor and accuse neither", (
   eq(ctx.peRuleHealthState(h.header), "cold", "while the one never placed goes cold on schedule");
 });
 
+test("anchors: a work item page is Plane's address shape, not Jira's", () => {
+  const ctx = loadCommon();
+  ok(ctx.peIsItemPath("/acme/browse/PROJ-142"), "Plane");
+  ok(ctx.peIsItemPath("/acme/browse/PROJ-142/"), "with a trailing slash");
+  ok(ctx.peIsItemPath("/acme/browse/42-7"), "an all-digit identifier");
+  // The extension runs on Jira for style rules, and Jira's issue view is /browse/{KEY} with
+  // no workspace in front. Reading that as a Plane item page recorded every Jira issue as a
+  // place both buttons failed.
+  ok(!ctx.peIsItemPath("/browse/PROJ-142"), "Jira Cloud");
+  ok(!ctx.peIsItemPath("/acme/projects/abc/issues/"), "a list route");
+  ok(!ctx.peIsItemPath("/acme/browse/"), "browse with nothing after it");
+  ok(!ctx.peIsItemPath("/acme/browse/PROJ-1/activity"), "something below an item");
+  ok(!ctx.peIsItemPath(""), "nothing");
+});
+
+test("anchors: a button that worked and then stopped is reported, not settled forever", () => {
+  const ctx = loadCommon();
+  const N = ctx.__HEALTH_MIN;
+  const hit = { toolbar: 1 };
+  const miss = { toolbar: 0 };
+  // The scenario this record exists for: placed many times, then a Plane release.
+  let h = {};
+  for (let i = 0; i < 50; i++) h = ctx.peAnchorHealthUpdate(h, hit, 1000 + i);
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok");
+  eq(h.toolbar.streak, 0, "no misses yet");
+  for (let i = 0; i < N - 1; i++) h = ctx.peAnchorHealthUpdate(h, miss, 5000);
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok", "one short of the bar, still quiet");
+  h = ctx.peAnchorHealthUpdate(h, miss, 5000);
+  eq(ctx.peAnchorHealthState(h.toolbar), "lost", "and on the " + N + "th in a row it speaks up");
+  eq(h.toolbar.at, 1049, "with the time it was last placed, which is the useful half");
+  // One placement — a click scan on a slow page, say — ends the run.
+  h = ctx.peAnchorHealthUpdate(h, hit, 9000);
+  eq(h.toolbar.streak, 0, "the run ends");
+  eq(ctx.peAnchorHealthState(h.toolbar), "ok", "and so does the warning");
+});
+
+test("anchors: misses broken up by placements never add up to lost", () => {
+  const ctx = loadCommon();
+  const N = ctx.__HEALTH_MIN;
+  let h = ctx.peAnchorHealthUpdate({}, { header: 1 }, 1);
+  // Three times the bar in misses — but never N in a row.
+  for (let i = 0; i < N * 3; i++) h = ctx.peAnchorHealthUpdate(h, { header: i % (N - 1) === 0 ? 1 : 0 }, 2);
+  eq(ctx.peAnchorHealthState(h.header), "ok");
+  // And "lost" needs a placement first: a button that never worked is "cold", which says so
+  // in words that do not claim it once did.
+  let never = {};
+  for (let i = 0; i < N; i++) never = ctx.peAnchorHealthUpdate(never, { header: 0 }, 3);
+  eq(ctx.peAnchorHealthState(never.header), "cold");
+});
+
 test("anchors: garbage in the record is read as nothing known", () => {
   const ctx = loadCommon();
   eq(ctx.peAnchorCounts(null, false), {});

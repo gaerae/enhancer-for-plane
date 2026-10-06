@@ -58,8 +58,9 @@ by Chrome Sync):
   working. Numbers and timestamps only; no page content and no addresses.
 - **Whether the two buttons found their place** — the same count and timestamp for
   the Template button (did it find a description toolbar) and the copy button (did it
-  find a work item header), so Settings can tell you when a Plane update has moved
-  either one. Numbers and timestamps only, the same as above.
+  find a work item header), plus how many work item pages in a row have gone by without
+  it, so Settings can tell you when a Plane update has moved either one. Numbers and
+  timestamps only, the same as above.
 
 ## What is accessed
 

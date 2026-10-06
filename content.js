@@ -106,6 +106,7 @@
   // that route causes) and delayed past the mount.
   let healthUrl = null;
   let healthTimer = null;
+  let anchorPage = null; // pathname + search the anchors were last sampled on — see recordRuleHealth
   const PE_HEALTH_DELAY = 2500;
 
   function scheduleRuleHealth() {
@@ -184,10 +185,27 @@
     // The two DOM anchors, on the same schedule and under the same rules. Taken after the
     // inject bursts have had their say (this runs 2.5s past the route change; the last
     // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
+    //
+    // Once per page, not once per address: a route sample fires on any change to the URL,
+    // and a jump to a comment on the same item changes only the fragment. Counting that
+    // would add a miss per click on a page where the button is missing, and a "lost"
+    // verdict reached by clicking around one item is not evidence about twenty of them.
+    const page = location.pathname + location.search;
+    if (!hitsOnly && page === anchorPage) return;
+    if (!hitsOnly) anchorPage = page;
     const anchors = peAnchorCounts(observeAnchors(), hitsOnly);
-    if (Object.keys(anchors).length) {
-      peGetAnchorHealth().then((prev) => peSaveAnchorHealth(peRuleHealthUpdate(prev, anchors, Date.now())));
-    }
+    if (!Object.keys(anchors).length) return;
+    peGetAnchorHealth().then((prev) => {
+      // A click scan runs every few seconds while someone is clicking, and on most work
+      // item pages it finds both buttons. Writing that every time is a storage event in
+      // every tab and an open Settings page for a record whose state cannot change, so a
+      // hits-only pass writes only when it moves something: a first placement, or the end
+      // of a run of misses. The route sample still stamps "last placed" on its own.
+      if (hitsOnly && Object.keys(anchors).every((id) => prev[id] && prev[id].hits > 0 && !(prev[id].streak > 0))) {
+        return;
+      }
+      return peSaveAnchorHealth(peAnchorHealthUpdate(prev, anchors, Date.now()));
+    });
   }
 
   // What this page offers each anchor, and what got placed. Only looking — peAnchorCounts
@@ -196,7 +214,7 @@
   // disabled rule is.
   function observeAnchors() {
     const obs = {};
-    const itemPage = !!peKeyFromPath(location.pathname);
+    const itemPage = peIsItemPath(location.pathname);
     if (hasAnyTemplates()) {
       // Editable ones only: a read-only view (no permission, an archived item) shows the
       // description in the same editor class with contenteditable="false", and a template
@@ -204,7 +222,13 @@
       const editors = [...document.querySelectorAll(".ProseMirror, .tiptap")].filter(
         (ed) => !isCommentArea(ed) && ed.getAttribute("contenteditable") !== "false"
       );
-      obs.toolbar = { itemPage, editors: editors.length, placed: document.querySelectorAll(".pe-body-tmpl-btn").length };
+      // Toolbar placements only. The modal-header and floating fallbacks are what
+      // ensureFloatingButton puts down precisely when no toolbar was found — counting them
+      // would let one "Create work item" dialog settle the record as healthy while the
+      // toolbar walk failed on every work item page, which is the bug this record exists
+      // to catch.
+      const placed = document.querySelectorAll(".pe-body-tmpl-btn:not(.pe-tmpl-header):not(.pe-tmpl-floating)").length;
+      obs.toolbar = { itemPage, editors: editors.length, placed };
     }
     if (hasCopyFormats()) {
       obs.header = { itemPage, placed: document.querySelectorAll(".pe-copy-ref-btn").length };

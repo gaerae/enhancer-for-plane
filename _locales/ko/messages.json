@@ -124,6 +124,11 @@
     "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "optTplAnchorLost": {
+    "message": "템플릿 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
   "optCopyAnchorOk": {
     "message": "복사 버튼 마지막 표시 $TIME$",
     "description": "In the copy reference card, when the button has found a work item header to sit beside.",
@@ -133,6 +138,11 @@
     "message": "작업 항목 페이지 $COUNT$곳에서 복사 버튼이 놓일 머리글을 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
     "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
     "placeholders": { "count": { "content": "$1" } }
+  },
+  "optCopyAnchorLost": {
+    "message": "복사 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
+    "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
   },
   "optRuleLabelPh": {
     "message": "설명 (예: 모듈 이름 폭)"

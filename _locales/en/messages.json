@@ -128,6 +128,11 @@
     "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
     "placeholders": { "count": { "content": "$1" } }
   },
+  "optTplAnchorLost": {
+    "message": "The Template button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+  },
   "optCopyAnchorOk": {
     "message": "Copy button last placed $TIME$",
     "description": "In the copy reference card, when the button has found a work item header to sit beside.",
@@ -137,6 +142,11 @@
     "message": "The copy button has not found a work item header yet, on $COUNT$ work item pages. Plane's layout may have changed.",
     "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
     "placeholders": { "count": { "content": "$1" } }
+  },
+  "optCopyAnchorLost": {
+    "message": "The copy button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
+    "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
+    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
   },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
