@@ -21,8 +21,10 @@ Schema unchanged.
   merged the cells beside it. Measured in Excel 16.112 (macOS): an 8-row table pasted as 24
   rows. The extension now marks each line break inside a cell with Excel's own
   `mso-data-placement:same-cell` and joins a cell's blocks into lines — paragraphs as they were,
-  list items as `•` / `1.` / `☑` lines, code with its indentation — and the same table pastes
-  as 8 rows. A cell with one line is left as it was. Plane's own copy format is untouched, so a
+  list items as `•` / `1.` / `☑` lines (a one-item list too, numbering from the list's own
+  start, zero included), code with its leading indentation — and the same table pastes as 8
+  rows. Empty paragraphs at the top or bottom of a cell are dropped rather than given a row. A
+  cell with one plain line is left as it was. Plane's own copy format is untouched, so a
   paste back into Plane is unchanged; with an older Plane that does not write that format, the
   HTML is left alone too, because Plane would paste it back. Windows Excel was not tested
   here; the style comes from Office's own HTML for Windows.
@@ -47,16 +49,19 @@ Schema unchanged.
   underline is now recognised by remark's own rule — exactly as long as the line above it —
   so a `---` you type as a separator after a Shift+Enter is still read as text.
 - **Backslashes inside a code block are no longer removed after a stray ```.** Three
-  backticks typed after a Shift+Enter, or right at the start of a list item, stay text, but
-  look like the start of a code block. Read as one, the code block that really followed was
-  read inside out, and its `\` line continuations were removed. A code block now only starts
-  where a block can start, and ends with the list item or quote it is in.
+  backticks typed as text — after a Shift+Enter, at the start of a list item, or as "```js"
+  at the start of a paragraph without the space that would have made a code block — look
+  exactly like the start of one. Read as one, the code block that really followed was read
+  inside out, and its `\` line continuations were removed. The Markdown alone cannot tell
+  them apart, so the code is now found from the copy's HTML, where every real code block is a
+  `<pre>` with its text; the Markdown-side reading stays as the fallback, and either one is
+  enough to protect a line.
 
   All four were found by checking the function against Plane's own conversion rather than
   against examples: the conversion run twice over the same description, once as Plane runs it
   and once with the line-break handler marking its own backslash, so the right answer is known
-  exactly. Over 100,000 generated descriptions it now removes no character the author typed.
-  About 1% still keep a stray `\`, all in shapes that read ambiguously — for instance a
+  exactly. Over 130,000 generated descriptions it now removes no character the author typed.
+  Under 1% still keep a stray `\`, all in shapes that read ambiguously — for instance a
   separator exactly as long as the line above it — where leaving it is the safe side.
 
 ### Internal

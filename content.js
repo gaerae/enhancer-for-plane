@@ -1761,13 +1761,16 @@
   // tall, each break inside its cell — measured the same way. With lists and code in the
   // cells too, an 8-row table pasted as 24 rows before this and as 8 after.
   //
-  // So every cell that holds more than one line is rewritten as its lines joined by that
-  // <br>. A Plane cell is "block+", so a line is whatever a block makes of it: a paragraph or
-  // heading is one line with its inline markup kept; a list is one line per item, marked
-  // "• ", "1. " or ☐/☑ the way it reads on screen, nested items indented; a code block is
-  // one line per line of code. A cell with a single line is left exactly as it was, and a
-  // cell holding a table of its own is left alone. The cost is borne by other HTML readers:
-  // a list in a cell pasted into a word processor arrives as lines of text, not as a list.
+  // So every cell that holds more than one line, or any list or code, is rewritten as its
+  // lines joined by that <br>. A Plane cell is "block+", so a line is whatever a block makes
+  // of it: a paragraph or heading is one line with its inline markup kept; a list is one line
+  // per item, marked "• ", "1. " or ☐/☑ the way it reads on screen, nested items indented —
+  // a one-item list too, so a list reads the same whatever its length; a code block is one
+  // line per line of code, its leading indentation kept. Empty paragraphs at the top or the
+  // bottom of a cell (Enter pressed at its end) are dropped — they would only pad the row.
+  // A cell with one plain line is left exactly as it was, and a cell holding a table of its
+  // own is left alone. The cost is borne by other HTML readers: a list in a cell pasted into
+  // a word processor arrives as lines of text, not as a list.
   //
   // Built from DOM nodes in a document of its own, never from HTML strings: DOMParser's
   // document is parsed and not rendered, so nothing in the copy runs or loads, and no markup
@@ -1781,8 +1784,12 @@
       if (cell.querySelector("table")) return;
       const breaks = cell.querySelectorAll("br");
       breaks.forEach((b) => b.setAttribute("style", "mso-data-placement:same-cell"));
-      const lines = cellLines(cell, 0, doc);
-      if (lines.length < 2 && !breaks.length) return;
+      const lines = cellLines(cell, 0);
+      // Decided on the cell as Plane wrote it: an empty paragraph under a line is a second
+      // block, and Excel gives it a row of its own — the trim below is what removes it.
+      if (lines.length < 2 && !breaks.length && !cell.querySelector("ul, ol, pre")) return;
+      while (lines.length && isBlankLine(lines[0])) lines.shift();
+      while (lines.length && isBlankLine(lines[lines.length - 1])) lines.pop();
       const out = [];
       lines.forEach((line, i) => {
         if (i) {
@@ -1798,8 +1805,14 @@
     return changed ? doc.body.innerHTML : null;
   }
 
-  // The lines a block container holds, in reading order — each line an array of nodes.
-  function cellLines(node, depth, doc) {
+  // A line with nothing to read on it: no text but whitespace, and no element but a break.
+  const isBlankLine = (line) =>
+    line.every((n) => (n.nodeType === 3 ? !n.nodeValue.trim() : n.nodeName === "BR" || !n.textContent.trim()));
+
+  // The lines a block container holds, in reading order — each line an array of nodes. Every
+  // node made here comes from node.ownerDocument, the parsed copy, never the page.
+  function cellLines(node, depth) {
+    const doc = node.ownerDocument;
     const out = [];
     let inline = []; // content sitting directly in the container, outside any block
     const flush = () => {
@@ -1818,17 +1831,21 @@
         out.push(Array.from(child.childNodes)); // inline markup kept: strong, em, a mention
       } else if (tag === "PRE") {
         flush();
-        // Leading spaces as NBSP: HTML collapses ordinary ones, and indentation is half of code.
+        // Leading indentation as NBSP — HTML collapses ordinary spaces, and a tab is four.
         child.textContent
           .replace(/\n$/, "")
           .split("\n")
-          .forEach((l) => out.push([doc.createTextNode(l.replace(/^ +/, (m) => "\u00a0".repeat(m.length)))]));
+          .forEach((l) =>
+            out.push([
+              doc.createTextNode(l.replace(/^[ \t]+/, (m) => "\u00a0".repeat(m.replace(/\t/g, "    ").length)))
+            ])
+          );
       } else if (tag === "UL" || tag === "OL") {
         flush();
-        out.push(...listLines(child, depth, doc));
+        out.push(...listLines(child, depth));
       } else if (/^(DIV|BLOCKQUOTE|SECTION|ARTICLE)$/.test(tag)) {
         flush();
-        out.push(...cellLines(child, depth, doc));
+        out.push(...cellLines(child, depth));
       } else if (/^(HR|LABEL|INPUT|IMG|COLGROUP|COL)$/.test(tag)) {
         // nothing a cell's text can carry
       } else {
@@ -1839,9 +1856,12 @@
     return out;
   }
 
-  function listLines(list, depth, doc) {
+  function listLines(list, depth) {
+    const doc = list.ownerDocument;
     const out = [];
-    let n = parseInt(list.getAttribute("start"), 10) || 1;
+    // Not `|| 1`: "0. " starts a list at zero, and zero is falsy.
+    const start = parseInt(list.getAttribute("start"), 10);
+    let n = Number.isNaN(start) ? 1 : start;
     for (const li of Array.from(list.children)) {
       if (li.tagName !== "LI") continue;
       const mark =
@@ -1852,7 +1872,7 @@
           : list.tagName === "OL"
             ? n++ + ". "
             : "• ";
-      const lines = cellLines(li, depth + 1, doc);
+      const lines = cellLines(li, depth + 1);
       const lead = doc.createTextNode("\u00a0\u00a0".repeat(depth) + mark);
       if (lines.length) lines[0].unshift(lead);
       else lines.push([lead]);
@@ -1860,6 +1880,7 @@
     }
     return out;
   }
+
 
   document.addEventListener("copy", onCopy);
 

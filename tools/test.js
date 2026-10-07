@@ -1312,6 +1312,29 @@ test("copy: every class the ground-truth fuzz found comes out exactly right", ()
     // underline exactly as long as the line above it, and this one is not.
     ["a separator line after a break", "<p>회의<br>---<br>다음</p>", "회의\\\n---\\\n다음\n", "회의\n---\n다음\n"],
     ["a separator line ending the paragraph", "<p>회의 정리<br>---</p>", "회의 정리\\\n---\n", "회의 정리\n---\n"],
+    // "```" typed at the start of a paragraph and followed by a Shift+Enter: remark writes
+    // "```\\", and the "\\" is the hard break, not a language. Read as an opener it took the
+    // real fence below for its close (found in review; the fuzz's typeable-only mode had
+    // ruled ``` out at a block start, which was too strict — the input rule wants a space).
+    ["``` and a break at a paragraph's start (was: code \\ deleted)",
+      "<p>```<br>foo</p><pre><code>docker run \\\n  --rm</code></pre>",
+      "```\\\nfoo\n\n```\ndocker run \\\n  --rm\n```\n",
+      "```\nfoo\n\n```\ndocker run \\\n  --rm\n```\n"],
+    ["the same inside a list item",
+      "<ol><li><p>```<br>foo</p><pre><code>docker run \\\n  --rm</code></pre></li></ol>",
+      "1. ```\\\n   foo\n\n   ```\n   docker run \\\n     --rm\n   ```\n",
+      "1. ```\n   foo\n\n   ```\n   docker run \\\n     --rm\n   ```\n"],
+    // "```js" typed at a paragraph's start and left without the space that makes it a code
+    // block — a Markdown habit — is a perfect fence look-alike. Only the HTML knows the real
+    // code block is the <pre> below, and its text is what gets protected.
+    ["a fence look-alike paragraph before a real code block",
+      "<p>```js</p><pre><code>docker run \\\n  --rm</code></pre><p>a<br>b</p>",
+      "```js\n\n```\ndocker run \\\n  --rm\n```\n\na\\\nb\n",
+      "```js\n\n```\ndocker run \\\n  --rm\n```\n\na\nb\n"],
+    ["the same in a list, with junk where a language would be (was: code \\ deleted)",
+      "<ol><li><p>```===<br><br></p><pre><code>x \\\ny</code></pre></li></ol><ol><li><p>review<br><strong>굵게</strong></p><pre><code>x \\\ny</code></pre></li></ol>",
+      "1. ```===\n\n   ```\n   x \\\n   y\n   ```\n\n1) review\\\n   **굵게**\n\n   ```\n   x \\\n   y\n   ```\n",
+      "1. ```===\n\n   ```\n   x \\\n   y\n   ```\n\n1) review\n   **굵게**\n\n   ```\n   x \\\n   y\n   ```\n"],
     // A list item that starts with a Shift+Enter and then "```": remark drops the leading
     // break, so "1. ```" looks exactly like a real opener. It never closes — the list item
     // ends, and the code block with it. Read without containers, it took the real fence

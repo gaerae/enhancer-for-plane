@@ -445,7 +445,7 @@ function peIsItemPath(pathname) {
 //             which keeps the list's URL and so can never be accused and never needs to be.
 //             A miss is a work item address with no button.
 //
-// `hitsOnly` is the click scan's pass (see recordRuleHealth): it may promote either anchor
+// `hitsOnly` is the click scan's pass (see recordAnchors in content.js): it may promote either anchor
 // and may accuse neither, which is what makes extra sampling safe to add.
 function peAnchorCounts(obs, hitsOnly) {
   const o = obs && typeof obs === "object" ? obs : {};
@@ -1591,7 +1591,7 @@ function peTidyCopiedText(plain, html) {
   const breaks = (String(html == null ? "" : html).match(/<br\b/gi) || []).length;
   if (!breaks) return null;
   const lines = text.split("\n");
-  const hits = peHardBreakLines(lines);
+  const hits = peHardBreakLines(lines, html);
   if (!hits.length || hits.length > breaks) return null;
   for (const i of hits) lines[i] = lines[i].slice(0, -1);
   return lines.join("\n");
@@ -1624,11 +1624,16 @@ const PE_MD_BLANK = /^[ \t]*$/;
 // the author typed, with the hard break's after it. Reading it as an escape left both on
 // the clipboard — "C:\\" for a path at the end of a line — which is the line break this
 // function exists to clean, plus nothing.
-function peHardBreakLines(lines) {
+function peHardBreakLines(lines, html) {
   const inCode = peFenceTracker();
+  const codeInHtml = peCodeLinesFromHtml(lines, html);
   const hits = [];
   for (let i = 0; i < lines.length - 1; i++) {
-    if (inCode(lines[i])) continue;
+    // Both run on every line, so the tracker keeps its state; either one saying "code" is
+    // enough. The HTML is the stronger of the two, and the tracker is what still holds when
+    // the HTML is missing or not shaped the way Plane writes it.
+    const tracked = inCode(lines[i]);
+    if (tracked || codeInHtml.has(i)) continue;
     if (peBlockEnds(lines[i + 1], lines[i])) continue;
     if (lines[i].endsWith("\\")) hits.push(i);
   }
@@ -1654,6 +1659,57 @@ function peBlockEnds(line, prev) {
     line.length === prev.length &&
     /^[ \t]*(?:=+|-+)[ \t]*$/.test(inner)
   );
+}
+
+// The lines of a remark payload that are a code block's own text, found from the HTML of the
+// same copy rather than from the Markdown. With escaping switched off, the Markdown alone is
+// ambiguous: "```js" typed as text and left without the space that would have made it a code
+// block looks exactly like a real fence, and peFenceTracker cannot tell — the real fence
+// further down then reads as its close, and the code after it as prose. The HTML has every
+// real code block as a <pre>, with its text. A block's lines are found where they appear
+// verbatim, under nothing but a container prefix (quote markers, indentation), between two
+// fence-shaped lines; searched in document order, each from where the last one ended.
+// Returns the set of line indexes, fences included.
+function peCodeLinesFromHtml(lines, html) {
+  const found = new Set();
+  const fence = /^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:`{3,}|~{3,})/;
+  const prefixOnly = /^(?:[ \t]*>)*[ \t]*$/;
+  const blocks = [];
+  const re = /<pre\b[^>]*>([\s\S]*?)<\/pre>/gi;
+  let m;
+  while ((m = re.exec(String(html == null ? "" : html)))) {
+    blocks.push(peHtmlText(m[1]).replace(/\n$/, "").split("\n"));
+  }
+  let from = 1;
+  for (const code of blocks) {
+    for (let i = from; i + code.length < lines.length; i++) {
+      if (!fence.test(lines[i - 1]) || !fence.test(lines[i + code.length])) continue;
+      const matches = code.every((c, j) => {
+        const l = lines[i + j];
+        return l.endsWith(c) && prefixOnly.test(l.slice(0, l.length - c.length));
+      });
+      if (!matches) continue;
+      for (let j = -1; j <= code.length; j++) found.add(i + j);
+      from = i + code.length + 1;
+      break;
+    }
+  }
+  return found;
+}
+
+// The text of an HTML fragment as a parser would give it: tags dropped, and the entities a
+// browser's serializer writes decoded. Enough for <pre><code> as ProseMirror writes it.
+function peHtmlText(fragment) {
+  const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0" };
+  return String(fragment)
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e) => {
+      if (e[0] === "#") {
+        const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(n) ? String.fromCodePoint(n) : all;
+      }
+      return Object.prototype.hasOwnProperty.call(named, e.toLowerCase()) ? named[e.toLowerCase()] : all;
+    });
 }
 
 // A stateful reader over a remark payload, one line at a time: true for a fence line and for
@@ -1718,9 +1774,13 @@ function peFenceTracker() {
       }
       char = "";
     }
-    const f = atBlockStart ? /^([ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?)(`{3,}|~{3,})/.exec(rest) : null;
+    // An info string ending in "\" is the line's own hard break, not a language: "```" typed
+    // at the start of a paragraph and followed by Shift+Enter stays text (the input rule wants
+    // a space), and remark writes it "```\". Read as an opener, it took the real fence below
+    // for its close and stripped the continuation inside it.
+    const f = atBlockStart ? /^([ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?)(`{3,}|~{3,})(.*)$/.exec(rest) : null;
     atBlockStart = peBlockEnds(line, before);
-    if (!f) return false;
+    if (!f || f[3].endsWith("\\")) return false;
     char = f[2][0];
     len = f[2].length;
     depth = depthOf(line);

@@ -1229,6 +1229,29 @@ const suites = [
         eq(table.getData("text/plane-editor-html"), TABLE);
       });
 
+      // The review's four: a list numbered from zero, an empty paragraph left at the end of
+      // a cell, a tab-indented code line, and a list with a single item — which must read
+      // the same as a longer one.
+      const TABLE2 = "<table><tbody><tr>" +
+        td('<ol start="0"><li><p>영</p></li><li><p>일</p></li></ol>') +
+        td(p("내용") + p("")) +
+        td("<pre><code>" + String.fromCharCode(9) + "if x:\\n" + String.fromCharCode(9, 9) + "return</code></pre>") +
+        td("<ul><li><p>하나뿐</p></li></ul>") +
+        "</tr></tbody></table>";
+      payload = { plain: "md", html: TABLE2 };
+      const table2 = fire("cell");
+      const cells2 = () => {
+        const t = document.createElement("template");
+        t.innerHTML = table2.getData("text/html");
+        return [...t.content.querySelectorAll("td")].map((c) => c.innerHTML);
+      };
+      check("a list that starts at zero is numbered from zero", () => eq(cells2()[0], "0. 영" + SC + "1. 일"));
+      check("an empty paragraph at the end of a cell is dropped, not given a row", () => eq(cells2()[1], "내용"));
+      check("a tab of indentation is kept as four spaces' width", () => {
+        eq(cells2()[2], "&nbsp;".repeat(4) + "if x:" + SC + "&nbsp;".repeat(8) + "return");
+      });
+      check("a one-item list reads the same as a longer one", () => eq(cells2()[3], "• 하나뿐"));
+
       payload = { plain: "md", html: TABLE, noPrivate: true };
       const older = fire("cell");
       check("without Plane's own flavour, text/html is left alone — Plane would paste it back", () => {

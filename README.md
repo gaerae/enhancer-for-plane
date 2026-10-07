@@ -140,8 +140,8 @@ fixes the serialization there is nothing left to take off and this goes quiet on
 turns every line break inside a cell into a new row, so a cell with a Shift+Enter, two
 paragraphs, a list or a block of code split across several rows and merged the cells beside
 it. Copied out of a description, a cell's lines now stay inside it: paragraphs and line
-breaks as they were, list items as `•` / `1.` / `☑` lines, code with its indentation. A cell
-with one line is left as it was.
+breaks as they were, list items as `•` / `1.` / `☑` lines, code with its leading indentation. A
+cell with one plain line is left as it was.
 
 Nothing to configure. Plane's own copy format is never touched, so pasting back into Plane is
 unchanged.
