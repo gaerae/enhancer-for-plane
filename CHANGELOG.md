@@ -14,6 +14,19 @@ first read, never rewritten by hand.
 
 Schema unchanged.
 
+### New
+- **A table copied out of a description pastes into Excel one cell per cell.** Excel reads a
+  copied table from its HTML version and turns every line break inside a cell into a new row,
+  so any cell with a Shift+Enter, two paragraphs, a list or code split across several rows and
+  merged the cells beside it. Measured in Excel 16.112 (macOS): an 8-row table pasted as 24
+  rows. The extension now marks each line break inside a cell with Excel's own
+  `mso-data-placement:same-cell` and joins a cell's blocks into lines — paragraphs as they were,
+  list items as `•` / `1.` / `☑` lines, code with its indentation — and the same table pastes
+  as 8 rows. A cell with one line is left as it was. Plane's own copy format is untouched, so a
+  paste back into Plane is unchanged; with an older Plane that does not write that format, the
+  HTML is left alone too, because Plane would paste it back. Windows Excel was not tested
+  here; the style comes from Office's own HTML for Windows.
+
 ### Fixed
 - **The last line break of a copied description no longer keeps its `\` when a
   non-breaking space follows it.** Every line break above it was cleaned and the last one kept

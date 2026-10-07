@@ -181,7 +181,7 @@ Clipboard (NOT a dashboard field — there is no box to paste this into)
   whether the clipboard needed disclosing. It did not, and nothing about it changes the
   Data usage answers below: what is read is read locally, in the user's own gesture, and
   never leaves the device.
-  No clipboard permission is requested or needed, and the clipboard's existing contents are never read. Two things happen, both inside a gesture the user made and both through the standard page API. "Copy reference" writes one string during the user's own click. And when the user copies inside a Plane description, the extension edits the plain-text version of THAT copy before it lands — Plane replaces it with Markdown whose line breaks carry a trailing backslash, and the backslash is removed. It reads only the data the page just put into that copy event, on granted origins only, and nothing is stored or sent anywhere.
+  No clipboard permission is requested or needed, and the clipboard's existing contents are never read. Two things happen, both inside a gesture the user made and both through the standard page API. "Copy reference" writes one string during the user's own click. And when the user copies inside a Plane description, the extension edits THAT copy before it lands — Plane replaces its plain-text version with Markdown whose line breaks carry a trailing backslash, and the backslash is removed; and when the copy holds a table, its HTML version is adjusted so each cell's lines stay in one cell when pasted into a spreadsheet. It reads only the data the page just put into that copy event, on granted origins only, and nothing is stored or sent anywhere.
 
 Remote code
   None. All JavaScript and CSS is bundled in the package; nothing is eval'd, injected as markup, or executed from the network at runtime.
@@ -191,7 +191,7 @@ Remote code
 
 ## Data usage disclosures  (Privacy practices tab — check these)
 
-• Does your extension collect or use user data? → Only "Website content" is read locally — to apply styling on matched Plane pages, and to take Plane's stray backslash out of the text of a copy the user is making. It is NOT collected, transmitted, or stored off-device.
+• Does your extension collect or use user data? → Only "Website content" is read locally — to apply styling on matched Plane pages, and to tidy a copy the user is making (Plane's stray backslash in the text, and a table's cells for pasting into a spreadsheet). It is NOT collected, transmitted, or stored off-device.
 • Personally identifiable information — NO
 • Health, financial, authentication, personal communications, location, web history, user activity — NO
   On "web history", which is worth being able to answer out loud rather than just ticking:

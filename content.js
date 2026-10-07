@@ -1715,8 +1715,9 @@
   // plugin listens for "copy" on the editor node and calls preventDefault(), which does
   // not stop propagation, so a bubble-phase listener up here runs after it with the
   // DataTransfer still writable — the clipboard is written from it once the dispatch ends.
-  // Only text/plain is rewritten. text/html and Plane's private flavour are left exactly
-  // as they were, which is what keeps a paste back into Plane on its normal path.
+  // Plane's private flavour is never touched, which is what keeps a paste back into Plane on
+  // its normal path; text/plain loses the backslashes, and text/html is made safe for a
+  // spreadsheet (excelSafeTables).
   //
   // "cut" is deliberately NOT handled, and it looks like an oversight, so: Plane's plugin
   // hooks "copy" alone, and with tiptap-markdown's own serializer switched off a cut falls
@@ -1731,11 +1732,135 @@
     if (!t || !t.closest || !t.closest(".ProseMirror, .tiptap")) return;
     const dt = e.clipboardData;
     if (!dt) return;
+    // Read once, before either rewrite: the backslash budget is a count of the <br>s Plane
+    // wrote, and the table rewrite below adds some.
+    const html = dt.getData("text/html");
     try {
-      const next = peTidyCopiedText(dt.getData("text/plain"), dt.getData("text/html"));
+      const next = peTidyCopiedText(dt.getData("text/plain"), html);
       if (next !== null) dt.setData("text/plain", next);
     } catch (_) {}
+    // Only when Plane's own flavour is there to paste back from. Plane reads it first, so
+    // text/html is free to serve everything else; a Plane old enough not to write it would
+    // paste the rewritten table back into itself, paragraphs joined into one.
+    try {
+      if (dt.getData("text/plane-editor-html")) {
+        const safe = excelSafeTables(html);
+        if (safe !== null) dt.setData("text/html", safe);
+      }
+    } catch (_) {}
   };
+
+  // A copied table, made to land in a spreadsheet one cell per cell.
+  //
+  // Excel reads a pasted table from the HTML flavour, and reads every line break inside a
+  // cell as the start of a new row. Measured in Excel 16.112 (macOS) with the payload Plane
+  // writes for a cell selection: a cell holding a Shift+Enter came out as two rows, with the
+  // other cells of that row merged across both; a cell holding two paragraphs came out as
+  // three, a blank row between them. Excel's own escape for "this break stays in the cell"
+  // is mso-data-placement:same-cell on the <br>, and with it the same table lands three rows
+  // tall, each break inside its cell — measured the same way. With lists and code in the
+  // cells too, an 8-row table pasted as 24 rows before this and as 8 after.
+  //
+  // So every cell that holds more than one line is rewritten as its lines joined by that
+  // <br>. A Plane cell is "block+", so a line is whatever a block makes of it: a paragraph or
+  // heading is one line with its inline markup kept; a list is one line per item, marked
+  // "• ", "1. " or ☐/☑ the way it reads on screen, nested items indented; a code block is
+  // one line per line of code. A cell with a single line is left exactly as it was, and a
+  // cell holding a table of its own is left alone. The cost is borne by other HTML readers:
+  // a list in a cell pasted into a word processor arrives as lines of text, not as a list.
+  //
+  // Built from DOM nodes in a document of its own, never from HTML strings: DOMParser's
+  // document is parsed and not rendered, so nothing in the copy runs or loads, and no markup
+  // is ever assigned through innerHTML (check-source.js holds that line for good reason —
+  // synced templates are written by strangers, and this is the same kind of string).
+  function excelSafeTables(html) {
+    if (!html || !/<t[dh][\s>]/i.test(html)) return null;
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    let changed = false;
+    doc.querySelectorAll("td, th").forEach((cell) => {
+      if (cell.querySelector("table")) return;
+      const breaks = cell.querySelectorAll("br");
+      breaks.forEach((b) => b.setAttribute("style", "mso-data-placement:same-cell"));
+      const lines = cellLines(cell, 0, doc);
+      if (lines.length < 2 && !breaks.length) return;
+      const out = [];
+      lines.forEach((line, i) => {
+        if (i) {
+          const br = doc.createElement("br");
+          br.setAttribute("style", "mso-data-placement:same-cell");
+          out.push(br);
+        }
+        out.push(...line);
+      });
+      cell.replaceChildren(...out);
+      changed = true;
+    });
+    return changed ? doc.body.innerHTML : null;
+  }
+
+  // The lines a block container holds, in reading order — each line an array of nodes.
+  function cellLines(node, depth, doc) {
+    const out = [];
+    let inline = []; // content sitting directly in the container, outside any block
+    const flush = () => {
+      if (inline.some((n) => n.nodeName !== "BR" && (n.nodeType !== 3 || n.nodeValue.trim()))) out.push(inline);
+      inline = [];
+    };
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        inline.push(child);
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      const tag = child.tagName;
+      if (/^(P|H[1-6])$/.test(tag)) {
+        flush();
+        out.push(Array.from(child.childNodes)); // inline markup kept: strong, em, a mention
+      } else if (tag === "PRE") {
+        flush();
+        // Leading spaces as NBSP: HTML collapses ordinary ones, and indentation is half of code.
+        child.textContent
+          .replace(/\n$/, "")
+          .split("\n")
+          .forEach((l) => out.push([doc.createTextNode(l.replace(/^ +/, (m) => "\u00a0".repeat(m.length)))]));
+      } else if (tag === "UL" || tag === "OL") {
+        flush();
+        out.push(...listLines(child, depth, doc));
+      } else if (/^(DIV|BLOCKQUOTE|SECTION|ARTICLE)$/.test(tag)) {
+        flush();
+        out.push(...cellLines(child, depth, doc));
+      } else if (/^(HR|LABEL|INPUT|IMG|COLGROUP|COL)$/.test(tag)) {
+        // nothing a cell's text can carry
+      } else {
+        inline.push(child); // inline markup, and a <br> sitting directly in the cell
+      }
+    }
+    flush();
+    return out;
+  }
+
+  function listLines(list, depth, doc) {
+    const out = [];
+    let n = parseInt(list.getAttribute("start"), 10) || 1;
+    for (const li of Array.from(list.children)) {
+      if (li.tagName !== "LI") continue;
+      const mark =
+        li.getAttribute("data-type") === "taskItem"
+          ? li.getAttribute("data-checked") === "true"
+            ? "☑ "
+            : "☐ "
+          : list.tagName === "OL"
+            ? n++ + ". "
+            : "• ";
+      const lines = cellLines(li, depth + 1, doc);
+      const lead = doc.createTextNode("\u00a0\u00a0".repeat(depth) + mark);
+      if (lines.length) lines[0].unshift(lead);
+      else lines.push([lead]);
+      out.push(...lines);
+    }
+    return out;
+  }
+
   document.addEventListener("copy", onCopy);
 
   document.addEventListener("mousedown", onDocClick, true);

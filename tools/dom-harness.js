@@ -1134,7 +1134,8 @@ const suites = [
         e.clipboardData.clearData();
         e.clipboardData.setData("text/plain", payload.plain);
         e.clipboardData.setData("text/html", payload.html);
-        e.clipboardData.setData("text/plane-editor-html", payload.html);
+        // An older Plane writes no private flavour, and then pastes back from text/html.
+        if (!payload.noPrivate) e.clipboardData.setData("text/plane-editor-html", payload.html);
       });
       const fire = (id, preload, type) => {
         const dt = new DataTransfer();
@@ -1185,6 +1186,69 @@ const suites = [
       const lastLine = fire("cell");
       check("the last line break is cleaned too when a non-breaking space follows it", () => {
         eq(lastLine.getData("text/plain"), "업무1\\n업무2\\n업무3\\n" + NBSP + "\\n");
+      });
+
+      // A copied table, for a spreadsheet. Excel reads the HTML flavour and turns every line
+      // break inside a cell into a new row — measured in Excel 16.112 with exactly this shape,
+      // an 8-row table came out 24 rows tall. The cure is Excel's own "stays in the cell" on
+      // each <br>, and a cell's blocks flattened into lines joined by one.
+      const SC = '<br style="mso-data-placement:same-cell">';
+      const td = (inner) => '<td colspan="1" rowspan="1" style="background-color: null; color: null">' + inner + "</td>";
+      const p = (t) => '<p class="editor-paragraph-block">' + t + "</p>";
+      const TABLE = '<table data-pm-slice="1 1 []"><tbody><tr>' +
+        td(p("1차 검토<br>2차 검토")) + td(p("<strong>굵게</strong> 첫 문단") + p("둘째 문단")) + td(p("한 줄")) +
+        "</tr><tr>" +
+        td('<ul><li><p>항목 1</p></li><li><p>항목 2</p><ul><li><p>하위</p></li></ul></li></ul>') +
+        td('<ol start="3"><li><p>셋째</p></li><li><p>넷째</p></li></ol>') +
+        td('<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>완료</p></div></li>' +
+           '<li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>남음</p></div></li></ul>') +
+        "</tr><tr>" + td("<pre><code>docker run " + BS + "\\n  --rm</code></pre>") + td(p("a")) + td(p("b")) + "</tr></tbody></table>";
+      payload = { plain: "md", html: TABLE };
+      const table = fire("cell");
+      const cells = () => {
+        const t = document.createElement("template");
+        t.innerHTML = table.getData("text/html");
+        return [...t.content.querySelectorAll("td")].map((c) => c.innerHTML);
+      };
+      check("a table's line breaks stay inside their cells", () => {
+        eq(cells()[0], "1차 검토" + SC + "2차 검토", "a Shift+Enter");
+        eq(cells()[1], "<strong>굵게</strong> 첫 문단" + SC + "둘째 문단", "two paragraphs, inline markup kept");
+      });
+      check("a cell with one line is left exactly as it was", () => {
+        eq(cells()[2], p("한 줄"));
+      });
+      check("a list in a cell becomes its items, marked the way they read", () => {
+        eq(cells()[3], "• 항목 1" + SC + "• 항목 2" + SC + "&nbsp;&nbsp;• 하위", "bullets, nested indented — innerHTML writes U+00A0 as &nbsp;");
+        eq(cells()[4], "3. 셋째" + SC + "4. 넷째", "numbered from the list's own start");
+        eq(cells()[5], "☑ 완료" + SC + "☐ 남음", "checked and unchecked");
+      });
+      check("a code block in a cell keeps its lines and its indentation", () => {
+        eq(cells()[6], "docker run " + BS + SC + "&nbsp;&nbsp;--rm");
+      });
+      check("Plane's own flavour is untouched, so a paste back into Plane is unchanged", () => {
+        eq(table.getData("text/plane-editor-html"), TABLE);
+      });
+
+      payload = { plain: "md", html: TABLE, noPrivate: true };
+      const older = fire("cell");
+      check("without Plane's own flavour, text/html is left alone — Plane would paste it back", () => {
+        eq(older.getData("text/html"), TABLE);
+      });
+
+      payload = { plain: "md", html: "<p>표가 아닌 복사<br>둘째 줄</p>" };
+      const prose = fire("cell");
+      check("a copy with no table in it keeps its HTML as it was", () => {
+        eq(prose.getData("text/html"), "<p>표가 아닌 복사<br>둘째 줄</p>");
+      });
+
+      // The backslash budget counts the <br>s Plane wrote, and the table rewrite adds some.
+      // Here the original has none — so the backslash is the author's, and must stay — while
+      // the rewritten HTML would have one and license deleting it.
+      payload = { plain: "경로 C:" + BS + "\\n다음\\n", html: '<table><tbody><tr><td><p>경로 C:' + BS + '</p><p>다음</p></td></tr></tbody></table>' };
+      const budget = fire("cell");
+      check("the backslash budget is read from the HTML Plane wrote, not the rewritten one", () => {
+        eq(budget.getData("text/plain"), "경로 C:" + BS + "\\n다음\\n");
+        ok(budget.getData("text/html").indexOf("mso-data-placement") > -1, "and the table was still rewritten");
       });`
   },
   {
