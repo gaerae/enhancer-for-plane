@@ -22,9 +22,11 @@ Schema unchanged.
   rows. The extension now marks each line break inside a cell with Excel's own
   `mso-data-placement:same-cell` and joins a cell's blocks into lines — paragraphs as they were,
   list items as `•` / `1.` / `☑` lines (a one-item list too, numbering from the list's own
-  start, zero included), code with its leading indentation — and the same table pastes as 8
+  start, zero included), code with its spacing, images kept — and the same table pastes as 8
   rows. Empty paragraphs at the top or bottom of a cell are dropped rather than given a row. A
-  cell with one plain line is left as it was. Plane's own copy format is untouched, so a
+  cell with one plain line is left as it was. Other apps that read the HTML version get the
+  same cells: pasted into Word or Google Docs, a list or heading inside a table cell arrives
+  as lines of text rather than as a list or a heading. Plane's own copy format is untouched, so a
   paste back into Plane is unchanged; with an older Plane that does not write that format, the
   HTML is left alone too, because Plane would paste it back. Windows Excel was not tested
   here; the style comes from Office's own HTML for Windows.
@@ -55,7 +57,8 @@ Schema unchanged.
   inside out, and its `\` line continuations were removed. The Markdown alone cannot tell
   them apart, so the code is now found from the copy's HTML, where every real code block is a
   `<pre>` with its text; the Markdown-side reading stays as the fallback, and either one is
-  enough to protect a line.
+  enough to protect a line. That fallback also now ends a code block with the list item or
+  quote it is in, without mistaking a `>` inside the code (a prompt, a redirect) for a quote.
 
   All four were found by checking the function against Plane's own conversion rather than
   against examples: the conversion run twice over the same description, once as Plane runs it

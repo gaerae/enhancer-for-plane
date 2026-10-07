@@ -1354,6 +1354,43 @@ test("copy: every class the ground-truth fuzz found comes out exactly right", ()
   eq(ctx.peTidyCopiedText("메모\\\n---\n", "<p>메모<br>---</p>"), null, "an underline-length separator");
 });
 
+// From the second review, each reproduced before it was fixed.
+test("copy: a code block ending on an empty line is still found in the HTML", () => {
+  const ctx = loadCommon();
+  // Enter pressed at the end of a code block leaves "\n\n" in the HTML, and remark trims
+  // every trailing newline. Trimming only one left the block unmatched, so it fell back to
+  // the tracker — which the "```js" paragraph above it fools. Truth from Plane's pipeline.
+  const html =
+    "<p>```js</p><pre><code>docker run \\\n  --rm\n\n</code></pre><p>a<br>b</p><table><tbody><tr><td><p>x<br>y</p></td></tr></tbody></table>";
+  const plane = "```js\n\n```\ndocker run \\\n  --rm\n```\n\na\\\nb\n\n|     |\n| --- |\n| x y |\n";
+  eq(ctx.peTidyCopiedText(plane, html), "```js\n\n```\ndocker run \\\n  --rm\n```\n\na\nb\n\n|     |\n| --- |\n| x y |\n");
+});
+
+test("copy: the tracker's container ends where the container ends, and no sooner", () => {
+  const ctx = loadCommon();
+  const read = (lines) => {
+    const inCode = ctx.peFenceTracker();
+    return lines.map((l) => inCode(l));
+  };
+  // A ">" at the start of a code line is the code's own — a prompt, a redirect — when the
+  // fence was opened under no quote. Read as a marker it closed the fence mid-block.
+  eq(read(["1. ```", "   > out \\", "   x \\", "   y", "   ```"]), [true, true, true, true, true]);
+  // An unclosed fence-looking item, then a list item whose first child is a real code block:
+  // leaving the first container has to let the second open.
+  eq(read(["1. ```", "", "2. ```", "   x \\", "   y", "   ```"]), [true, true, true, true, true, true]);
+});
+
+test("copy: a numeric entity outside Unicode does not abort the clean-up", () => {
+  const ctx = loadCommon();
+  // String.fromCodePoint throws above U+10FFFF, and a throw stopped every backslash in the
+  // copy from being cleaned.
+  eq(ctx.peTidyCopiedText("a\\\nb\n", "<pre>&#99999999;</pre><p>a<br>b</p>"), "a\nb\n");
+  // Asked of the decoder directly, because the clean-up above also survives on the try/catch
+  // around the HTML reading — which would leave the guard itself unpinned.
+  eq(ctx.peHtmlText("&#99999999;&#x110000;"), "&#99999999;&#x110000;", "left as written");
+  eq(ctx.peHtmlText("&lt;a&gt; &amp; &#x41;&#66;&nbsp;"), "<a> & AB\u00a0", "and the ones Plane writes, decoded");
+});
+
 // The two DOM anchors get the rule-health treatment: what one page is evidence of is a
 // small decision table, and it is the whole feature, so it is pinned here rather than left
 // to the content script. The record itself reuses peRuleHealthUpdate / peRuleHealthState,

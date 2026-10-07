@@ -1205,11 +1205,11 @@ const suites = [
         "</tr><tr>" + td("<pre><code>docker run " + BS + "\\n  --rm</code></pre>") + td(p("a")) + td(p("b")) + "</tr></tbody></table>";
       payload = { plain: "md", html: TABLE };
       const table = fire("cell");
-      const cells = () => {
-        const t = document.createElement("template");
-        t.innerHTML = table.getData("text/html");
-        return [...t.content.querySelectorAll("td")].map((c) => c.innerHTML);
-      };
+      // Each cell's HTML as the clipboard holds it. Parsed in an inert document, for the same
+      // reason the content script does.
+      const cellsOf = (dt) =>
+        [...new DOMParser().parseFromString(dt.getData("text/html"), "text/html").querySelectorAll("td")].map((c) => c.innerHTML);
+      const cells = () => cellsOf(table);
       check("a table's line breaks stay inside their cells", () => {
         eq(cells()[0], "1차 검토" + SC + "2차 검토", "a Shift+Enter");
         eq(cells()[1], "<strong>굵게</strong> 첫 문단" + SC + "둘째 문단", "two paragraphs, inline markup kept");
@@ -1240,17 +1240,39 @@ const suites = [
         "</tr></tbody></table>";
       payload = { plain: "md", html: TABLE2 };
       const table2 = fire("cell");
-      const cells2 = () => {
-        const t = document.createElement("template");
-        t.innerHTML = table2.getData("text/html");
-        return [...t.content.querySelectorAll("td")].map((c) => c.innerHTML);
-      };
+      const cells2 = () => cellsOf(table2);
       check("a list that starts at zero is numbered from zero", () => eq(cells2()[0], "0. 영" + SC + "1. 일"));
       check("an empty paragraph at the end of a cell is dropped, not given a row", () => eq(cells2()[1], "내용"));
       check("a tab of indentation is kept as four spaces' width", () => {
         eq(cells2()[2], "&nbsp;".repeat(4) + "if x:" + SC + "&nbsp;".repeat(8) + "return");
       });
       check("a one-item list reads the same as a longer one", () => eq(cells2()[3], "• 하나뿐"));
+
+      // The second review's four: content that only looked blank, spacing inside a code line,
+      // and a break that ends its own paragraph.
+      const TABLE3 = "<table><tbody><tr>" +
+        td(p("설명") + '<img src="https://p.test/x.png" alt="그림">' + p("둘째")) +
+        td(p("a") + p(NBSP)) +
+        td(p("a") + '<p><mention-component entity_name="user_mention" entity_identifier="u1"></mention-component></p>') +
+        td("<pre><code>key:     value</code></pre>") +
+        td(p("a<br>") + p("b")) +
+        "</tr></tbody></table>";
+      payload = { plain: "md", html: TABLE3 };
+      const table3 = fire("cell");
+      const cells3 = () => cellsOf(table3);
+      // Plane's image is a block node, so it sits in the cell itself, not inside a paragraph —
+      // and only a cell with more than one line is rebuilt, so that is where it could be lost.
+      check("an image in a rewritten cell stays", () => ok(cells3()[0].indexOf("<img") > -1, cells3()[0]));
+      check("a paragraph holding only a non-breaking space is the author's, not padding", () => {
+        eq(cells3()[1], "a" + SC + "&nbsp;");
+      });
+      check("a mention, which Plane writes with no text inside, is content too", () => {
+        ok(cells3()[2].indexOf("mention-component") > -1, cells3()[2]);
+      });
+      check("spacing inside a code line survives HTML", () => {
+        eq(cells3()[3], "key:" + "&nbsp;".repeat(4) + " value");
+      });
+      check("a break that ends its own paragraph adds no blank line", () => eq(cells3()[4], "a" + SC + "b"));
 
       payload = { plain: "md", html: TABLE, noPrivate: true };
       const older = fire("cell");
@@ -1264,12 +1286,13 @@ const suites = [
         eq(prose.getData("text/html"), "<p>표가 아닌 복사<br>둘째 줄</p>");
       });
 
-      // The backslash budget counts the <br>s Plane wrote, and the table rewrite adds some.
+      // The backslash budget counts the <br>s Plane wrote, and the table rewrite adds some, so
+      // the order of the two in onCopy matters: tidy first, from the HTML as Plane wrote it.
       // Here the original has none — so the backslash is the author's, and must stay — while
-      // the rewritten HTML would have one and license deleting it.
+      // the rewritten HTML has one, and would license deleting it if the rewrite ran first.
       payload = { plain: "경로 C:" + BS + "\\n다음\\n", html: '<table><tbody><tr><td><p>경로 C:' + BS + '</p><p>다음</p></td></tr></tbody></table>' };
       const budget = fire("cell");
-      check("the backslash budget is read from the HTML Plane wrote, not the rewritten one", () => {
+      check("the backslash budget is counted before the table rewrite adds <br>s", () => {
         eq(budget.getData("text/plain"), "경로 C:" + BS + "\\n다음\\n");
         ok(budget.getData("text/html").indexOf("mso-data-placement") > -1, "and the table was still rewritten");
       });`

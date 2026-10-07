@@ -1626,7 +1626,12 @@ const PE_MD_BLANK = /^[ \t]*$/;
 // function exists to clean, plus nothing.
 function peHardBreakLines(lines, html) {
   const inCode = peFenceTracker();
-  const codeInHtml = peCodeLinesFromHtml(lines, html);
+  let codeInHtml = new Set();
+  try {
+    codeInHtml = peCodeLinesFromHtml(lines, html);
+  } catch (_) {
+    // The HTML reading only ever adds protection. If it fails, the tracker still stands.
+  }
   const hits = [];
   for (let i = 0; i < lines.length - 1; i++) {
     // Both run on every line, so the tracker keeps its state; either one saying "code" is
@@ -1678,7 +1683,11 @@ function peCodeLinesFromHtml(lines, html) {
   const re = /<pre\b[^>]*>([\s\S]*?)<\/pre>/gi;
   let m;
   while ((m = re.exec(String(html == null ? "" : html)))) {
-    blocks.push(peHtmlText(m[1]).replace(/\n$/, "").split("\n"));
+    // Every trailing newline, not one: remark trims them all (hast-util-to-mdast's
+    // trimTrailingLines), so a block that ends on an empty line — Enter pressed at its end —
+    // never matched, and fell back to the tracker alone. An empty block is zero lines.
+    const text = peHtmlText(m[1]).replace(/\n+$/, "");
+    blocks.push(text === "" ? [] : text.split("\n"));
   }
   let from = 1;
   for (const code of blocks) {
@@ -1706,7 +1715,9 @@ function peHtmlText(fragment) {
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e) => {
       if (e[0] === "#") {
         const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-        return Number.isFinite(n) ? String.fromCodePoint(n) : all;
+        // Outside Unicode, String.fromCodePoint throws — and a throw here aborted the whole
+        // clean-up. Left as written instead.
+        return Number.isFinite(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : all;
       }
       return Object.prototype.hasOwnProperty.call(named, e.toLowerCase()) ? named[e.toLowerCase()] : all;
     });
@@ -1748,6 +1759,16 @@ function peFenceTracker() {
   // markers; rest is what follows them, with its own indentation intact.
   const depthOf = (line) => (/^(?:[ \t]*>)*/.exec(line)[0].match(/>/g) || []).length;
   const restOf = (line) => line.replace(/^(?:[ \t]*>[ ]?)*/, "");
+  // Take off at most n quote markers. Inside a fence only the ones it was opened under are
+  // container; a ">" after them is the code's own — a shell prompt, a redirect, a quoted
+  // email — and reading it as a marker made the line look outdented and closed the fence
+  // mid-block.
+  const unquote = (line, n) => {
+    let rest = line;
+    let k = 0;
+    for (let m; k < n && (m = /^[ \t]*>[ ]?/.exec(rest)); k++) rest = rest.slice(m[0].length);
+    return { k, rest };
+  };
   let char = ""; // the fence currently open, "`" or "~"
   let len = 0;
   let depth = 0; // the quote depth it was opened at
@@ -1764,15 +1785,18 @@ function peFenceTracker() {
       // under, is outside the list item or the quote — CommonMark ends the code block there.
       // Without this, a fence-shaped line that never closes (the next case below) took the
       // next real opener for its close, and the code after that for prose.
-      const left =
-        depthOf(line) < depth || (!PE_MD_BLANK.test(rest) && /^[ \t]*/.exec(rest)[0].length < indent);
+      const u = unquote(line, depth);
+      const left = u.k < depth || (!PE_MD_BLANK.test(u.rest) && /^[ \t]*/.exec(u.rest)[0].length < indent);
       if (!left) {
-        const c = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(rest);
+        const c = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(u.rest);
         if (c && c[1][0] === char && c[1].length >= len) char = "";
         atBlockStart = false;
         return true;
       }
+      // Out of the container, this line starts a block of its own if the one before ended
+      // one — so a real opener here counts. atBlockStart still holds the in-code false.
       char = "";
+      atBlockStart = before === undefined || peBlockEnds(before);
     }
     // An info string ending in "\" is the line's own hard break, not a language: "```" typed
     // at the start of a paragraph and followed by Shift+Enter stays text (the input rule wants

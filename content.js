@@ -1742,6 +1742,15 @@
     // Only when Plane's own flavour is there to paste back from. Plane reads it first, so
     // text/html is free to serve everything else; a Plane old enough not to write it would
     // paste the rewritten table back into itself, paragraphs joined into one.
+    //
+    // That is Plane's behaviour, not a documented promise, so here is what it rests on, read
+    // in the source of v1.3.0, v1.4.2 and main: markdown-clipboard.ts writes the flavour on
+    // copy, and CoreEditorProps.handlePaste (core/props.ts) reads it and returns true before
+    // anything else. Every Plane editor — description, comment, Pages, collaborative — is
+    // built by useEditor, which installs those props on the view itself, and ProseMirror
+    // asks the view's props before any plugin's. This is the line to re-check against a new
+    // Plane version. If the flavour is renamed, this goes quiet: the Excel fix stops and
+    // nothing else changes.
     try {
       if (dt.getData("text/plane-editor-html")) {
         const safe = excelSafeTables(html);
@@ -1766,11 +1775,11 @@
   // of it: a paragraph or heading is one line with its inline markup kept; a list is one line
   // per item, marked "• ", "1. " or ☐/☑ the way it reads on screen, nested items indented —
   // a one-item list too, so a list reads the same whatever its length; a code block is one
-  // line per line of code, its leading indentation kept. Empty paragraphs at the top or the
+  // line per line of code, its spacing kept. Empty paragraphs at the top or the
   // bottom of a cell (Enter pressed at its end) are dropped — they would only pad the row.
   // A cell with one plain line is left exactly as it was, and a cell holding a table of its
-  // own is left alone. The cost is borne by other HTML readers: a list in a cell pasted into
-  // a word processor arrives as lines of text, not as a list.
+  // own is left alone. The cost is borne by other HTML readers: a list or a heading in a cell
+  // pasted into a word processor arrives as lines of text, not as a list or a heading.
   //
   // Built from DOM nodes in a document of its own, never from HTML strings: DOMParser's
   // document is parsed and not rendered, so nothing in the copy runs or loads, and no markup
@@ -1805,9 +1814,12 @@
     return changed ? doc.body.innerHTML : null;
   }
 
-  // A line with nothing to read on it: no text but whitespace, and no element but a break.
-  const isBlankLine = (line) =>
-    line.every((n) => (n.nodeType === 3 ? !n.nodeValue.trim() : n.nodeName === "BR" || !n.textContent.trim()));
+  // A line with nothing on it: no text but HTML's own whitespace, and no element but a break.
+  // Not trim(): it also takes U+00A0, the trap peBlockEnds documents, and a paragraph holding
+  // only a non-breaking space was the author's. And any element but a break is content — an
+  // image, or a mention, which Plane serializes with no text inside it.
+  const isBlankNode = (n) => (n.nodeType === 3 ? /^[ \t\n\r]*$/.test(n.nodeValue) : n.nodeName === "BR");
+  const isBlankLine = (line) => line.every(isBlankNode);
 
   // The lines a block container holds, in reading order — each line an array of nodes. Every
   // node made here comes from node.ownerDocument, the parsed copy, never the page.
@@ -1816,7 +1828,7 @@
     const out = [];
     let inline = []; // content sitting directly in the container, outside any block
     const flush = () => {
-      if (inline.some((n) => n.nodeName !== "BR" && (n.nodeType !== 3 || n.nodeValue.trim()))) out.push(inline);
+      if (!isBlankLine(inline)) out.push(inline);
       inline = [];
     };
     for (const child of Array.from(node.childNodes)) {
@@ -1828,32 +1840,42 @@
       const tag = child.tagName;
       if (/^(P|H[1-6])$/.test(tag)) {
         flush();
-        out.push(Array.from(child.childNodes)); // inline markup kept: strong, em, a mention
+        // Inline markup kept: strong, em, a mention. A break that ends the block renders
+        // nothing in Plane or in a browser; left in, the join below makes it a blank line.
+        const nodes = Array.from(child.childNodes);
+        while (nodes.length && isBlankNode(nodes[nodes.length - 1])) nodes.pop();
+        out.push(nodes);
       } else if (tag === "PRE") {
         flush();
-        // Leading indentation as NBSP — HTML collapses ordinary spaces, and a tab is four.
         child.textContent
           .replace(/\n$/, "")
           .split("\n")
-          .forEach((l) =>
-            out.push([
-              doc.createTextNode(l.replace(/^[ \t]+/, (m) => "\u00a0".repeat(m.replace(/\t/g, "    ").length)))
-            ])
-          );
+          .forEach((l) => out.push([doc.createTextNode(codeSpacing(l))]));
       } else if (tag === "UL" || tag === "OL") {
         flush();
         out.push(...listLines(child, depth));
       } else if (/^(DIV|BLOCKQUOTE|SECTION|ARTICLE)$/.test(tag)) {
         flush();
         out.push(...cellLines(child, depth));
-      } else if (/^(HR|LABEL|INPUT|IMG|COLGROUP|COL)$/.test(tag)) {
-        // nothing a cell's text can carry
+      } else if (/^(HR|LABEL|INPUT|COLGROUP|COL)$/.test(tag)) {
+        // nothing a cell's text can carry; an image is inline content and stays
       } else {
         inline.push(child); // inline markup, and a <br> sitting directly in the cell
       }
     }
     flush();
     return out;
+  }
+
+  // A line of code, spaced so HTML keeps it: HTML collapses runs of ordinary spaces, so an
+  // indent becomes NBSP and so does all but the last space of any run inside the line —
+  // aligned columns, YAML comments, an ASCII table. Single spaces stay ordinary, so the text
+  // copied back out of the cell is still mostly real spaces. A tab is four.
+  function codeSpacing(line) {
+    return line
+      .replace(/\t/g, "    ")
+      .replace(/^ +/, (m) => "\u00a0".repeat(m.length))
+      .replace(/ {2,}/g, (m) => "\u00a0".repeat(m.length - 1) + " ");
   }
 
   function listLines(list, depth) {
