@@ -1283,10 +1283,52 @@ test("copy: a payload with nothing to fix is left alone, not rewritten", () => {
   // what was there, so the caller never writes a flavour it had no reason to write.
   eq(ctx.peTidyCopiedText("첫째 줄\n둘째 줄\n", br), null, "already clean");
   eq(ctx.peTidyCopiedText("| a1 a2 |\n| ----- |\n", br), null, "a copied table has no hard breaks left");
-  eq(ctx.peTidyCopiedText("경로 C:\\\\\n다음\n", br), null, "an escaped backslash is a character, not a break");
   eq(ctx.peTidyCopiedText("끝은 백슬래시\\", br), null, "the last line is not followed by a newline");
   eq(ctx.peTidyCopiedText("", br), null);
   eq(ctx.peTidyCopiedText(null, br), null);
+});
+
+// Ground truth, not guesses. Each pair below came out of Plane's own conversion run twice
+// over the same HTML — once as Plane runs it, once with the hard-break handler marking its
+// own backslash — so "truth" is exactly the Plane payload minus Plane's backslashes. A fuzz
+// of 42,000 generated descriptions against that truth found these classes; each was wrong
+// before this change, two of them by deleting a character the author wrote.
+test("copy: every class the ground-truth fuzz found comes out exactly right", () => {
+  const ctx = loadCommon();
+  const cases = [
+    // The author's own backslash right before a Shift+Enter. Plane switches remark's
+    // escaping off, so "\\" at the end of a line is the author's and then the break's — not
+    // an escape. Read as one, both stayed: "C:\\" for a path at the end of a line.
+    ["an author's backslash before a break", "<p>경로 C:\\<br>다음</p>", "경로 C:\\\\\n다음\n", "경로 C:\\\n다음\n"],
+    // A heading with a line break is written as a setext heading. Its last line is followed
+    // by the underline, not by a blank — and the author's backslash ending it was taken.
+    ["a heading with a break (was: author's \\ deleted)", "<h2>업무<br>경로 C:\\</h2>", "업무\\\n경로 C:\\\n------\n", "업무\n경로 C:\\\n------\n"],
+    // Inside a quote, the line between two paragraphs is ">" alone. That is blank.
+    ["a blank line inside a quote", "<blockquote><p>경로 C:\\</p><p>다음<br>줄</p></blockquote>", "> 경로 C:\\\n>\n> 다음\\\n> 줄\n", "> 경로 C:\\\n>\n> 다음\n> 줄\n"],
+    // "```" typed after a Shift+Enter stays text, and is not a fence: read as one, the real
+    // fence below was taken for its close and the shell continuation inside it was stripped.
+    ["backticks after a break (was: code \\ deleted)", "<blockquote><p>밑줄<br>```</p></blockquote><blockquote><p>x</p><pre><code>q \\\nr</code></pre></blockquote>", "> 밑줄\\\n> ```\n\n> x\n>\n> ```\n> q \\\n> r\n> ```\n", "> 밑줄\n> ```\n\n> x\n>\n> ```\n> q \\\n> r\n> ```\n"],
+    // A "---" separator typed after a Shift+Enter is not an underline: remark draws an
+    // underline exactly as long as the line above it, and this one is not.
+    ["a separator line after a break", "<p>회의<br>---<br>다음</p>", "회의\\\n---\\\n다음\n", "회의\n---\n다음\n"],
+    ["a separator line ending the paragraph", "<p>회의 정리<br>---</p>", "회의 정리\\\n---\n", "회의 정리\n---\n"],
+    // A list item that starts with a Shift+Enter and then "```": remark drops the leading
+    // break, so "1. ```" looks exactly like a real opener. It never closes — the list item
+    // ends, and the code block with it. Read without containers, it took the real fence
+    // below for its close and stripped the shell continuation inside.
+    ["a fence-shaped line that ends with its list item (was: code \\ deleted)",
+      "<ol><li><p><br>```</p></li><li><p>업무<br>세부</p></li></ol><pre><code>docker run \\\n  --rm</code></pre>",
+      "1. ```\n\n2. 업무\\\n   세부\n\n```\ndocker run \\\n  --rm\n```\n",
+      "1. ```\n\n2. 업무\n   세부\n\n```\ndocker run \\\n  --rm\n```\n"]
+  ];
+  for (const [what, html, plane, truth] of cases) {
+    const got = ctx.peTidyCopiedText(plane, html);
+    eq(got === null ? plane : got, truth, what);
+  }
+  // The known limit, pinned so it stays on the safe side: when the line above is exactly as
+  // long as the dashes, it is indistinguishable from remark's own underline, and the "\" is
+  // left where it is. A stray backslash is what Plane gives today; a deleted one is worse.
+  eq(ctx.peTidyCopiedText("메모\\\n---\n", "<p>메모<br>---</p>"), null, "an underline-length separator");
 });
 
 // The two DOM anchors get the rule-health treatment: what one page is evidence of is a

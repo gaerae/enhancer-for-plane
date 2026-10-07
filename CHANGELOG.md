@@ -24,11 +24,33 @@ Schema unchanged.
   means spaces and tabs only, which is also how the fence detection reads indentation.
   Reproduced through Plane's own Markdown conversion at the library versions it pins, and
   pinned with that payload in the value tests and the browser suite.
+- **A backslash you typed right before a Shift+Enter no longer doubles up.** `C:\` at the end
+  of a line followed by a line break was copied as `C:\\`: two backslashes were read as an
+  escape, but Plane switches Markdown escaping off, so they are the one you typed and the
+  break's. Now exactly one is removed.
+- **A heading with a line break no longer loses a backslash you typed at its end.** remark
+  writes such a heading with an underline (`-----`) instead of `##`, so its last line is
+  followed by the underline rather than a blank line, and was read as continuing. The
+  underline is now recognised by remark's own rule — exactly as long as the line above it —
+  so a `---` you type as a separator after a Shift+Enter is still read as text.
+- **Backslashes inside a code block are no longer removed after a stray ```.** Three
+  backticks typed after a Shift+Enter, or right at the start of a list item, stay text, but
+  look like the start of a code block. Read as one, the code block that really followed was
+  read inside out, and its `\` line continuations were removed. A code block now only starts
+  where a block can start, and ends with the list item or quote it is in.
+
+  All four were found by checking the function against Plane's own conversion rather than
+  against examples: the conversion run twice over the same description, once as Plane runs it
+  and once with the line-break handler marking its own backslash, so the right answer is known
+  exactly. Over 100,000 generated descriptions it now removes no character the author typed.
+  About 1% still keep a stray `\`, all in shapes that read ambiguously — for instance a
+  separator exactly as long as the line above it — where leaving it is the safe side.
 
 ### Internal
 - `peTidyCopiedText` is split into the budget check, `peHardBreakLines` (the per-line
-  tests) and `peFenceTracker` (which lines are code). No behaviour change beyond the fix
-  above; each guard still fails a check of its own when removed.
+  tests), `peBlockEnds` (does this line end the block above it) and `peFenceTracker` (which
+  lines are code). Every guard fails a check of its own when removed, and the classes the
+  ground-truth check found are pinned as Plane's exact output in `tools/test.js`.
 
 ---
 
