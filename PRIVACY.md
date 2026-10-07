@@ -73,12 +73,14 @@ by Chrome Sync):
   reads nothing on them.
 - **The clipboard, only inside a copy you made.** Choosing a format in "Copy
   reference" writes that one string to your clipboard. And when you copy inside a
-  Plane description, the extension edits the plain-text version of *that* copy on
-  its way out: Plane replaces it with Markdown that spells a line break as a
-  trailing `\`, and that backslash is taken off. What it reads there is the text
-  you are copying, handed to it by the page as part of your own keystroke — never
-  what was on the clipboard before, which it cannot see and asks for no permission
-  to see. Nothing is stored, and nothing leaves the browser.
+  Plane description, the extension edits *that* copy on its way out: Plane replaces
+  its plain-text version with Markdown that spells a line break as a trailing `\`,
+  and that backslash is taken off; and when the copy holds a table, its HTML version
+  is adjusted so each cell's lines stay in one cell when pasted into a spreadsheet.
+  What it reads there is the content you are copying, handed to it by the page as
+  part of your own keystroke — never what was on the clipboard before, which it
+  cannot see and asks for no permission to see. Nothing is stored, and nothing
+  leaves the browser.
 - **What you type for Quick open.** Chrome hands the extension what follows the
   `issue` keyword — and only that; it sends nothing before the keyword is active,
   and nothing you type anywhere else in the address bar. If it is shaped like a

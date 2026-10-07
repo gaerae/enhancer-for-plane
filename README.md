@@ -125,18 +125,27 @@ three selections. It works on the item's own page and in the panel a list opens.
 
 ![One click beside a work item's ID copies it in the format you wrote](store-assets/screenshot-4-copy.png)
 
-### 🧹 Copied text — the stray `\`
+### 🧹 Copied text — the stray `\`, and tables into a spreadsheet
 
 Plane replaces the plain-text side of the clipboard with Markdown whenever you copy inside a
 description, and its Markdown spells a line break as a trailing `\`. Select part of a table
 cell that holds a Shift+Enter, copy it, and that backslash follows you into the form field,
 the spreadsheet cell, the chat message. This takes it back off.
 
-Nothing to configure, and nothing else is touched: the rich-text flavours go to the clipboard
-exactly as Plane wrote them, so pasting back into Plane is unchanged. A backslash you typed
-yourself stays — whether there was a line break there at all is read off the same copy's HTML
-— and so does a line continuation inside a code block. When Plane fixes the serialization
-there is nothing left to take off and this goes quiet on its own.
+A backslash you typed yourself stays — whether there was a line break there at all is read
+off the same copy's HTML — and so does a line continuation inside a code block. When Plane
+fixes the serialization there is nothing left to take off and this goes quiet on its own.
+
+**A table pastes into Excel one cell per cell.** Excel reads a copied table from its HTML and
+turns every line break inside a cell into a new row, so a cell with a Shift+Enter, two
+paragraphs, a list or a block of code split across several rows and merged the cells beside
+it. Copied out of a description, a cell's lines now stay inside it: paragraphs and line
+breaks as they were, list items as `•` / `1.` / `☑` lines, code with its spacing, images kept.
+A cell with one plain line is left as it was. Word and Google Docs read the same HTML, so there
+a list or heading inside a table cell arrives as lines of text.
+
+Nothing to configure. Plane's own copy format is never touched, so pasting back into Plane is
+unchanged.
 
 ### 📐 Style rules — a generic engine
 

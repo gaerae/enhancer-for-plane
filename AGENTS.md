@@ -374,6 +374,19 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   a preset the user deleted is not resurrected, because the step appends nothing. Never widen
   that table into "any selector we ever shipped": a value in it is a licence to overwrite
   somebody's storage.
+- **A transform judged against examples looked right four times over.** The copy clean-up
+  (`peTidyCopiedText`) passed every hand-written case and still shipped a miss, then had four
+  more classes found in an afternoon — two of them deleting a character the author typed —
+  once it was checked against the real thing: Plane's `convertHTMLToMarkdown` rebuilt outside
+  this repo at its catalog versions, run twice over generated HTML, once as Plane runs it and
+  once with the `break` handler marking its own backslash, so the right answer is exact.
+  That rig needs npm packages and so cannot live in `tools/`; rebuild it (the classes it found
+  are in `tools/test.js`, as Plane's literal output) before changing that function again, and
+  judge a change by "deleted nothing the author typed", not by how many backslashes go. When
+  the generator leaves out what "nobody can type", check that against Plane's input rules
+  rather than against intuition: the first such filter dropped "```" at a paragraph's start,
+  but the rule only fires when a space follows it, and the filter hid exactly the deletion a
+  code review found next.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

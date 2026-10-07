@@ -95,10 +95,12 @@
   }
 
   /* ================================================================== */
-  /* 1a. Rule health — did each selector actually match anything?         */
+  /* 1a. Health — did each rule match, did each button find its place?   */
   /* ================================================================== */
   // The answer that was always one call away and never asked for. See peRuleHealthUpdate
   // in common.js for why this records "has it ever matched" rather than a per-page verdict.
+  // One sampler feeds two records: the style rules (recordRules) and the two buttons' DOM
+  // anchors (recordAnchors), on the same schedule and under the same hits-only rule.
   //
   // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
   // names has mounted, and a count taken at navigation time would score every route a miss.
@@ -109,22 +111,22 @@
   // only the fragment, and keying on location.href counted every such click as another page:
   // a rule that misses on work item pages piled up misses from one item and reached "never
   // matched" without twenty pages ever having been looked at. The same page looked at twice
-  // is not more evidence. Found on the anchor record first (see recordRuleHealth); the rules
+  // is not more evidence. Found on the anchor record first (see recordAnchors); the rules
   // had the same fault from the start.
-  let healthUrl = null;
+  let healthRoute = null;
   let healthTimer = null;
-  let anchorPage = null; // the route the anchors were last sampled on — see recordRuleHealth
+  let anchorPage = null; // the route the anchors were last sampled on — see recordAnchors
   const PE_HEALTH_DELAY = 2500;
 
-  function scheduleRuleHealth() {
+  function scheduleHealthSample() {
     if (!settings || !isActive()) return;
     const route = location.pathname + location.search;
-    if (route === healthUrl) return; // already counted this route
-    healthUrl = route;
+    if (route === healthRoute) return; // already counted this route
+    healthRoute = route;
     clearTimeout(healthTimer);
     healthTimer = setTimeout(() => {
       try {
-        recordRuleHealth();
+        recordHealth();
       } catch (_) {}
     }, PE_HEALTH_DELAY);
   }
@@ -159,13 +161,18 @@
     // probably still open.
     setTimeout(() => {
       try {
-        recordRuleHealth(true);
+        recordHealth(true);
       } catch (_) {}
     }, 400);
   }
 
-  function recordRuleHealth(hitsOnly) {
+  function recordHealth(hitsOnly) {
     if (!settings || !isActive()) return;
+    recordRules(hitsOnly);
+    recordAnchors(hitsOnly);
+  }
+
+  function recordRules(hitsOnly) {
     const rules = Array.isArray(settings.rules) ? settings.rules : [];
     const counts = {};
     rules.forEach((r) => {
@@ -190,6 +197,9 @@
         peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
       );
     }
+  }
+
+  function recordAnchors(hitsOnly) {
     // The two DOM anchors, on the same schedule and under the same rules. Taken after the
     // inject bursts have had their say (this runs 2.5s past the route change; the last
     // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
@@ -791,7 +801,7 @@
     // Last, and self-throttling: injectAll runs on every mutation burst, this runs once per
     // route. Hanging it here rather than on a navigation event is what makes it work on an
     // SPA that changes the URL without one.
-    scheduleRuleHealth();
+    scheduleHealthSample();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -1705,8 +1715,9 @@
   // plugin listens for "copy" on the editor node and calls preventDefault(), which does
   // not stop propagation, so a bubble-phase listener up here runs after it with the
   // DataTransfer still writable — the clipboard is written from it once the dispatch ends.
-  // Only text/plain is rewritten. text/html and Plane's private flavour are left exactly
-  // as they were, which is what keeps a paste back into Plane on its normal path.
+  // Plane's private flavour is never touched, which is what keeps a paste back into Plane on
+  // its normal path; text/plain loses the backslashes, and text/html is made safe for a
+  // spreadsheet (excelSafeTables).
   //
   // "cut" is deliberately NOT handled, and it looks like an oversight, so: Plane's plugin
   // hooks "copy" alone, and with tiptap-markdown's own serializer switched off a cut falls
@@ -1721,11 +1732,178 @@
     if (!t || !t.closest || !t.closest(".ProseMirror, .tiptap")) return;
     const dt = e.clipboardData;
     if (!dt) return;
+    // Read once, before either rewrite: the backslash budget is a count of the <br>s Plane
+    // wrote, and the table rewrite below adds some.
+    const html = dt.getData("text/html");
     try {
-      const next = peTidyCopiedText(dt.getData("text/plain"), dt.getData("text/html"));
+      const next = peTidyCopiedText(dt.getData("text/plain"), html);
       if (next !== null) dt.setData("text/plain", next);
     } catch (_) {}
+    // Only when Plane's own flavour is there to paste back from. Plane reads it first, so
+    // text/html is free to serve everything else; a Plane old enough not to write it would
+    // paste the rewritten table back into itself, paragraphs joined into one.
+    //
+    // That is Plane's behaviour, not a documented promise, so here is what it rests on, read
+    // in the source of v1.3.0, v1.4.2 and main: markdown-clipboard.ts writes the flavour on
+    // copy, and CoreEditorProps.handlePaste (core/props.ts) reads it and returns true before
+    // anything else. Every Plane editor — description, comment, Pages, collaborative — is
+    // built by useEditor, which installs those props on the view itself, and ProseMirror
+    // asks the view's props before any plugin's. This is the line to re-check against a new
+    // Plane version. If the flavour is renamed, this goes quiet: the Excel fix stops and
+    // nothing else changes.
+    try {
+      if (dt.getData("text/plane-editor-html")) {
+        const safe = excelSafeTables(html);
+        if (safe !== null) dt.setData("text/html", safe);
+      }
+    } catch (_) {}
   };
+
+  // A copied table, made to land in a spreadsheet one cell per cell.
+  //
+  // Excel reads a pasted table from the HTML flavour, and reads every line break inside a
+  // cell as the start of a new row. Measured in Excel 16.112 (macOS) with the payload Plane
+  // writes for a cell selection: a cell holding a Shift+Enter came out as two rows, with the
+  // other cells of that row merged across both; a cell holding two paragraphs came out as
+  // three, a blank row between them. Excel's own escape for "this break stays in the cell"
+  // is mso-data-placement:same-cell on the <br>, and with it the same table lands three rows
+  // tall, each break inside its cell — measured the same way. With lists and code in the
+  // cells too, an 8-row table pasted as 24 rows before this and as 8 after.
+  //
+  // So every cell that holds more than one line, or any list or code, is rewritten as its
+  // lines joined by that <br>. A Plane cell is "block+", so a line is whatever a block makes
+  // of it: a paragraph or heading is one line with its inline markup kept; a list is one line
+  // per item, marked "• ", "1. " or ☐/☑ the way it reads on screen, nested items indented —
+  // a one-item list too, so a list reads the same whatever its length; a code block is one
+  // line per line of code, its spacing kept. Empty paragraphs at the top or the
+  // bottom of a cell (Enter pressed at its end) are dropped — they would only pad the row.
+  // A cell with one plain line is left exactly as it was, and a cell holding a table of its
+  // own is left alone. The cost is borne by other HTML readers: a list or a heading in a cell
+  // pasted into a word processor arrives as lines of text, not as a list or a heading.
+  //
+  // Built from DOM nodes in a document of its own, never from HTML strings: DOMParser's
+  // document is parsed and not rendered, so nothing in the copy runs or loads, and no markup
+  // is ever assigned through innerHTML (check-source.js holds that line for good reason —
+  // synced templates are written by strangers, and this is the same kind of string).
+  function excelSafeTables(html) {
+    if (!html || !/<t[dh][\s>]/i.test(html)) return null;
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    let changed = false;
+    doc.querySelectorAll("td, th").forEach((cell) => {
+      if (cell.querySelector("table")) return;
+      const breaks = cell.querySelectorAll("br");
+      breaks.forEach((b) => b.setAttribute("style", "mso-data-placement:same-cell"));
+      const lines = cellLines(cell, 0);
+      // Decided on the cell as Plane wrote it: an empty paragraph under a line is a second
+      // block, and Excel gives it a row of its own — the trim below is what removes it.
+      if (lines.length < 2 && !breaks.length && !cell.querySelector("ul, ol, pre")) return;
+      while (lines.length && isBlankLine(lines[0])) lines.shift();
+      while (lines.length && isBlankLine(lines[lines.length - 1])) lines.pop();
+      const out = [];
+      lines.forEach((line, i) => {
+        if (i) {
+          const br = doc.createElement("br");
+          br.setAttribute("style", "mso-data-placement:same-cell");
+          out.push(br);
+        }
+        out.push(...line);
+      });
+      cell.replaceChildren(...out);
+      changed = true;
+    });
+    return changed ? doc.body.innerHTML : null;
+  }
+
+  // A line with nothing on it: no text but HTML's own whitespace, and no element but a break.
+  // Not trim(): it also takes U+00A0, the trap peBlockEnds documents, and a paragraph holding
+  // only a non-breaking space was the author's. And any element but a break is content — an
+  // image, or a mention, which Plane serializes with no text inside it.
+  const isBlankNode = (n) => (n.nodeType === 3 ? /^[ \t\n\r]*$/.test(n.nodeValue) : n.nodeName === "BR");
+  const isBlankLine = (line) => line.every(isBlankNode);
+
+  // The lines a block container holds, in reading order — each line an array of nodes. Every
+  // node made here comes from node.ownerDocument, the parsed copy, never the page.
+  function cellLines(node, depth) {
+    const doc = node.ownerDocument;
+    const out = [];
+    let inline = []; // content sitting directly in the container, outside any block
+    const flush = () => {
+      if (!isBlankLine(inline)) out.push(inline);
+      inline = [];
+    };
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        inline.push(child);
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      const tag = child.tagName;
+      if (/^(P|H[1-6])$/.test(tag)) {
+        flush();
+        // Inline markup kept: strong, em, a mention. A break that ends the block renders
+        // nothing in Plane or in a browser; left in, the join below makes it a blank line.
+        const nodes = Array.from(child.childNodes);
+        while (nodes.length && isBlankNode(nodes[nodes.length - 1])) nodes.pop();
+        out.push(nodes);
+      } else if (tag === "PRE") {
+        flush();
+        child.textContent
+          .replace(/\n$/, "")
+          .split("\n")
+          .forEach((l) => out.push([doc.createTextNode(codeSpacing(l))]));
+      } else if (tag === "UL" || tag === "OL") {
+        flush();
+        out.push(...listLines(child, depth));
+      } else if (/^(DIV|BLOCKQUOTE|SECTION|ARTICLE)$/.test(tag)) {
+        flush();
+        out.push(...cellLines(child, depth));
+      } else if (/^(HR|LABEL|INPUT|COLGROUP|COL)$/.test(tag)) {
+        // nothing a cell's text can carry; an image is inline content and stays
+      } else {
+        inline.push(child); // inline markup, and a <br> sitting directly in the cell
+      }
+    }
+    flush();
+    return out;
+  }
+
+  // A line of code, spaced so HTML keeps it: HTML collapses runs of ordinary spaces, so an
+  // indent becomes NBSP and so does all but the last space of any run inside the line —
+  // aligned columns, YAML comments, an ASCII table. Single spaces stay ordinary, so the text
+  // copied back out of the cell is still mostly real spaces. A tab is four.
+  function codeSpacing(line) {
+    return line
+      .replace(/\t/g, "    ")
+      .replace(/^ +/, (m) => "\u00a0".repeat(m.length))
+      .replace(/ {2,}/g, (m) => "\u00a0".repeat(m.length - 1) + " ");
+  }
+
+  function listLines(list, depth) {
+    const doc = list.ownerDocument;
+    const out = [];
+    // Not `|| 1`: "0. " starts a list at zero, and zero is falsy.
+    const start = parseInt(list.getAttribute("start"), 10);
+    let n = Number.isNaN(start) ? 1 : start;
+    for (const li of Array.from(list.children)) {
+      if (li.tagName !== "LI") continue;
+      const mark =
+        li.getAttribute("data-type") === "taskItem"
+          ? li.getAttribute("data-checked") === "true"
+            ? "☑ "
+            : "☐ "
+          : list.tagName === "OL"
+            ? n++ + ". "
+            : "• ";
+      const lines = cellLines(li, depth + 1);
+      const lead = doc.createTextNode("\u00a0\u00a0".repeat(depth) + mark);
+      if (lines.length) lines[0].unshift(lead);
+      else lines.push([lead]);
+      out.push(...lines);
+    }
+    return out;
+  }
+
+
   document.addEventListener("copy", onCopy);
 
   document.addEventListener("mousedown", onDocClick, true);
@@ -1850,7 +2028,7 @@
       // Editing a rule is the one moment the reader is owed a fresh answer about it, and
       // refresh() is what a settings change calls. Forget which route was counted so the
       // edited selector is measured again on the page already in front of them.
-      healthUrl = null;
+      healthRoute = null;
       applyFocusClass();
       applyStyles();
       announceFocusOnce();

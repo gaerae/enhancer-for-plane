@@ -10,6 +10,71 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.11.0 — 2026-10-07
+
+Schema unchanged.
+
+### New
+- **A table copied out of a description pastes into Excel one cell per cell.** Excel reads a
+  copied table from its HTML version and turns every line break inside a cell into a new row,
+  so any cell with a Shift+Enter, two paragraphs, a list or code split across several rows and
+  merged the cells beside it. Measured in Excel 16.112 (macOS): an 8-row table pasted as 24
+  rows. The extension now marks each line break inside a cell with Excel's own
+  `mso-data-placement:same-cell` and joins a cell's blocks into lines — paragraphs as they were,
+  list items as `•` / `1.` / `☑` lines (a one-item list too, numbering from the list's own
+  start, zero included), code with its spacing, images kept — and the same table pastes as 8
+  rows. Empty paragraphs at the top or bottom of a cell are dropped rather than given a row. A
+  cell with one plain line is left as it was. Other apps that read the HTML version get the
+  same cells: pasted into Word or Google Docs, a list or heading inside a table cell arrives
+  as lines of text rather than as a list or a heading. Plane's own copy format is untouched, so a
+  paste back into Plane is unchanged; with an older Plane that does not write that format, the
+  HTML is left alone too, because Plane would paste it back. Windows Excel was not tested
+  here; the style comes from Office's own HTML for Windows.
+
+### Fixed
+- **The last line break of a copied description no longer keeps its `\` when a
+  non-breaking space follows it.** Every line break above it was cleaned and the last one kept
+  its backslash (shown as `₩` in Korean Windows fonts). The description's last line held only a
+  non-breaking space (U+00A0). remark, like CommonMark, treats that as text, so the break above
+  it is a real hard break and is written as one; but the check for "the next line is blank"
+  used JavaScript's `trim()`, which also strips U+00A0, and read the line as blank. Blank now
+  means spaces and tabs only, which is also how the fence detection reads indentation.
+  Reproduced through Plane's own Markdown conversion at the library versions it pins, and
+  pinned with that payload in the value tests and the browser suite.
+- **A backslash you typed right before a Shift+Enter no longer doubles up.** `C:\` at the end
+  of a line followed by a line break was copied as `C:\\`: two backslashes were read as an
+  escape, but Plane switches Markdown escaping off, so they are the one you typed and the
+  break's. Now exactly one is removed.
+- **A heading with a line break no longer loses a backslash you typed at its end.** remark
+  writes such a heading with an underline (`-----`) instead of `##`, so its last line is
+  followed by the underline rather than a blank line, and was read as continuing. The
+  underline is now recognised by remark's own rule — exactly as long as the line above it —
+  so a `---` you type as a separator after a Shift+Enter is still read as text.
+- **Backslashes inside a code block are no longer removed after a stray ```.** Three
+  backticks typed as text — after a Shift+Enter, at the start of a list item, or as "```js"
+  at the start of a paragraph without the space that would have made a code block — look
+  exactly like the start of one. Read as one, the code block that really followed was read
+  inside out, and its `\` line continuations were removed. The Markdown alone cannot tell
+  them apart, so the code is now found from the copy's HTML, where every real code block is a
+  `<pre>` with its text; the Markdown-side reading stays as the fallback, and either one is
+  enough to protect a line. That fallback also now ends a code block with the list item or
+  quote it is in, without mistaking a `>` inside the code (a prompt, a redirect) for a quote.
+
+  All four were found by checking the function against Plane's own conversion rather than
+  against examples: the conversion run twice over the same description, once as Plane runs it
+  and once with the line-break handler marking its own backslash, so the right answer is known
+  exactly. Over 130,000 generated descriptions it now removes no character the author typed.
+  Under 1% still keep a stray `\`, all in shapes that read ambiguously — for instance a
+  separator exactly as long as the line above it — where leaving it is the safe side.
+
+### Internal
+- `peTidyCopiedText` is split into the budget check, `peHardBreakLines` (the per-line
+  tests), `peBlockEnds` (does this line end the block above it) and `peFenceTracker` (which
+  lines are code). Every guard fails a check of its own when removed, and the classes the
+  ground-truth check found are pinned as Plane's exact output in `tools/test.js`.
+
+---
+
 ## v1.10.0 — 2026-10-06
 
 Schema unchanged.

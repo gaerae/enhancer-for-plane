@@ -445,7 +445,7 @@ function peIsItemPath(pathname) {
 //             which keeps the list's URL and so can never be accused and never needs to be.
 //             A miss is a work item address with no button.
 //
-// `hitsOnly` is the click scan's pass (see recordRuleHealth): it may promote either anchor
+// `hitsOnly` is the click scan's pass (see recordAnchors in content.js): it may promote either anchor
 // and may accuse neither, which is what makes extra sampling safe to add.
 function peAnchorCounts(obs, hitsOnly) {
   const o = obs && typeof obs === "object" ? obs : {};
@@ -1399,38 +1399,6 @@ function peSourceDisplayName(src, entry) {
   return peSourceLabel(src && src.url);
 }
 
-// Read the rule-health record (chrome.storage.local). Absent is the normal state on a
-// fresh install and reads as "nothing known yet", which is what peRuleHealthState says
-// about an id it does not find.
-// Read/write the recently-opened list (chrome.storage.local).
-function peGetRecent() {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage.local.get(PE_RECENT_KEY, (res) => {
-        const r = res && res[PE_RECENT_KEY];
-        resolve(Array.isArray(r) ? r : []);
-      });
-    } catch (_) {
-      resolve([]);
-    }
-  });
-}
-
-function peSaveRecent(list) {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage.local.set({ [PE_RECENT_KEY]: list }, () => {
-        // A convenience list. A failed write costs one remembered jump, and there is nothing
-        // the reader could do about it, so it is swallowed rather than surfaced.
-        void (chrome.runtime && chrome.runtime.lastError);
-        resolve();
-      });
-    } catch (_) {
-      resolve();
-    }
-  });
-}
-
 // One object or array in chrome.storage.local, read and written the way every device-only
 // record here is: a read that fails is "nothing known yet", and a write that fails is
 // swallowed — these are advisory, and there is nothing the reader could do about it.
@@ -1460,6 +1428,15 @@ function peSetLocal(key, value) {
   });
 }
 
+// The recently-opened list. An array, so a missing or malformed record reads as [].
+function peGetRecent() {
+  return peGetLocalObject(PE_RECENT_KEY).then((v) => (Array.isArray(v) ? v : []));
+}
+function peSaveRecent(list) {
+  return peSetLocal(PE_RECENT_KEY, list);
+}
+// Absent is the normal state on a fresh install and reads as "nothing known yet", which is
+// what peRuleHealthState and peAnchorHealthState say about an id they do not find.
 function peGetRuleHealth() {
   return peGetLocalObject(PE_RULE_HEALTH_KEY);
 }
@@ -1600,71 +1577,241 @@ function peMissingItemFields(format, item) {
 //
 // `html` is the text/html flavour of the SAME copy, and it is the evidence that the
 // backslash is Plane's and not the author's. Plane disables Markdown escaping, so a
-// backslash somebody typed reaches the clipboard bare and looks identical to a hard break;
-// two things separate them, and both were needed.
-//
-// One: a hard break is never the last thing in its block, so the line after it is never
-// empty. An authored "C:\" ending a paragraph is followed by a blank line, and that
-// is the shape this refuses.
-//
-// Two: a budget. Plane writes at most one backslash per <br>, so more candidates than <br>s
+// backslash somebody typed reaches the clipboard bare and looks identical to a hard break.
+// Three things separate them; peHardBreakLines holds the per-line two, and the budget here
+// is the third: Plane writes at most one backslash per <br>, so more candidates than <br>s
 // means at least one was typed and there is no telling which — leave the whole copy alone.
 // "At most" is doing work there: a <br> in a table cell becomes a space and a <br> ending a
-// block is dropped, so the count is a ceiling, never a quota to spend. Both failures point
-// the same way — a leftover "\" is what happens today, while deleting a character the author
+// block is dropped, so the count is a ceiling, never a quota to spend. Every guard fails the
+// same way — a leftover "\" is what happens today, while deleting a character the author
 // wrote is a new harm. Returns the new plain text, or null for "leave the clipboard alone".
 function peTidyCopiedText(plain, html) {
   const text = typeof plain === "string" ? plain : "";
   if (text.indexOf("\\\n") === -1) return null;
   const breaks = (String(html == null ? "" : html).match(/<br\b/gi) || []).length;
   if (!breaks) return null;
-
-  // Fence tracking reads the line with its container prefixes taken off. remark indents a
-  // fence by whatever encloses it — measured on Plane's own pipeline, a code block inside a
-  // nested list arrives as "  * ```" and one inside a quote as "> ```" — and a pattern
-  // anchored at the line start sees neither, then takes the "\" off "    docker run \" as
-  // if it were prose. Only fence detection is normalized; the backslash itself is judged on
-  // the line as written.
-  //
-  // Opening and closing are not normalized the same way, and the difference is the point.
-  // An opener may carry a list marker, because that is where remark puts one; a closer never
-  // does — the marker is not repeated on the continuation lines of a list item, measured as
-  // "  * ```" open and "    ```" closed. Strip a marker while looking for the close and a
-  // line of code that happens to read "* ```" — a fenced block documenting Markdown — ends
-  // the block early, and the stripping resumes over what is still somebody's shell script.
-  const quoted = (line) => line.replace(/^(?:\s*>)*\s*/, "");
-  const bare = (line) => quoted(line).replace(/^(?:[-*+]|\d+[.)])\s+/, "");
   const lines = text.split("\n");
-  let fenceChar = ""; // the fence currently open, "`" or "~"
-  let fenceLen = 0;
-  const hits = [];
-  // The last line is not followed by a newline, so a backslash there is not a hard break.
-  for (let i = 0; i < lines.length - 1; i++) {
-    // Inside a fence "docker run \" is a shell line continuation, not a hard break.
-    // Code always arrives fenced (measured: remark fences even a block with no language),
-    // so tracking fences is the whole of it — there is no indented-code case to miss.
-    if (fenceChar) {
-      const c = /^(`{3,}|~{3,})\s*$/.exec(quoted(lines[i]));
-      if (c && c[1][0] === fenceChar && c[1].length >= fenceLen) {
-        fenceChar = "";
-        fenceLen = 0;
-      }
-      continue;
-    }
-    const f = /^(`{3,}|~{3,})/.exec(bare(lines[i]));
-    if (f) {
-      fenceChar = f[1][0];
-      fenceLen = f[1].length;
-      continue;
-    }
-    // A block never ends on a hard break, so the line after one always has something on it.
-    if (!lines[i + 1].trim()) continue;
-    // A lone trailing backslash only. "a\\" is an escaped backslash the author wrote.
-    if (/(?:^|[^\\])\\$/.test(lines[i])) hits.push(i);
-  }
+  const hits = peHardBreakLines(lines, html);
   if (!hits.length || hits.length > breaks) return null;
   for (const i of hits) lines[i] = lines[i].slice(0, -1);
   return lines.join("\n");
+}
+
+// A blank line, as Markdown means it: nothing but spaces and tabs. Not JavaScript's trim(),
+// and not \s — both also take U+00A0 and the other Unicode spaces, which CommonMark treats as
+// text. That difference shipped: a description whose last line held only a non-breaking
+// space (what a spreadsheet or a web page tends to leave behind when pasted) came out of
+// remark as "line three\" over a line of one NBSP — a real hard break, correctly written —
+// and trim() read that line as blank, so the last "\" of every such copy stayed on the
+// clipboard while the ones above it were taken off.
+const PE_MD_BLANK = /^[ \t]*$/;
+
+// The indexes of the lines that end in a hard break Plane wrote, in a remark payload split
+// on "\n". A candidate is a line outside code (peFenceTracker) that ends in a backslash and is
+// followed by more of the same block. That last test is the shape of a real one: a hard break
+// is never the last thing in its block, so an authored "C:\" ending a block is refused. The
+// last line of the payload is never a candidate for the same reason — nothing follows it.
+//
+// "The block goes on" is decided by peBlockEnds, and it has three answers, each of which
+// shipped wrong once or was found wrong by checking against Plane's own pipeline (see
+// tools/test.js): a blank line in Markdown's sense, not trim()'s; a blank line inside a
+// quote, which is ">" alone; and a setext underline, which is how remark writes a heading
+// that contains a line break — the heading's last line is followed by "-----", not by a
+// blank, and an author's backslash ending that heading was taken.
+//
+// Any number of trailing backslashes qualifies, and exactly one is Plane's. Plane switches
+// remark's escaping off, so "\\" at the end of a line is not an escaped backslash: it is one
+// the author typed, with the hard break's after it. Reading it as an escape left both on
+// the clipboard — "C:\\" for a path at the end of a line — which is the line break this
+// function exists to clean, plus nothing.
+function peHardBreakLines(lines, html) {
+  const inCode = peFenceTracker();
+  let codeInHtml = new Set();
+  try {
+    codeInHtml = peCodeLinesFromHtml(lines, html);
+  } catch (_) {
+    // The HTML reading only ever adds protection. If it fails, the tracker still stands.
+  }
+  const hits = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    // Both run on every line, so the tracker keeps its state; either one saying "code" is
+    // enough. The HTML is the stronger of the two, and the tracker is what still holds when
+    // the HTML is missing or not shaped the way Plane writes it.
+    const tracked = inCode(lines[i]);
+    if (tracked || codeInHtml.has(i)) continue;
+    if (peBlockEnds(lines[i + 1], lines[i])) continue;
+    if (lines[i].endsWith("\\")) hits.push(i);
+  }
+  return hits;
+}
+
+// Does `line` end the block that `prev` is in? Blank (spaces and tabs only — see
+// PE_MD_BLANK), blank once a quote's ">" markers are taken off, or the setext underline of
+// a heading whose last line is `prev`.
+//
+// The underline is matched by remark's own rule, not by its look. remark draws it exactly as
+// long as the heading's last line (mdast-util-to-markdown, handle/heading.js: the value's
+// length minus the position after its last EOL), and any container prefix lands on both
+// lines alike — so a real underline is the same length as the line above it. A line of
+// "---" that somebody typed after a Shift+Enter, as a separator, almost never is; reading
+// every such line as an underline left the "\" above it on the clipboard.
+function peBlockEnds(line, prev) {
+  const inner = line.replace(/^(?:[ \t]*>)+/, "");
+  if (PE_MD_BLANK.test(inner)) return true;
+  return (
+    typeof prev === "string" &&
+    !PE_MD_BLANK.test(prev) &&
+    line.length === prev.length &&
+    /^[ \t]*(?:=+|-+)[ \t]*$/.test(inner)
+  );
+}
+
+// The lines of a remark payload that are a code block's own text, found from the HTML of the
+// same copy rather than from the Markdown. With escaping switched off, the Markdown alone is
+// ambiguous: "```js" typed as text and left without the space that would have made it a code
+// block looks exactly like a real fence, and peFenceTracker cannot tell — the real fence
+// further down then reads as its close, and the code after it as prose. The HTML has every
+// real code block as a <pre>, with its text. A block's lines are found where they appear
+// verbatim, under nothing but a container prefix (quote markers, indentation), between two
+// fence-shaped lines; searched in document order, each from where the last one ended.
+// Returns the set of line indexes, fences included.
+function peCodeLinesFromHtml(lines, html) {
+  const found = new Set();
+  const fence = /^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:`{3,}|~{3,})/;
+  const prefixOnly = /^(?:[ \t]*>)*[ \t]*$/;
+  const blocks = [];
+  const re = /<pre\b[^>]*>([\s\S]*?)<\/pre>/gi;
+  let m;
+  while ((m = re.exec(String(html == null ? "" : html)))) {
+    // Every trailing newline, not one: remark trims them all (hast-util-to-mdast's
+    // trimTrailingLines), so a block that ends on an empty line — Enter pressed at its end —
+    // never matched, and fell back to the tracker alone. An empty block is zero lines.
+    const text = peHtmlText(m[1]).replace(/\n+$/, "");
+    blocks.push(text === "" ? [] : text.split("\n"));
+  }
+  let from = 1;
+  for (const code of blocks) {
+    for (let i = from; i + code.length < lines.length; i++) {
+      if (!fence.test(lines[i - 1]) || !fence.test(lines[i + code.length])) continue;
+      const matches = code.every((c, j) => {
+        const l = lines[i + j];
+        return l.endsWith(c) && prefixOnly.test(l.slice(0, l.length - c.length));
+      });
+      if (!matches) continue;
+      for (let j = -1; j <= code.length; j++) found.add(i + j);
+      from = i + code.length + 1;
+      break;
+    }
+  }
+  return found;
+}
+
+// The text of an HTML fragment as a parser would give it: tags dropped, and the entities a
+// browser's serializer writes decoded. Enough for <pre><code> as ProseMirror writes it.
+function peHtmlText(fragment) {
+  const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0" };
+  return String(fragment)
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e) => {
+      if (e[0] === "#") {
+        const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        // Outside Unicode, String.fromCodePoint throws — and a throw here aborted the whole
+        // clean-up. Left as written instead.
+        return Number.isFinite(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : all;
+      }
+      return Object.prototype.hasOwnProperty.call(named, e.toLowerCase()) ? named[e.toLowerCase()] : all;
+    });
+}
+
+// A stateful reader over a remark payload, one line at a time: true for a fence line and for
+// every line between an opening fence and its close. Code always arrives fenced (measured:
+// remark fences even a block with no language), so fences are the whole of it — there is no
+// indented-code case to miss.
+//
+// Fences are read with their container prefixes taken off, because remark indents a fence by
+// whatever encloses it — measured on Plane's own pipeline, a code block inside a nested list
+// arrives as "  * ```" and one inside a quote as "> ```", and a pattern anchored at the line
+// start sees neither. Opening and closing are not normalized the same way, and the difference
+// is the point. An opener may carry a list marker, because that is where remark puts one; a
+// closer never does — the marker is not repeated on a list item's later lines, measured as
+// "  * ```" open and "    ```" closed. Strip a marker while looking for the close and a line of
+// code that happens to read "* ```" — a block documenting Markdown — ends the block early, and
+// the stripping resumes over what is still somebody's shell script. Whitespace here is
+// Markdown's too, spaces and tabs (see PE_MD_BLANK).
+//
+// A fence also ends with its container. Shift+Enter at the start of a list item followed by
+// "```" is typeable — the input rule does not see a block start after a break — and remark
+// drops the leading break, so "1. ```" arrives looking exactly like a real opener. It never
+// closes; the list item ends instead, and so does the code block, by CommonMark's rules. Read
+// without containers, it took the next real fence for its close and stripped the shell
+// continuations inside that one.
+//
+// And an opener only counts where a block can start: the top of the payload, or after a line
+// that ends a block (peBlockEnds). remark separates blocks with a blank line, so a real code
+// block always arrives there. Three backticks typed after a Shift+Enter do not — Plane's
+// input rule turns "```" into a code block only at the start of a paragraph, so after a hard
+// break they stay text, and remark writes them bare on the line after "\". Read as an
+// opener, they made the tracker's idea of inside and outside run backwards from there: the
+// real fence below was taken for a close, and the "\" inside it for a hard break.
+function peFenceTracker() {
+  // A line's container prefix, as remark writes it: blockquote markers ("> ", or ">" on an
+  // empty line), then — for the content of a list item — indentation. depth counts the
+  // markers; rest is what follows them, with its own indentation intact.
+  const depthOf = (line) => (/^(?:[ \t]*>)*/.exec(line)[0].match(/>/g) || []).length;
+  const restOf = (line) => line.replace(/^(?:[ \t]*>[ ]?)*/, "");
+  // Take off at most n quote markers. Inside a fence only the ones it was opened under are
+  // container; a ">" after them is the code's own — a shell prompt, a redirect, a quoted
+  // email — and reading it as a marker made the line look outdented and closed the fence
+  // mid-block.
+  const unquote = (line, n) => {
+    let rest = line;
+    let k = 0;
+    for (let m; k < n && (m = /^[ \t]*>[ ]?/.exec(rest)); k++) rest = rest.slice(m[0].length);
+    return { k, rest };
+  };
+  let char = ""; // the fence currently open, "`" or "~"
+  let len = 0;
+  let depth = 0; // the quote depth it was opened at
+  let indent = 0; // and the column its content starts at, list marker counted as indentation
+  let atBlockStart = true; // the previous line ended a block, or there was none
+  let prev; // the line before this one, for peBlockEnds's underline test
+  return (line) => {
+    const before = prev;
+    prev = line;
+    const rest = restOf(line);
+    if (char) {
+      // The fence ends with its container, whether or not it was closed. A non-blank line
+      // indented less than the fence's own content, or with fewer ">" than it was opened
+      // under, is outside the list item or the quote — CommonMark ends the code block there.
+      // Without this, a fence-shaped line that never closes (the next case below) took the
+      // next real opener for its close, and the code after that for prose.
+      const u = unquote(line, depth);
+      const left = u.k < depth || (!PE_MD_BLANK.test(u.rest) && /^[ \t]*/.exec(u.rest)[0].length < indent);
+      if (!left) {
+        const c = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(u.rest);
+        if (c && c[1][0] === char && c[1].length >= len) char = "";
+        atBlockStart = false;
+        return true;
+      }
+      // Out of the container, this line starts a block of its own if the one before ended
+      // one — so a real opener here counts. atBlockStart still holds the in-code false.
+      char = "";
+      atBlockStart = before === undefined || peBlockEnds(before);
+    }
+    // An info string ending in "\" is the line's own hard break, not a language: "```" typed
+    // at the start of a paragraph and followed by Shift+Enter stays text (the input rule wants
+    // a space), and remark writes it "```\". Read as an opener, it took the real fence below
+    // for its close and stripped the continuation inside it.
+    const f = atBlockStart ? /^([ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?)(`{3,}|~{3,})(.*)$/.exec(rest) : null;
+    atBlockStart = peBlockEnds(line, before);
+    if (!f || f[3].endsWith("\\")) return false;
+    char = f[2][0];
+    len = f[2].length;
+    depth = depthOf(line);
+    indent = f[1].length;
+    atBlockStart = false;
+    return true;
+  };
 }
 
 // Split a typed key on its LAST "-" into { proj, num } for the {{key.proj}} / {{key.num}}
