@@ -1399,38 +1399,6 @@ function peSourceDisplayName(src, entry) {
   return peSourceLabel(src && src.url);
 }
 
-// Read the rule-health record (chrome.storage.local). Absent is the normal state on a
-// fresh install and reads as "nothing known yet", which is what peRuleHealthState says
-// about an id it does not find.
-// Read/write the recently-opened list (chrome.storage.local).
-function peGetRecent() {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage.local.get(PE_RECENT_KEY, (res) => {
-        const r = res && res[PE_RECENT_KEY];
-        resolve(Array.isArray(r) ? r : []);
-      });
-    } catch (_) {
-      resolve([]);
-    }
-  });
-}
-
-function peSaveRecent(list) {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage.local.set({ [PE_RECENT_KEY]: list }, () => {
-        // A convenience list. A failed write costs one remembered jump, and there is nothing
-        // the reader could do about it, so it is swallowed rather than surfaced.
-        void (chrome.runtime && chrome.runtime.lastError);
-        resolve();
-      });
-    } catch (_) {
-      resolve();
-    }
-  });
-}
-
 // One object or array in chrome.storage.local, read and written the way every device-only
 // record here is: a read that fails is "nothing known yet", and a write that fails is
 // swallowed — these are advisory, and there is nothing the reader could do about it.
@@ -1460,6 +1428,15 @@ function peSetLocal(key, value) {
   });
 }
 
+// The recently-opened list. An array, so a missing or malformed record reads as [].
+function peGetRecent() {
+  return peGetLocalObject(PE_RECENT_KEY).then((v) => (Array.isArray(v) ? v : []));
+}
+function peSaveRecent(list) {
+  return peSetLocal(PE_RECENT_KEY, list);
+}
+// Absent is the normal state on a fresh install and reads as "nothing known yet", which is
+// what peRuleHealthState and peAnchorHealthState say about an id they do not find.
 function peGetRuleHealth() {
   return peGetLocalObject(PE_RULE_HEALTH_KEY);
 }

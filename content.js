@@ -95,10 +95,12 @@
   }
 
   /* ================================================================== */
-  /* 1a. Rule health — did each selector actually match anything?         */
+  /* 1a. Health — did each rule match, did each button find its place?   */
   /* ================================================================== */
   // The answer that was always one call away and never asked for. See peRuleHealthUpdate
   // in common.js for why this records "has it ever matched" rather than a per-page verdict.
+  // One sampler feeds two records: the style rules (recordRules) and the two buttons' DOM
+  // anchors (recordAnchors), on the same schedule and under the same hits-only rule.
   //
   // Timing is the whole difficulty: Plane is an SPA, so the URL changes before the list it
   // names has mounted, and a count taken at navigation time would score every route a miss.
@@ -109,22 +111,22 @@
   // only the fragment, and keying on location.href counted every such click as another page:
   // a rule that misses on work item pages piled up misses from one item and reached "never
   // matched" without twenty pages ever having been looked at. The same page looked at twice
-  // is not more evidence. Found on the anchor record first (see recordRuleHealth); the rules
+  // is not more evidence. Found on the anchor record first (see recordAnchors); the rules
   // had the same fault from the start.
-  let healthUrl = null;
+  let healthRoute = null;
   let healthTimer = null;
-  let anchorPage = null; // the route the anchors were last sampled on — see recordRuleHealth
+  let anchorPage = null; // the route the anchors were last sampled on — see recordAnchors
   const PE_HEALTH_DELAY = 2500;
 
-  function scheduleRuleHealth() {
+  function scheduleHealthSample() {
     if (!settings || !isActive()) return;
     const route = location.pathname + location.search;
-    if (route === healthUrl) return; // already counted this route
-    healthUrl = route;
+    if (route === healthRoute) return; // already counted this route
+    healthRoute = route;
     clearTimeout(healthTimer);
     healthTimer = setTimeout(() => {
       try {
-        recordRuleHealth();
+        recordHealth();
       } catch (_) {}
     }, PE_HEALTH_DELAY);
   }
@@ -159,13 +161,18 @@
     // probably still open.
     setTimeout(() => {
       try {
-        recordRuleHealth(true);
+        recordHealth(true);
       } catch (_) {}
     }, 400);
   }
 
-  function recordRuleHealth(hitsOnly) {
+  function recordHealth(hitsOnly) {
     if (!settings || !isActive()) return;
+    recordRules(hitsOnly);
+    recordAnchors(hitsOnly);
+  }
+
+  function recordRules(hitsOnly) {
     const rules = Array.isArray(settings.rules) ? settings.rules : [];
     const counts = {};
     rules.forEach((r) => {
@@ -190,6 +197,9 @@
         peSaveRuleHealth(peRuleHealthPrune(peRuleHealthUpdate(prev, counts, Date.now()), rules))
       );
     }
+  }
+
+  function recordAnchors(hitsOnly) {
     // The two DOM anchors, on the same schedule and under the same rules. Taken after the
     // inject bursts have had their say (this runs 2.5s past the route change; the last
     // burst is at 1.2s), so "no button" means the anchor was not found, not not looked for.
@@ -791,7 +801,7 @@
     // Last, and self-throttling: injectAll runs on every mutation burst, this runs once per
     // route. Hanging it here rather than on a navigation event is what makes it work on an
     // SPA that changes the URL without one.
-    scheduleRuleHealth();
+    scheduleHealthSample();
   }
   // setTimeout-based debounce (requestAnimationFrame pauses in background tabs, so it's avoided)
   function scheduleInject() {
@@ -1850,7 +1860,7 @@
       // Editing a rule is the one moment the reader is owed a fresh answer about it, and
       // refresh() is what a settings change calls. Forget which route was counted so the
       // edited selector is measured again on the page already in front of them.
-      healthUrl = null;
+      healthRoute = null;
       applyFocusClass();
       applyStyles();
       announceFocusOnce();
