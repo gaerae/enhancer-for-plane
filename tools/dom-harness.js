@@ -1172,6 +1172,19 @@ const suites = [
       const outside = fire("plain", { "text/plain": "첫째 줄" + BS + "\\n둘째 줄\\n", "text/html": HTML });
       check("a copy from outside any editor is none of our business", () => {
         eq(outside.getData("text/plain"), "첫째 줄" + BS + "\\n둘째 줄\\n");
+      });
+
+      // The case reported from use, end to end: a description whose last line holds only a
+      // non-breaking space. Every break above it was cleaned and the last one was not,
+      // because the line under it read as blank. The payload is what Plane's pipeline wrote.
+      const NBSP = String.fromCharCode(160);
+      payload = {
+        plain: "업무1" + BS + "\\n업무2" + BS + "\\n업무3" + BS + "\\n" + NBSP + "\\n",
+        html: "<p>업무1<br>업무2<br>업무3<br>" + NBSP + "</p>"
+      };
+      const lastLine = fire("cell");
+      check("the last line break is cleaned too when a non-breaking space follows it", () => {
+        eq(lastLine.getData("text/plain"), "업무1\\n업무2\\n업무3\\n" + NBSP + "\\n");
       });`
   },
   {

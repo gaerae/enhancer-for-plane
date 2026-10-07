@@ -1217,6 +1217,24 @@ test("copy: a fence is found under whatever encloses it, not only at the line st
   );
 });
 
+// Reported from use: every line break in a copied description came out clean except the
+// last, which kept its "\". Reproduced through Plane's own pipeline (root.ts and
+// marks-handler.ts, at the versions its catalog pins): the last line of the paragraph held
+// a single non-breaking space. remark treats U+00A0 as text, as CommonMark does, so the
+// break above it is real and written as one. The blank-line test used trim(), which strips
+// U+00A0 — so it read that line as blank and the break above as the author's.
+test("copy: a line holding only a non-breaking space is text, so the break above it is Plane's", () => {
+  const ctx = loadCommon();
+  const html = '<p class="editor-paragraph-block">업무1<br>업무2<br>업무3<br>\u00a0</p>';
+  const plain = "업무1\\\n업무2\\\n업무3\\\n\u00a0\n"; // what Plane's pipeline wrote for it
+  eq(ctx.peTidyCopiedText(plain, html), "업무1\n업무2\n업무3\n\u00a0\n", "the last break kept its backslash");
+  // The other Unicode spaces trim() takes are text to Markdown as well.
+  eq(ctx.peTidyCopiedText("a\\\n\u3000\n", "<p>a<br>\u3000</p>"), "a\n\u3000\n", "an ideographic space");
+  // And blank still means what it meant: spaces and tabs. An authored backslash ending a
+  // block is followed by one of those, and stays.
+  eq(ctx.peTidyCopiedText("경로 C:\\\n \t\n다음\\\n줄\n", "<p>a<br>b</p>"), "경로 C:\\\n \t\n다음\n줄\n");
+});
+
 test("copy: a backslash that ends a block is the author's — nothing ends on a hard break", () => {
   const ctx = loadCommon();
   // The payload that showed why the <br> count is not enough on its own: a table and a

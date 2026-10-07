@@ -1600,71 +1600,87 @@ function peMissingItemFields(format, item) {
 //
 // `html` is the text/html flavour of the SAME copy, and it is the evidence that the
 // backslash is Plane's and not the author's. Plane disables Markdown escaping, so a
-// backslash somebody typed reaches the clipboard bare and looks identical to a hard break;
-// two things separate them, and both were needed.
-//
-// One: a hard break is never the last thing in its block, so the line after it is never
-// empty. An authored "C:\" ending a paragraph is followed by a blank line, and that
-// is the shape this refuses.
-//
-// Two: a budget. Plane writes at most one backslash per <br>, so more candidates than <br>s
+// backslash somebody typed reaches the clipboard bare and looks identical to a hard break.
+// Three things separate them; peHardBreakLines holds the per-line two, and the budget here
+// is the third: Plane writes at most one backslash per <br>, so more candidates than <br>s
 // means at least one was typed and there is no telling which — leave the whole copy alone.
 // "At most" is doing work there: a <br> in a table cell becomes a space and a <br> ending a
-// block is dropped, so the count is a ceiling, never a quota to spend. Both failures point
-// the same way — a leftover "\" is what happens today, while deleting a character the author
+// block is dropped, so the count is a ceiling, never a quota to spend. Every guard fails the
+// same way — a leftover "\" is what happens today, while deleting a character the author
 // wrote is a new harm. Returns the new plain text, or null for "leave the clipboard alone".
 function peTidyCopiedText(plain, html) {
   const text = typeof plain === "string" ? plain : "";
   if (text.indexOf("\\\n") === -1) return null;
   const breaks = (String(html == null ? "" : html).match(/<br\b/gi) || []).length;
   if (!breaks) return null;
-
-  // Fence tracking reads the line with its container prefixes taken off. remark indents a
-  // fence by whatever encloses it — measured on Plane's own pipeline, a code block inside a
-  // nested list arrives as "  * ```" and one inside a quote as "> ```" — and a pattern
-  // anchored at the line start sees neither, then takes the "\" off "    docker run \" as
-  // if it were prose. Only fence detection is normalized; the backslash itself is judged on
-  // the line as written.
-  //
-  // Opening and closing are not normalized the same way, and the difference is the point.
-  // An opener may carry a list marker, because that is where remark puts one; a closer never
-  // does — the marker is not repeated on the continuation lines of a list item, measured as
-  // "  * ```" open and "    ```" closed. Strip a marker while looking for the close and a
-  // line of code that happens to read "* ```" — a fenced block documenting Markdown — ends
-  // the block early, and the stripping resumes over what is still somebody's shell script.
-  const quoted = (line) => line.replace(/^(?:\s*>)*\s*/, "");
-  const bare = (line) => quoted(line).replace(/^(?:[-*+]|\d+[.)])\s+/, "");
   const lines = text.split("\n");
-  let fenceChar = ""; // the fence currently open, "`" or "~"
-  let fenceLen = 0;
-  const hits = [];
-  // The last line is not followed by a newline, so a backslash there is not a hard break.
-  for (let i = 0; i < lines.length - 1; i++) {
-    // Inside a fence "docker run \" is a shell line continuation, not a hard break.
-    // Code always arrives fenced (measured: remark fences even a block with no language),
-    // so tracking fences is the whole of it — there is no indented-code case to miss.
-    if (fenceChar) {
-      const c = /^(`{3,}|~{3,})\s*$/.exec(quoted(lines[i]));
-      if (c && c[1][0] === fenceChar && c[1].length >= fenceLen) {
-        fenceChar = "";
-        fenceLen = 0;
-      }
-      continue;
-    }
-    const f = /^(`{3,}|~{3,})/.exec(bare(lines[i]));
-    if (f) {
-      fenceChar = f[1][0];
-      fenceLen = f[1].length;
-      continue;
-    }
-    // A block never ends on a hard break, so the line after one always has something on it.
-    if (!lines[i + 1].trim()) continue;
-    // A lone trailing backslash only. "a\\" is an escaped backslash the author wrote.
-    if (/(?:^|[^\\])\\$/.test(lines[i])) hits.push(i);
-  }
+  const hits = peHardBreakLines(lines);
   if (!hits.length || hits.length > breaks) return null;
   for (const i of hits) lines[i] = lines[i].slice(0, -1);
   return lines.join("\n");
+}
+
+// A blank line, as Markdown means it: nothing but spaces and tabs. Not JavaScript's trim(),
+// and not \s — both also take U+00A0 and the other Unicode spaces, which CommonMark treats as
+// text. That difference shipped: a description whose last line held only a non-breaking
+// space (what a spreadsheet or a web page tends to leave behind when pasted) came out of
+// remark as "line three\" over a line of one NBSP — a real hard break, correctly written —
+// and trim() read that line as blank, so the last "\" of every such copy stayed on the
+// clipboard while the ones above it were taken off.
+const PE_MD_BLANK = /^[ \t]*$/;
+
+// The indexes of the lines that end in a hard break Plane wrote, in a remark payload split
+// on "\n". Two per-line tests, both from the shape remark gives a real one:
+//   - it is followed by more of the same block, so the next line is not blank. A hard break
+//     is never the last thing in its block; an authored "C:\" ending a paragraph is followed
+//     by the blank line between blocks, and that is the shape refused. The last line of the
+//     payload is never a candidate for the same reason — nothing follows it.
+//   - it ends in exactly one backslash. "a\\" is an escaped backslash somebody typed.
+// Lines inside a code fence are never candidates: there "docker run \" is a shell line
+// continuation, and peFenceTracker says which lines those are.
+function peHardBreakLines(lines) {
+  const inCode = peFenceTracker();
+  const hits = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (inCode(lines[i])) continue;
+    if (PE_MD_BLANK.test(lines[i + 1])) continue;
+    if (/(?:^|[^\\])\\$/.test(lines[i])) hits.push(i);
+  }
+  return hits;
+}
+
+// A stateful reader over a remark payload, one line at a time: true for a fence line and for
+// every line between an opening fence and its close. Code always arrives fenced (measured:
+// remark fences even a block with no language), so fences are the whole of it — there is no
+// indented-code case to miss.
+//
+// Fences are read with their container prefixes taken off, because remark indents a fence by
+// whatever encloses it — measured on Plane's own pipeline, a code block inside a nested list
+// arrives as "  * ```" and one inside a quote as "> ```", and a pattern anchored at the line
+// start sees neither. Opening and closing are not normalized the same way, and the difference
+// is the point. An opener may carry a list marker, because that is where remark puts one; a
+// closer never does — the marker is not repeated on a list item's later lines, measured as
+// "  * ```" open and "    ```" closed. Strip a marker while looking for the close and a line of
+// code that happens to read "* ```" — a block documenting Markdown — ends the block early, and
+// the stripping resumes over what is still somebody's shell script. Whitespace here is
+// Markdown's too, spaces and tabs (see PE_MD_BLANK).
+function peFenceTracker() {
+  const quoted = (line) => line.replace(/^(?:[ \t]*>)*[ \t]*/, "");
+  const bare = (line) => quoted(line).replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "");
+  let char = ""; // the fence currently open, "`" or "~"
+  let len = 0;
+  return (line) => {
+    if (char) {
+      const c = /^(`{3,}|~{3,})[ \t]*$/.exec(quoted(line));
+      if (c && c[1][0] === char && c[1].length >= len) char = "";
+      return true;
+    }
+    const f = /^(`{3,}|~{3,})/.exec(bare(line));
+    if (!f) return false;
+    char = f[1][0];
+    len = f[1].length;
+    return true;
+  };
 }
 
 // Split a typed key on its LAST "-" into { proj, num } for the {{key.proj}} / {{key.num}}

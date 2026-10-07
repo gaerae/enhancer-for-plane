@@ -10,6 +10,28 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.11.0 — 2026-10-07
+
+Schema unchanged.
+
+### Fixed
+- **The last line break of a copied description no longer keeps its `\` when a
+  non-breaking space follows it.** Every line break above it was cleaned and the last one kept
+  its backslash (shown as `₩` in Korean Windows fonts). The description's last line held only a
+  non-breaking space (U+00A0). remark, like CommonMark, treats that as text, so the break above
+  it is a real hard break and is written as one; but the check for "the next line is blank"
+  used JavaScript's `trim()`, which also strips U+00A0, and read the line as blank. Blank now
+  means spaces and tabs only, which is also how the fence detection reads indentation.
+  Reproduced through Plane's own Markdown conversion at the library versions it pins, and
+  pinned with that payload in the value tests and the browser suite.
+
+### Internal
+- `peTidyCopiedText` is split into the budget check, `peHardBreakLines` (the per-line
+  tests) and `peFenceTracker` (which lines are code). No behaviour change beyond the fix
+  above; each guard still fails a check of its own when removed.
+
+---
+
 ## v1.10.0 — 2026-10-06
 
 Schema unchanged.
