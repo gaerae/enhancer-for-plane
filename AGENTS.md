@@ -431,7 +431,7 @@ lies:
   page after the release exists rather than guessing before it does. With drafts, "exists"
   means published: the date that counts is the day someone pressed Publish.
 
-- **`.github/` holds two files besides the workflows, and everything else GitHub's
+- **`.github/` holds three files besides the workflows, and everything else GitHub's
   community checklist asks for is absent on purpose.** All of it was written and then
   removed rather than left to rot; the reasoning is here so the next empty row on the
   community-standards page does not restart the argument. The test each one failed is the
@@ -442,7 +442,11 @@ lies:
   versions, and what Settings says about the rule — the fields that actually separate "this
   selector does not fit Cloud" from "you never switched it on", which is the confusion that
   let two presets sit dead for a release. **`config.yml`**, which keeps an exploitable bug
-  off the public tracker and sends Plane's own bugs to Plane.
+  off the public tracker and sends Plane's own bugs to Plane. **`dependabot.yml`**, for the
+  workflows' actions and nothing else, because the test above does not apply to it: it
+  answers no reader's question, so it has nothing to drift from. It was added when CI had
+  been running `actions/*@v4` on Node 20 after both were superseded, which nothing in the
+  repo could have said.
 
   What is not: a **feature-request form**, which would gate the rarest input behind a
   question most people cannot answer. **`CONTRIBUTING.md`**, written as a pointer here and
@@ -451,7 +455,8 @@ lies:
   hour. A **code of conduct**, which for one contributor promises a process that does not
   exist; the draft's own main content was a disclaimer saying so. **`SECURITY.md`**, whose
   working part is a private channel, and that is a repo setting rather than a document —
-  turn on private vulnerability reporting and the button exists without the prose.
+  private vulnerability reporting is on (since 2026-10-30; it was off for the whole time
+  this paragraph said it was the answer), so the button exists without the prose.
   A **pull-request template**, which for a solo repo restates a checklist that is already
   here and that every agent working in this repo already has loaded.
 

@@ -1,0 +1,12 @@
+# The workflows' actions only. There is no package.json, so there is nothing else for
+# Dependabot to read. The actions ran on Node 20 past its end of life because nothing
+# in this repo said a newer major existed; this is what says it now.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

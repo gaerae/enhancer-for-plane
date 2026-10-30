@@ -24,7 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          # The release is made through the API with GH_TOKEN; nothing pushes with git.
+          persist-credentials: false
 
       - name: Read version from manifest
         id: ver
@@ -34,15 +37,16 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           # Listed rather than looked up by tag: a draft has no tag until it is
           # published, and the by-tag endpoint does not return drafts, so a lookup
           # would miss the draft this workflow made on the last run and cut another.
           # The list does include drafts for a token that can push, which this one can.
-          tag="v${{ steps.ver.outputs.version }}"
-          if gh api "repos/${{ github.repository }}/releases" --paginate --jq ".[].tag_name" | grep -qx "$tag"; then
+          tag="v${VERSION}"
+          if gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq ".[].tag_name" | grep -qx "$tag"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::v${{ steps.ver.outputs.version }} already released — skipping."
+            echo "::notice::${tag} already released — skipping."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
@@ -68,14 +72,14 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           gh release create "v${VERSION}" "$ZIP" \
-            --target "${{ github.sha }}" \
+            --target "${GITHUB_SHA}" \
             --title "Enhancer for Plane v${VERSION}" \
             --generate-notes \
             --draft
 
       - name: Upload build artifact
         if: steps.check.outputs.exists == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: enhancer-for-plane-${{ steps.ver.outputs.version }}
           path: ${{ env.ZIP }}
