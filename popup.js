@@ -9,8 +9,14 @@
   let currentTabUrl = "";
   let currentTabTitle = "";
   let recent = [];
+  // The status line has more than one writer, and Re-scan's answer arrives a refresh and a
+  // quarter of a second after it was asked for. Every writer moves this on; Re-scan's reply
+  // only lands if nothing has since — otherwise switching the extension off mid-scan reads
+  // "off" for an instant and then a green "ready" from the scan that was already out.
+  let statusQuery = 0;
 
   function updateDomainStatus() {
+    ++statusQuery;
     const statusEl = $("domainStatus");
     const addBtn = $("addDomain");
     const pickBtn = $("pickEl");
@@ -311,10 +317,13 @@
     $("rescan").addEventListener("click", () => {
       if (currentTabId == null) return;
       const statusEl = $("domainStatus");
+      const mine = ++statusQuery;
       statusEl.textContent = peMsg("popRescanning");
       statusEl.className = "pop-status";
       try {
         chrome.tabs.sendMessage(currentTabId, { type: "pe-rescan" }, (resp) => {
+          void chrome.runtime.lastError; // read before the early return, or Chrome logs it unchecked
+          if (mine !== statusQuery) return; // the line has said something newer since
           if (chrome.runtime.lastError || !resp) {
             statusEl.textContent = peMsg("popNotLoaded");
             statusEl.className = "pop-status off";
@@ -353,6 +362,7 @@
           if (!granted) {
             state.domains = (state.domains || []).filter((d) => d !== currentHost);
             peSaveSettings(state);
+            ++statusQuery;
             const statusEl = $("domainStatus");
             statusEl.textContent = peMsg("popPermNeeded", [currentHost]);
             statusEl.className = "pop-status off";

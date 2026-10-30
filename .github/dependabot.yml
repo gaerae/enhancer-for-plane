@@ -1,0 +1,19 @@
+# The workflows' actions only. There is no package.json, so there is nothing else for
+# Dependabot to read. The actions ran on Node 20 past its end of life because nothing
+# in this repo said a newer major existed; this is what says it now.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    # weekly is what GitHub's own starter file writes; interval cannot be left out.
+    schedule:
+      interval: weekly
+    # A version is proposed only once it has been out for 7 days, so a release that is
+    # pulled or turns out compromised in its first week never reaches a PR here. Security
+    # updates ignore this and arrive at once. Actions cannot take per-semver cooldowns
+    # (semver-*-days are "Not supported" for github-actions), so one number covers all.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
