@@ -296,6 +296,25 @@ for (const f of SHIPPED) {
   }
 }
 
+/* 9. Every action is pinned to a commit, with the version it was named in a comment.
+   A tag is a pointer its owner can move, so `@v7` runs whatever that tag says today, with
+   this repo's token, on the workflow that cuts the release. The comment is not decoration:
+   it is what Dependabot rewrites alongside the SHA, and without one a pin reads as a hash
+   nobody can place. */
+const WORKFLOWS = ".github/workflows";
+for (const name of fs.readdirSync(path.join(ROOT, WORKFLOWS))) {
+  if (!/\.ya?ml$/.test(name)) continue;
+  const file = `${WORKFLOWS}/${name}`;
+  const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split("\n");
+  lines.forEach((line, i) => {
+    const uses = line.match(/^\s*(?:-\s*)?uses:\s*(\S+)(.*)$/);
+    if (!uses) return;
+    if (!/@[0-9a-f]{40}$/.test(uses[1]) || !/#\s*v\d+\.\d+\.\d+/.test(uses[2])) {
+      err(file, i + 1, `"${uses[1]}" must be pinned as owner/repo@<40-hex sha> # vX.Y.Z`);
+    }
+  });
+}
+
 for (const e of errors) console.log(`  ERROR ${e}`);
 console.log(`\nsource: ${SHIPPED.length} shipped files · ${errors.length} error(s)`);
 process.exit(errors.length ? 1 : 0);
