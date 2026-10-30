@@ -435,14 +435,26 @@ lies:
   page after the release exists rather than guessing before it does. With drafts, "exists"
   means published: the date that counts is the day someone pressed Publish.
 
-- **`.github/` holds three files besides the workflows, and everything else GitHub's
-  community checklist asks for is absent on purpose.** All of it was written and then
-  removed rather than left to rot; the reasoning is here so the next empty row on the
-  community-standards page does not restart the argument. The test each one failed is the
-  same: 118 commits by one author and no issue or PR from anyone else, so a file that
-  answers a question nobody has asked is a file that will drift instead of help.
+- **`.github/` holds three files besides the workflows, `SECURITY.md` sits at the root, and
+  everything else GitHub's community checklist asks for is absent on purpose.** All of it was
+  written and then removed rather than left to rot — twice, the second time a day after a
+  pass that filled the checklist to 100% — and the reasoning is here so the next empty row on
+  the community-standards page does not restart the argument. The test each one failed is the
+  same: one author and no issue or PR from anyone else, so a file that answers a question
+  nobody has asked is a file that will drift instead of help. The second round drifted inside
+  a day: its CONTRIBUTING.md and PR template forbade the manifest bump every feature PR makes,
+  asked for an `[Unreleased]` section CHANGELOG has never had, and named a Node version CI
+  was leaving. An empty row costs nothing — measured 2026-10-30 across eight open-source
+  browser extensions, the community score ran 50–75%, and the only two with a code of conduct
+  have a team behind them.
 
-  What is there: **`ISSUE_TEMPLATE/bug_report.yml`**, which asks which Plane, which
+  What is there: **`SECURITY.md`**, because the private channel is a repo setting (on since
+  2026-10-30) but the file is what the Security tab shows a stranger deciding how to report:
+  which version counts, which door to use, and that one person answers. This extension has
+  host access to people's work trackers, so that is the one question worth answering before
+  it is asked. It holds no rule of this repo, and what the extension touches is a link to
+  `PRIVACY.md` rather than a second account of it — the version that restated it called every
+  granted host a Plane host. **`ISSUE_TEMPLATE/bug_report.yml`**, which asks which Plane, which
   versions, and what Settings says about the rule — the fields that actually separate "this
   selector does not fit Cloud" from "you never switched it on", which is the confusion that
   let two presets sit dead for a release. **`config.yml`**, which keeps an exploitable bug
@@ -457,12 +469,10 @@ lies:
   already restating the four checks and five review rules before its own commit was
   finished — this file's warning about two documents that almost agree, happening inside an
   hour. A **code of conduct**, which for one contributor promises a process that does not
-  exist; the draft's own main content was a disclaimer saying so. **`SECURITY.md`**, whose
-  working part is a private channel, and that is a repo setting rather than a document —
-  private vulnerability reporting is on (since 2026-10-30; it was off for the whole time
-  this paragraph said it was the answer), so the button exists without the prose.
-  A **pull-request template**, which for a solo repo restates a checklist that is already
-  here and that every agent working in this repo already has loaded.
+  exist; the draft's own main content was a disclaimer saying so. A **pull-request
+  template**, which for a solo repo restates a checklist that is already here and that every
+  agent working in this repo already has loaded — and which `gh pr create --body` never shows
+  anyway.
 
 - **Zero dependencies.** No `package.json`, no build step. Plain scripts loaded by the
   browser; `tools/` runs on stock node. Adding the first dependency is a project
