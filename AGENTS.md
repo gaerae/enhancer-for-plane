@@ -302,8 +302,12 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   mode is on, and shows the switch when the tab says yes. Flip the master switch off while that
   reply is in flight and it lands anyway — putting a Focus mode control on screen underneath a
   status line reading "the extension is off". Number the question and drop replies to older
-  ones. Every `chrome.tabs.sendMessage` from the popup has this shape; the one that writes the
-  status line (Re-scan) can overwrite a newer status the same way.
+  ones. Every `chrome.tabs.sendMessage` from the popup has this shape. The one that writes the
+  status line (Re-scan) overwrote a newer status the same way until it was numbered too
+  (`statusQuery`): its reply comes a refresh and 250ms after the click, and switching the
+  extension off in that window left a green "ready" under the switch. The counter belongs to
+  the *line*, not to the message — every writer of the line moves it, not just the one that
+  asks the tab, or the writer that did not is the one a late reply overwrites.
 - **A percentage in `padding` measures the containing block, not the element.** The
   reading-width preset centres a column with `padding-inline: max(2.25rem, (100% - 60rem) / 2)`,
   which is right in Plane (the column is the flex child filling its parent) — but the first

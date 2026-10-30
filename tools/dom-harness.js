@@ -2846,6 +2846,37 @@ const suites = [
       });`
   },
   {
+    // Re-scan answers after a refresh and a 250ms settle, so the status line it writes can
+    // have moved on by then. The same shape as the focus switch above, on the other writer.
+    name: "popup · a re-scan that lands late",
+    page: { name: "pop-rescan", ...POPUP, seed: seedOf() },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const status = () => document.getElementById("domainStatus");
+      const master = document.getElementById("enabled");
+      const answer = { ok: true, active: true, buttons: 1 };
+      // The control first: with nothing in between, the reply is what the line shows. Without
+      // this the case below would pass on a popup that ignored every reply.
+      chrome.tabs.sendMessage = (id, msg, cb) => { if (msg.type === "pe-rescan") cb(answer); };
+      document.getElementById("rescan").click();
+      check("a reply to the latest question is shown", () => {
+        eq(status().textContent, peMsg("popRescanReady"));
+        ok(/\\bon\\b/.test(status().className), "class: " + status().className);
+      });
+      const held = [];
+      chrome.tabs.sendMessage = (id, msg, cb) => { if (msg.type === "pe-rescan") held.push(() => cb(answer)); };
+      document.getElementById("rescan").click();
+      await waitFor(() => held.length, "the re-scan to go out");
+      master.checked = false;
+      master.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => status().textContent === peMsg("popDisabled"), "the line to say the extension is off");
+      held.forEach((reply) => reply());
+      check("a re-scan that lands after the switch went off does not overwrite it", () => {
+        eq(status().textContent, peMsg("popDisabled"), "the late reply wrote over a newer status");
+        ok(/\\boff\\b/.test(status().className), "class: " + status().className);
+      });`
+  },
+  {
     // The popup is 260px wide, so nearly every Korean string in it wraps — the surface where
     // breaking an 어절 in half is most likely and least visible to anyone reading English.
     name: "popup · korean line breaking",
