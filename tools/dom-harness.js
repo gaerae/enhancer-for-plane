@@ -265,8 +265,32 @@ function buildPlanePage({ name, seed, local, lang, plane, body }) {
 
 // How long one Chrome launch may take before it counts as hung, not slow.
 const LAUNCH_TIMEOUT_MS = 30000;
+// A launch that hangs is tried once more, and only a hang: every other launch error is about
+// the machine or the flags and would fail the same way twice. Measured: in the first five
+// runs on CI's Ubuntu 26 runner one page hung once (`pop-tall`) and passed on the re-run, and
+// locally, with other headless Chromes busy on the machine, a different five or six pages
+// hung on each run. A retry still runs every assertion, so it cannot turn "ran nothing" into a pass
+// — and each one is printed in the summary, so a page that starts needing it is visible.
+const LAUNCH_ATTEMPTS = 2;
+const retried = [];
 let launch = 0;
+// execFileSync reports its own timeout as code ETIMEDOUT and leaves `killed` unset — the
+// check used to read `killed`, so a hang was reported as "spawnSync … ETIMEDOUT" and the
+// message written for it never appeared.
+const isLaunchTimeout = (e) => !!e && (e.code === "ETIMEDOUT" || e.killed === true);
 function run(chrome, page, hash) {
+  let last = null;
+  for (let attempt = 1; attempt <= LAUNCH_ATTEMPTS; attempt++) {
+    const r = launchOnce(chrome, page, hash);
+    if (!r.timedOut) {
+      if (attempt > 1) retried.push(path.basename(page));
+      return r.results;
+    }
+    last = r;
+  }
+  return last.results;
+}
+function launchOnce(chrome, page, hash) {
   const url = fileUrl(page) + (hash || "");
   let dom = "";
   try {
@@ -307,9 +331,15 @@ function run(chrome, page, hash) {
   } catch (e) {
     // The message reads the constant rather than restating it: it said 60s while the timeout
     // was 30s, which sends whoever hits it looking for a hang twice as long as the real one.
-    const why = e && e.killed ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : String(e.message).slice(0, 200);
-    return [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail: why }];
+    const timedOut = isLaunchTimeout(e);
+    const why = timedOut
+      ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s, ${LAUNCH_ATTEMPTS} times`
+      : String(e.message).slice(0, 200);
+    return { timedOut, results: [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail: why }] };
   }
+  return { timedOut: false, results: readResults(page, dom) };
+}
+function readResults(page, dom) {
   const m = dom.match(/<pre id="pe-results">([\s\S]*?)<\/pre>/);
   if (!m) {
     return [{ name: `${path.basename(page)} — no results`, pass: false, detail: "the page never reported; it probably threw before reporting" }];
@@ -2983,6 +3013,8 @@ try {
 }
 console.log(
   `\ndom: ${results.length - failed.length} passed, ${failed.length} failed, ${results.length} total` +
-    ` · ${suites.length} page(s) in ${path.basename(chrome)}\n`
+    ` · ${suites.length} page(s) in ${path.basename(chrome)}` +
+    (retried.length ? ` · ${retried.length} launch(es) retried after a hang: ${retried.join(", ")}` : "") +
+    "\n"
 );
 process.exit(failed.length || hardError ? 1 : 0);
