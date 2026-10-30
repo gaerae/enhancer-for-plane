@@ -265,8 +265,55 @@ function buildPlanePage({ name, seed, local, lang, plane, body }) {
 
 // How long one Chrome launch may take before it counts as hung, not slow.
 const LAUNCH_TIMEOUT_MS = 30000;
+// A launch that hangs is tried once more, and only a hang, because a hang is the failure
+// measured to pass on a second try: in the first five runs on CI's Ubuntu 26 runner one page
+// hung once (`pop-tall`) and passed on the re-run. Locally a different five or six launches
+// per run failed another way — a non-zero exit, "Command failed" — while other headless
+// Chromes were busy on the machine; that did not come back in a logged full run or in twenty
+// launches on their own, so nobody knows what it is, and a retry for an uncharacterised
+// failure would only hide it. A retry still runs every assertion, so it cannot turn "ran
+// nothing" into a pass.
+const LAUNCH_ATTEMPTS = 2;
+// Retries are for a stray hang, not for a run where everything hangs — PE_CHROME_PROFILE on
+// macOS is that run (see below), and doubling it would turn a ~48-minute failure into a
+// ~97-minute one. After this many, a hang fails on its first attempt like it always did.
+const MAX_RETRIES_PER_RUN = 3;
+// A pause before the retry, because the hangs were measured under load and an immediate
+// relaunch walks straight back into it. It is not about leftovers: on macOS a Chrome killed
+// mid-page left no helper process behind, under SIGTERM or SIGKILL, at 0, 2 and 7 seconds.
+// Linux was not measured. Capped by the line above, so it costs at most a few seconds a run.
+const RETRY_PAUSE_MS = 2000;
+const retried = [];
+const stalled = []; // dumped the page, then hung on exit — read, not relaunched
+// Retries spent, not retries that worked: in the run where everything hangs, none of them
+// work, and counting successes would never reach the cap it exists for.
+let retriesSpent = 0;
 let launch = 0;
-function run(chrome, page, hash) {
+// execFileSync reports its own timeout as code ETIMEDOUT. It has no `killed` field — that is
+// the async API's — and the check used to read it, so a hang printed "spawnSync … ETIMEDOUT"
+// and never the message written for it.
+const isLaunchTimeout = (e) => !!e && e.code === "ETIMEDOUT";
+const pauseSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function run(chrome, page, hash, label) {
+  const attempts = [];
+  for (;;) {
+    const r = launchOnce(chrome, page, hash);
+    attempts.push(r);
+    const canRetry = attempts.length < LAUNCH_ATTEMPTS && retriesSpent < MAX_RETRIES_PER_RUN;
+    if (!r.timedOut || !canRetry) break;
+    retriesSpent++;
+    pauseSync(RETRY_PAUSE_MS);
+  }
+  const last = attempts[attempts.length - 1];
+  // A retry that passed is recorded against the suite, the name the FAIL lines use; one that
+  // did not is a failure and says what each attempt did, counted here rather than assumed.
+  if (attempts.length > 1 && !last.error) retried.push(label);
+  if (attempts.some((a) => a.stalled)) stalled.push(label);
+  if (!last.error) return last.results;
+  const detail = attempts.map((a) => a.error).join("; then ");
+  return [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail }];
+}
+function launchOnce(chrome, page, hash) {
   const url = fileUrl(page) + (hash || "");
   let dom = "";
   try {
@@ -301,15 +348,29 @@ function run(chrome, page, hash) {
         // A browser that never exits would otherwise stall the run with no output at all —
         // the failure mode that looks exactly like a pass. A good launch takes about three
         // seconds, so anything past thirty is broken, not slow: kill it and report it.
-        timeout: LAUNCH_TIMEOUT_MS
+        timeout: LAUNCH_TIMEOUT_MS,
+        // SIGKILL, because spawnSync waits for the child to exit after signalling it: a Chrome
+        // wedged badly enough to ignore SIGTERM would block here forever, and the timeout
+        // would never get as far as reporting anything.
+        killSignal: "SIGKILL"
       }
     );
   } catch (e) {
+    const timedOut = isLaunchTimeout(e);
+    // A Chrome that dumped the page and then stalled on its way out has already done the
+    // work: the timeout error carries what it wrote. Read that before calling it a hang.
+    const partial = timedOut && typeof e.stdout === "string" ? e.stdout : "";
+    if (/<pre id="pe-results">[\s\S]*?<\/pre>/.test(partial)) {
+      return { timedOut: false, stalled: true, results: readResults(page, partial) };
+    }
     // The message reads the constant rather than restating it: it said 60s while the timeout
     // was 30s, which sends whoever hits it looking for a hang twice as long as the real one.
-    const why = e && e.killed ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : String(e.message).slice(0, 200);
-    return [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail: why }];
+    const error = timedOut ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : String(e.message).slice(0, 200);
+    return { timedOut, error };
   }
+  return { timedOut: false, results: readResults(page, dom) };
+}
+function readResults(page, dom) {
   const m = dom.match(/<pre id="pe-results">([\s\S]*?)<\/pre>/);
   if (!m) {
     return [{ name: `${path.basename(page)} — no results`, pass: false, detail: "the page never reported; it probably threw before reporting" }];
@@ -2994,7 +3055,7 @@ if (!chrome) {
 for (const suite of suites) {
   const build = suite.page.plane ? buildPlanePage : buildPage;
   const page = build({ ...suite.page, body: suite.body });
-  for (const r of run(chrome, page, suite.hash)) {
+  for (const r of run(chrome, page, suite.hash, suite.name)) {
     results.push({ ...r, suite: suite.name });
   }
 }
@@ -3002,6 +3063,18 @@ for (const suite of suites) {
 const failed = results.filter((r) => !r.pass);
 for (const r of results) {
   if (!r.pass) console.log(`  FAIL  ${r.suite} — ${r.name}\n          ${r.detail}`);
+}
+// A hang that was absorbed is not a failure, and it is not nothing either: a page that starts
+// hanging on its first launch every run would otherwise ride a green check, paying 30s a run,
+// in a log nobody opens because it passed. So each one is a line of its own here and, in
+// GitHub Actions, a warning annotation — which shows on the run's summary page, green or not.
+const hangs = [
+  ...retried.map((s) => [s, "Chrome hung and the page passed on a second launch"]),
+  ...stalled.map((s) => [s, "Chrome hung after dumping the page; its results were read from the killed launch"])
+];
+for (const [suite, what] of hangs) {
+  console.log(`  WARN  ${suite} — ${what}`);
+  if (process.env.GITHUB_ACTIONS) console.log(`::warning title=DOM harness hang::${suite} — ${what}`);
 }
 if (!results.length) {
   hardError = "no assertions ran at all";
@@ -3014,6 +3087,8 @@ try {
 }
 console.log(
   `\ndom: ${results.length - failed.length} passed, ${failed.length} failed, ${results.length} total` +
-    ` · ${suites.length} page(s) in ${path.basename(chrome)}\n`
+    ` · ${suites.length} page(s) in ${path.basename(chrome)}` +
+    (hangs.length ? ` · ${hangs.length} hang(s) absorbed, see WARN above` : "") +
+    "\n"
 );
 process.exit(failed.length || hardError ? 1 : 0);
