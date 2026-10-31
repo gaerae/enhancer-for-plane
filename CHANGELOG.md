@@ -10,6 +10,51 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.12.0 — 2026-10-31
+
+Schema unchanged.
+
+### New
+- **Right-click opens every key in a selection.** The menu entry read the first key out of
+  what was selected and dropped the rest, so a release note or a chat message listing five
+  items opened one. Each key now opens in its own tab through its own target, up to 10 at a
+  time; the first comes to the front and the rest wait behind it, so a selection of one works
+  as it did. A key that cannot open does not stop the others, and Settings opens only when
+  none could. The entry is now called **Open work items from selection**. Anything key-shaped
+  counts, so `UTF-8` in a selection opens a tab that goes nowhere; that was already true when
+  it came first.
+- **Pin the work items you keep returning to.** On a work item's tab, **Pin** at the end of
+  the popup's item line keeps it above the recents, with its title, until you take it off.
+  Recents roll off after twelve jumps and never held an item reached by clicking inside the
+  tracker, which is how most items are reached. Six at most, on this device only. A full list
+  refuses a seventh rather than dropping a pin, and **Restore defaults** clears them on the
+  save that follows.
+
+### Improved
+- **The popup's item line shows with no copy format too**, because it now also holds the pin.
+- **The jump box has 4px more room**, which is what its placeholder needs when the popup
+  scrolls.
+
+### Fixed
+- **Switching the extension off right after Re-scan no longer shows a green "ready" under
+  it.** The scan answers a refresh and 250ms after the click, and that late answer overwrote
+  the newer status.
+
+### Internal
+- **The template menu is finally opened in a real browser.** Nothing had: the anchors were
+  proved and the menu was not. `ct-menu` drives the rows, the filter, a sync landing under an
+  open menu, the insert into title and body, and Alt+T on the focused editor, on a page with
+  two editors.
+- **The harness says what a failed Chrome launch reported**, and retries a hung launch once
+  and names it. The local failures that prompted this have not been reproduced, and their
+  cause is still unknown.
+- **Supply chain.** Every action is pinned to a commit and `check-source.js` keeps it so;
+  Actions may run only GitHub's own; published releases are immutable; Dependabot updates the
+  workflows after a seven-day cooldown; CI runs on Node 24 with read-only permissions.
+- `SECURITY.md` is kept and shortened, and the files that restated `AGENTS.md` are gone.
+
+---
+
 ## v1.11.0 — 2026-10-07
 
 Schema unchanged.
