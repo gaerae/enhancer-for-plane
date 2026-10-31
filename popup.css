@@ -259,6 +259,79 @@ input:checked + .switch::after {
   white-space: nowrap;
   color: var(--muted);
 }
+/* What you keep coming back to. Rows rather than chips: a pin has a title, because it may be
+   weeks since you opened it and the key alone will not say what it was. */
+.pop-pins {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 7px;
+}
+.pop-pins[hidden] {
+  display: none;
+}
+.pop-pin {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.pop-pin-open {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.pop-pin-open:hover {
+  border-color: var(--accent);
+}
+/* The title gives way, never the key: left to shrink, a key breaks at its hyphen. */
+.pop-pin-open .pop-recent-key {
+  flex: none;
+  white-space: nowrap;
+}
+.pop-pin-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pop-pin-remove {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pop-pin-remove:hover {
+  color: var(--text);
+}
+.pop-btn.pop-pin-toggle {
+  margin: 7px 0 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.pop-btn.pop-pin-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
 .pop-copy-block[hidden] {
   display: none;
 }

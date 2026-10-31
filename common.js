@@ -1435,6 +1435,12 @@ function peGetRecent() {
 function peSaveRecent(list) {
   return peSetLocal(PE_RECENT_KEY, list);
 }
+function peGetPins() {
+  return peGetLocalObject(PE_PINS_KEY).then(pePinsClean);
+}
+function peSavePins(list) {
+  return peSetLocal(PE_PINS_KEY, list);
+}
 // Absent is the normal state on a fresh install and reads as "nothing known yet", which is
 // what peRuleHealthState and peAnchorHealthState say about an id they do not find.
 function peGetRuleHealth() {
@@ -2352,6 +2358,47 @@ function peRecentMatches(list, text) {
   return (Array.isArray(list) ? list : [])
     .filter((r) => r && typeof r === "object" && r.key && r.url)
     .filter((r) => !q || String(r.key).toLowerCase().indexOf(q) === 0);
+}
+
+// The items someone keeps coming back to, kept on the popup. Recents cannot do this: they
+// roll off after twelve jumps, and an item reached by clicking around inside the tracker is
+// never in them at all — so a pin is taken from the tab, not from the list above it.
+//
+// Per device, like the recents, for the same reason and one more. Settings would give it a
+// second writer on a form that saves whole snapshots (see `knownDomains`), for a list that
+// names what you are working on.
+const PE_PINS_KEY = "pePins";
+const PE_MAX_PINS = 6;
+const PE_MAX_PIN_TITLE = 120; // the title is the tab's, so a page wrote it
+
+// An entry is { key, url, name, title }, or null when it could not be opened again. The
+// address is the identity: one key on two trackers is two items.
+function pePinEntry(e) {
+  const o = e && typeof e === "object" ? e : {};
+  const key = String(o.key == null ? "" : o.key).trim();
+  const url = String(o.url == null ? "" : o.url).trim();
+  if (!key || !peIsHttpUrl(url)) return null;
+  return {
+    key,
+    url,
+    name: String(o.name == null ? "" : o.name),
+    title: String(o.title == null ? "" : o.title).slice(0, PE_MAX_PIN_TITLE)
+  };
+}
+function pePinsClean(list) {
+  return (Array.isArray(list) ? list : []).map(pePinEntry).filter(Boolean).slice(0, PE_MAX_PINS);
+}
+function peIsPinned(list, url) {
+  return pePinsClean(list).some((p) => p.url === url);
+}
+// Oldest first, so a pin keeps its place. A full list refuses rather than dropping one: a pin
+// is a decision somebody made, and pinning a seventh does not unmake the first.
+function pePinToggle(list, entry) {
+  const pins = pePinsClean(list);
+  const e = pePinEntry(entry);
+  if (!e) return pins;
+  if (pins.some((p) => p.url === e.url)) return pins.filter((p) => p.url !== e.url);
+  return pins.length < PE_MAX_PINS ? pins.concat(e) : pins;
 }
 
 // Does this look like an API endpoint rather than a page a person should land on?

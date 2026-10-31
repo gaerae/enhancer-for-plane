@@ -34,6 +34,7 @@ Plane Cloud and self-hosted alike, and only on the domains you enable.
 |---|---|---|
 | **Open an item by key** | Address bar: `issue` ␣ `PROJ-123` · toolbar popup · right-click a key in any text | one Quick open link |
 | **Come back to a recent one** | Same two places — they appear the moment you type the keyword | nothing, it fills itself |
+| **Keep the ones you return to** | Toolbar popup: **Pin this item** on a work item's tab | one Quick open link |
 | **Search instead of opening** | Address bar: `issue` ␣ `login bug` | a search URL on that link |
 | **Copy a reference** | The button beside the item's key · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd> · the popup | nothing, three formats ship |
 | **Insert a title + body** | "Template" button in the description toolbar · <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> | one template |
@@ -81,6 +82,8 @@ someone else's text.
   `ENG-` at Linear and leave the rest on Plane.
 - **The keys you opened last come back**, in the address bar and the popup. Twelve entries,
   per device, never synced. **Clear** at the end of the popup's row forgets them.
+- **The items you keep returning to stay.** On a work item's tab, **Pin this item** in the
+  popup keeps it, with its title, until you take it off. Six at most, on this device only.
 - **Words search instead of opening.** `issue login bug` goes to the tracker's search, if
   that target has a search URL with `{{q}}`. How far it gets you varies: Jira and GitHub
   land on results, while Plane opens its search page with your words already in the box and

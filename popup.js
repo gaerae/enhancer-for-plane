@@ -9,6 +9,8 @@
   let currentTabUrl = "";
   let currentTabTitle = "";
   let recent = [];
+  let pins = [];
+  let pinTarget = null; // the work item in this tab, when a quick link recognises one
   // The status line has more than one writer, and Re-scan's answer arrives a refresh and a
   // quarter of a second after it was asked for. Every writer moves this on; Re-scan's reply
   // only lands if nothing has since — otherwise switching the extension off mid-scan reads
@@ -159,7 +161,10 @@
   // reader might be standing when they cannot remember a key.
   function renderRecent() {
     const box = $("recentList");
-    const rows = peRecentMatches(recent, "").filter((r) => peIsHttpUrl(r.url)).slice(0, 6);
+    // A pinned item is already one row up, and six chips is little enough to lose one to that.
+    const rows = peRecentMatches(recent, "")
+      .filter((r) => peIsHttpUrl(r.url) && !peIsPinned(pins, r.url))
+      .slice(0, 6);
     box.innerHTML = "";
     box.hidden = !rows.length;
     rows.forEach((r) => {
@@ -197,6 +202,65 @@
       peSaveRecent([]);
     });
     box.appendChild(clear);
+  }
+
+  // What the tab is, for the pin button. The canonical address rather than the tab's, for the
+  // reason setupCopy gives, and the same reason makes it comparable with what a pin stores.
+  function setupPin() {
+    const m = peMatchItemUrl(state.quickLinks || [], currentTabUrl);
+    if (!m) return; // not a work item, so there is nothing here to pin
+    const url = peExpandQuickLink(m.link, m.key);
+    if (!peIsHttpUrl(url)) return;
+    pinTarget = { key: m.key, url, name: m.link.name, title: peTitleFromDocTitle(currentTabTitle, m.key) };
+    $("pinItem").addEventListener("click", () => setPins(pePinToggle(pins, pinTarget)));
+  }
+
+  // Only one popup can be open, so what it holds is the current list and needs no re-read.
+  function setPins(list) {
+    pins = list;
+    renderPins();
+    renderRecent();
+    peSavePins(pins);
+  }
+
+  function renderPins() {
+    const box = $("pinList");
+    box.innerHTML = "";
+    box.hidden = !pins.length;
+    pins.forEach((p) => {
+      const row = document.createElement("div");
+      row.className = "pop-pin";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "pop-pin-open";
+      open.title = p.url;
+      const k = document.createElement("span");
+      k.className = "pop-recent-key";
+      k.textContent = p.key;
+      const t = document.createElement("span");
+      t.className = "pop-pin-title";
+      t.textContent = p.title || p.name;
+      open.append(k, t);
+      open.addEventListener("click", () => jumpTo(p.key, p.url, { name: p.name }));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "pop-pin-remove";
+      remove.textContent = "\u00d7";
+      remove.title = peMsg("popPinRemove", [p.key]);
+      remove.setAttribute("aria-label", peMsg("popPinRemove", [p.key]));
+      remove.addEventListener("click", () => setPins(pePinToggle(pins, p)));
+      row.append(open, remove);
+      box.appendChild(row);
+    });
+
+    const btn = $("pinItem");
+    if (!pinTarget) return;
+    const pinned = peIsPinned(pins, pinTarget.url);
+    const full = !pinned && pins.length >= PE_MAX_PINS;
+    btn.hidden = false;
+    btn.disabled = full;
+    btn.setAttribute("aria-pressed", String(pinned));
+    btn.textContent = full ? peMsg("popPinFull", [String(PE_MAX_PINS)]) : peMsg("popPinAdd");
   }
 
   // Copy reference, from the tab's address and title — no injection, no page read. This is
@@ -250,6 +314,8 @@
     $("enabled").checked = !!state.enabled;
     $("tplCount").textContent = peCountTemplates(peBuildTemplateSections(state, syncCache));
     setupJump();
+    setupPin();
+    renderPins();
     renderRecent();
     setupCopy();
     updateDomainStatus();
@@ -385,10 +451,11 @@
         if (tab.url) currentHost = new URL(tab.url).hostname;
       }
     } catch (_) {}
-    Promise.all([peGetSettings(), peGetSyncCache(), peGetRecent()]).then(([s, c, r]) => {
+    Promise.all([peGetSettings(), peGetSyncCache(), peGetRecent(), peGetPins()]).then(([s, c, r, p]) => {
       state = s;
       syncCache = c;
       recent = r;
+      pins = p;
       init();
     });
   });
