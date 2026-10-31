@@ -525,10 +525,17 @@ To ship a new version:
    That is when the `v<version>` tag is created. The notes are what Settings
    links to from the version number, which is why nothing goes public before
    someone has written them.
+5. Publishing also sends it to the store:
+   [.github/workflows/store.yml](.github/workflows/store.yml) uploads that zip to
+   the Chrome Web Store and submits it for review.
+6. If `store-assets/` changed since the version the store is serving, the run
+   uploads the zip and stops red, because the API cannot edit listing text. Update
+   the listing in the dashboard and press **Submit for review** there.
 
-You can also trigger it from **Actions ▸ Release extension ▸ Run workflow**.
-Then download the zip from the Release (a draft's assets are downloadable to you)
-and upload it in the Chrome Web Store dashboard.
+You can also trigger the first step from **Actions ▸ Release extension ▸ Run
+workflow**, and send a published release again from **Actions ▸ Store ▸ Run
+workflow**, for example after a failed run. The one-time Google setup is under
+[Packaging](store-assets/STORE_LISTING.md#packaging).
 
 > If the release step fails with a 403, enable **Settings ▸ Actions ▸ General ▸
 > Workflow permissions ▸ Read and write permissions** so the workflow can create

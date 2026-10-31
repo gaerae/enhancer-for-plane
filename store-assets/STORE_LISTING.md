@@ -429,10 +429,72 @@ not among them.
 CI builds the upload zip automatically — bump `version` in manifest.json, push to
 `main`, and `.github/workflows/release.yml` publishes a GitHub Release with
 `enhancer-for-plane-<version>.zip` (only the shipping files; store-assets, docs,
-LICENSE, .github, and icons/icon.svg are excluded). Download that zip and upload
-it in the dashboard.
+LICENSE, .github, and icons/icon.svg are excluded).
 
-To build the same zip locally instead (run from the repo root):
+Publishing that release runs `.github/workflows/store.yml`, which uploads the zip and
+submits it for review. If `store-assets/` changed since the version the store is
+serving, it uploads and stops red: paste what changed into the dashboard, then press
+Submit for review there. The API has no call for listing text, screenshots, or
+permission justifications.
+
+### One-time setup
+
+Nothing below is a secret, and no key is created. The run proves who it is with its
+GitHub identity, and Google lets exactly this repository's `chrome-web-store` environment
+act as a service account that can do nothing except what the store dashboard allows it.
+
+Paste this into [Cloud Shell](https://shell.cloud.google.com). The project id is global,
+so change it if it is taken:
+
+    PROJECT=enhancer-for-plane-cws
+    REPO=gaerae/enhancer-for-plane
+    REPO_ID=1296040347
+
+    gcloud projects create "$PROJECT"
+    gcloud config set project "$PROJECT"
+    gcloud services enable chromewebstore.googleapis.com iam.googleapis.com \
+      iamcredentials.googleapis.com sts.googleapis.com
+    gcloud iam service-accounts create cws-publisher --display-name="Chrome Web Store publisher"
+    gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
+    gcloud iam workload-identity-pools providers create-oidc enhancer-for-plane \
+      --location=global --workload-identity-pool=github \
+      --issuer-uri="https://token.actions.githubusercontent.com" \
+      --attribute-mapping="google.subject=assertion.sub" \
+      --attribute-condition="assertion.repository_id=='$REPO_ID'"
+    NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+    SA="cws-publisher@$PROJECT.iam.gserviceaccount.com"
+    POOL="projects/$NUMBER/locations/global/workloadIdentityPools/github"
+    gcloud iam service-accounts add-iam-policy-binding "$SA" \
+      --role=roles/iam.workloadIdentityUser \
+      --member="principal://iam.googleapis.com/$POOL/subject/repo:$REPO:environment:chrome-web-store"
+    echo "GCP_WORKLOAD_PROVIDER=$POOL/providers/enhancer-for-plane"
+    echo "GCP_SERVICE_ACCOUNT=$SA"
+
+Then:
+
+1. In the Developer Dashboard's **Account** section, add the service account's email. A
+   publisher can have only one.
+2. Set the two values it printed on the environment, along with the store's own ids:
+
+       gh variable set GCP_WORKLOAD_PROVIDER --env chrome-web-store --body "<printed value>"
+       gh variable set GCP_SERVICE_ACCOUNT --env chrome-web-store --body "<printed value>"
+       gh variable set CWS_PUBLISHER_ID --env chrome-web-store --body "<id from the dashboard URL>"
+       gh variable set CWS_EXTENSION_ID --env chrome-web-store --body dicjfphghjfljkifogkplgdeefjdkhbo
+
+The environment itself admits only `main` and `v*` tags. To rebuild it:
+
+    gh api -X PUT repos/gaerae/enhancer-for-plane/environments/chrome-web-store \
+      -F 'deployment_branch_policy[protected_branches]=false' \
+      -F 'deployment_branch_policy[custom_branch_policies]=true'
+    gh api repos/gaerae/enhancer-for-plane/environments/chrome-web-store/deployment-branch-policies \
+      -f name=main -f type=branch
+    gh api repos/gaerae/enhancer-for-plane/environments/chrome-web-store/deployment-branch-policies \
+      -f 'name=v*' -f type=tag
+
+### By hand
+
+To upload without the workflow, download the zip from the release, or build the same zip
+locally (run from the repo root):
 
   zip -r "enhancer-for-plane-$(jq -r .version manifest.json).zip" \
       manifest.json common.js content.js content.css background.js \

@@ -1,0 +1,58 @@
+name: Store
+
+# Hands a release to the Chrome Web Store the moment someone presses Publish on it. The draft
+# release.yml cuts stays the gate: nothing here runs before that click, and a draft cannot be
+# sent by hand either, because tools/store-submit.js only reads published releases.
+#
+# Run workflow is for a release this did not get to: one published before this file existed
+# (a release runs the workflow at its own tag), or one the run for it failed on.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release to send, like v1.12.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Two releases in a row must not race for the one draft the store keeps.
+concurrency:
+  group: store
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Google trusts this environment and nothing else in the repo, and the environment only
+    # admits main and v* tags, so a pushed branch cannot ask for a store token.
+    environment: chrome-web-store
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every tag: the listing is compared against the version the store is serving.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Upload and submit
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GCP_WORKLOAD_PROVIDER: ${{ vars.GCP_WORKLOAD_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: node tools/store-submit.js
