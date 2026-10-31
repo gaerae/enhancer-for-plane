@@ -1096,12 +1096,16 @@
     "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
   },
   "popPinAdd": {
-    "message": "Pin this item",
-    "description": "Toggle in the popup, shown on a work item's tab. The same words in both positions: aria-pressed and the pressed style say which one it is in."
+    "message": "Pin",
+    "description": "Toggle on the popup's item line, shown on a work item's tab. The same word in both positions: aria-pressed and the pressed style say which one it is in. It shares a line with the item's title, so keep it short."
+  },
+  "popPinAddTitle": {
+    "message": "Pin this item to the popup",
+    "description": "Tooltip and accessible name for popPinAdd. Plain text: a title, not a pre-line sink."
   },
   "popPinFull": {
     "message": "Up to $MAX$ items can be pinned",
-    "description": "Replaces popPinAdd when the list is full and the button is disabled, so the reason is on screen rather than in a tooltip on a dead control.",
+    "description": "Tooltip and accessible name for the pin button when the list is full and the button is disabled. The button itself shows the count. Plain text.",
     "placeholders": { "max": { "content": "$1" } }
   },
   "popPinRemove": {

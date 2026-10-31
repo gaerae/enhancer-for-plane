@@ -1092,12 +1092,16 @@
     "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
   },
   "popPinAdd": {
-    "message": "이 항목 고정",
-    "description": "Toggle in the popup, shown on a work item's tab. The same words in both positions: aria-pressed and the pressed style say which one it is in."
+    "message": "고정",
+    "description": "Toggle on the popup's item line, shown on a work item's tab. The same word in both positions: aria-pressed and the pressed style say which one it is in. It shares a line with the item's title, so keep it short."
+  },
+  "popPinAddTitle": {
+    "message": "이 항목을 팝업에 고정합니다",
+    "description": "Tooltip and accessible name for popPinAdd. Plain text: a title, not a pre-line sink."
   },
   "popPinFull": {
     "message": "최대 $MAX$개까지 고정할 수 있습니다",
-    "description": "Replaces popPinAdd when the list is full and the button is disabled, so the reason is on screen rather than in a tooltip on a dead control.",
+    "description": "Tooltip and accessible name for the pin button when the list is full and the button is disabled. The button itself shows the count. Plain text.",
     "placeholders": { "max": { "content": "$1" } }
   },
   "popPinRemove": {

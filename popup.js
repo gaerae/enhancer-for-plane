@@ -257,10 +257,15 @@
     if (!pinTarget) return;
     const pinned = peIsPinned(pins, pinTarget.url);
     const full = !pinned && pins.length >= PE_MAX_PINS;
+    // The line has room for a word, so a full list shows its count, and the sentence goes
+    // to the tooltip and to a screen reader.
+    const says = full ? peMsg("popPinFull", [String(PE_MAX_PINS)]) : peMsg("popPinAddTitle");
     btn.hidden = false;
     btn.disabled = full;
     btn.setAttribute("aria-pressed", String(pinned));
-    btn.textContent = full ? peMsg("popPinFull", [String(PE_MAX_PINS)]) : peMsg("popPinAdd");
+    btn.textContent = full ? PE_MAX_PINS + "/" + PE_MAX_PINS : peMsg("popPinAdd");
+    btn.title = says;
+    btn.setAttribute("aria-label", says);
   }
 
   // Copy reference, from the tab's address and title — no injection, no page read. This is
@@ -271,7 +276,7 @@
     const block = $("copyBlock");
     const formats = (state.copyFormats || []).filter((f) => f && String(f.format || "").trim());
     const m = peMatchItemUrl(state.quickLinks || [], currentTabUrl);
-    if (!m || !formats.length) return; // not a work item, or nothing to copy it as
+    if (!m) return; // not a work item
     const item = {
       key: m.key,
       title: peTitleFromDocTitle(currentTabTitle, m.key),
@@ -281,6 +286,9 @@
     };
     block.hidden = false;
     $("copyItem").textContent = item.title ? m.key + " " + item.title : m.key;
+    // With no formats there is nothing to copy, but the line still names the item and holds
+    // its pin, which must not depend on a list about something else.
+    $("copyLabel").hidden = !formats.length;
     const box = $("copyFormats");
     box.innerHTML = "";
     formats.forEach((f) => {

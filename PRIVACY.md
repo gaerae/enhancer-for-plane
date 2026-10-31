@@ -57,7 +57,7 @@ by Chrome Sync):
 - **Pinned work items** — the key, the address, the name of the target, and the
   title from the tab's title bar, for the items you pinned in the popup. It stays on
   this device for the same reason the list above does, and nothing is added to it
-  unless you press **Pin this item**. The × beside a pin removes it; "Restore
+  unless you press **Pin**. The × beside a pin removes it; "Restore
   defaults" clears them all, on the save that follows.
 - **How often each style rule matched** — a count per rule and the time it last
   matched anything, which is how Settings can tell you a rule has quietly stopped

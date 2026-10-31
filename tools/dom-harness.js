@@ -612,6 +612,22 @@ function checkPageBuilderQuotesNothing() {
 }
 checkPageBuilderQuotesNothing();
 
+// What the jump box's placeholder needs against what it has. Both widths depend on the state
+// of the popup around it, so more than one suite has to ask.
+const JUMP_ROOM = `
+const jumpRoom = () => {
+  const input = document.getElementById("jumpKey");
+  const probe = document.createElement("span");
+  const cs = getComputedStyle(input);
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+  probe.textContent = input.placeholder;
+  document.body.appendChild(probe);
+  const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const need = probe.getBoundingClientRect().width;
+  probe.remove();
+  ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+};`;
+
 // A full shortlist, with titles long enough to have to give way.
 const FULL_PINS = [1, 2, 3, 4, 5, 6].map((n) => ({
   key: "PROJ-" + n,
@@ -642,6 +658,7 @@ const suites = [
     },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      ${JUMP_ROOM}
       const scroll = () => document.getElementById("popScroll");
       const foot = () => document.querySelector(".pop-foot");
       check("the document stays inside Chrome's 600px", () => {
@@ -661,6 +678,9 @@ const suites = [
         ok(scroll().scrollHeight > scroll().clientHeight + 4,
            "content " + scroll().scrollHeight + " fits in " + scroll().clientHeight);
       });
+      // On CI's fonts this missed by a pixel, because the popup there overflows where a Mac's
+      // does not and the scrollbar comes out of the box's width.
+      check("the jump placeholder still fits once the scrollbar has taken its share", jumpRoom);
       check("the scrollbar takes real space rather than fading out of sight", () => {
         const gutter = scroll().offsetWidth - scroll().clientWidth;
         ok(gutter >= 6, "gutter is " + gutter + "px — an overlay scrollbar is invisible at rest");
@@ -855,6 +875,14 @@ const suites = [
       check("the button is a toggle that says which way it is", () => {
         eq(btn().getAttribute("aria-pressed"), "false");
         eq(btn().textContent, peMsg("popPinAdd"));
+        eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
+      });
+      // As a row of its own it cost every work item tab 35px, and on CI's fonts that was the
+      // difference between no scrollbar and one that took the jump box's width.
+      check("it shares the item's line, so it costs the popup no height", () => {
+        const a = btn().getBoundingClientRect();
+        const b = document.getElementById("copyItem").getBoundingClientRect();
+        ok(a.top < b.bottom && b.top < a.bottom, "the pin is on a line of its own");
       });
       const off = getComputedStyle(btn()).backgroundColor;
 
@@ -901,7 +929,7 @@ const suites = [
   },
   {
     // Refusing silently would read as a broken button, and the tooltip on a disabled control
-    // is the last place anyone looks, so the reason replaces the label.
+    // is the last place anyone looks, so the count is on the button itself.
     name: "popup · a full list of pins",
     page: { name: "pop-pins-full", ...POPUP, seed: seedOf(), local: { pePins: FULL_PINS } },
     body: `
@@ -909,7 +937,9 @@ const suites = [
       const btn = () => document.getElementById("pinItem");
       check("a seventh is refused, and the button says why", () => {
         ok(btn().disabled, "the button is live");
-        eq(btn().textContent, peMsg("popPinFull", ["6"]));
+        eq(btn().textContent, "6/6");
+        eq(btn().getAttribute("aria-label"), peMsg("popPinFull", ["6"]));
+        eq(btn().title, peMsg("popPinFull", ["6"]));
       });
       check("long titles give way instead of widening the popup", () => {
         const box = document.getElementById("pinList");
@@ -929,6 +959,19 @@ const suites = [
       check("and letting one go frees the button", () => {
         ok(!btn().disabled, "still disabled");
         eq(btn().textContent, peMsg("popPinAdd"));
+        eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
+      });`
+  },
+  {
+    // Someone who deleted every copy format has not opted out of pinning.
+    name: "popup · pinning with no copy format",
+    page: { name: "pop-pins-noformat", ...POPUP, seed: seedOf({ copyFormats: [] }) },
+    body: `
+      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
+      check("the item's line stays, without the heading for a feature with nothing to show", () => {
+        ok(!document.getElementById("copyBlock").hidden, "the block is gone, and the pin with it");
+        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect");
+        ok(document.getElementById("copyLabel").getClientRects().length === 0, "a heading over nothing");
       });`
   },
   {
@@ -2447,6 +2490,7 @@ const suites = [
     },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      ${JUMP_ROOM}
       const chips = () => [...document.querySelectorAll("#recentList .pop-recent-item")];
 
       check("the keys opened last are offered under the jump box", () => {
@@ -2460,18 +2504,7 @@ const suites = [
       // the first wording it grew ("Issue key, or words to search…") was cut off mid-word at
       // this width. Nothing else would have caught it: a truncated placeholder is not an
       // error, it is just a sentence you cannot read. Korean is measured in the pop-ko suite.
-      check("the jump placeholder fits the box it is in", () => {
-        const input = document.getElementById("jumpKey");
-        const probe = document.createElement("span");
-        const cs = getComputedStyle(input);
-        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
-        probe.textContent = input.placeholder;
-        document.body.appendChild(probe);
-        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        const need = probe.getBoundingClientRect().width;
-        probe.remove();
-        ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
-      });
+      check("the jump placeholder fits the box it is in", jumpRoom);
       check("a chip fits its row rather than stretching it", () => {
         const box = document.getElementById("recentList").getBoundingClientRect();
         for (const c of chips()) {

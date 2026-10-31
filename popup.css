@@ -170,7 +170,7 @@ input:checked + .switch::after {
 .pop-jump-key {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 13px;
@@ -321,24 +321,42 @@ input:checked + .switch::after {
 .pop-pin-remove:hover {
   color: var(--text);
 }
-.pop-btn.pop-pin-toggle {
-  margin: 7px 0 0;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 500;
+.pop-pin-toggle {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
 }
-.pop-btn.pop-pin-toggle[aria-pressed="true"] {
+.pop-pin-toggle:hover:enabled {
+  border-color: var(--accent);
+}
+.pop-pin-toggle[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast);
+}
+.pop-pin-toggle:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 .pop-copy-block[hidden] {
   display: none;
 }
 /* Which item is about to be copied. One line: the popup is 300px and a wrapped title would
    push the buttons below the fold. */
-.pop-copy-item {
+.pop-copy-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: -2px 0 7px;
+}
+.pop-copy-item {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--muted);
   overflow: hidden;
