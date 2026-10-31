@@ -49,6 +49,8 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
   "\n;globalThis.__MAX_SELECTION_KEYS = PE_MAX_SELECTION_KEYS;" +
+  "\n;globalThis.__MAX_PINS = PE_MAX_PINS;" +
+  "\n;globalThis.__MAX_PIN_TITLE = PE_MAX_PIN_TITLE;" +
   "\n;globalThis.PE_QUICK_EXAMPLES = PE_QUICK_EXAMPLES;" +
   "\n;globalThis.PE_QUICK_PARTS = PE_QUICK_PARTS;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
@@ -1711,6 +1713,57 @@ test("selection: the card states the cap the code enforces, in both locales", ()
     const msg = JSON.parse(read("_locales/" + lang + "/messages.json"));
     ok(msg.optQuickDesc.message.indexOf(String(ctx.__MAX_SELECTION_KEYS)) > -1, lang + " does not state the cap");
   }
+});
+
+test("pins: pinning adds to the end and pinning again takes it off", () => {
+  const { pePinToggle } = loadCommon();
+  const a = { key: "A-1", url: "https://t/A-1", name: "Plane", title: "One" };
+  const b = { key: "B-2", url: "https://t/B-2", name: "Plane", title: "" };
+  let list = pePinToggle([], a);
+  list = pePinToggle(list, b);
+  eq(list.map((p) => p.key), ["A-1", "B-2"], "a shortlist keeps its places, so an old pin stays where the hand expects it");
+  eq(pePinToggle(list, a).map((p) => p.key), ["B-2"], "the same item again is an unpin");
+});
+
+// The same key on two trackers is two items, and the address is what tells them apart.
+test("pins: an item is its address, not its key", () => {
+  const { pePinToggle, peIsPinned } = loadCommon();
+  const list = pePinToggle([], { key: "GAE-2", url: "https://plane.example/GAE-2" });
+  ok(peIsPinned(list, "https://plane.example/GAE-2"));
+  ok(!peIsPinned(list, "https://linear.app/GAE-2"), "another tracker's GAE-2 is not this one");
+  eq(pePinToggle(list, { key: "GAE-2", url: "https://linear.app/GAE-2" }).length, 2);
+});
+
+// A full list refuses rather than dropping the oldest. A pin is a decision somebody made, and
+// nothing about pinning a seventh item says they have changed their mind about the first.
+test("pins: a full list refuses a new item and still lets one go", () => {
+  const ctx = loadCommon();
+  let list = [];
+  for (let i = 0; i < ctx.__MAX_PINS; i++) list = ctx.pePinToggle(list, { key: "K-" + (i + 1), url: "https://t/" + (i + 1) });
+  eq(list.length, ctx.__MAX_PINS);
+  eq(ctx.pePinToggle(list, { key: "NEW-1", url: "https://t/new" }).map((p) => p.key), list.map((p) => p.key), "the list is unchanged");
+  eq(ctx.pePinToggle(list, { key: "K-1", url: "https://t/1" }).length, ctx.__MAX_PINS - 1, "and unpinning still works");
+});
+
+// The title comes from a tab, so a page wrote it, and a record is only worth keeping if it
+// can be opened again.
+test("pins: an entry is clamped, and one that cannot be opened is not kept", () => {
+  const ctx = loadCommon();
+  const list = ctx.pePinToggle([], { key: "A-1", url: "https://t/A-1", title: "x".repeat(5000), name: 7 });
+  ok(list[0].title.length <= ctx.__MAX_PIN_TITLE, "the title is clamped");
+  eq(list[0].name, "7", "and non-string fields are not trusted");
+  eq(ctx.pePinToggle([], { key: "", url: "https://t/x" }), [], "no key");
+  eq(ctx.pePinToggle([], { key: "A-1", url: "javascript:alert(1)" }), [], "no openable address");
+});
+
+test("pins: a malformed record reads as the entries that survive", () => {
+  const { pePinsClean } = loadCommon();
+  eq(pePinsClean(null), []);
+  eq(pePinsClean("nope"), []);
+  eq(
+    pePinsClean([null, 3, { key: "A-1" }, { key: "B-2", url: "https://t/B-2", title: "ok" }]).map((p) => p.key),
+    ["B-2"]
+  );
 });
 
 test("recent: newest first, one row per key, capped", () => {

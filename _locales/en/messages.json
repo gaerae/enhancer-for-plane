@@ -491,7 +491,7 @@
     "placeholders": { "sites": { "content": "$1" } }
   },
   "msgResetConfirm": {
-    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nThe work items you opened recently are forgotten too.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
+    "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nThe work items you opened recently or pinned are forgotten too.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
   },
   "msgResetDone": {
     "message": "Restored defaults. Click “Save” to apply."
@@ -1094,6 +1094,24 @@
   "popRecentClearTitle": {
     "message": "Forget the work items you opened recently",
     "description": "Tooltip and accessible name for popRecentClear. Plain text: a title, not a pre-line sink."
+  },
+  "popPinAdd": {
+    "message": "Pin",
+    "description": "Toggle on the popup's item line, shown on a work item's tab. The same word in both positions: aria-pressed and the pressed style say which one it is in. It shares a line with the item's title, so keep it short."
+  },
+  "popPinAddTitle": {
+    "message": "Pin this item to the popup",
+    "description": "Tooltip and accessible name for popPinAdd. Plain text: a title, not a pre-line sink."
+  },
+  "popPinFull": {
+    "message": "Up to $MAX$ items can be pinned",
+    "description": "Tooltip and accessible name for the pin button when the list is full and the button is disabled. The button itself shows the count. Plain text.",
+    "placeholders": { "max": { "content": "$1" } }
+  },
+  "popPinRemove": {
+    "message": "Unpin $KEY$",
+    "description": "Tooltip and accessible name for the × on a pinned row. Plain text: a title, not a pre-line sink.",
+    "placeholders": { "key": { "content": "$1" } }
   },
   "popJumpAuto": {
     "message": "Auto"

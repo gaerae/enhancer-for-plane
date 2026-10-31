@@ -74,6 +74,7 @@ Every one of them is off, empty or inert until you ask for it.
 ⚡ Go straight to a work item — quick open
 Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it.
 The same box is on the toolbar popup, and both offer the keys you opened last.
+Pin the items you keep returning to, and the popup holds them for you.
 A key almost never arrives on its own; it arrives inside a sentence, in a Slack message or a pull request title.
 Select it anywhere, right-click, and choose "Open work items from selection" — nothing to type, nothing to set up.
 Several keys open in their own tabs, up to 10 at a time.
@@ -147,7 +148,7 @@ An independent, unofficial add-on: not affiliated with or endorsed by Plane, and
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and reaching a work item from its key via a user-configured link — on the Plane instances the user chooses. Reaching a work item covers the several places a key can be typed or found: the address bar, the toolbar popup, the list of keys the user opened most recently, and a key selected in text on any page. All of them build a URL from the same user-configured link and navigate to it.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and reaching a work item from its key via a user-configured link — on the Plane instances the user chooses. Reaching a work item covers the several places a key can be typed or found: the address bar, the toolbar popup, the list of keys the user opened most recently, the items the user pinned, and a key selected in text on any page. All of them build a URL from the same user-configured link and navigate to it.
 
 ---
 
@@ -263,6 +264,7 @@ Plane Cloud와 자체 호스팅 모두에서 동작하며, 릴리스마다 양�
 ⚡ 키만 입력해 작업 항목 열기 — 바로 열기
 주소창에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 넣으면 Enter로 열립니다.
 같은 입력칸이 툴바 팝업에도 있고, 두 곳 모두 최근에 연 항목을 보여 줍니다.
+자주 여는 항목은 고정해 두면 팝업에 남습니다.
 키는 키의 모습으로 오지 않습니다. Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
 그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요 — 입력할 것도, 따로 준비할 것도 없습니다.
 키가 여러 개면 각각 새 탭으로, 한 번에 10개까지 열립니다.

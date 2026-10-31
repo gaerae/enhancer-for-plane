@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-10-07_
+_Last updated: 2026-10-31_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
@@ -54,6 +54,11 @@ by Chrome Sync):
   machine to your own browsing in the address bar is not a feature, and there is
   no server for it to go to. **Clear**, at the end of the list in the popup, forgets it;
   "Restore defaults" also clears it, on the save that follows.
+- **Pinned work items** — the key, the address, the name of the target, and the
+  title from the tab's title bar, for the items you pinned in the popup. It stays on
+  this device for the same reason the list above does, and nothing is added to it
+  unless you press **Pin**. The × beside a pin removes it; "Restore
+  defaults" clears them all, on the save that follows.
 - **How often each style rule matched** — a count per rule and the time it last
   matched anything, which is how Settings can tell you a rule has quietly stopped
   working. Numbers and timestamps only; no page content and no addresses.

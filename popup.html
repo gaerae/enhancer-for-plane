@@ -29,6 +29,7 @@
           <select id="jumpTarget" class="pop-jump-target" hidden></select>
           <button type="submit" class="pop-jump-go" data-i18n-title="popJumpGo" data-i18n-aria-label="popJumpGo" title="Open">→</button>
         </form>
+        <div class="pop-pins" id="pinList" hidden></div>
         <div class="pop-recent" id="recentList" hidden></div>
         <hr class="pop-div" />
       </div>
@@ -39,7 +40,13 @@
            button that cannot do anything. -->
       <div class="pop-copy-block" id="copyBlock" hidden>
         <div class="pop-label" id="copyLabel" data-i18n="popCopyLabel">Copy reference</div>
-        <div class="pop-copy-item" id="copyItem"></div>
+        <!-- The pin shares this line on purpose. As a row of its own it cost every work item
+             tab 35px, which was enough to bring the scrollbar out and take the jump box's
+             width with it. -->
+        <div class="pop-copy-line">
+          <div class="pop-copy-item" id="copyItem"></div>
+          <button type="button" class="pop-pin-toggle" id="pinItem" aria-pressed="false" hidden></button>
+        </div>
         <div class="pop-copy-formats" id="copyFormats"></div>
         <hr class="pop-div" />
       </div>

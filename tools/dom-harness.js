@@ -612,6 +612,30 @@ function checkPageBuilderQuotesNothing() {
 }
 checkPageBuilderQuotesNothing();
 
+// What the jump box's placeholder needs against what it has. Both widths depend on the state
+// of the popup around it, so more than one suite has to ask.
+const JUMP_ROOM = `
+const jumpRoom = () => {
+  const input = document.getElementById("jumpKey");
+  const probe = document.createElement("span");
+  const cs = getComputedStyle(input);
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
+  probe.textContent = input.placeholder;
+  document.body.appendChild(probe);
+  const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const need = probe.getBoundingClientRect().width;
+  probe.remove();
+  ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
+};`;
+
+// A full shortlist, with titles long enough to have to give way.
+const FULL_PINS = [1, 2, 3, 4, 5, 6].map((n) => ({
+  key: "PROJ-" + n,
+  url: "https://plane.example.com/acme/browse/PROJ-" + n,
+  name: "Plane",
+  title: "A title long enough that it cannot fit on one row of a 260px popup, number " + n
+}));
+
 const suites = [
   {
     // Chrome caps a toolbar popup at 600px and cuts the rest. This one reached 606 on an
@@ -630,10 +654,11 @@ const suites = [
         { key: "DU-61", url: "https://gprxh.atlassian.net/browse/DU-61", name: "Jira", at: 400 },
         { key: "GH-1234", url: "https://github.com/gaerae/enhancer-for-plane/issues/1234", name: "GitHub", at: 300 },
         { key: "TRASHSWD-17", url: "https://gprxh.atlassian.net/browse/TRASHSWD-17", name: "Jira", at: 200 }
-      ] }
+      ], pePins: FULL_PINS }
     },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      ${JUMP_ROOM}
       const scroll = () => document.getElementById("popScroll");
       const foot = () => document.querySelector(".pop-foot");
       check("the document stays inside Chrome's 600px", () => {
@@ -653,6 +678,9 @@ const suites = [
         ok(scroll().scrollHeight > scroll().clientHeight + 4,
            "content " + scroll().scrollHeight + " fits in " + scroll().clientHeight);
       });
+      // On CI's fonts this missed by a pixel, because the popup there overflows where a Mac's
+      // does not and the scrollbar comes out of the box's width.
+      check("the jump placeholder still fits once the scrollbar has taken its share", jumpRoom);
       check("the scrollbar takes real space rather than fading out of sight", () => {
         const gutter = scroll().offsetWidth - scroll().clientWidth;
         ok(gutter >= 6, "gutter is " + gutter + "px — an overlay scrollbar is invisible at rest");
@@ -759,11 +787,15 @@ const suites = [
       name: "opt-reset-recent",
       ...OPTIONS,
       seed: seedOf(),
-      local: { peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }] }
+      local: {
+        peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }],
+        pePins: [FULL_PINS[0]]
+      }
     },
     body: `
       ${TAB_READY}
       const recent = () => window.__LOCAL.peRecent;
+      const pins = () => window.__LOCAL.pePins;
       const save = async () => {
         const n = window.__written.length;
         document.getElementById("status").textContent = "";
@@ -773,7 +805,10 @@ const suites = [
       };
 
       await save();
-      check("an ordinary save leaves the list alone", () => eq(recent().length, 1));
+      check("an ordinary save leaves the list alone", () => {
+        eq(recent().length, 1);
+        eq(pins().length, 1, "pins");
+      });
 
       window.confirm = () => true;
       document.getElementById("reset").click();
@@ -782,8 +817,10 @@ const suites = [
 
       await save();
       check("reset, then save, forgets it", () => eq(recent().length, 0, "still remembered: " + JSON.stringify(recent())));
+      check("and the pinned items with it", () => eq(pins().length, 0, "still pinned: " + JSON.stringify(pins())));
       check("and the confirm said it would", () => {
         ok(peMsg("msgResetConfirm").indexOf("recently") > -1, "the confirm does not mention it");
+        ok(peMsg("msgResetConfirm").indexOf("pinned") > -1, "the confirm does not mention pins");
       });
 
       // A reset, then settings arriving from another surface before Save. The page adopts
@@ -801,6 +838,173 @@ const suites = [
       check("a reset replaced by settings from elsewhere clears nothing on the next save", () => {
         eq(recent().length, 1, "the list was wiped by a reset that no longer existed");
       });`
+  },
+  {
+    // The stub's tab is a work item, PROJ-7, which the seed's Plane link recognises and the
+    // recents also hold. That one tab is the whole input: the row, the title, the canonical
+    // address and the chip that has to step aside all come from it.
+    name: "popup · pinning the item in the tab",
+    page: {
+      name: "pop-pins",
+      ...POPUP,
+      seed: seedOf(),
+      local: {
+        peRecent: [
+          { key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", at: 2 },
+          { key: "ENG-9", url: "https://linear.app/acme/issue/ENG-9", name: "Linear", at: 1 }
+        ],
+        // A tab's title is written by the page it came from.
+        pePins: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", title: '<img src=x id="hostile">Old item' }]
+      }
+    },
+    body: `
+      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
+      const btn = () => document.getElementById("pinItem");
+      const rows = () => [...document.querySelectorAll("#pinList .pop-pin")];
+      const keyOf = (r) => r.querySelector(".pop-recent-key").textContent;
+      const chips = () => [...document.querySelectorAll("#recentList .pop-recent-key")].map((n) => n.textContent);
+      const stored = () => window.__LOCAL.pePins;
+
+      check("a pinned item shows its key and its title", () => {
+        eq(rows().map(keyOf).join(), "PROJ-1");
+        eq(rows()[0].querySelector(".pop-pin-title").textContent, '<img src=x id="hostile">Old item');
+      });
+      check("and that title is text, whatever the page wrote", () => {
+        eq(document.querySelectorAll("#hostile").length, 0, "a tab title became an element");
+      });
+      check("the button is a toggle that says which way it is", () => {
+        eq(btn().getAttribute("aria-pressed"), "false");
+        eq(btn().textContent, peMsg("popPinAdd"));
+        eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
+      });
+      // As a row of its own it cost every work item tab 35px, and on CI's fonts that was the
+      // difference between no scrollbar and one that took the jump box's width.
+      check("it shares the item's line, so it costs the popup no height", () => {
+        const a = btn().getBoundingClientRect();
+        const b = document.getElementById("copyItem").getBoundingClientRect();
+        ok(a.top < b.bottom && b.top < a.bottom, "the pin is on a line of its own");
+      });
+      const off = getComputedStyle(btn()).backgroundColor;
+
+      btn().click();
+      check("pinning stores the tab's item, canonical address and title", () => {
+        const p = stored()[stored().length - 1];
+        eq(p.key, "PROJ-7");
+        eq(p.url, "https://plane.example.com/acme/browse/PROJ-7");
+        eq(p.title, "Fix the login redirect");
+        eq(p.name, "Plane");
+      });
+      check("it joins the list at once, after the older pin", () => eq(rows().map(keyOf).join(), "PROJ-1,PROJ-7"));
+      check("and the toggle shows it in words a screen reader gets and a style the eye gets", () => {
+        eq(btn().getAttribute("aria-pressed"), "true");
+        ok(getComputedStyle(btn()).backgroundColor !== off, "pressed looks identical to unpressed");
+      });
+      check("a pinned item is not also offered as a recent chip", () => eq(chips().join(), "ENG-9"));
+
+      btn().click();
+      check("pressing it again takes the pin off", () => {
+        eq(stored().map((p) => p.key).join(), "PROJ-1");
+        eq(btn().getAttribute("aria-pressed"), "false");
+      });
+      check("and the chip comes back", () => eq(chips().join(), "PROJ-7,ENG-9"));
+
+      btn().click();
+      document.querySelector(".pop-recent-clear").click();
+      check("forgetting the recents leaves the pins", () => eq(stored().length, 2));
+      check("a pin's remove button names what it removes", () => {
+        const x = rows()[0].querySelector(".pop-pin-remove");
+        eq(x.getAttribute("aria-label"), peMsg("popPinRemove", ["PROJ-1"]));
+      });
+      rows()[1].querySelector(".pop-pin-remove").click();
+      check("the remove button on the tab's own row moves the toggle too", () => {
+        eq(rows().map(keyOf).join(), "PROJ-1");
+        eq(btn().getAttribute("aria-pressed"), "false");
+      });
+
+      rows()[0].querySelector(".pop-pin-open").click();
+      check("a row opens its item in a new tab and shuts the popup", () => {
+        eq(window.__opened, "https://plane.example.com/acme/browse/PROJ-1");
+        ok(window.__closed, "the popup stayed open");
+      });`
+  },
+  {
+    // Refusing silently would read as a broken button, and the tooltip on a disabled control
+    // is the last place anyone looks, so the count is on the button itself.
+    name: "popup · a full list of pins",
+    page: { name: "pop-pins-full", ...POPUP, seed: seedOf(), local: { pePins: FULL_PINS } },
+    body: `
+      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
+      const btn = () => document.getElementById("pinItem");
+      check("a seventh is refused, and the button says why", () => {
+        ok(btn().disabled, "the button is live");
+        eq(btn().textContent, "6/6");
+        eq(btn().getAttribute("aria-label"), peMsg("popPinFull", ["6"]));
+        eq(btn().title, peMsg("popPinFull", ["6"]));
+      });
+      check("long titles give way instead of widening the popup", () => {
+        const box = document.getElementById("pinList");
+        ok(box.scrollWidth <= box.clientWidth, box.scrollWidth + " > " + box.clientWidth);
+        ok(document.documentElement.scrollWidth <= window.innerWidth, "the page scrolls sideways");
+      });
+      // A key breaks at its hyphen given the chance, and a long title gives it the chance: the
+      // first version showed "PROJ-" over "1", with every check here green.
+      check("a key stays on one line however long the title beside it", () => {
+        document.querySelectorAll("#pinList .pop-recent-key").forEach((k) => {
+          const r = document.createRange();
+          r.selectNodeContents(k);
+          eq(r.getClientRects().length, 1, k.textContent + " lines");
+        });
+      });
+      document.querySelector("#pinList .pop-pin-remove").click();
+      check("and letting one go frees the button", () => {
+        ok(!btn().disabled, "still disabled");
+        eq(btn().textContent, peMsg("popPinAdd"));
+        eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
+      });`
+  },
+  {
+    // Someone who deleted every copy format has not opted out of pinning.
+    name: "popup · pinning with no copy format",
+    page: { name: "pop-pins-noformat", ...POPUP, seed: seedOf({ copyFormats: [] }) },
+    body: `
+      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
+      check("the item's line stays, without the heading for a feature with nothing to show", () => {
+        ok(!document.getElementById("copyBlock").hidden, "the block is gone, and the pin with it");
+        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect");
+        ok(document.getElementById("copyLabel").getClientRects().length === 0, "a heading over nothing");
+      });`
+  },
+  {
+    // The item in the tab can be one of the six, and then the button is its way out.
+    name: "popup · a full list holding the item in the tab",
+    page: {
+      name: "pop-pins-self",
+      ...POPUP,
+      seed: seedOf(),
+      local: { pePins: FULL_PINS.slice(0, 5).concat({ key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", title: "" }) }
+    },
+    body: `
+      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
+      check("the button stays live, because unpinning needs no room", () => {
+        ok(!document.getElementById("pinItem").disabled, "disabled");
+        eq(document.getElementById("pinItem").getAttribute("aria-pressed"), "true");
+      });
+      check("and a pin with no title falls back to its target's name", () => {
+        eq(document.querySelectorAll("#pinList .pop-pin-title")[5].textContent, "Plane");
+      });`
+  },
+  {
+    // A tab no link recognises has nothing to pin, and the list above it still works.
+    name: "popup · pins on a tab that is not a work item",
+    page: {
+      name: "pop-pins-other",
+      ...POPUP,
+      seed: seedOf({ quickLinks: [{ id: "q9", name: "Elsewhere", enabled: true, prefix: "", url: "https://elsewhere.example.com/{{key}}" }] }),
+      local: { pePins: FULL_PINS.slice(0, 1) }
+    },
+    body: `
+      await waitFor(() => document.querySelectorAll("#pinList .pop-pin").length === 1, "the pinned row");
+      check("there is no button to press", () => ok(document.getElementById("pinItem").hidden, "offered on a tab with no item"));`
   },
   {
     // A site switched on from the popup while this page sits open with unsaved edits. The
@@ -2286,6 +2490,7 @@ const suites = [
     },
     body: `
       await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      ${JUMP_ROOM}
       const chips = () => [...document.querySelectorAll("#recentList .pop-recent-item")];
 
       check("the keys opened last are offered under the jump box", () => {
@@ -2299,18 +2504,7 @@ const suites = [
       // the first wording it grew ("Issue key, or words to search…") was cut off mid-word at
       // this width. Nothing else would have caught it: a truncated placeholder is not an
       // error, it is just a sentence you cannot read. Korean is measured in the pop-ko suite.
-      check("the jump placeholder fits the box it is in", () => {
-        const input = document.getElementById("jumpKey");
-        const probe = document.createElement("span");
-        const cs = getComputedStyle(input);
-        probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:" + cs.font;
-        probe.textContent = input.placeholder;
-        document.body.appendChild(probe);
-        const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        const need = probe.getBoundingClientRect().width;
-        probe.remove();
-        ok(need <= room, "placeholder needs " + Math.ceil(need) + "px, has " + Math.floor(room) + "px: " + input.placeholder);
-      });
+      check("the jump placeholder fits the box it is in", jumpRoom);
       check("a chip fits its row rather than stretching it", () => {
         const box = document.getElementById("recentList").getBoundingClientRect();
         for (const c of chips()) {
