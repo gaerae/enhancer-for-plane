@@ -10,22 +10,27 @@
   let currentTabTitle = "";
   let recent = [];
   let pins = [];
-  let pinTarget = null; // the work item in this tab, when a quick link recognises one
+  let tabItem = null; // the work item in this tab, when a quick link recognises one
   // The status line has more than one writer, and Re-scan's answer arrives a refresh and a
   // quarter of a second after it was asked for. Every writer moves this on; Re-scan's reply
   // only lands if nothing has since — otherwise switching the extension off mid-scan reads
   // "off" for an instant and then a green "ready" from the scan that was already out.
   let statusQuery = 0;
 
+  // The only way onto the line, so no writer can forget the counter.
+  function setStatus(text, tone) {
+    const el = $("domainStatus");
+    el.textContent = text;
+    el.className = tone ? "pop-status " + tone : "pop-status";
+    return ++statusQuery;
+  }
+
   function updateDomainStatus() {
-    ++statusQuery;
-    const statusEl = $("domainStatus");
     const addBtn = $("addDomain");
     const pickBtn = $("pickEl");
     const rescanBtn = $("rescan");
     if (!currentHost) {
-      statusEl.textContent = peMsg("popUnknown");
-      statusEl.className = "pop-status";
+      setStatus(peMsg("popUnknown"));
       addBtn.hidden = true;
       pickBtn.hidden = true;
       rescanBtn.hidden = true;
@@ -38,18 +43,15 @@
     rescanBtn.hidden = !active; // re-scan/self-heal is only relevant on active sites
     refreshFocusToggle(active);
     if (active) {
-      statusEl.textContent = peMsg("popActive", [currentHost]);
-      statusEl.className = "pop-status on";
+      setStatus(peMsg("popActive", [currentHost]), "on");
       addBtn.hidden = true;
     } else if (!state.enabled) {
       // The master switch is off everywhere, so this says nothing about the host — naming
       // it here was what made the switch above read as a per-site one.
-      statusEl.textContent = peMsg("popDisabled");
-      statusEl.className = "pop-status off";
+      setStatus(peMsg("popDisabled"), "off");
       addBtn.hidden = true;
     } else {
-      statusEl.textContent = peMsg("popInactive", [currentHost]);
-      statusEl.className = "pop-status off";
+      setStatus(peMsg("popInactive", [currentHost]), "off");
       addBtn.hidden = false;
     }
   }
@@ -89,14 +91,15 @@
   // quick link is configured; the target picker appears only when there is more than one.
   // It just opens a URL — no host permission, and it works regardless of the current site.
   function setupJump() {
-    const block = $("jumpBlock");
     const form = $("jumpForm");
     const input = $("jumpKey");
     const targetSel = $("jumpTarget");
     const links = (state.quickLinks || []).filter((l) => l && l.enabled !== false && String(l.url || "").trim());
-    if (!links.length) return; // nothing to jump to → leave the block (label + divider) hidden
+    if (!links.length) {
+      form.hidden = true; // nothing to jump to, and only the lists below can need the block
+      return;
+    }
 
-    block.hidden = false;
     if (links.length > 1) {
       // "Auto" routes by the key's prefix; the named rows force one target.
       targetSel.innerHTML = "";
@@ -139,7 +142,7 @@
         window.close();
         return;
       }
-      jumpTo(key, link ? peExpandQuickLink(link, key) : "", link);
+      jumpTo({ key, url: link ? peExpandQuickLink(link, key) : "", name: link && link.name });
     });
     input.focus();
   }
@@ -148,13 +151,44 @@
   // here: the next two lines destroy this page, and a storage write pending in a context
   // being torn down may never land. It is also the right shape — the jump happens now, and
   // bookkeeping never stands between the reader and the tab they asked for.
-  function jumpTo(key, url, link) {
+  function jumpTo({ key, url, name }) {
     if (!peIsHttpUrl(url)) return;
     try {
-      chrome.runtime.sendMessage({ type: "pe-remember-open", key, url, name: (link && link.name) || "" });
+      chrome.runtime.sendMessage({ type: "pe-remember-open", key, url, name });
     } catch (_) {}
     chrome.tabs.create({ url });
     window.close();
+  }
+
+  // A key with something beside it, that opens the item. Text only: a recent's name is the
+  // user's, but a pin's title is the tab's, so a page wrote it.
+  function keyButton(className, item, beside) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = className;
+    b.title = item.url;
+    const k = document.createElement("span");
+    k.className = "pop-recent-key";
+    k.textContent = item.key;
+    b.appendChild(k);
+    if (beside) {
+      const n = document.createElement("span");
+      n.className = "pop-recent-name";
+      n.textContent = beside;
+      b.appendChild(n);
+    }
+    b.addEventListener("click", () => jumpTo(item));
+    return b;
+  }
+
+  // Everything the jump block holds. The block shows while any of it does: the box needs a
+  // link, and the lists do not, because a pin and a recent carry their own address, and the
+  // × and Clear that take them away have to outlive the last link.
+  function renderLists() {
+    renderPins();
+    renderPinButton();
+    renderRecent();
+    $("jumpBlock").hidden = ["jumpForm", "pinList", "recentList"].every((id) => $(id).hidden);
   }
 
   // The keys opened last, as buttons. Same list the omnibox offers, in the other place the
@@ -166,26 +200,11 @@
       .filter((r) => peIsHttpUrl(r.url) && !peIsPinned(pins, r.url))
       .slice(0, 6);
     box.innerHTML = "";
-    box.hidden = !rows.length;
-    rows.forEach((r) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "pop-recent-item";
-      b.title = r.url;
-      const k = document.createElement("span");
-      k.className = "pop-recent-key";
-      k.textContent = r.key;
-      b.appendChild(k);
-      if (r.name) {
-        const n = document.createElement("span");
-        n.className = "pop-recent-name";
-        n.textContent = r.name;
-        b.appendChild(n);
-      }
-      b.addEventListener("click", () => jumpTo(r.key, r.url, { name: r.name }));
-      box.appendChild(b);
-    });
-    if (!rows.length) return;
+    box.hidden = !recent.length;
+    rows.forEach((r) => box.appendChild(keyButton("pop-recent-item", r, r.name)));
+    // By the list, not the row: with every recent pinned there are no chips, and the address
+    // bar still offers them.
+    if (!recent.length) return;
     // Forgetting the list used to take Restore defaults — every setting reset and every
     // site's access handed back, to clear six chips. It sits at the end of the row, where
     // the list ends, and asks nothing: the list rebuilds itself from the next jump, so a
@@ -198,28 +217,33 @@
     clear.setAttribute("aria-label", peMsg("popRecentClearTitle"));
     clear.addEventListener("click", () => {
       recent = [];
-      renderRecent();
+      renderLists();
       peSaveRecent([]);
     });
     box.appendChild(clear);
   }
 
-  // What the tab is, for the pin button. The canonical address rather than the tab's, for the
-  // reason setupCopy gives, and the same reason makes it comparable with what a pin stores.
-  function setupPin() {
+  // The work item this tab is, or null, read once so the pin and the copy block cannot disagree
+  // about it. The canonical form the template describes, not the address bar: Linear's address
+  // carries a title slug it redirects from, which is dead weight in a paste, and only the
+  // canonical form compares with what a pin stores.
+  function readTabItem() {
     const m = peMatchItemUrl(state.quickLinks || [], currentTabUrl);
-    if (!m) return; // not a work item, so there is nothing here to pin
-    const url = peExpandQuickLink(m.link, m.key);
-    if (!peIsHttpUrl(url)) return;
-    pinTarget = { key: m.key, url, name: m.link.name, title: peTitleFromDocTitle(currentTabTitle, m.key) };
-    $("pinItem").addEventListener("click", () => setPins(pePinToggle(pins, pinTarget)));
+    const url = m ? peExpandQuickLink(m.link, m.key) : "";
+    if (!peIsHttpUrl(url)) return null;
+    return { key: m.key, url, name: m.link.name, title: peTitleFromDocTitle(currentTabTitle, m.key) };
+  }
+
+  function setupPin() {
+    if (!tabItem) return;
+    $("pinItem").hidden = false;
+    $("pinItem").addEventListener("click", () => setPins(pePinToggle(pins, tabItem)));
   }
 
   // Only one popup can be open, so what it holds is the current list and needs no re-read.
   function setPins(list) {
     pins = list;
-    renderPins();
-    renderRecent();
+    renderLists();
     peSavePins(pins);
   }
 
@@ -230,18 +254,6 @@
     pins.forEach((p) => {
       const row = document.createElement("div");
       row.className = "pop-pin";
-      const open = document.createElement("button");
-      open.type = "button";
-      open.className = "pop-pin-open";
-      open.title = p.url;
-      const k = document.createElement("span");
-      k.className = "pop-recent-key";
-      k.textContent = p.key;
-      const t = document.createElement("span");
-      t.className = "pop-pin-title";
-      t.textContent = p.title || p.name;
-      open.append(k, t);
-      open.addEventListener("click", () => jumpTo(p.key, p.url, { name: p.name }));
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "pop-pin-remove";
@@ -249,22 +261,24 @@
       remove.title = peMsg("popPinRemove", [p.key]);
       remove.setAttribute("aria-label", peMsg("popPinRemove", [p.key]));
       remove.addEventListener("click", () => setPins(pePinToggle(pins, p)));
-      row.append(open, remove);
+      row.append(keyButton("pop-pin-open", p, p.title || p.name), remove);
       box.appendChild(row);
     });
+  }
 
+  function renderPinButton() {
+    if (!tabItem) return;
     const btn = $("pinItem");
-    if (!pinTarget) return;
-    const pinned = peIsPinned(pins, pinTarget.url);
+    const pinned = peIsPinned(pins, tabItem.url);
     const full = !pinned && pins.length >= PE_MAX_PINS;
     // The line has room for a word, so a full list shows its count, and the sentence goes
-    // to the tooltip and to a screen reader.
+    // to the tooltip and to a screen reader. Only the tooltip follows the state: aria-pressed
+    // says it is on, and a name that flipped too would read "unpin, pressed".
     const says = full ? peMsg("popPinFull", [String(PE_MAX_PINS)]) : peMsg("popPinAddTitle");
-    btn.hidden = false;
     btn.disabled = full;
     btn.setAttribute("aria-pressed", String(pinned));
     btn.textContent = full ? PE_MAX_PINS + "/" + PE_MAX_PINS : peMsg("popPinAdd");
-    btn.title = says;
+    btn.title = pinned ? peMsg("popPinRemove", [tabItem.key]) : says;
     btn.setAttribute("aria-label", says);
   }
 
@@ -275,17 +289,9 @@
   function setupCopy() {
     const block = $("copyBlock");
     const formats = (state.copyFormats || []).filter((f) => f && String(f.format || "").trim());
-    const m = peMatchItemUrl(state.quickLinks || [], currentTabUrl);
-    if (!m) return; // not a work item
-    const item = {
-      key: m.key,
-      title: peTitleFromDocTitle(currentTabTitle, m.key),
-      // The canonical form the template describes, not the address bar: Linear's address
-      // carries a title slug it redirects from, and that slug is dead weight in a paste.
-      url: peExpandQuickLink(m.link, m.key)
-    };
+    if (!tabItem) return; // not a work item
     block.hidden = false;
-    $("copyItem").textContent = item.title ? m.key + " " + item.title : m.key;
+    $("copyItem").textContent = tabItem.title ? tabItem.key + " " + tabItem.title : tabItem.key;
     // With no formats there is nothing to copy, but the line still names the item and holds
     // its pin, which must not depend on a list about something else.
     $("copyLabel").hidden = !formats.length;
@@ -296,10 +302,10 @@
       b.type = "button";
       b.className = "pop-btn ghost pop-copy-fmt";
       b.textContent = f.name || peMsg("menuUntitled");
-      const text = peExpandCopyFormat(f.format, item);
+      const text = peExpandCopyFormat(f.format, tabItem);
       b.title = text;
       b.addEventListener("click", async () => {
-        const missing = peMissingItemFields(f.format, item);
+        const missing = peMissingItemFields(f.format, tabItem);
         try {
           await navigator.clipboard.writeText(text);
         } catch (_) {
@@ -321,10 +327,10 @@
     peApplyI18n(document);
     $("enabled").checked = !!state.enabled;
     $("tplCount").textContent = peCountTemplates(peBuildTemplateSections(state, syncCache));
+    tabItem = readTabItem();
     setupJump();
     setupPin();
-    renderPins();
-    renderRecent();
+    renderLists();
     setupCopy();
     updateDomainStatus();
 
@@ -390,31 +396,18 @@
     // Force a re-scan (self-heal) on the current tab; keep the popup open for feedback.
     $("rescan").addEventListener("click", () => {
       if (currentTabId == null) return;
-      const statusEl = $("domainStatus");
-      const mine = ++statusQuery;
-      statusEl.textContent = peMsg("popRescanning");
-      statusEl.className = "pop-status";
+      const mine = setStatus(peMsg("popRescanning"));
       try {
         chrome.tabs.sendMessage(currentTabId, { type: "pe-rescan" }, (resp) => {
-          void chrome.runtime.lastError; // read before the early return, or Chrome logs it unchecked
+          const failed = chrome.runtime.lastError; // read before the early return, or Chrome logs it unchecked
           if (mine !== statusQuery) return; // the line has said something newer since
-          if (chrome.runtime.lastError || !resp) {
-            statusEl.textContent = peMsg("popNotLoaded");
-            statusEl.className = "pop-status off";
-          } else if (!resp.active) {
-            statusEl.textContent = peMsg("popInactiveHere");
-            statusEl.className = "pop-status off";
-          } else if (resp.buttons > 0) {
-            statusEl.textContent = peMsg("popRescanReady");
-            statusEl.className = "pop-status on";
-          } else {
-            statusEl.textContent = peMsg("popRescanOpen");
-            statusEl.className = "pop-status on";
-          }
+          if (failed || !resp) setStatus(peMsg("popNotLoaded"), "off");
+          else if (!resp.active) setStatus(peMsg("popInactiveHere"), "off");
+          else if (resp.buttons > 0) setStatus(peMsg("popRescanReady"), "on");
+          else setStatus(peMsg("popRescanOpen"), "on");
         });
       } catch (_) {
-        statusEl.textContent = peMsg("popNotLoadedShort");
-        statusEl.className = "pop-status off";
+        setStatus(peMsg("popNotLoadedShort"), "off");
       }
     });
 
@@ -436,10 +429,7 @@
           if (!granted) {
             state.domains = (state.domains || []).filter((d) => d !== currentHost);
             peSaveSettings(state);
-            ++statusQuery;
-            const statusEl = $("domainStatus");
-            statusEl.textContent = peMsg("popPermNeeded", [currentHost]);
-            statusEl.className = "pop-status off";
+            setStatus(peMsg("popPermNeeded", [currentHost]), "off");
             return;
           }
           $("enabled").checked = true;

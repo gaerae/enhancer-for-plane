@@ -142,7 +142,14 @@ input:checked + .switch {
 input:checked + .switch::after {
   transform: translateX(17px);
 }
-.pop-jump-block[hidden] {
+.pop-jump-block[hidden],
+.pop-jump[hidden],
+.pop-jump-target[hidden],
+.pop-recent[hidden],
+.pop-pins[hidden],
+.pop-copy-block[hidden],
+.pop-perm[hidden],
+.pop-focus[hidden] {
   display: none;
 }
 /* Group heading. Shared by every block in the popup so the groups read as siblings. */
@@ -186,9 +193,6 @@ input:checked + .switch::after {
   background: #fff;
   color: var(--text);
 }
-.pop-jump-target[hidden] {
-  display: none;
-}
 .pop-jump-go {
   flex: 0 0 auto;
   padding: 0 12px;
@@ -210,9 +214,6 @@ input:checked + .switch::after {
   flex-wrap: wrap;
   gap: 5px;
   margin-top: 7px;
-}
-.pop-recent[hidden] {
-  display: none;
 }
 .pop-recent-item {
   display: inline-flex;
@@ -267,9 +268,6 @@ input:checked + .switch::after {
   gap: 3px;
   margin-top: 7px;
 }
-.pop-pins[hidden] {
-  display: none;
-}
 .pop-pin {
   display: flex;
   align-items: center;
@@ -298,13 +296,6 @@ input:checked + .switch::after {
 .pop-pin-open .pop-recent-key {
   flex: none;
   white-space: nowrap;
-}
-.pop-pin-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
 }
 .pop-pin-remove {
   flex: none;
@@ -342,9 +333,6 @@ input:checked + .switch::after {
 .pop-pin-toggle:disabled {
   color: var(--muted);
   cursor: default;
-}
-.pop-copy-block[hidden] {
-  display: none;
 }
 /* Which item is about to be copied. One line: the popup is 300px and a wrapped title would
    push the buttons below the fold. */
@@ -417,9 +405,6 @@ input:checked + .switch::after {
   line-height: 1.45;
   cursor: pointer;
 }
-.pop-perm[hidden] {
-  display: none;
-}
 .pop-perm:hover {
   border-color: #e6bf5c;
 }
@@ -449,9 +434,6 @@ input:checked + .switch::after {
    switch's — .pop-toggle itself carries none. */
 .pop-focus {
   margin-top: 8px;
-}
-.pop-focus[hidden] {
-  display: none;
 }
 .pop-btn {
   width: 100%;

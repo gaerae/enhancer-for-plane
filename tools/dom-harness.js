@@ -321,13 +321,16 @@ const STDERR_LOG = path.join(OUT, "chrome-stderr.log");
 // What a launch that failed actually said. execFileSync's own message is the command line and
 // nothing else, which is how a failure on five pages a run stayed uncharacterised.
 function exitDetail(e) {
-  const how = e.signal ? `killed by ${e.signal}` : `exit ${e.status}`;
+  // No status means the process never ran: ENOENT from a bad PE_CHROME, EACCES from a file that
+  // is not executable. Reading "exit null" there is how this function lost the cause it exists for.
+  const how = e.signal ? `killed by ${e.signal}` : e.status == null ? String(e.code || e.message) : `exit ${e.status}`;
   let tail = "";
   try {
     tail = fs.readFileSync(STDERR_LOG, "utf8").trim().split("\n").slice(-3).join(" | ");
   } catch (_) {}
   return tail ? `${how}: ${tail.slice(-300)}` : `${how}, nothing on stderr`;
 }
+const RESULTS_RE = /<pre id="pe-results">([\s\S]*?)<\/pre>/;
 function launchOnce(chrome, page, hash) {
   const url = fileUrl(page) + (hash || "");
   let dom = "";
@@ -376,7 +379,7 @@ function launchOnce(chrome, page, hash) {
     // A Chrome that dumped the page and then stalled on its way out has already done the
     // work: the timeout error carries what it wrote. Read that before calling it a hang.
     const partial = timedOut && typeof e.stdout === "string" ? e.stdout : "";
-    if (/<pre id="pe-results">[\s\S]*?<\/pre>/.test(partial)) {
+    if (RESULTS_RE.test(partial)) {
       return { timedOut: false, stalled: true, results: readResults(page, partial) };
     }
     // The message reads the constant rather than restating it: it said 60s while the timeout
@@ -389,7 +392,7 @@ function launchOnce(chrome, page, hash) {
   return { timedOut: false, results: readResults(page, dom) };
 }
 function readResults(page, dom) {
-  const m = dom.match(/<pre id="pe-results">([\s\S]*?)<\/pre>/);
+  const m = dom.match(RESULTS_RE);
   if (!m) {
     return [{ name: `${path.basename(page)} — no results`, pass: false, detail: "the page never reported; it probably threw before reporting" }];
   }
@@ -511,13 +514,14 @@ const PLANE = `
 </div>`;
 
 // A description editor with an attach button six levels up — self-hosted Plane 1.4's shape,
-// the same one ct-tmpl's "shallow" case builds. Appended to PLANE for the anchor suites, so
-// the page has both anchors: this toolbar, and the item header PLANE already carries.
+// the same one ct-tmpl's "shallow" case builds.
+const anchorBox = (box, editor, attach = "") =>
+  `<div id="${box}"><div><div><div><div>${editor}</div></div></div></div>` +
+  `<button type="button" aria-label="Attach"${attach}><input type="file" /></button></div>`;
+// Appended to PLANE for the anchor suites, so the page has both anchors: this toolbar, and the
+// item header PLANE already carries.
 const ANCHOR_EDITOR =
-  `<div id="editors"><div id="box"><div><div><div><div>` +
-  `<div class="ProseMirror" id="ed"><p>description</p></div>` +
-  `</div></div></div></div>` +
-  `<button type="button" aria-label="Attach" id="attach"><input type="file" /></button></div></div>`;
+  `<div id="editors">` + anchorBox("box", `<div class="ProseMirror" id="ed"><p>description</p></div>`, ` id="attach"`) + `</div>`;
 
 // Both anchor suites open the same way: both buttons placed, then the first route sample
 // written. Waiting for the buttons first is what makes the sample's numbers mean something.
@@ -867,7 +871,7 @@ const suites = [
 
       check("a pinned item shows its key and its title", () => {
         eq(rows().map(keyOf).join(), "PROJ-1");
-        eq(rows()[0].querySelector(".pop-pin-title").textContent, '<img src=x id="hostile">Old item');
+        eq(rows()[0].querySelector(".pop-recent-name").textContent, '<img src=x id="hostile">Old item');
       });
       check("and that title is text, whatever the page wrote", () => {
         eq(document.querySelectorAll("#hostile").length, 0, "a tab title became an element");
@@ -899,6 +903,12 @@ const suites = [
         eq(btn().getAttribute("aria-pressed"), "true");
         ok(getComputedStyle(btn()).backgroundColor !== off, "pressed looks identical to unpressed");
       });
+      // The word on the button stays: aria-pressed is what says it is on, and a name that
+      // flipped as well would read "unpin, pressed". The tooltip has no pressed state to lean on.
+      check("its tooltip says what the next click does", () => {
+        eq(btn().title, peMsg("popPinRemove", ["PROJ-7"]));
+        eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
+      });
       check("a pinned item is not also offered as a recent chip", () => eq(chips().join(), "ENG-9"));
 
       btn().click();
@@ -928,13 +938,58 @@ const suites = [
       });`
   },
   {
+    // A pin carries its own address, so it does not need a link to open, and the reader who
+    // removes their last link still has to be able to reach the × the privacy policy promises.
+    // The one recent is the one pin, because that empties the row of chips while the address
+    // bar still offers it, and Clear has to outlive them.
+    name: "popup · pins and recents with no quick link",
+    page: {
+      name: "pop-pins-nolink",
+      ...POPUP,
+      seed: seedOf({ quickLinks: [] }),
+      local: {
+        peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }],
+        pePins: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", title: "" }]
+      }
+    },
+    body: `
+      await waitFor(() => !document.getElementById("domainStatus").textContent.includes("Checking"), "the popup to resolve");
+      const block = () => document.getElementById("jumpBlock");
+      const shown = (e) => !!(e && e.getClientRects().length);
+      check("the lists are on screen", () => {
+        ok(shown(document.querySelector("#pinList .pop-pin-remove")), "a pin nobody can remove");
+        ok(shown(document.querySelector("#recentList .pop-recent-clear")), "a list nobody can clear");
+      });
+      check("the box that needs a link is not", () => ok(!shown(document.getElementById("jumpForm")), "a form that can open nothing"));
+      check("Clear stays while the list it clears exists, with no chip left to show", () => {
+        eq(document.querySelectorAll("#recentList .pop-recent-item").length, 0);
+      });
+      check("a pin with no title falls back to its target's name", () => {
+        eq(document.querySelector("#pinList .pop-recent-name").textContent, "Plane");
+      });
+      check("a tab no link recognises has nothing to pin", () => ok(document.getElementById("pinItem").hidden, "offered with no item"));
+      document.querySelector("#pinList .pop-pin-remove").click();
+      check("taking the pin off leaves the block for what is still in it", () => {
+        eq(window.__LOCAL.pePins.length, 0);
+        ok(!block().hidden, "the recents went with it");
+      });
+      document.querySelector("#recentList .pop-recent-clear").click();
+      check("with nothing left, the block goes", () => ok(block().hidden, "a heading over nothing"));`
+  },
+  {
     // Refusing silently would read as a broken button, and the tooltip on a disabled control
     // is the last place anyone looks, so the count is on the button itself.
     name: "popup · a full list of pins",
-    page: { name: "pop-pins-full", ...POPUP, seed: seedOf(), local: { pePins: FULL_PINS } },
+    page: { name: "pop-pins-full", ...POPUP, seed: seedOf({ copyFormats: [] }), local: { pePins: FULL_PINS } },
     body: `
       await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
       const btn = () => document.getElementById("pinItem");
+      // Someone who deleted every copy format has not opted out of pinning.
+      check("the item's line stays, without the heading for a feature with nothing to show", () => {
+        ok(!document.getElementById("copyBlock").hidden, "the block is gone, and the pin with it");
+        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect");
+        ok(document.getElementById("copyLabel").getClientRects().length === 0, "a heading over nothing");
+      });
       check("a seventh is refused, and the button says why", () => {
         ok(btn().disabled, "the button is live");
         eq(btn().textContent, "6/6");
@@ -960,51 +1015,14 @@ const suites = [
         ok(!btn().disabled, "still disabled");
         eq(btn().textContent, peMsg("popPinAdd"));
         eq(btn().getAttribute("aria-label"), peMsg("popPinAddTitle"));
-      });`
-  },
-  {
-    // Someone who deleted every copy format has not opted out of pinning.
-    name: "popup · pinning with no copy format",
-    page: { name: "pop-pins-noformat", ...POPUP, seed: seedOf({ copyFormats: [] }) },
-    body: `
-      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
-      check("the item's line stays, without the heading for a feature with nothing to show", () => {
-        ok(!document.getElementById("copyBlock").hidden, "the block is gone, and the pin with it");
-        eq(document.getElementById("copyItem").textContent, "PROJ-7 Fix the login redirect");
-        ok(document.getElementById("copyLabel").getClientRects().length === 0, "a heading over nothing");
-      });`
-  },
-  {
-    // The item in the tab can be one of the six, and then the button is its way out.
-    name: "popup · a full list holding the item in the tab",
-    page: {
-      name: "pop-pins-self",
-      ...POPUP,
-      seed: seedOf(),
-      local: { pePins: FULL_PINS.slice(0, 5).concat({ key: "PROJ-7", url: "https://plane.example.com/acme/browse/PROJ-7", name: "Plane", title: "" }) }
-    },
-    body: `
-      await waitFor(() => !document.getElementById("pinItem").hidden, "the pin button");
-      check("the button stays live, because unpinning needs no room", () => {
-        ok(!document.getElementById("pinItem").disabled, "disabled");
-        eq(document.getElementById("pinItem").getAttribute("aria-pressed"), "true");
       });
-      check("and a pin with no title falls back to its target's name", () => {
-        eq(document.querySelectorAll("#pinList .pop-pin-title")[5].textContent, "Plane");
+      btn().click();
+      // The item in the tab can be one of the six, and then the button is its way out.
+      check("a full list holding the tab's item leaves the button live, because unpinning needs no room", () => {
+        eq(window.__LOCAL.pePins.length, 6);
+        ok(!btn().disabled, "disabled");
+        eq(btn().getAttribute("aria-pressed"), "true");
       });`
-  },
-  {
-    // A tab no link recognises has nothing to pin, and the list above it still works.
-    name: "popup · pins on a tab that is not a work item",
-    page: {
-      name: "pop-pins-other",
-      ...POPUP,
-      seed: seedOf({ quickLinks: [{ id: "q9", name: "Elsewhere", enabled: true, prefix: "", url: "https://elsewhere.example.com/{{key}}" }] }),
-      local: { pePins: FULL_PINS.slice(0, 1) }
-    },
-    body: `
-      await waitFor(() => document.querySelectorAll("#pinList .pop-pin").length === 1, "the pinned row");
-      check("there is no button to press", () => ok(document.getElementById("pinItem").hidden, "offered on a tab with no item"));`
   },
   {
     // A site switched on from the popup while this page sits open with unsaved edits. The
@@ -1392,14 +1410,8 @@ const suites = [
       name: "ct-menu",
       plane:
         PLANE +
-        `<div id="box-a"><div><div><div><div>` +
-        `<div class="ProseMirror" contenteditable="true" id="ed-a"><p>first</p></div>` +
-        `</div></div></div></div>` +
-        `<button type="button" aria-label="Attach"><input type="file" /></button></div>` +
-        `<div id="box-b"><div><div><div><div>` +
-        `<div class="ProseMirror" contenteditable="true" id="ed-b"><p>second</p></div>` +
-        `</div></div></div></div>` +
-        `<button type="button" aria-label="Attach"><input type="file" /></button></div>`,
+        anchorBox("box-a", `<div class="ProseMirror" contenteditable="true" id="ed-a"><p>first</p></div>`) +
+        anchorBox("box-b", `<div class="ProseMirror" contenteditable="true" id="ed-b"><p>second</p></div>`),
       seed: seedOf({
         allDomains: true,
         templates: [

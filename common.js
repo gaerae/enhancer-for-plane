@@ -1848,9 +1848,12 @@ function peRouteQuickLink(links, key) {
   if (!usable.length) return null;
   let best = null;
   let bestLen = -1;
+  // In either case: a URL is matched without it (peMatchQuickLink) and a selection dedupes
+  // without it, so "eng-5" is the item "ENG-5" is, and has to reach the same target.
+  const upper = k.toUpperCase();
   for (const l of usable) {
     const p = String(l.prefix || "");
-    if (p && k.startsWith(p) && p.length > bestLen) {
+    if (p && upper.startsWith(p.toUpperCase()) && p.length > bestLen) {
       best = l;
       bestLen = p.length;
     }
@@ -2177,10 +2180,11 @@ function peLooksLikeKey(text) {
   return PE_ITEM_KEY_RE.test(String(text == null ? "" : text).trim());
 }
 
-// How many keys one selection may open. Selecting a whole release note should open a handful
-// of tabs, not forty — and the menu entry cannot warn first, because Chrome offers no hook
-// before a context menu shows. Past this it is a page that was selected rather than a list of
-// items, so the first ones win and Settings' Quick open card says where the line is.
+// How many tabs one selection may open. Selecting a whole release note should open a handful,
+// not forty — and the menu entry cannot warn first, because Chrome offers no hook before a
+// context menu shows. Past this it is a page that was selected rather than a list of items, so
+// the first ones win and Settings' Quick open card says where the line is. Counted where the
+// tabs open rather than here, or keys with no target would use it up.
 const PE_MAX_SELECTION_KEYS = 10;
 
 // The work item keys in a lump of text, in the order written, each once. For the context
@@ -2189,14 +2193,16 @@ const PE_MAX_SELECTION_KEYS = 10;
 // it.
 //
 // Scanned by token rather than by a loose global regex so the same shape rule decides here
-// as everywhere else. Punctuation around a key is stripped (a trailing full stop, brackets
-// in a PR title) but the key itself is never guessed at.
+// as everywhere else. Whatever cannot be part of a word ends a token, so PROJ-1/PROJ-2 is two
+// keys however they were joined, while a hyphen or an underscore holds one together:
+// PROJ-123-add-login is a branch name, not the item it mentions. The key itself is never
+// guessed at.
 function peKeysFromText(text) {
-  const words = String(text == null ? "" : text).split(/[\s,;"'`()[\]{}<>]+/);
+  const words = String(text == null ? "" : text).split(/[^A-Za-z0-9_-]+/);
   const keys = [];
   const seen = new Set();
   for (const w of words) {
-    const t = w.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "");
+    const t = w.replace(/^[_-]+/, "").replace(/[_-]+$/, "");
     if (!peLooksLikeKey(t)) continue;
     // A year-month gets past the key shape whenever the month is not zero-padded — "2026-10"
     // is a valid key for a project whose identifier is "2026". PE_ITEM_KEY_RE lets it
@@ -2208,9 +2214,13 @@ function peKeysFromText(text) {
     if (seen.has(id)) continue;
     seen.add(id);
     keys.push(t);
-    if (keys.length === PE_MAX_SELECTION_KEYS) break;
   }
-  return keys;
+  // A key can be all digits, and so can "2-3 days" or a phone number, and nothing in the token
+  // says which. A selection holding a key with letters in it has said what its keys look like,
+  // so the numbers beside it are numbers. Alone they are still keys: someone on a numbered
+  // project selects "42-7 and 42-8" and means them. UTF-8 and SHA-256 have no such tell.
+  const named = keys.filter((k) => /[A-Za-z]/.test(k));
+  return named.length ? named : keys;
 }
 
 // A quick link read backwards: which item, if any, does this URL name?
@@ -2226,9 +2236,10 @@ function peKeysFromText(text) {
 // peExpandQuickLink writes. Trailing path, query and hash are allowed after the match,
 // because a real address carries them: Linear redirects /issue/GAE-2 to
 // /issue/GAE-2/connect-your-tools and Plane's browse links end in a slash (both measured
-// 2026-08-08).
-function peMatchQuickLink(template, url) {
-  const t = String(template == null ? "" : template);
+// 2026-08-08). An address that holds only the number, as GitHub's and GitLab's do, gets its
+// project from the link's prefix: that is the half peExpandQuickLink drops on the way out.
+function peMatchQuickLink(link, url) {
+  const t = String((link && link.url) || "");
   const u = String(url == null ? "" : url);
   if (!t || !u) return "";
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2270,7 +2281,8 @@ function peMatchQuickLink(template, url) {
     }
     parts[name] = v;
   });
-  const key = (parts.key || (parts.proj && parts.num ? parts.proj + "-" + parts.num : "")).trim();
+  const proj = parts.proj || String(link.prefix == null ? "" : link.prefix).trim().replace(/-$/, "");
+  const key = (parts.key || (proj && parts.num ? proj + "-" + parts.num : "")).trim();
   // The shape check is not politeness — it is what stops a template from claiming a page it
   // has no business claiming. Without it "…/browse/{{key}}" answers "settings" for
   // /browse/settings, and the popup offers to copy a reference to a word.
@@ -2287,7 +2299,7 @@ function peMatchItemUrl(links, url) {
     .filter((l) => l && typeof l === "object" && l.enabled !== false && l.url)
     .sort((a, b) => String(b.url).length - String(a.url).length);
   for (const l of usable) {
-    const key = peMatchQuickLink(l.url, url);
+    const key = peMatchQuickLink(l, url);
     if (key) return { key, link: l };
   }
   return null;
@@ -2382,7 +2394,7 @@ function pePinEntry(e) {
     key,
     url,
     name: String(o.name == null ? "" : o.name),
-    title: String(o.title == null ? "" : o.title).slice(0, PE_MAX_PIN_TITLE)
+    title: peClampStr(o.title, PE_MAX_PIN_TITLE)
   };
 }
 function pePinsClean(list) {
@@ -2397,7 +2409,7 @@ function pePinToggle(list, entry) {
   const pins = pePinsClean(list);
   const e = pePinEntry(entry);
   if (!e) return pins;
-  if (pins.some((p) => p.url === e.url)) return pins.filter((p) => p.url !== e.url);
+  if (peIsPinned(pins, e.url)) return pins.filter((p) => p.url !== e.url);
   return pins.length < PE_MAX_PINS ? pins.concat(e) : pins;
 }
 
