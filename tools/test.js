@@ -4019,6 +4019,282 @@ test("copy: Korean prose enumerates with commas, not a chain of middots", () => 
   eq(bad, [], "three or more items chained with 가운뎃점 — use commas or 와/과: " + bad.join(", "));
 });
 
+/* ---------- store submission ----------
+   tools/store-submit.js talks to three services and runs for real only when a release is
+   published, which cannot be undone. So everything it decides is proved here, against a
+   stub offering what the script calls and nothing else. What this cannot prove is that
+   Google accepts the requests: the shapes below come from Google's own auth action. */
+
+const store = require("./store-submit.js");
+const ZIP = Buffer.from("the release zip");
+const ZIP_DIGEST = "sha256:" + require("crypto").createHash("sha256").update(ZIP).digest("hex");
+const STORE_PROVIDER = "projects/123/locations/global/workloadIdentityPools/pool/providers/github";
+const STORE_ENV = {
+  RELEASE_TAG: "v1.13.0",
+  GITHUB_REPOSITORY: "o/r",
+  GITHUB_TOKEN: "repo-token",
+  ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.test/token?run=1",
+  ACTIONS_ID_TOKEN_REQUEST_TOKEN: "runner-secret",
+  GCP_WORKLOAD_PROVIDER: STORE_PROVIDER,
+  GCP_SERVICE_ACCOUNT: "cws@p.iam.gserviceaccount.com",
+  CWS_PUBLISHER_ID: "pub",
+  CWS_EXTENSION_ID: "ext"
+};
+const LIVE_1_12 = { state: "PUBLISHED", distributionChannels: [{ deployPercentage: 100, crxVersion: "1.12.0" }] };
+
+function storeRig(over = {}) {
+  const rig = { calls: [], warnings: [], slept: 0, compared: [] };
+  const statuses = over.statuses || [{ publishedItemRevisionStatus: LIVE_1_12 }];
+  const json = (body, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(body) });
+  const routes = [
+    ["release", /api\.github\.com\/repos\/o\/r\/releases\/tags\/v1\.13\.0$/, () =>
+      over.release || json({
+        assets: [{ name: "enhancer-for-plane-1.13.0.zip", digest: over.digest || ZIP_DIGEST, browser_download_url: "https://dl.test/z.zip" }]
+      })],
+    ["oidc", /^https:\/\/oidc\.test\/token/, () => json({ value: "github-jwt" })],
+    ["sts", /^https:\/\/sts\.googleapis\.com\/v1\/token$/, () => over.sts || json({ access_token: "federated" })],
+    ["iam", /^https:\/\/iamcredentials\.googleapis\.com\/v1\/projects\/-\/serviceAccounts\/.+:generateAccessToken$/, () =>
+      json({ accessToken: "store-token" })],
+    ["zip", /^https:\/\/dl\.test\/z\.zip$/, () => ({ ok: true, status: 200, arrayBuffer: async () => ZIP })],
+    ["upload", /^https:\/\/chromewebstore\.googleapis\.com\/upload\/v2\/publishers\/pub\/items\/ext:upload$/, () =>
+      json(over.upload || { uploadState: "SUCCEEDED", crxVersion: "1.13.0" })],
+    ["status", /^https:\/\/chromewebstore\.googleapis\.com\/v2\/publishers\/pub\/items\/ext:fetchStatus$/, () =>
+      over.statusResponse || json(statuses.length > 1 ? statuses.shift() : statuses[0])],
+    ["publish", /^https:\/\/chromewebstore\.googleapis\.com\/v2\/publishers\/pub\/items\/ext:publish$/, () =>
+      json(over.publish || { state: "PENDING_REVIEW" })]
+  ];
+  rig.io = {
+    fetch: async (url, init = {}) => {
+      const route = routes.find(([, re]) => re.test(String(url)));
+      if (!route) throw new Error("unexpected request: " + url);
+      rig.calls.push({ name: route[0], url: String(url), init });
+      return route[2]();
+    },
+    sleep: async () => { rig.slept++; },
+    warn: (text) => rig.warnings.push(text),
+    listingChanges: (from, to) => {
+      rig.compared.push([from, to]);
+      return over.listing === undefined ? [] : over.listing;
+    }
+  };
+  rig.names = () => rig.calls.map((c) => c.name);
+  rig.call = (name) => rig.calls.find((c) => c.name === name);
+  return rig;
+}
+const storeRefusal = async (rig, env = STORE_ENV) => {
+  try {
+    await store.submit(env, rig.io);
+  } catch (e) {
+    return e.message;
+  }
+  throw new Error("expected the run to stop");
+};
+
+test("store: a release reaches review through federation, with no stored credential", async () => {
+  const rig = storeRig();
+  const done = await store.submit(STORE_ENV, rig.io);
+  eq(rig.names(), ["release", "oidc", "sts", "iam", "status", "zip", "upload", "publish"], "order");
+  eq(done.submitted, true, "reported as submitted");
+  match(done.message, /1\.13\.0.*PENDING_REVIEW/, "the summary names version and state");
+
+  const oidc = rig.call("oidc");
+  eq(new URL(oidc.url).searchParams.get("audience"), "https://iam.googleapis.com/" + STORE_PROVIDER, "OIDC audience");
+  eq(oidc.init.headers.Authorization, "Bearer runner-secret", "OIDC request auth");
+
+  const sts = rig.call("sts");
+  eq(JSON.parse(sts.init.body), {
+    audience: "//iam.googleapis.com/" + STORE_PROVIDER,
+    grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+    requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    subjectToken: "github-jwt",
+    subjectTokenType: "urn:ietf:params:oauth:token-type:jwt"
+  }, "STS body");
+  eq(sts.init.headers.Authorization, undefined, "STS's reference says not to send Authorization");
+
+  const iam = rig.call("iam");
+  match(iam.url, /serviceAccounts\/cws@p\.iam\.gserviceaccount\.com:generateAccessToken$/, "impersonated account");
+  eq(iam.init.headers.Authorization, "Bearer federated", "IAM call uses the federated token");
+  eq(JSON.parse(iam.init.body).scope, ["https://www.googleapis.com/auth/chromewebstore"], "only the store scope");
+
+  const up = rig.call("upload");
+  eq(up.init.method, "POST", "upload method");
+  ok(Buffer.from(up.init.body).equals(ZIP), "the body is the release's zip");
+  eq(up.init.headers.Authorization, "Bearer store-token", "upload auth");
+  eq(rig.call("publish").init.method, "POST", "publish method");
+  eq(rig.call("release").init.headers.Authorization, "Bearer repo-token", "the shared runner IP would otherwise hit GitHub's anonymous limit");
+  eq(rig.compared, [["v1.12.0", "v1.13.0"]], "compared against what the store is serving, not the previous tag");
+});
+
+test("store: an upload still processing is polled to the end, in either spelling Google documents", async () => {
+  for (const spelling of ["IN_PROGRESS", "UPLOAD_IN_PROGRESS"]) {
+    const live = { publishedItemRevisionStatus: LIVE_1_12 };
+    const rig = storeRig({
+      upload: { uploadState: spelling },
+      statuses: [live, { ...live, lastAsyncUploadState: "IN_PROGRESS" }, { ...live, lastAsyncUploadState: "SUCCEEDED" }]
+    });
+    await store.submit(STORE_ENV, rig.io);
+    eq(rig.slept, 2, spelling + ": one wait per unfinished poll");
+    eq(rig.names().filter((n) => n === "publish").length, 1, spelling + ": submitted once it finished");
+  }
+});
+
+test("store: an upload that fails or never finishes is not submitted", async () => {
+  const live = { publishedItemRevisionStatus: LIVE_1_12 };
+  const failed = storeRig({ upload: { uploadState: "FAILED", itemError: [{ error_detail: "bad manifest" }] } });
+  match(await storeRefusal(failed), /upload.*FAILED.*bad manifest/, "says what the store said");
+  ok(!failed.names().includes("publish"), "a failed upload is not submitted");
+
+  const hung = storeRig({ upload: { uploadState: "IN_PROGRESS" }, statuses: [live, { ...live, lastAsyncUploadState: "IN_PROGRESS" }] });
+  match(await storeRefusal(hung), /IN_PROGRESS/, "says where it stopped");
+  ok(!hung.names().includes("publish"), "an unfinished upload is not submitted");
+
+  const lost = storeRig({ upload: { uploadState: "IN_PROGRESS" }, statuses: [live, { ...live, lastAsyncUploadState: "NOT_FOUND" }] });
+  match(await storeRefusal(lost), /NOT_FOUND/, "an upload the store lost is a failure, not a success");
+});
+
+test("store: a draft cannot be sent, so the Publish click stays the gate", async () => {
+  const rig = storeRig({ release: { ok: false, status: 404, text: async () => "{}" } });
+  match(await storeRefusal(rig), /v1\.13\.0.*Publish/, "says why");
+  eq(rig.names(), ["release"], "Google is not asked for anything");
+});
+
+test("store: a zip that is not the release's bytes is not uploaded", async () => {
+  const rig = storeRig({ digest: "sha256:" + "0".repeat(64) });
+  match(await storeRefusal(rig), /digest/i, "says why");
+  ok(!rig.names().includes("upload"), "nothing reaches the store");
+});
+
+test("store: a release without the expected zip stops, naming the file it looked for", async () => {
+  const rig = storeRig({ release: { ok: true, status: 200, text: async () => JSON.stringify({ assets: [{ name: "other.zip" }] }) } });
+  match(await storeRefusal(rig), /enhancer-for-plane-1\.13\.0\.zip/, "names the file");
+  eq(rig.names(), ["release"], "before any token exists");
+});
+
+test("store: running it again changes nothing once the version is at the store", async () => {
+  const atStore = [
+    { publishedItemRevisionStatus: { state: "PUBLISHED", distributionChannels: [{ crxVersion: "1.13.0" }] } },
+    { publishedItemRevisionStatus: LIVE_1_12, submittedItemRevisionStatus: { state: "PENDING_REVIEW", distributionChannels: [{ crxVersion: "1.13.0" }] } },
+    { publishedItemRevisionStatus: LIVE_1_12, submittedItemRevisionStatus: { state: "STAGED", distributionChannels: [{ crxVersion: "1.13.0" }] } }
+  ];
+  for (const status of atStore) {
+    const rig = storeRig({ statuses: [status] });
+    const done = await store.submit(STORE_ENV, rig.io);
+    eq(done.submitted, false, "nothing new was submitted");
+    match(done.message, /already/, "says so");
+    ok(!rig.names().includes("upload"), "no second upload");
+  }
+});
+
+test("store: a version the store turned down can be sent again", async () => {
+  const rig = storeRig({
+    statuses: [{ publishedItemRevisionStatus: LIVE_1_12, submittedItemRevisionStatus: { state: "REJECTED", distributionChannels: [{ crxVersion: "1.13.0" }] } }]
+  });
+  eq((await store.submit(STORE_ENV, rig.io)).submitted, true, "a rejection is not 'already there'");
+});
+
+test("store: an older version still in review stops the run before it uploads", async () => {
+  const rig = storeRig({
+    statuses: [{ publishedItemRevisionStatus: LIVE_1_12, submittedItemRevisionStatus: { state: "PENDING_REVIEW", distributionChannels: [{ crxVersion: "1.12.1" }] } }]
+  });
+  match(await storeRefusal(rig), /1\.12\.1.*review/, "names what is in the way");
+  ok(!rig.names().includes("upload"), "nothing is uploaded on top of a review");
+});
+
+test("store: changed store copy uploads but does not submit, and the run is not green", async () => {
+  const rig = storeRig({ listing: ["store-assets/STORE_LISTING.md"] });
+  const message = await storeRefusal(rig);
+  match(message, /store-assets\/STORE_LISTING\.md/, "names what changed");
+  match(message, /1\.12\.0/, "names what it was compared against");
+  match(message, /Submit for review/, "says what to do next");
+  ok(rig.names().includes("upload"), "the package is waiting in the dashboard");
+  ok(!rig.names().includes("publish"), "stale copy is not sent to review");
+});
+
+test("store: when nothing can be compared, it stops rather than assumes", async () => {
+  const unknownTag = storeRig({ listing: null });
+  match(await storeRefusal(unknownTag), /Submit for review/, "a comparison that failed is not 'no change'");
+  ok(!unknownTag.names().includes("publish"), "not submitted");
+
+  const neverPublished = storeRig({ statuses: [{}] });
+  neverPublished.io.listingChanges = () => { throw new Error("nothing to compare against"); };
+  match(await storeRefusal(neverPublished), /Submit for review/, "no published version is not 'no change' either");
+  ok(!neverPublished.names().includes("publish"), "not submitted");
+});
+
+test("store: warnings from the submission reach the run, not the void", async () => {
+  const rig = storeRig({
+    publish: { state: "PENDING_REVIEW", warningInfo: { warnings: [{ reason: "PERMISSION", description: "broad host access" }] } }
+  });
+  await store.submit(STORE_ENV, rig.io);
+  eq(rig.warnings, ["PERMISSION: broad host access"], "warning text");
+});
+
+test("store: a refused request reports Google's answer and never a token", async () => {
+  const rig = storeRig({ sts: { ok: false, status: 403, text: async () => '{"error":"unauthorized_client"}' } });
+  const message = await storeRefusal(rig);
+  match(message, /403.*unauthorized_client/, "status and body");
+  ok(!/github-jwt|runner-secret/.test(message), "no credential in the message");
+
+  const denied = storeRig({ statusResponse: { ok: false, status: 403, text: async () => '{"error":{"status":"PERMISSION_DENIED"}}' } });
+  match(await storeRefusal(denied), /403.*PERMISSION_DENIED/, "store refusal");
+});
+
+test("store: a missing setting is named before anything is requested", async () => {
+  for (const name of Object.keys(STORE_ENV)) {
+    const rig = storeRig();
+    const message = await storeRefusal(rig, { ...STORE_ENV, [name]: "" });
+    match(message, new RegExp(name), "names " + name);
+    eq(rig.names(), [], name + ": no request made");
+  }
+});
+
+test("store: only a release tag is accepted, because Run workflow takes free text", async () => {
+  for (const tag of ["1.13.0", "main", "v1.13", "--output=x", "v1.13.0;x"]) {
+    const rig = storeRig();
+    match(await storeRefusal(rig, { ...STORE_ENV, RELEASE_TAG: tag }), /is not a release tag/, JSON.stringify(tag));
+    eq(rig.names(), [], tag + ": no request made");
+  }
+});
+
+test("store: the listing comparison reads real git, and failure is not 'unchanged'", () => {
+  const { execFileSync } = require("child_process");
+  const dir = fs.mkdtempSync(path.join(require("os").tmpdir(), "pe-store-"));
+  const git = (...args) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, stdio: "pipe" });
+  try {
+    git("init", "-q");
+    fs.mkdirSync(path.join(dir, "store-assets"));
+    fs.writeFileSync(path.join(dir, "store-assets/STORE_LISTING.md"), "one");
+    fs.writeFileSync(path.join(dir, "manifest.json"), "{}");
+    git("add", ".");
+    git("commit", "-qm", "a");
+    git("tag", "v1.0.0");
+    fs.writeFileSync(path.join(dir, "manifest.json"), '{"a":1}');
+    git("commit", "-qam", "b");
+    git("tag", "v1.1.0");
+    fs.writeFileSync(path.join(dir, "store-assets/STORE_LISTING.md"), "two");
+    git("commit", "-qam", "c");
+    git("tag", "v1.2.0");
+    eq(store.listingChanges("v1.0.0", "v1.1.0", dir), [], "a release that left the copy alone");
+    eq(store.listingChanges("v1.1.0", "v1.2.0", dir), ["store-assets/STORE_LISTING.md"], "a release that changed it");
+    eq(store.listingChanges("v0.9.0", "v1.2.0", dir), null, "an unknown tag means unknown, not unchanged");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("store: the workflow waits for the Publish click and keeps the store credential to itself", () => {
+  const yml = read(".github/workflows/store.yml");
+  match(yml, /release:\s+types: \[published\]/, "fires on Publish, not on the draft release.yml makes");
+  match(yml, /environment: chrome-web-store/, "the Google binding names this environment");
+  match(read(".github/workflows/release.yml"), /enhancer-for-plane-\$\{VERSION\}\.zip/, "the zip name store-submit.js looks for");
+  for (const name of fs.readdirSync(path.join(ROOT, ".github/workflows"))) {
+    if (name === "store.yml") continue;
+    ok(!read(".github/workflows/" + name).includes("id-token"), name + " has no reason to hold an identity token");
+  }
+});
+
 /* ---------- run ---------- */
 
 // A test that awaits something which never settles does not fail — node runs out of work

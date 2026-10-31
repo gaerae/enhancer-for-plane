@@ -483,9 +483,15 @@ Chrome으로 페이지를 띄워서 봅니다(콘텐츠 스크립트에는 배�
 4. 자동 생성된 커밋 목록 위에 릴리스 노트를 쓰고 **Publish**를 누릅니다. `v<버전>` 태그는
    이때 생깁니다. 설정의 버전 번호가 이 노트로 연결되므로, 누군가 노트를 쓰기 전에는 아무것도
    공개되지 않게 했습니다.
+5. Publish를 누르면 스토어로도 갑니다.
+   [.github/workflows/store.yml](.github/workflows/store.yml)이 그 zip을 Chrome 웹스토어에
+   올리고 심사를 요청합니다.
+6. 스토어에 게시된 버전 이후로 `store-assets/`가 바뀌었다면, 실행은 zip만 올리고 실패로
+   멈춥니다. API로는 등록 정보 문구를 고칠 수 없기 때문입니다. 대시보드에서 문구를 고친 뒤
+   거기서 **Submit for review**를 누릅니다.
 
-이후 Release에서 zip을 내려받아(초안의 첨부 파일도 내려받을 수 있습니다) Chrome 웹스토어
-대시보드에 업로드합니다.
+실행이 실패했을 때처럼 게시된 릴리스를 다시 보내려면 **Actions ▸ Store ▸ Run workflow**를
+씁니다. Google 쪽 최초 설정은 [Packaging](store-assets/STORE_LISTING.md#packaging)에 있습니다.
 
 ## 라이선스
 

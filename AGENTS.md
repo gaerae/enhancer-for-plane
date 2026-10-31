@@ -434,6 +434,28 @@ lies:
   which is why this sits on top of `--draft` instead of fighting it. Check the zip before
   pressing Publish.
 
+- **The store gets a release when someone presses Publish, and the listing stays a human
+  step.** `store.yml` fires on `release: published`, so the draft stays the gate, and
+  `store-submit.js` reads releases through the endpoint that serves published ones only, so
+  Run workflow cannot get past it. Upload and submission are automated and nothing else can
+  be: the API has no call for listing text, and the audit before v1.12.0 found a storage
+  justification that had fallen behind the code. So when `store-assets/` differs from what the
+  store is serving, the run uploads, refuses to submit, and goes red. Red on purpose: a green
+  run here would read as "submitted", and a person has to act. The comparison is against the
+  version `fetchStatus` says is published, not the previous tag, because a tag that never
+  reached the store says nothing about what reviewers last saw. A comparison that failed
+  counts as a change.
+
+  There is no key to leak or rotate. The run's GitHub identity is exchanged at Google for a
+  token that lasts fifteen minutes, on a service account whose only power is that the dashboard
+  names it, and Google trusts only this repository's id in the `chrome-web-store` environment,
+  which admits only `main` and `v*`. Google's store docs show impersonation through `gcloud`
+  and never mention federation; underneath both is the same `generateAccessToken` call, and
+  only the caller differs. `google-github-actions/auth` would do this in one step, and it is
+  not used because `allowed_actions` is GitHub-owned only and three `fetch` calls were not
+  worth widening that. `tools/test.js` proves every decision against a stub, but the request
+  shapes are copied from that action's source, and only a real run can prove Google takes them.
+
 - **Every action is pinned to a commit.** `@v7` is a pointer its owner can move, and
   `release.yml` runs with `contents: write`. `check-source.js` fails a tag or a pin with no
   `# vX.Y.Z` beside it; that comment is what Dependabot rewrites along with the SHA.
