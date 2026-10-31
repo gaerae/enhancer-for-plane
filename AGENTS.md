@@ -50,8 +50,9 @@ changed anything a user sees, drive it:
   Keep the positive and negative cases on one page — `settings` arrives asynchronously, and
   while it is null the script reports "not active" for the same reason an unenabled site does,
   so a suite that opens on an inactive site cannot tell a refusal from a slow start.
-- **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness has two,
-  `ct-picker` and `ct-picker-plain`; extend those rather than guessing.
+- **Template picker (`content.js`)**: needs a page with a `.ProseMirror` element. `ct-tmpl`
+  builds one, as does `ANCHOR_EDITOR`; start from those rather than guessing. `ct-picker` is
+  the element picker, a different feature.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
   leaf `<button>` whose text is a key — and, for the peek-panel path, a second harness
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
