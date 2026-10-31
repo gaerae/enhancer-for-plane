@@ -427,6 +427,17 @@ lies:
   **draft**. Write the body, then publish; the tag is created on publish. Do not take the
   `--draft` back out to save the click: the click is the point.
 
+- **A published release cannot be redone, and that is the setting doing its job.** Immutable
+  releases are on (since 2026-10-30): publishing locks the zip and the tag, and deleting the
+  release does not free the tag name, so a bad zip means a new version rather than a replaced
+  asset. The title and notes stay editable and a draft stays editable until it is published,
+  which is why this sits on top of `--draft` instead of fighting it. Check the zip before
+  pressing Publish.
+
+- **Every action is pinned to a commit.** `@v7` is a pointer its owner can move, and
+  `release.yml` runs with `contents: write`. `check-source.js` fails a tag or a pin with no
+  `# vX.Y.Z` beside it; that comment is what Dependabot rewrites along with the SHA.
+
 - **A CHANGELOG date is the release's date, not the day you wrote the entry.** The entry
   gets written before the version bump is pushed, and `release.yml` cuts the release
   whenever that push lands — so an evening's writing released the next morning leaves a
