@@ -457,7 +457,7 @@ function ensureContextMenu() {
     chrome.contextMenus.create(
       {
         id: PE_CTX_ID,
-        title: peMsg("ctxOpenSelection") || "Open work item from selection",
+        title: peMsg("ctxOpenSelection") || "Open work items from selection",
         contexts: ["selection"]
       },
       () => void (chrome.runtime && chrome.runtime.lastError)
@@ -468,21 +468,27 @@ function ensureContextMenu() {
 if (chrome.contextMenus) {
   chrome.contextMenus.onClicked.addListener((info) => {
     if (!info || info.menuItemId !== PE_CTX_ID) return;
-    const key = peKeyFromText(info.selectionText);
-    if (!key) return; // no key in what was selected — a menu entry that does nothing is the
-    // honest outcome here, because the alternative is opening something the reader did not
+    const keys = peKeysFromText(info.selectionText);
+    if (!keys.length) return; // no key in what was selected — a menu entry that does nothing is
+    // the honest outcome here, because the alternative is opening something the reader did not
     // point at. The item only appears on a selection, so this is not a dead end they can sit in.
     peGetSettings().then((settings) => {
-      const link = peRouteQuickLink(peEnabledQuickLinks(settings), key);
-      const url = link ? peExpandQuickLink(link, key) : "";
-      if (!peIsHttpUrl(url)) {
+      const links = peEnabledQuickLinks(settings);
+      const jumps = [];
+      for (const key of keys) {
+        const link = peRouteQuickLink(links, key);
+        const url = link ? peExpandQuickLink(link, key) : "";
+        if (peIsHttpUrl(url)) jumps.push({ key, url, name: (link && link.name) || "" });
+      }
+      if (!jumps.length) {
         chrome.runtime.openOptionsPage();
         return;
       }
-      // A new tab, always: the selection is on a page the reader was reading, and replacing
-      // it with the work item would lose their place.
-      chrome.tabs.create({ url });
-      peRememberOpened(key, url, link);
+      // New tabs, always: the selection is on a page the reader was reading, and replacing it
+      // with the work item would lose their place. Only the first takes the window, so a
+      // selection of one behaves as it always did and the rest wait behind it.
+      jumps.forEach((j, i) => chrome.tabs.create({ url: j.url, active: i === 0 }));
+      peRememberOpened(jumps);
     });
   });
 }
@@ -545,7 +551,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // calls window.close() in the same breath, and a storage write left pending in a context
   // that is being torn down is a write that may never land. No reply — the caller is gone.
   if (msg && msg.type === "pe-remember-open") {
-    peRememberOpened(msg.key, msg.url, { name: msg.name });
+    peRememberOpened([{ key: msg.key, url: msg.url, name: msg.name }]);
     return;
   }
   if (msg && msg.type === "pe-sync-now") {
@@ -623,12 +629,15 @@ function peOpenUrl(url, disposition) {
   }
 }
 
-// Remember a jump, so the omnibox can offer it back. Fire-and-forget: a jump that opened is
+// Remember jumps, so the omnibox can offer them back. Fire-and-forget: a jump that opened is
 // the outcome the reader wanted, and a failed bookkeeping write must not be allowed to look
-// like a failed jump.
-function peRememberOpened(key, url, link) {
+// like a failed jump. One read and one write however many there are: the list is a single
+// item, so a write per jump would each start from the list before the others, and only the
+// last would land. Folded from the end so the first jump ends up on top.
+function peRememberOpened(jumps) {
+  const now = Date.now();
   peGetRecent()
-    .then((list) => peSaveRecent(peRecentAdd(list, { key, url, name: (link && link.name) || "" }, Date.now())))
+    .then((list) => peSaveRecent(jumps.reduceRight((acc, j) => peRecentAdd(acc, j, now), list)))
     .catch(() => {});
 }
 
@@ -746,7 +755,7 @@ if (chrome.omnibox) {
       // right: a phrase is not an item.
       peGetSettings().then((settings) => {
         const m = peMatchItemUrl(peEnabledQuickLinks(settings), entered);
-        if (m) peRememberOpened(m.key, entered, m.link);
+        if (m) peRememberOpened([{ key: m.key, url: entered, name: m.link && m.link.name }]);
       });
       omniReset();
       return;
@@ -767,7 +776,7 @@ if (chrome.omnibox) {
       const url = chosen ? peExpandQuickLink(chosen, entered) : "";
       if (peIsHttpUrl(url)) {
         peOpenUrl(url, disposition);
-        peRememberOpened(entered, url, chosen);
+        peRememberOpened([{ key: entered, url, name: chosen && chosen.name }]);
       } else chrome.runtime.openOptionsPage(); // nothing configured, or a bad url — send them to set one
       omniReset();
     });

@@ -48,6 +48,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
+  "\n;globalThis.__MAX_SELECTION_KEYS = PE_MAX_SELECTION_KEYS;" +
   "\n;globalThis.PE_QUICK_EXAMPLES = PE_QUICK_EXAMPLES;" +
   "\n;globalThis.PE_QUICK_PARTS = PE_QUICK_PARTS;" +
   "\n;globalThis.__MAX_VARS = PE_MAX_VARIABLES;" +
@@ -168,7 +169,7 @@ function chromeItemBytes(key, value) {
 
 function loadWorker({ settings, respond, granted = true }) {
   const noop = { addListener() {} };
-  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [], recent: [], opened: [] };
+  const state = { settings, cache: { bySource: {} }, writes: [], fetched: [], recent: [], opened: [], created: [] };
   const ctx = {
     console,
     URL,
@@ -236,7 +237,14 @@ function loadWorker({ settings, respond, granted = true }) {
         create: (o, cb) => { state.menu = o; cb && cb(); },
         onClicked: { addListener: (f) => (state.onMenu = f) }
       },
-      tabs: { query: async () => [], create: (o) => state.opened.push(o.url), update: () => {} },
+      tabs: {
+        query: async () => [],
+        create: (o) => {
+          state.opened.push(o.url);
+          state.created.push(o);
+        },
+        update: () => {}
+      },
       storage: {
         // Hand back a copy, exactly as chrome.storage does — it structured-clones on
         // read, so a caller can never mutate stored state by writing to what it read.
@@ -1660,21 +1668,49 @@ test("search: a phrase is expanded into the target's search URL", () => {
 });
 
 // The context menu's whole job. What gets selected on a page is a sentence, not a key.
-test("selection: the key is found inside whatever was selected", () => {
-  const { peKeyFromText } = loadCommon();
-  eq(peKeyFromText("blocked by PROJ-123 until Friday"), "PROJ-123");
-  eq(peKeyFromText("PROJ-123"), "PROJ-123");
-  eq(peKeyFromText("see (PROJ-123)."), "PROJ-123", "punctuation around it is not part of it");
-  eq(peKeyFromText("fix: GAE-2, GAE-3"), "GAE-2", "the first one wins");
-  eq(peKeyFromText("배포 전에 DATA-5 확인"), "DATA-5", "and the surrounding text need not be English");
-  eq(peKeyFromText("nothing to see here"), "");
+test("selection: every key is found inside whatever was selected", () => {
+  const { peKeysFromText } = loadCommon();
+  eq(peKeysFromText("blocked by PROJ-123 until Friday"), ["PROJ-123"]);
+  eq(peKeysFromText("PROJ-123"), ["PROJ-123"]);
+  eq(peKeysFromText("see (PROJ-123)."), ["PROJ-123"], "punctuation around it is not part of it");
+  eq(peKeysFromText("fix: GAE-2, GAE-3"), ["GAE-2", "GAE-3"], "in the order they were written");
+  eq(peKeysFromText("배포 전에 DATA-5 확인"), ["DATA-5"], "and the surrounding text need not be English");
+  eq(peKeysFromText("nothing to see here"), []);
   // Prose is full of dates. The key shape alone lets "2026-10" through (it is a valid key
   // for a project called 2026), which is a fair trade everywhere except here.
-  eq(peKeyFromText("released 2026-07 and 2026-10"), "", "neither form of a year-month");
-  eq(peKeyFromText("shipped in 1999-9"), "", "including a two-digit-year-looking one");
-  eq(peKeyFromText("2026-13 is not a month"), "2026-13", "and a 13th month is a key again");
-  eq(peKeyFromText(""), "");
-  eq(peKeyFromText(null), "");
+  eq(peKeysFromText("released 2026-07 and 2026-10"), [], "neither form of a year-month");
+  eq(peKeysFromText("shipped in 1999-9"), [], "including a two-digit-year-looking one");
+  eq(peKeysFromText("2026-13 is not a month"), ["2026-13"], "and a 13th month is a key again");
+  eq(peKeysFromText(""), []);
+  eq(peKeysFromText(null), []);
+});
+
+// A release note names the same item twice, and two tabs on one item help nobody. Plane
+// redirects a lowercase key to the same page, so case does not make it a second item.
+test("selection: a key mentioned twice is one key, spelled as it first appeared", () => {
+  const { peKeysFromText } = loadCommon();
+  eq(peKeysFromText("A-1 then B-2 then A-1 again"), ["A-1", "B-2"]);
+  eq(peKeysFromText("proj-5 and PROJ-5"), ["proj-5"]);
+});
+
+// What stands between a selected page and a window of forty tabs.
+test("selection: the keys stop at the cap, keeping the first ones", () => {
+  const ctx = loadCommon();
+  const keys = Array.from({ length: ctx.__MAX_SELECTION_KEYS + 5 }, (_, i) => "K-" + (i + 1));
+  const got = ctx.peKeysFromText(keys.join(" "));
+  eq(got.length, ctx.__MAX_SELECTION_KEYS);
+  eq(got[got.length - 1], "K-" + ctx.__MAX_SELECTION_KEYS);
+});
+
+// Settings quotes the cap as a digit, because it is a number someone may need to look up
+// after a selection opened fewer tabs than it held. The menu entry cannot say it: Chrome has
+// no hook before a context menu shows, so its title is fixed.
+test("selection: the card states the cap the code enforces, in both locales", () => {
+  const ctx = loadCommon();
+  for (const lang of ["en", "ko"]) {
+    const msg = JSON.parse(read("_locales/" + lang + "/messages.json"));
+    ok(msg.optQuickDesc.message.indexOf(String(ctx.__MAX_SELECTION_KEYS)) > -1, lang + " does not state the cap");
+  }
 });
 
 test("recent: newest first, one row per key, capped", () => {
@@ -2067,6 +2103,63 @@ test("menu: a key is opened out of the middle of a selection", async () => {
   await tick();
   eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "opened in a new tab");
   eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "and remembered like any other jump");
+});
+
+test("menu: every key in a selection opens, the first in front and the rest behind it", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "fixed GAERA-6, GAERA-7 and GAE-2" });
+  await tick();
+  await tick();
+  eq(
+    w.state.opened,
+    [
+      "https://app.plane.so/gaerae/browse/GAERA-6",
+      "https://app.plane.so/gaerae/browse/GAERA-7",
+      "https://linear.app/gaerae/issue/GAE-2"
+    ],
+    "each through its own prefix's target, in the order written"
+  );
+  eq(w.state.created.map((o) => o.active), [true, false, false], "only the first takes the window");
+});
+
+// Three opens are three read-modify-writes of one list if each remembers for itself, and
+// they all read it before any of them has written. Only the last key would survive, and
+// nothing about the tabs that opened would say so.
+test("menu: a selection of keys is remembered whole, the first on top", async () => {
+  const w = loadOmnibox();
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "GAERA-6 GAERA-7 GAE-2" });
+  await tick();
+  await tick();
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6", "GAERA-7", "GAE-2"]);
+  eq(w.state.recent.map((r) => r.name), [Q_PLANE.name, Q_PLANE.name, Q_LINEAR.name]);
+});
+
+// A key no target can build a URL for must not cost the ones that can: the reader asked for
+// all of them, and Settings is the answer only when nothing could open.
+test("menu: a key with no target does not stop the others", async () => {
+  const dead = { id: "q3", name: "Dead", enabled: true, prefix: "BAD-", url: "javascript:void('{{key}}')" };
+  const w = loadOmnibox({ quickLinks: [Q_PLANE, dead] });
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "BAD-1 GAERA-6" });
+  await tick();
+  await tick();
+  eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "the key that resolves still opens");
+  eq(w.state.created[0].active, true, "and it is the one in front, being the first that opened");
+  eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "only what opened is remembered");
+  ok(!w.state.openedOptions, "and Settings stays closed");
+});
+
+test("menu: when no key in the selection can open, Settings is the way forward", async () => {
+  const dead = { id: "q3", name: "Dead", enabled: true, prefix: "", url: "javascript:void('{{key}}')" };
+  const w = loadOmnibox({ quickLinks: [dead] });
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "GAERA-6 GAERA-7" });
+  await tick();
+  await tick();
+  eq(w.state.opened, [], "nothing opened");
+  ok(w.state.openedOptions, "and the reader is sent to set a link up");
 });
 
 test("menu: a selection with no key in it opens nothing", async () => {

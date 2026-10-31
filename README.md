@@ -67,9 +67,10 @@ someone else's text.
 - **Address bar.** Type `issue`, a space, then a key like `PROJ-123` — Enter opens it. The
   same input is in the toolbar popup.
 - **Right-click.** A key almost never arrives as a key; it arrives inside a sentence, in a
-  Slack message or a PR title. Select it anywhere, right-click, and choose **Open work item
-  from selection**. Chrome hands over the selected text; the page is never read. This is the
-  one entry point that needs nothing typed.
+  Slack message or a PR title. Select it anywhere, right-click, and choose **Open work items
+  from selection**. Several keys open in their own tabs, up to 10 at a time. Chrome hands over
+  the selected text; the page is never read. This is the one entry point that needs nothing
+  typed.
 - **Adding a link is a paste.** Copy the address of a work item you have open and paste it
   into Settings ▸ **Work items** — a known tracker is recognised and both URLs are filled,
   search included. Nothing open? Start from an example row: Plane, Jira, Linear, GitHub,
@@ -442,7 +443,7 @@ a missing browser is a failure rather than a quiet pass. Contributor rules live 
   tab's hostname to show status and offer "Enable on this site," and messages the
   tab to start the element picker. Limited to the tab you invoked it on.
 - `contextMenus` — adds one right-click entry, shown only when text is selected, that reads
-  a work item key out of the selection and opens it. Chrome hands over the selected text; the
+  work item keys out of the selection and opens them. Chrome hands over the selected text; the
   page itself is never read, and the entry appears on no other kind of click.
 - `scripting` — registers/injects the content script on the specific origins you
   grant (see below).
