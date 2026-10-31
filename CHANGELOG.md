@@ -20,9 +20,11 @@ Schema unchanged.
   items opened one. Each key now opens in its own tab through its own target, up to 10 at a
   time; the first comes to the front and the rest wait behind it, so a selection of one works
   as it did. A key that cannot open does not stop the others, and Settings opens only when
-  none could. The entry is now called **Open work items from selection**. Anything key-shaped
-  counts, so `UTF-8` in a selection opens a tab that goes nowhere; that was already true when
-  it came first.
+  none could, and the 10 counts tabs, so a key that cannot open does not use one up. Keys come
+  apart at any separator, not just a space or a comma, so `PROJ-1/PROJ-2` is two. Numbers such
+  as `2-3` are skipped when the selection also holds a key with letters in it. The entry is now
+  called **Open work items from selection**. Anything else key-shaped counts, so `UTF-8` in a
+  selection opens a tab that goes nowhere; that was already true when it came first.
 - **Pin the work items you keep returning to.** On a work item's tab, **Pin** at the end of
   the popup's item line keeps it above the recents, with its title, until you take it off.
   Recents roll off after twelve jumps and never held an item reached by clicking inside the

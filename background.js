@@ -478,7 +478,8 @@ if (chrome.contextMenus) {
       for (const key of keys) {
         const link = peRouteQuickLink(links, key);
         const url = link ? peExpandQuickLink(link, key) : "";
-        if (peIsHttpUrl(url)) jumps.push({ key, url, name: (link && link.name) || "" });
+        if (peIsHttpUrl(url)) jumps.push({ key, url, name: link.name });
+        if (jumps.length === PE_MAX_SELECTION_KEYS) break;
       }
       if (!jumps.length) {
         chrome.runtime.openOptionsPage();
@@ -755,7 +756,7 @@ if (chrome.omnibox) {
       // right: a phrase is not an item.
       peGetSettings().then((settings) => {
         const m = peMatchItemUrl(peEnabledQuickLinks(settings), entered);
-        if (m) peRememberOpened([{ key: m.key, url: entered, name: m.link && m.link.name }]);
+        if (m) peRememberOpened([{ key: m.key, url: entered, name: m.link.name }]);
       });
       omniReset();
       return;
@@ -776,7 +777,7 @@ if (chrome.omnibox) {
       const url = chosen ? peExpandQuickLink(chosen, entered) : "";
       if (peIsHttpUrl(url)) {
         peOpenUrl(url, disposition);
-        peRememberOpened([{ key: entered, url, name: chosen && chosen.name }]);
+        peRememberOpened([{ key: entered, url, name: chosen.name }]);
       } else chrome.runtime.openOptionsPage(); // nothing configured, or a bad url — send them to set one
       omniReset();
     });

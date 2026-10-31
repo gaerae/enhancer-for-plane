@@ -1580,6 +1580,7 @@ test("quick: routing picks the longest matching prefix, else the empty-prefix de
     { id: "infra", prefix: "ENG-INFRA-", url: "https://infra.test/{{key}}" }
   ];
   eq(peRouteQuickLink(links, "ENG-12").id, "linear", "prefix match");
+  eq(peRouteQuickLink(links, "eng-12").id, "linear", "in either case, which is how a selection and a URL read a key");
   eq(peRouteQuickLink(links, "ENG-INFRA-9").id, "infra", "longest prefix wins over a shorter one");
   eq(peRouteQuickLink(links, "DATA-3").id, "plane", "no prefix match falls back to the empty-prefix default");
   eq(peRouteQuickLink(links, ""), null, "an empty key routes nowhere");
@@ -1641,6 +1642,8 @@ test("quick: the schema is stamped and a v5 user gains an empty quickLinks list"
 
 // Real templates from real workspaces, 2026-08-08.
 const Q_PLANE = { id: "q1", name: "Plane", enabled: true, prefix: "", url: "https://app.plane.so/gaerae/browse/{{key}}", searchUrl: "https://app.plane.so/gaerae/search?q={{q}}" };
+// A target no address can be built from, for the keys that cannot open.
+const Q_DEAD = { id: "q3", name: "Dead", enabled: true, prefix: "BAD-", url: "javascript:void('{{key}}')" };
 const Q_LINEAR = { id: "q2", name: "Linear", enabled: true, prefix: "GAE-", url: "https://linear.app/gaerae/issue/{{key}}" };
 
 // The whole disambiguation between "open this" and "find this". It has to be decidable
@@ -1695,13 +1698,33 @@ test("selection: a key mentioned twice is one key, spelled as it first appeared"
   eq(peKeysFromText("proj-5 and PROJ-5"), ["proj-5"]);
 });
 
-// What stands between a selected page and a window of forty tabs.
-test("selection: the keys stop at the cap, keeping the first ones", () => {
-  const ctx = loadCommon();
-  const keys = Array.from({ length: ctx.__MAX_SELECTION_KEYS + 5 }, (_, i) => "K-" + (i + 1));
-  const got = ctx.peKeysFromText(keys.join(" "));
-  eq(got.length, ctx.__MAX_SELECTION_KEYS);
-  eq(got[got.length - 1], "K-" + ctx.__MAX_SELECTION_KEYS);
+// A list of keys is written with whatever was to hand, and a whole-token test turned every
+// one of these into a word that was not a key: nothing opened, and nothing said why.
+test("selection: keys come apart at any separator, not just a space or a comma", () => {
+  const { peKeysFromText } = loadCommon();
+  eq(peKeysFromText("feat(PROJ-1/PROJ-2) PROJ-3|PROJ-4"), ["PROJ-1", "PROJ-2", "PROJ-3", "PROJ-4"]);
+  eq(peKeysFromText("PROJ-5\u00b7PROJ-6 PROJ-7\u3001PROJ-8 PROJ-9\u2192PROJ-10"), ["PROJ-5", "PROJ-6", "PROJ-7", "PROJ-8", "PROJ-9", "PROJ-10"]);
+  eq(peKeysFromText("https://app.plane.so/gaerae/browse/GAERA-6/"), ["GAERA-6"], "a pasted address is a separator too");
+  eq(peKeysFromText("*PROJ-1* _PROJ-2_ -PROJ-3-"), ["PROJ-1", "PROJ-2", "PROJ-3"], "markup around a key is not part of it");
+});
+
+// The other half of that test: splitting must not manufacture a key out of something longer.
+test("selection: a key inside a longer token stays inside it", () => {
+  const { peKeysFromText } = loadCommon();
+  eq(peKeysFromText("feature/PROJ-123-add-login"), [], "a branch name is not the item it mentions");
+  eq(peKeysFromText("due 2026-10-31"), [], "a full date");
+  eq(peKeysFromText("snake_case-1"), [], "an underscore joins, so this is one word");
+});
+
+// A digits-only key is real (AGENTS.md: a project identifier can be all digits), and so is
+// "2-3 days". Nothing tells them apart on its own, but a selection that also names a key with
+// letters in it has said what its keys look like.
+test("selection: numbers beside a real key are numbers", () => {
+  const { peKeysFromText } = loadCommon();
+  eq(peKeysFromText("PROJ-1 takes 2-3 days, see pages 10-20"), ["PROJ-1"]);
+  eq(peKeysFromText("call 010-1234 about GAE-2"), ["GAE-2"]);
+  eq(peKeysFromText("42-7 and 42-8"), ["42-7", "42-8"], "a selection of nothing else still means them");
+  eq(peKeysFromText("42-7"), ["42-7"]);
 });
 
 // Settings quotes the cap as a digit, because it is a number someone may need to look up
@@ -1823,6 +1846,14 @@ test("tab: the popup can name the item from a URL and a title alone", () => {
   eq(ctx.peTitleFromDocTitle("gaerae - 작업 항목", "GAERA-2"), "");
   // A template must validate what it captured or it claims pages it has no business claiming.
   eq(ctx.peMatchItemUrl(links, "https://app.plane.so/gaerae/browse/settings"), null);
+  // GitHub's number is the whole of what its address holds, and the link's prefix is the rest
+  // of the key. Without it the shipped GitHub and GitLab examples recognised no tab at all.
+  const gh = { id: "g", enabled: true, name: "GitHub", prefix: "GH-", url: "https://github.com/o/r/issues/{{key.num}}" };
+  const hit = ctx.peMatchItemUrl([gh], "https://github.com/o/r/issues/1234");
+  eq(hit && hit.key, "GH-1234", "a numbers-only template takes the project from its prefix");
+  eq(ctx.peExpandQuickLink(gh, "GH-1234"), "https://github.com/o/r/issues/1234", "and that key builds the same address back");
+  eq(ctx.peMatchItemUrl([gh], "https://github.com/o/r/issues/new"), null, "the shape check still stands");
+  eq(ctx.peMatchItemUrl([{ ...gh, prefix: "" }], "https://github.com/o/r/issues/1234"), null, "with no prefix there is no key to name");
   eq(ctx.peMatchItemUrl([], "https://app.plane.so/gaerae/browse/GAERA-6"), null, "nothing configured, nothing claimed");
 
   // Jira, measured on a real site 2026-08-08: the key leads but is bracketed, and the site
@@ -2147,6 +2178,14 @@ test("omnibox: a picked row is remembered as the item it resolves to", async () 
   eq(w.state.recent[0].name, "Linear");
 });
 
+// The menu is built on install, and what it does lands two ticks after the click.
+async function selectText(w, text) {
+  w.state.onInstalled();
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: text });
+  await tick();
+  await tick();
+}
+
 test("menu: a key is opened out of the middle of a selection", async () => {
   const w = loadOmnibox();
   w.state.onInstalled(); // the menu is built on install, which is the wiring under test
@@ -2160,10 +2199,7 @@ test("menu: a key is opened out of the middle of a selection", async () => {
 
 test("menu: every key in a selection opens, the first in front and the rest behind it", async () => {
   const w = loadOmnibox();
-  w.state.onInstalled();
-  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "fixed GAERA-6, GAERA-7 and GAE-2" });
-  await tick();
-  await tick();
+  await selectText(w, "fixed GAERA-6, GAERA-7 and GAE-2");
   eq(
     w.state.opened,
     [
@@ -2181,10 +2217,7 @@ test("menu: every key in a selection opens, the first in front and the rest behi
 // nothing about the tabs that opened would say so.
 test("menu: a selection of keys is remembered whole, the first on top", async () => {
   const w = loadOmnibox();
-  w.state.onInstalled();
-  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "GAERA-6 GAERA-7 GAE-2" });
-  await tick();
-  await tick();
+  await selectText(w, "GAERA-6 GAERA-7 GAE-2");
   eq(w.state.recent.map((r) => r.key), ["GAERA-6", "GAERA-7", "GAE-2"]);
   eq(w.state.recent.map((r) => r.name), [Q_PLANE.name, Q_PLANE.name, Q_LINEAR.name]);
 });
@@ -2192,35 +2225,58 @@ test("menu: a selection of keys is remembered whole, the first on top", async ()
 // A key no target can build a URL for must not cost the ones that can: the reader asked for
 // all of them, and Settings is the answer only when nothing could open.
 test("menu: a key with no target does not stop the others", async () => {
-  const dead = { id: "q3", name: "Dead", enabled: true, prefix: "BAD-", url: "javascript:void('{{key}}')" };
-  const w = loadOmnibox({ quickLinks: [Q_PLANE, dead] });
-  w.state.onInstalled();
-  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "BAD-1 GAERA-6" });
-  await tick();
-  await tick();
+  const w = loadOmnibox({ quickLinks: [Q_PLANE, Q_DEAD] });
+  await selectText(w, "BAD-1 GAERA-6");
   eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "the key that resolves still opens");
   eq(w.state.created[0].active, true, "and it is the one in front, being the first that opened");
   eq(w.state.recent.map((r) => r.key), ["GAERA-6"], "only what opened is remembered");
   ok(!w.state.openedOptions, "and Settings stays closed");
 });
 
-test("menu: when no key in the selection can open, Settings is the way forward", async () => {
-  const dead = { id: "q3", name: "Dead", enabled: true, prefix: "", url: "javascript:void('{{key}}')" };
-  const w = loadOmnibox({ quickLinks: [dead] });
+// What stands between a selected page and a window of forty tabs. It counts tabs, not keys:
+// counted at the parse, ten keys with no target would use up the cap and hide the eleventh.
+test("menu: the cap counts tabs, keeping the first ones", async () => {
+  const w = loadOmnibox();
   w.state.onInstalled();
-  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "GAERA-6 GAERA-7" });
+  const n = loadCommon().__MAX_SELECTION_KEYS;
+  const keys = Array.from({ length: n + 5 }, (_, i) => "K-" + (i + 1));
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: keys.join(" ") });
   await tick();
   await tick();
+  eq(w.state.opened.length, n);
+  ok(w.state.opened[n - 1].endsWith("/K-" + n), "the last one through is the last under the cap");
+});
+
+test("menu: a key that cannot open spends none of the cap", async () => {
+  const w = loadOmnibox({ quickLinks: [Q_PLANE, Q_DEAD] });
+  w.state.onInstalled();
+  const n = loadCommon().__MAX_SELECTION_KEYS;
+  const bad = Array.from({ length: n }, (_, i) => "BAD-" + (i + 1));
+  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: bad.join(" ") + " GAERA-6" });
+  await tick();
+  await tick();
+  eq(w.state.opened, ["https://app.plane.so/gaerae/browse/GAERA-6"], "the eleventh key was the one that could open");
+  ok(!w.state.openedOptions, "and Settings stays closed");
+});
+
+// Dedupe reads a key in either case, so routing has to: the spelling that survived sent the
+// item to the default target, and the tracker the selection named never opened.
+test("menu: a key spelled two ways goes to the target its prefix names", async () => {
+  const w = loadOmnibox({ quickLinks: [Q_PLANE, { ...Q_LINEAR, prefix: "ENG-" }] });
+  await selectText(w, "eng-5 and ENG-5");
+  eq(w.state.opened, ["https://linear.app/gaerae/issue/eng-5"]);
+});
+
+test("menu: when no key in the selection can open, Settings is the way forward", async () => {
+  const w = loadOmnibox({ quickLinks: [{ ...Q_DEAD, prefix: "" }] });
+  await selectText(w, "GAERA-6 GAERA-7");
   eq(w.state.opened, [], "nothing opened");
   ok(w.state.openedOptions, "and the reader is sent to set a link up");
 });
 
 test("menu: a selection with no key in it opens nothing", async () => {
   const w = loadOmnibox();
-  w.state.onInstalled();
-  await w.state.onMenu({ menuItemId: w.state.menu.id, selectionText: "just some prose" });
-  await tick();
-  await tick();
+  await selectText(w, "just some prose");
   eq(w.state.opened, [], "nothing was opened");
   eq(w.state.recent, [], "and nothing remembered");
 });
