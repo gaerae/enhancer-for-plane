@@ -1178,6 +1178,188 @@ const suites = [
       });`
   },
   {
+    // The extension's biggest feature, and until this suite no browser check had ever opened
+    // it: the anchors were proved and the insert paths were not. Two editors, because which
+    // box a template lands in is decided by the button that opened the menu, and with one
+    // editor that choice cannot be wrong. The second one takes a paste the way Plane's full
+    // editor does; the first has no handler, the way the "Create work item" modal behaves.
+    name: "content · the template menu",
+    page: {
+      name: "ct-menu",
+      plane:
+        PLANE +
+        `<div id="box-a"><div><div><div><div>` +
+        `<div class="ProseMirror" contenteditable="true" id="ed-a"><p>first</p></div>` +
+        `</div></div></div></div>` +
+        `<button type="button" aria-label="Attach"><input type="file" /></button></div>` +
+        `<div id="box-b"><div><div><div><div>` +
+        `<div class="ProseMirror" contenteditable="true" id="ed-b"><p>second</p></div>` +
+        `</div></div></div></div>` +
+        `<button type="button" aria-label="Attach"><input type="file" /></button></div>`,
+      seed: seedOf({
+        allDomains: true,
+        templates: [
+          { id: "t1", name: "Bug", title: "[Bug] {{var.team}}", content: "## Steps\n1. first\n" },
+          { id: "t2", name: "Title only", title: "Release notes", content: "" },
+          { id: "t3", name: "Body only", title: "", content: "- [ ] check" }
+        ],
+        templateSync: { enabled: true, sources: [{ id: "s1", url: "https://example.com/t.json", enabled: true }] }
+      }),
+      local: {
+        peSyncCache: {
+          bySource: {
+            s1: {
+              // Whoever controls the source writes this, so it is the hostile string.
+              remoteName: '<img src=x id="hostile">Team pack',
+              templates: [
+                { id: "a", name: "Deploy", group: "Ops", title: "", content: "the rollback plan" },
+                { id: "b", name: "Incident", group: "Ops", title: "", content: "timeline" },
+                { id: "c", name: "On-call", group: "Ops", title: "", content: "handover" },
+                { id: "d", name: "RFC", group: "Review", title: "", content: "proposal" },
+                { id: "e", name: "ADR", group: "Review", title: "", content: "decision" },
+                { id: "f", name: "Postmortem", group: "Review", title: "", content: "causes" }
+              ]
+            }
+          }
+        }
+      }
+    },
+    body: `
+      await waitFor(() => document.querySelectorAll(".pe-body-tmpl-btn").length === 2, "both template buttons");
+      const btn = (id) => document.querySelector("#" + id + " .pe-body-tmpl-btn");
+      const menu = () => document.getElementById("pe-tmpl-menu");
+      const isOpen = () => !!menu() && getComputedStyle(menu()).display !== "none";
+      const shown = (sel) => [...menu().querySelectorAll(sel)].filter((n) => n.getClientRects().length > 0);
+      const names = () => shown(".pe-menu-item-title").map((n) => n.textContent);
+      const pick = (name) => shown(".pe-menu-item").find((n) => n.querySelector(".pe-menu-item-title").textContent === name).click();
+      const filter = (q) => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        f.value = q;
+        f.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      const title = () => document.getElementById("title-input");
+      const key = (o) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", Object.assign({ bubbles: true, cancelable: true }, o)));
+
+      btn("box-a").click();
+      check("the button opens a menu listing every template", () => {
+        ok(isOpen(), "no menu");
+        eq(names().length, 9, "rows");
+      });
+      check("your own come first, labelled because synced blocks follow them", () => {
+        eq(names().slice(0, 3).join(), "Bug,Title only,Body only");
+        eq(shown(".pe-menu-section-label")[0].textContent, peMsg("menuYours"));
+      });
+      check("a synced block carries its source's name and each group's", () => {
+        eq(shown(".pe-menu-subsection").map((n) => n.textContent).join(), "Ops,Review");
+      });
+      check("a source name is text, whatever its author wrote", () => {
+        eq(document.querySelectorAll("#pe-tmpl-menu img, #hostile").length, 0, "markup from a source became an element");
+        eq(shown(".pe-menu-section-synced .pe-menu-section-label")[0].textContent, '<img src=x id="hostile">Team pack');
+      });
+      check("it stays on the screen", () => {
+        const r = menu().getBoundingClientRect();
+        ok(r.left >= 0 && r.right <= window.innerWidth, "x " + r.left + "-" + r.right + " of " + window.innerWidth);
+      });
+      check("pressing a row does not take the cursor out of the editor", () => {
+        const ev = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+        shown(".pe-menu-item")[0].dispatchEvent(ev);
+        ok(ev.defaultPrevented, "the mousedown would have moved focus before the template went in");
+      });
+
+      // Nine rows is one over the line at which the box appears.
+      filter("rollback");
+      check("the filter reads a template's body, not just its name", () => eq(names().join(), "Deploy"));
+      check("a group with no hits loses its header, and one with hits keeps it", () => {
+        eq(shown(".pe-menu-subsection").map((n) => n.textContent).join(), "Ops");
+      });
+      check("so does your own block", () => {
+        eq(shown(".pe-menu-section-label").map((n) => n.textContent).join(), '<img src=x id="hostile">Team pack');
+      });
+      filter("nothing has this");
+      check("no hits at all says so, and drops the source's header too", () => {
+        eq(names().length, 0, "rows");
+        eq(shown(".pe-menu-empty").map((n) => n.textContent).join(), peMsg("menuNoMatch"));
+        eq(shown(".pe-menu-section-label").length, 0, "headers left over an empty list");
+      });
+      filter("");
+      check("clearing it brings everything back", () => eq(names().length, 9));
+
+      // The service worker finishes a sync while the menu is up.
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("a sync that lands under an open menu redraws it", () => eq(names().join(), "Bug,Title only,Body only"));
+      check("and with no synced block left, the filter and the label both go", () => {
+        eq(menu().querySelectorAll(".pe-menu-filter-input").length, 0, "filter on a three-row list");
+        eq(menu().querySelectorAll(".pe-menu-section").length, 0, "a label with nothing to tell apart");
+      });
+
+      pick("Bug");
+      check("picking one fills the title, with its variable resolved", () => {
+        eq(title().value, "A work item[Bug] Platform");
+      });
+      check("and the body, as rendered blocks rather than Markdown", () => {
+        eq((document.querySelector("#ed-a h2") || {}).textContent, "Steps", "the heading");
+        ok(document.getElementById("ed-a").textContent.indexOf("##") === -1, "literal markers in the editor");
+      });
+      check("in the editor whose button opened the menu", () => {
+        eq(document.getElementById("ed-b").textContent, "second");
+      });
+      check("and the menu closes", () => ok(!isOpen(), "still open"));
+
+      const before = document.getElementById("ed-a").textContent;
+      title().value = "Blank";
+      btn("box-a").click();
+      pick("Title only");
+      check("a template with no body leaves the editor alone", () => {
+        eq(title().value, "BlankRelease notes");
+        eq(document.getElementById("ed-a").textContent, before);
+      });
+
+      // Alt+T's whole reason to exist: you are writing, in this editor, and you want a
+      // template here. On macOS the key arrives as a dagger, which is why it reads e.code.
+      const pasted = [];
+      const edB = document.getElementById("ed-b");
+      edB.addEventListener("paste", (e) => {
+        e.preventDefault();
+        pasted.push(e.clipboardData.getData("text/html"));
+        edB.insertAdjacentHTML("beforeend", e.clipboardData.getData("text/html"));
+      });
+      title().value = "Untouched";
+      edB.focus();
+      key({ altKey: true, code: "KeyT", key: "\\u2020" });
+      check("Alt+T opens the menu without leaving the editor", () => {
+        ok(isOpen(), "no menu");
+        eq(document.activeElement.id, "ed-b", "focus");
+      });
+      pick("Body only");
+      check("and the template lands in the editor being written in", () => {
+        ok(edB.textContent.indexOf("check") > -1, "the second editor got nothing: " + edB.textContent);
+        eq(document.getElementById("ed-a").textContent, before, "the first editor");
+      });
+      check("through a paste, which is the path Plane's full editor parses", () => {
+        eq(pasted.length, 1, "pastes");
+        ok(pasted[0].indexOf("<") === 0, "not HTML: " + pasted[0]);
+      });
+      check("a template with no title leaves the title alone", () => eq(title().value, "Untouched"));
+
+      btn("box-a").click();
+      btn("box-a").click();
+      check("its button closes it again", () => ok(!isOpen(), "still open"));
+      btn("box-a").click();
+      btn("box-b").click();
+      check("the other editor's button moves it rather than closing it", () => ok(isOpen(), "closed"));
+      key({ key: "Escape" });
+      check("Escape closes it", () => ok(!isOpen(), "still open"));
+
+      const sent = [];
+      chrome.runtime.sendMessage = (m) => sent.push(m);
+      btn("box-a").click();
+      menu().querySelector(".pe-menu-config").click();
+      check("the footer goes to Settings and shuts the menu", () => {
+        eq(sent.map((m) => m.type).join(), "pe-open-options");
+        ok(!isOpen(), "still open");
+      });`
+  },
+  {
     // The value-level half of this lives in test.js; what only a browser can prove is the
     // phase. Plane's own plugin listens for "copy" on the editor node and calls
     // preventDefault() + clearData() before writing Markdown — so this page registers a
