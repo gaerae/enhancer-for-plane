@@ -155,13 +155,13 @@ Enhancer for Plane has one purpose: to let users customize the Plane (makeplane)
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds four device-only records: the team templates downloaded from the user's own source URLs, so the picker can read them without a network request; the last few work item keys the user opened, so the address bar and popup can offer them again; a count of how often each style rule has matched an element; and a count of how often each of the extension's two buttons (Template, copy) has been placed. The two counts are numbers and timestamps only, shown in Settings. None of this is sent anywhere, and the storage.local records are not synced.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds five device-only records: the team templates downloaded from the user's own source URLs, so the picker can read them without a network request; the last few work item keys the user opened, so the address bar and popup can offer them again; the work items the user pinned in the popup (key, address, target name and tab title), written only when the user presses "Pin"; a count of how often each style rule has matched an element; and a count of how often each of the extension's two buttons (Template, copy) has been placed. The two counts are numbers and timestamps only, shown in Settings. None of this is sent anywhere, and the storage.local records are not synced.
 
 alarms
   Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
 
 activeTab
-  When the user clicks the toolbar icon, the popup reads the current tab's address and title. The address gives the hostname, which is what tells the user whether enhancements are active on this site and offers "Enable on this site"; the address and title together are also what "Copy reference" builds its string from when the tab is a work item, which is why this path needs no content script and works on any tracker the user has configured a link for. The popup also messages the current tab to start the element picker. Both values are used in that moment and are not stored or transmitted. Access is limited to the tab the user explicitly invoked the extension on, and only for as long as that invocation lasts.
+  When the user clicks the toolbar icon, the popup reads the current tab's address and title. The address gives the hostname, which is what tells the user whether enhancements are active on this site and offers "Enable on this site"; the address and title together are also what "Copy reference" builds its string from when the tab is a work item, which is why this path needs no content script and works on any tracker the user has configured a link for. The popup also messages the current tab to start the element picker. Reading these values stores nothing, and neither value is ever transmitted. Two popup buttons keep part of what was read, and only when pressed: "Pin" saves that work item's address and title in storage.local on this device, and "Enable on this site" adds the hostname to the user's domain list. Access is limited to the tab the user explicitly invoked the extension on, and only for as long as that invocation lasts.
 
 contextMenus
   Adds one right-click item, "Open work items from selection", shown only when text is selected. A key rarely arrives on its own — it arrives inside a sentence, in a chat message or a pull request title — so this is the same navigation the address bar offers, reached from where the key actually is. Chrome passes the extension the selected text and nothing else: the page is never read, no script is injected, and the extension has no access to the page the selection came from. The selected text is matched against a key pattern and any keys it contains, ten at most, are used to build URLs from the user's own configured link. It is not stored.
@@ -197,11 +197,13 @@ Remote code
 • Personally identifiable information — NO
 • Health, financial, authentication, personal communications, location, web history, user activity — NO
   On "web history", which is worth being able to answer out loud rather than just ticking:
-  the extension keeps the last few work item keys and URLs the user opened through it, in
-  storage.local on that device. Chrome's policy defines collection as transmitting data off
-  the user's device, and nothing here leaves it — there is no server to send it to, it is
-  excluded from Chrome Sync on purpose, and the user can clear it from the popup in one click (or with "Restore defaults"). So NO is correct,
-  and PRIVACY.md says the same thing in the same words.
+  the extension keeps the last few work item keys and URLs the user opened through it, and
+  the address and title of each item the user pinned, in storage.local on that device.
+  Chrome's policy defines collection as transmitting data off the user's device, and nothing
+  here leaves it — there is no server to send it to, it is excluded from Chrome Sync on
+  purpose, and the user can clear the recent list from the popup in one click, remove a pin
+  with its ×, or clear both with "Restore defaults". So NO is correct, and PRIVACY.md says
+  the same thing in the same words.
 • I do NOT sell or transfer user data to third parties (except approved cases) — attest
 • I do NOT use or transfer user data for purposes unrelated to the item's single purpose — attest
 • I do NOT use or transfer user data to determine creditworthiness / lending — attest

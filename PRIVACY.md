@@ -108,9 +108,12 @@ by Chrome Sync):
   icon, the popup reads the active tab's address — the hostname is what tells you
   whether the extension is active on that site — and, when the address matches one
   of your Quick open links, its title as well, so "Copy reference" can offer you
-  that item's key and title without touching the page. Both values are used in
-  that moment and are neither stored nor transmitted. This is why copying works on
-  a tracker the rest of the extension never runs on: it reads the tab, not the
+  that item's key and title without touching the page. Reading them stores nothing,
+  and neither value is ever transmitted. Two buttons in the popup keep part of what
+  was read, and only when you press them: **Pin** saves that item's address and title
+  on this device, as described under [What is stored](#what-is-stored), and **Enable
+  on this site** adds the hostname to your list of domains. This is why copying works
+  on a tracker the rest of the extension never runs on: it reads the tab, not the
   page.
 
 ## Template sync — the only network access
