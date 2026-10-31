@@ -270,9 +270,10 @@ const LAUNCH_TIMEOUT_MS = 30000;
 // hung once (`pop-tall`) and passed on the re-run. Locally a different five or six launches
 // per run failed another way — a non-zero exit, "Command failed" — while other headless
 // Chromes were busy on the machine; that did not come back in a logged full run or in twenty
-// launches on their own, so nobody knows what it is, and a retry for an uncharacterised
-// failure would only hide it. A retry still runs every assertion, so it cannot turn "ran
-// nothing" into a pass.
+// launches on their own, and not in three full runs at once at a load of 49, so nobody knows
+// what it is, and a retry for an uncharacterised failure would only hide it. When it comes
+// back, exitDetail says what the launch reported: start there. A retry still runs every
+// assertion, so it cannot turn "ran nothing" into a pass.
 const LAUNCH_ATTEMPTS = 2;
 // Retries are for a stray hang, not for a run where everything hangs — PE_CHROME_PROFILE on
 // macOS is that run (see below), and doubling it would turn a ~48-minute failure into a
@@ -313,9 +314,24 @@ function run(chrome, page, hash, label) {
   const detail = attempts.map((a) => a.error).join("; then ");
   return [{ name: `${path.basename(page)} — chrome failed to run`, pass: false, detail }];
 }
+// A file rather than a pipe: Chrome's helpers inherit stderr, and a pipe one of them keeps
+// open would hold spawnSync past the main process's exit, adding the hang this exists to
+// explain. Truncated per launch, so it only ever holds the launch being reported.
+const STDERR_LOG = path.join(OUT, "chrome-stderr.log");
+// What a launch that failed actually said. execFileSync's own message is the command line and
+// nothing else, which is how a failure on five pages a run stayed uncharacterised.
+function exitDetail(e) {
+  const how = e.signal ? `killed by ${e.signal}` : `exit ${e.status}`;
+  let tail = "";
+  try {
+    tail = fs.readFileSync(STDERR_LOG, "utf8").trim().split("\n").slice(-3).join(" | ");
+  } catch (_) {}
+  return tail ? `${how}: ${tail.slice(-300)}` : `${how}, nothing on stderr`;
+}
 function launchOnce(chrome, page, hash) {
   const url = fileUrl(page) + (hash || "");
   let dom = "";
+  const stderr = fs.openSync(STDERR_LOG, "w");
   try {
     dom = execFileSync(
       chrome,
@@ -343,7 +359,7 @@ function launchOnce(chrome, page, hash) {
       ],
       {
         encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
+        stdio: ["ignore", "pipe", stderr],
         maxBuffer: 64 * 1024 * 1024,
         // A browser that never exits would otherwise stall the run with no output at all —
         // the failure mode that looks exactly like a pass. A good launch takes about three
@@ -365,8 +381,10 @@ function launchOnce(chrome, page, hash) {
     }
     // The message reads the constant rather than restating it: it said 60s while the timeout
     // was 30s, which sends whoever hits it looking for a hang twice as long as the real one.
-    const error = timedOut ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : String(e.message).slice(0, 200);
+    const error = timedOut ? `timed out after ${LAUNCH_TIMEOUT_MS / 1000}s` : exitDetail(e);
     return { timedOut, error };
+  } finally {
+    fs.closeSync(stderr);
   }
   return { timedOut: false, results: readResults(page, dom) };
 }
