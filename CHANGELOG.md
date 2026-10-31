@@ -19,12 +19,12 @@ Schema unchanged.
   what was selected and dropped the rest, so a release note or a chat message listing five
   items opened one. Each key now opens in its own tab through its own target, up to 10 at a
   time; the first comes to the front and the rest wait behind it, so a selection of one works
-  as it did. A key that cannot open does not stop the others, and Settings opens only when
-  none could, and the 10 counts tabs, so a key that cannot open does not use one up. Keys come
-  apart at any separator, not just a space or a comma, so `PROJ-1/PROJ-2` is two. Numbers such
-  as `2-3` are skipped when the selection also holds a key with letters in it. The entry is now
-  called **Open work items from selection**. Anything else key-shaped counts, so `UTF-8` in a
-  selection opens a tab that goes nowhere; that was already true when it came first.
+  as it did. A key that cannot open does not stop the others or use up one of the 10, and
+  Settings opens only when none could. Keys come apart at any separator, not just a space or a
+  comma, so `PROJ-1/PROJ-2` is two. Numbers such as `2-3` are skipped when the selection also
+  holds a key with letters in it. The entry is now called **Open work items from selection**.
+  Anything else key-shaped counts, so `UTF-8` in a selection opens a tab that goes nowhere;
+  that was already true when it came first.
 - **Pin the work items you keep returning to.** On a work item's tab, **Pin** at the end of
   the popup's item line keeps it above the recents, with its title, until you take it off.
   Recents roll off after twelve jumps and never held an item reached by clicking inside the
@@ -41,6 +41,13 @@ Schema unchanged.
 - **Switching the extension off right after Re-scan no longer shows a green "ready" under
   it.** The scan answers a refresh and 250ms after the click, and that late answer overwrote
   the newer status.
+- **A key in lower case reaches the target its prefix names.** `eng-5` went to the default
+  target even with a target set for `ENG-`, in the address bar, the popup and the right-click
+  menu alike.
+- **Copy reference appears on GitHub and GitLab issue tabs.** Those addresses hold only the
+  number, so a `{{key.num}}` link recognised no tab. The link's prefix now supplies the rest.
+- **Recent items stay reachable with no Quick open link.** The list and its **Clear** button
+  went with the last link.
 
 ### Internal
 - **The template menu is finally opened in a real browser.** Nothing had: the anchors were
@@ -50,6 +57,8 @@ Schema unchanged.
 - **The harness says what a failed Chrome launch reported**, and retries a hung launch once
   and names it. The local failures that prompted this have not been reproduced, and their
   cause is still unknown.
+- **The popup reads the tab's item once and writes its status line in one place**, so the pin
+  and the copy block cannot disagree and a writer cannot forget the counter a late reply checks.
 - **Supply chain.** Every action is pinned to a commit and `check-source.js` keeps it so;
   Actions may run only GitHub's own; published releases are immutable; Dependabot updates the
   workflows after a seven-day cooldown; CI runs on Node 24 with read-only permissions.
