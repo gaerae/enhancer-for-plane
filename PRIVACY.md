@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-08-09_
+_Last updated: 2026-10-07_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in

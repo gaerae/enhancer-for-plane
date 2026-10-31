@@ -41,8 +41,7 @@ changed anything a user sees, drive it:
 
 - **Options page / popup**: add the case to `tools/dom-harness.js` — that is what
   it is for, and it turns a one-off check into one that runs forever. Reach for a
-  hand-served page with a stubbed `chrome` (see "Driving the UI" below) only while
-  exploring. Node cannot render CSS.
+  hand-served page with a stubbed `chrome` only while exploring. Node cannot render CSS.
 - **Style rules and focus mode (`content.js`)**: `buildPlanePage` in the harness serves a
   synthetic work item page — the classes and the id the shipped rules select on, and no more
   than that. Extend that markup rather than mocking Plane. It is also the only check that
@@ -51,8 +50,8 @@ changed anything a user sees, drive it:
   Keep the positive and negative cases on one page — `settings` arrives asynchronously, and
   while it is null the script reports "not active" for the same reason an unenabled site does,
   so a suite that opens on an inactive site cannot tell a refusal from a slow start.
-- **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness
-  pattern is in this session's history; rebuild it rather than guessing.
+- **Picker (`content.js`)**: needs a page with a `.ProseMirror` element. The harness has two,
+  `ct-picker` and `ct-picker-plain`; extend those rather than guessing.
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
   leaf `<button>` whose text is a key — and, for the peek-panel path, a second harness
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
