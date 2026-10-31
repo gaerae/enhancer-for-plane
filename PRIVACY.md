@@ -92,12 +92,13 @@ by Chrome Sync):
   Quick open needs no site access at all and works with no domain granted. Keys
   you open this way are remembered on this device — see "Recently opened work
   items" above.
-- **Text you select, only when you use the right-click item.** "Open work item
+- **Text you select, only when you use the right-click item.** "Open work items
   from selection" appears when text is selected. Choosing it makes Chrome pass the
   extension **that selected text and nothing else** — the page itself is never
   read, no script is placed on it, and the extension has no access to the site the
-  selection came from. The text is scanned for something key-shaped and, if found,
-  turned into a URL from your own configured link. It is not stored.
+  selection came from. The text is scanned for anything key-shaped, and each key
+  found, up to ten, is turned into a URL from your own configured link. The selection
+  itself is not stored; a key that opens goes on the recently opened list like any other.
 - **The current tab's address and title (activeTab).** When you click the toolbar
   icon, the popup reads the active tab's address — the hostname is what tells you
   whether the extension is active on that site — and, when the address matches one

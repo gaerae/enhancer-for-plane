@@ -2171,15 +2171,24 @@ function peLooksLikeKey(text) {
   return PE_ITEM_KEY_RE.test(String(text == null ? "" : text).trim());
 }
 
-// The first work item key in a lump of text, or "". For the context menu: what gets selected
-// on a page is "blocked by PROJ-123 until Friday", not a bare key, and asking the reader to
-// select exactly the key would make the feature slower than typing it.
+// How many keys one selection may open. Selecting a whole release note should open a handful
+// of tabs, not forty — and the menu entry cannot warn first, because Chrome offers no hook
+// before a context menu shows. Past this it is a page that was selected rather than a list of
+// items, so the first ones win and Settings' Quick open card says where the line is.
+const PE_MAX_SELECTION_KEYS = 10;
+
+// The work item keys in a lump of text, in the order written, each once. For the context
+// menu: what gets selected on a page is "blocked by PROJ-123 until Friday", not a bare key,
+// and asking the reader to select exactly the key would make the feature slower than typing
+// it.
 //
 // Scanned by token rather than by a loose global regex so the same shape rule decides here
 // as everywhere else. Punctuation around a key is stripped (a trailing full stop, brackets
 // in a PR title) but the key itself is never guessed at.
-function peKeyFromText(text) {
+function peKeysFromText(text) {
   const words = String(text == null ? "" : text).split(/[\s,;"'`()[\]{}<>]+/);
+  const keys = [];
+  const seen = new Set();
   for (const w of words) {
     const t = w.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "");
     if (!peLooksLikeKey(t)) continue;
@@ -2189,9 +2198,13 @@ function peKeyFromText(text) {
     // there is theoretical), but this function reads prose, and prose is full of dates.
     // Here the odds invert: "shipped 2026-10" is common and a project called 2026 is not.
     if (/^(19|20)\d{2}-(1[0-2]|[1-9])$/.test(t)) continue;
-    return t;
+    const id = t.toLowerCase();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    keys.push(t);
+    if (keys.length === PE_MAX_SELECTION_KEYS) break;
   }
-  return "";
+  return keys;
 }
 
 // A quick link read backwards: which item, if any, does this URL name?

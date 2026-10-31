@@ -75,7 +75,8 @@ Every one of them is off, empty or inert until you ask for it.
 Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it.
 The same box is on the toolbar popup, and both offer the keys you opened last.
 A key almost never arrives on its own; it arrives inside a sentence, in a Slack message or a pull request title.
-Select it anywhere, right-click, and choose "Open work item from selection" — nothing to type, nothing to set up.
+Select it anywhere, right-click, and choose "Open work items from selection" — nothing to type, nothing to set up.
+Several keys open in their own tabs, up to 10 at a time.
 Setting the link up is one paste: copy the address of any work item you have open and it falls out of it, search address included.
 Plane, Jira, Linear, GitHub and GitLab are recognised by name, and several can coexist: point ENG- at Linear and leave the rest on Plane.
 Type words instead of a key and it searches instead.
@@ -162,7 +163,7 @@ activeTab
   When the user clicks the toolbar icon, the popup reads the current tab's address and title. The address gives the hostname, which is what tells the user whether enhancements are active on this site and offers "Enable on this site"; the address and title together are also what "Copy reference" builds its string from when the tab is a work item, which is why this path needs no content script and works on any tracker the user has configured a link for. The popup also messages the current tab to start the element picker. Both values are used in that moment and are not stored or transmitted. Access is limited to the tab the user explicitly invoked the extension on, and only for as long as that invocation lasts.
 
 contextMenus
-  Adds one right-click item, "Open work item from selection", shown only when text is selected. A key rarely arrives on its own — it arrives inside a sentence, in a chat message or a pull request title — so this is the same navigation the address bar offers, reached from where the key actually is. Chrome passes the extension the selected text and nothing else: the page is never read, no script is injected, and the extension has no access to the page the selection came from. The selected text is matched against a key pattern and, if it contains one, used to build a URL from the user's own configured link. It is not stored.
+  Adds one right-click item, "Open work items from selection", shown only when text is selected. A key rarely arrives on its own — it arrives inside a sentence, in a chat message or a pull request title — so this is the same navigation the address bar offers, reached from where the key actually is. Chrome passes the extension the selected text and nothing else: the page is never read, no script is injected, and the extension has no access to the page the selection came from. The selected text is matched against a key pattern and any keys it contains, ten at most, are used to build URLs from the user's own configured link. It is not stored.
 
 omnibox (manifest key, not a permission)
   Registers the keyword "issue" in the address bar. The extension receives what the user types only AFTER they have typed that keyword and a space — Chrome sends nothing before the keyword is active, and nothing from any other omnibox input. What is typed is matched against a key pattern to build a URL from the user's configured link, or, when it is not shaped like a key, put into the user's configured search URL for that tracker. Either way it is turned into an address in the browser and navigated to. Nothing is sent to the developer or to any search service the user has not configured.
@@ -264,6 +265,7 @@ Plane Cloud와 자체 호스팅 모두에서 동작하며, 릴리스마다 양�
 같은 입력칸이 툴바 팝업에도 있고, 두 곳 모두 최근에 연 항목을 보여 줍니다.
 키는 키의 모습으로 오지 않습니다. Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
 그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요 — 입력할 것도, 따로 준비할 것도 없습니다.
+키가 여러 개면 각각 새 탭으로, 한 번에 10개까지 열립니다.
 링크 설정은 붙여넣기 한 번입니다. 열어 둔 작업 항목의 주소를 복사해 붙여넣으면 검색 주소까지 그대로 나옵니다.
 Plane, Jira, Linear, GitHub, GitLab은 이름으로 알아보고, 여러 개를 함께 둘 수 있습니다(ENG-는 Linear로, 나머지는 Plane으로).
 키 대신 낱말을 넣으면 검색으로 갑니다.
