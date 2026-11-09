@@ -38,6 +38,9 @@
   // lists, and the save — built on what was there before — would read them as deleted here.
   // The save reads storage again after the prompt and carries it instead.
   let saveInFlight = false;
+  // A change from elsewhere was refused because a save was out. If that save then fails with
+  // the form still clean, nothing else will ever announce the change — so it is taken then.
+  let refusedWhileSaving = false;
   // A source row deleted by the user, so the rebuild that follows knows the row is gone on
   // purpose — see restoreSourceListPlace.
   let sourceDeleted = false;
@@ -1361,6 +1364,7 @@
           if (sJson === syncedJson) return;
           syncedJson = sJson; // adopt the new storage baseline either way
           if (isDirty() || saveInFlight) {
+            if (saveInFlight) refusedWhileSaving = true;
             flash(peMsg("msgChangedElsewhere"), true);
             return;
           }
@@ -1619,12 +1623,22 @@
     return !!ok;
   }
 
-  async function revokeStalePermissions(settings) {
+  async function revokeStalePermissions(settings, before) {
     const desired = desiredOrigins(settings);
     // Drop grants for origins no longer listed (domains or sources); no gesture needed.
     // Source origins may be specific hosts (https://host/*), so match those too.
     try {
       const perms = await chrome.permissions.getAll();
+      // An origin that appeared in storage since `before` — the read this save was built on — is
+      // a site switched on a moment ago (the popup grants, then writes), not one this save
+      // removed, so it keeps its access. Only what is new counts: a site this save took off was
+      // in `before`, and still goes.
+      if (before) {
+        try {
+          const had = desiredOrigins(before);
+          desiredOrigins(await peGetSettings()).forEach((o) => had.indexOf(o) === -1 && desired.indexOf(o) === -1 && desired.push(o));
+        } catch (_) {}
+      }
       const stale = (perms.origins || []).filter((o) => /^(\*|https?):\/\//.test(o) && !desired.includes(o));
       if (stale.length) await chrome.permissions.remove({ origins: stale });
     } catch (_) {}
@@ -1750,6 +1764,7 @@
     // nothing adopted after this point is in `next`.
     const known = { domains: knownDomains.slice(), rules: knownRuleIds.slice() };
     saveInFlight = true;
+    refusedWhileSaving = false;
     let stored = null;
     try {
       stored = await peGetSettings();
@@ -1790,7 +1805,7 @@
     try {
       savingSelf = true;
       await peSaveSettings(next);
-      if (permOk) await revokeStalePermissions(next);
+      if (permOk) await revokeStalePermissions(next, after || stored);
       // Only after the settings write succeeded: a failed save leaves the flag set, so the
       // save that does go through is the one that clears it. And only for the reset this save
       // carried: one confirmed while it was in flight is not in what was written.
@@ -1891,12 +1906,28 @@
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
       }
+      if (refusedWhileSaving && !isDirty()) adoptStored();
     } finally {
       // Released a turn later than the save, so every event the save produced has landed
       // while the flag was still set.
       setTimeout(() => (savingSelf = false), 0);
       saveInFlight = false;
     }
+  }
+
+  // Take what storage holds now, as the page does on load. Quietly: whatever the caller just
+  // said — a failed save — is the message that matters.
+  function adoptStored() {
+    peGetSettings()
+      .then((s) => {
+        syncedJson = JSON.stringify(s);
+        state = s;
+        resetPending = false;
+        remember(s);
+        render();
+        settle();
+      })
+      .catch(() => {});
   }
 
   function reloadSyncCache() {
@@ -2066,7 +2097,8 @@
 
   // Edits live in this page until Save, and closing the tab used to drop them without a word.
   window.addEventListener("beforeunload", (e) => {
-    if (!isDirty()) return;
+    // Mid-save, too: the edit being saved is not in storage until the save ends.
+    if (!isDirty() && !saveInFlight) return;
     e.preventDefault();
     e.returnValue = "";
   });

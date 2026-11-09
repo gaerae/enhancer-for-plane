@@ -1602,6 +1602,78 @@ const suites = [
       });`
   },
   {
+    // The tidy-up after a write hands back access to origins the settings no longer list —
+    // judged against what this save wrote. A site switched on from the popup in that window is
+    // in storage and was not in the write, and its access was taken away a moment after it was
+    // granted.
+    name: "options · a site switched on while access is tidied keeps its access",
+    page: {
+      name: "opt-save-cleanup-site",
+      ...OPTIONS,
+      seed: seedOf(),
+      env: { holdCleanup: true, origins: ["*://plane.example.com/*"] }
+    },
+    body: `
+      ${TAB_READY}
+      // The popup grants first and writes second, so the grant is already there when the
+      // tidy-up asks Chrome what is granted; the write lands while it decides.
+      window.__ENV.origins.push("*://b.example.com/*");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.domains = f.domains.concat(["b.example.com"]);
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      window.__cleanup();
+      await sleep(200);
+      check("its access is still granted", () => ok((window.__removed || []).indexOf("*://b.example.com/*") === -1, "removed: " + (window.__removed || []).join()));`
+  },
+  {
+    // Closing while the save is still out: the edit being saved is not in storage until the
+    // save ends, and an edit back to what was there before reads as clean against the old
+    // baseline — so the page let itself be closed over a value storage no longer held.
+    name: "options · closing while a save is out asks first",
+    page: { name: "opt-save-leave", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      const was = body().value;
+      type(body(), "B");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      type(body(), was);
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("it asks", () => ok(leave(), "it let the page close mid-save"));
+      window.__cleanup();`
+  },
+  {
+    // A clean form whose save fails had refused the change that landed meanwhile — refusing is
+    // right while a save is out — and then never took it: nothing else would ever announce it,
+    // and the next Save wrote the older settings back.
+    name: "options · a change refused during a save that then fails is taken afterwards",
+    page: {
+      name: "opt-save-fail-adopt",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await sleep(300);
+      check("the save failed", () => eq(window.__written.length, 0));
+      check("and the form now shows the change from elsewhere", () =>
+        ok([...document.querySelectorAll("#quickList input")].some((i) => i.value.indexOf("elsewhere.example.com") > -1), "not adopted"));`
+  },
+  {
     // A reset confirmed while a save is in flight is not part of what that save wrote, so that
     // save must not clear what the reset promised to clear — the recents and the pins go when
     // the reset itself is saved, and not before.
@@ -2558,6 +2630,13 @@ const suites = [
         ok(document.activeElement !== document.body, "focus fell to <body>");
         ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
       });
+      // A sync landing under the open menu redraws it, and the focused row with it.
+      btn("box-a").click();
+      shown(".pe-menu-item")[1].focus();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("a redraw under a focused row keeps focus in the menu", () => ok(menu().contains(document.activeElement), "focus went to " + document.activeElement.tagName));
+      key({ key: "Escape" });
+      await sleep(50);
       // Alt+T is a toggle. With a row focused there is no editor in focus to match it against,
       // and it used to move the menu to the first editor on the page instead of closing it.
       btn("box-b").click();
@@ -2629,6 +2708,37 @@ const suites = [
       });
       replaceAll();
       check("and through a paste", () => eq(times(), 1, edA.innerHTML));`
+  },
+  {
+    // Replacing a selection with exactly what it held leaves the document as it was, so no
+    // comparison of the document can see it worked — and the fallback put a second copy at the
+    // caret. What does change is the selection: it was a range, and the paste used it up.
+    name: "content · replacing a selection with the same text goes in once",
+    page: {
+      name: "ct-menu-same",
+      plane: PLANE + anchorBox("box-s", `<div class="ProseMirror" contenteditable="true" id="ed-s"><p>same</p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Same", title: "", content: "same" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-s");
+      ed.addEventListener("paste", (e) => {
+        e.preventDefault();
+        ed.innerHTML = "<p>same</p>";
+        const r = document.createRange();
+        r.selectNodeContents(ed.firstChild);
+        r.collapse(false);
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+      });
+      ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.firstChild);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("one copy, not two", () => eq(ed.textContent, "same"));`
   },
   {
     // Text and element count alone cannot see where a paragraph ends: "ab|cd" replaced by

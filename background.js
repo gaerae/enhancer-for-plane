@@ -285,8 +285,10 @@ async function commitSource(id, entry) {
         // URL the source has just been pointed at must not leave the old file's templates
         // standing under the new one's name. An entry from before URLs were recorded has none
         // and keeps its copy, as peSourceEntry assumes.
+        // With no entry before it there is nothing to be the same as: a first failure records
+        // its URL, or it would match whatever URL the source is given next.
         const prev = out.bySource[id] || {};
-        const same = !prev.url || prev.url === entry.url;
+        const same = !!out.bySource[id] && (!prev.url || prev.url === entry.url);
         // The URL stays whatever fetched the templates kept here. Stamping the failed one onto
         // an entry that never recorded its own would vouch for templates from somewhere else.
         const fields = { status: "error", lastError: entry.error, errorCode: entry.code || "", errorArgs: entry.args || [] };

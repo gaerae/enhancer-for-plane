@@ -1381,22 +1381,38 @@
     // the document's outline — each element's tag where it opens and closes, and the text
     // between — with attributes left out, and anything the editor marks
     // contenteditable="false" skipped, which is how it draws what is not the document.
+    //
+    // And one thing no comparison of the document can see: a selection replaced by exactly what
+    // it held. What does change is the selection — a range before, used up after — so a paste
+    // that collapsed a range it was given counts, or the fallback put a second copy at the caret.
     const shape = () => {
       const out = [];
+      let text = ""; // adjacent text nodes are one run: how the editor splits them is not content
+      const flush = () => {
+        if (text) out.push(text);
+        text = "";
+      };
       const walk = (node) => {
         for (let c = node.firstChild; c; c = c.nextSibling) {
-          if (c.nodeType === 3) out.push(c.data);
+          if (c.nodeType === 3) text += c.data;
           else if (c.nodeType === 1 && c.getAttribute("contenteditable") !== "false") {
+            flush();
             out.push("<" + c.tagName);
             walk(c);
+            flush();
             out.push(">");
           }
         }
       };
       walk(editor);
-      return out.join("\u0001");
+      flush();
+      const s = window.getSelection();
+      return { doc: out.join("\u0001"), range: !!(s && s.rangeCount && !s.isCollapsed && editor.contains(s.anchorNode)) };
     };
-    const changed = (before) => shape() !== before;
+    const changed = (before) => {
+      const now = shape();
+      return now.doc !== before.doc || (before.range && !now.range);
+    };
     try {
       const before = shape();
       const dt = new DataTransfer();
@@ -2231,7 +2247,12 @@
         const nv = changes[PE_SYNC_CACHE_KEY].newValue;
         syncCache = { bySource: (nv && nv.bySource) || {} };
         recountTemplates();
-        if (menuOpen && menu) renderMenu();
+        if (menuOpen && menu) {
+          // The redraw takes a focused row away with it; focus stays in the menu.
+          const hadFocus = menu.contains(document.activeElement);
+          renderMenu();
+          if (hadFocus && menuRows()[0]) menuRows()[0].focus();
+        }
         try {
           injectAll();
         } catch (_) {}

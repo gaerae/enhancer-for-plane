@@ -955,6 +955,14 @@ test("sync: a source whose URL changed is fetched at once, and never keeps the o
 
 // An entry from before URLs were recorded is taken as matching, so its templates are kept on a
 // failure. Stamping the failed URL onto it would then vouch for templates from somewhere else.
+// A source's first fetch failing has no entry before it to keep, so there is nothing to be
+// "the same" as: the entry records the URL it failed on, or it would match any later one.
+test("sync: a first failure records the URL it failed on", async () => {
+  const { ctx, state } = loadWorker({ settings: oneSource({ url: "https://y.test/t.json" }), respond: () => { throw new TypeError("Failed to fetch"); } });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.url, "https://y.test/t.json");
+});
+
 test("sync: a failure does not vouch for templates whose URL was never recorded", async () => {
   const { ctx, state } = loadWorker({ settings: oneSource({ url: "https://y.test/t.json" }), respond: () => { throw new Error("offline"); } });
   state.cache.bySource.src1 = { status: "ok", fetchedAt: 1, count: 1, templates: [{ id: "sync:src1:a", name: "A", content: "c" }] };
