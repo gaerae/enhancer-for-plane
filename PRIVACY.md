@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-10-31_
+_Last updated: 2026-11-09_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
@@ -59,6 +59,10 @@ by Chrome Sync):
   this device for the same reason the list above does, and nothing is added to it
   unless you press **Pin**. The × beside a pin removes it; "Restore
   defaults" clears them all, on the save that follows.
+- **Recently inserted templates** — the ids of the last three templates you inserted,
+  so a long template menu can offer them first. Ids only, never a template's text; a
+  synced template's id is the one its source gave it, prefixed with the source. "Restore
+  defaults" clears it, on the save that follows.
 - **How often each style rule matched** — a count per rule and the time it last
   matched anything, which is how Settings can tell you a rule has quietly stopped
   working. Numbers and timestamps only; no page content and no addresses.

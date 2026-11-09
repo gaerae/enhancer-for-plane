@@ -1491,6 +1491,12 @@ function peGetPins() {
 function peSavePins(list) {
   return peSetLocal(PE_PINS_KEY, list);
 }
+function peGetTplRecent() {
+  return peGetLocalObject(PE_TPL_RECENT_KEY).then((v) => peTplRecentAdd(v, ""));
+}
+function peSaveTplRecent(list) {
+  return peSetLocal(PE_TPL_RECENT_KEY, list);
+}
 // Absent is the normal state on a fresh install and reads as "nothing known yet", which is
 // what peRuleHealthState and peAnchorHealthState say about an id they do not find.
 function peGetRuleHealth() {
@@ -2546,6 +2552,37 @@ function peBuildTemplateSections(settings, cache) {
     }
   }
   return sections;
+}
+
+// The templates this device inserted last, offered at the top of a long menu: with a team
+// pack the one you use every day sits under a source header and two groups, and the filter
+// only helps once you remember what it is called. Per device, like the recently opened
+// items, because it is a record of what this browser did rather than a setting. Ids only:
+// personal ones are the user's own, synced ones are "sync:<source>:<id>"
+// (peNormalizeRemoteTemplates), so the two cannot collide and nothing a source wrote is kept.
+const PE_TPL_RECENT_KEY = "peTplRecent";
+const PE_MAX_TPL_RECENT = 3;
+
+// Newest first, one entry per id, capped. A template with no id has nothing stable to
+// remember it by, so it leaves the list as it was.
+function peTplRecentAdd(list, id) {
+  const kept = (Array.isArray(list) ? list : []).filter((x) => typeof x === "string" && x);
+  const key = typeof id === "string" ? id : "";
+  if (!key) return kept.slice(0, PE_MAX_TPL_RECENT);
+  return [key].concat(kept.filter((x) => x !== key)).slice(0, PE_MAX_TPL_RECENT);
+}
+
+// The remembered templates the menu is showing anyway, in the order they were used. Read off
+// the built sections rather than the settings, so a template that was deleted, a source that
+// was switched off and a group the user hid all drop out for the same reason: the menu does
+// not have them.
+function peTplRecentPick(sections, ids) {
+  const byId = new Map();
+  for (const s of sections || []) {
+    const lists = s.kind === "synced" ? (s.groups || []).map((g) => g.items || []) : [s.items || []];
+    for (const items of lists) for (const t of items) if (t && t.id && !byId.has(t.id)) byId.set(t.id, t);
+  }
+  return (Array.isArray(ids) ? ids : []).filter((id) => byId.has(id)).map((id) => byId.get(id));
 }
 
 // Total templates across built sections (personal items + every synced group's items).

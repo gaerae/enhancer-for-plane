@@ -447,6 +447,28 @@ test("sections: a source with no cached templates is skipped", () => {
   eq(ctx.peBuildTemplateSections(settings, { bySource: { srcA: { templates: [] } } }).length, 0, "empty entry");
 });
 
+test("recent templates: newest first, once each, three at most", () => {
+  const ctx = loadCommon();
+  let list = [];
+  for (const id of ["a", "b", "a", "c", "d"]) list = ctx.peTplRecentAdd(list, id);
+  eq(list, ["d", "c", "a"], "the oldest falls off, and a repeat moves up rather than in twice");
+  eq(ctx.peTplRecentAdd(list, ""), list, "a template with no id leaves it as it was");
+  eq(ctx.peTplRecentAdd({ not: "a list" }, "x"), ["x"], "a damaged record starts over");
+  eq(ctx.peTplRecentAdd(["a", 7, null, "", "b"], ""), ["a", "b"], "and its junk is dropped");
+});
+
+// Synced ids are namespaced on the way in, so the list holds "sync:srcA:a", not "a" — the
+// same id from two sources, or a personal "a", must not stand in for each other.
+test("recent templates: only what the menu is showing, in the order it was used", () => {
+  const { ctx, sections } = sectionsFor({ hidden: ["Ops"] });
+  const synced = (id) => sections[1].groups.flatMap((g) => g.items).find((t) => t.name === id).id;
+  const picked = ctx.peTplRecentPick(sections, [synced("B"), "gone", "p", "sync:srcA:c", "a"]);
+  eq(picked.map((t) => t.name), ["B", "Mine"], "deleted, hidden-group and un-namespaced ids drop out");
+  ok(synced("B").indexOf("sync:srcA:") === 0, "the synced id carries its source");
+  eq(ctx.peTplRecentPick(sectionsFor({ enabled: false }).sections, [synced("B"), "p"]).map((t) => t.name), ["Mine"],
+    "a source switched off takes its templates out of the recent block too");
+});
+
 // The popup badge counted state.templates and said "2" while the picker offered 16.
 // Both now call peBuildTemplateSections, so the two cannot drift: whatever removes a
 // template from the menu removes it from the count by the same rule.
