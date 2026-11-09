@@ -53,6 +53,12 @@
   // again. `refusals` counts them, so a save can tell one it built on from one that came later.
   let behind = false;
   let refusals = 0;
+  // Who spoke last about the master switch — see carriedEnabled. `switchOwn`: the form's switch
+  // was set on this page (a click, Restore defaults, an import) and nothing has spoken since.
+  // `switchSpoken` counts the changes from elsewhere that did, so a save can tell one that came
+  // while it was out from one it was built after.
+  let switchOwn = false;
+  let switchSpoken = 0;
   // A source row deleted by the user, so the rebuild that follows knows the row is gone on
   // purpose — see restoreSourceListPlace.
   let sourceDeleted = false;
@@ -270,6 +276,7 @@
   function settle() {
     cleanJson = canon(state);
     baseGen++;
+    switchOwn = false; // the form is what storage holds, the switch included
   }
 
   // What the templates card and the copy card say about whether their button has been
@@ -1155,7 +1162,10 @@
 
   /* ---------------- events ---------------- */
   function bind() {
-    el.enabled.addEventListener("change", () => (state.enabled = el.enabled.checked));
+    el.enabled.addEventListener("change", () => {
+      state.enabled = el.enabled.checked;
+      switchOwn = true;
+    });
 
     el.allDomains.addEventListener("change", () => {
       state.allDomains = el.allDomains.checked;
@@ -1406,8 +1416,13 @@
           // stringified here.
           const sJson = JSON.stringify(s);
           if (sJson === syncedJson) return;
+          const was = syncedJson ? JSON.parse(syncedJson) : null;
           syncedJson = sJson; // adopt the new storage baseline either way
           if (isDirty() || saveInFlight) {
+            if (speaksToSwitch(s, was)) {
+              switchOwn = false;
+              switchSpoken++;
+            }
             if (saveInFlight) refusedWhileSaving = true;
             behind = true;
             refusals++;
@@ -1522,6 +1537,7 @@
       try {
         state = peDeepMerge(PE_DEFAULTS, peSanitizeSettings(peMigrate(raw)));
         resetPending = false; // an import replaces the reset, so its save must not clear anything
+        switchOwn = true; // the backup's switch is the one the user chose to load
         render();
         // An import replaces every tab's contents, and the message it flashes asks the user
         // to review before saving — but Import lives on the Backup tab, which shows none of
@@ -1636,15 +1652,30 @@
     return added;
   }
   // The master switch's version, for the popup's toggle. It is one value, not a list, so the
-  // question is not "has this page seen it" but "has this page changed it": a switch still where
-  // this page last loaded or saved it (`base`) is not an opinion the user has expressed here, and
-  // storage's position is carried; one flipped here is the user's and is written. The two cannot
-  // disagree — if both moved off `base`, they moved to the same place. Returns whether it carried.
-  function carriedEnabled(target, stored, base) {
-    if (!stored || typeof stored.enabled !== "boolean" || target.enabled !== base) return false;
+  // question is not "has this page seen it" but "who spoke last": the switch is written when it
+  // was set on this page and nothing elsewhere has spoken since (`mine`), and carried from
+  // storage otherwise. Comparing with the baseline instead answered a different question — a
+  // baseline left stale by a refused change made Restore defaults' "on" read as untouched, and
+  // a popup that switched the extension on where storage already was could not outrank an older
+  // unsaved "off" here. Returns whether it carried.
+  function carriedEnabled(target, stored, mine) {
+    if (mine || !stored || typeof stored.enabled !== "boolean") return false;
     if (stored.enabled === target.enabled) return false;
     target.enabled = stored.enabled;
     return true;
+  }
+  // Whether a change from elsewhere says something about the switch. Storage holds whole
+  // settings, so every writer writes `enabled`, and most of them only pass along what they read
+  // — the picker adding a rule has no opinion about it. Two things do: the switch moving, and a
+  // site added with the extension on, which is what the popup's "Enable on this site" writes
+  // (it switches the extension on with the site, even where it already was, which nothing else
+  // could show). Like the picker's rule count elsewhere on this page, that is a signature, not a
+  // promise: a site added on another device with the extension on reads as the same thing.
+  function speaksToSwitch(s, was) {
+    if (!s || !was || typeof s.enabled !== "boolean") return false;
+    if (s.enabled !== was.enabled) return true;
+    const before = was.domains || [];
+    return s.enabled === true && (s.domains || []).some((d) => before.indexOf(d) === -1);
   }
   // The page has had these on screen: the lists the merges above read. Every way the page takes
   // its state from storage, or writes it there, goes through here, so none can forget one.
@@ -1778,8 +1809,11 @@
     // prompt — leave the form editable, and anything typed in that window is not in `next`.
     const startJson = JSON.stringify(state);
     const startCanon = canon(state);
-    // The master switch as this page last loaded or saved it. See carriedEnabled.
-    const baseEnabled = JSON.parse(cleanJson || "{}").enabled;
+    // What this page last loaded or saved, read once: the source rename below compares with it.
+    // And whether the switch on the form is this page's word — see carriedEnabled.
+    const baseline = JSON.parse(cleanJson || "{}");
+    const switchMine = switchOwn;
+    const spokenMark = switchSpoken;
     const resetMark = resetPending ? resetSeq : -1; // the reset this save carries, if any
     const next = JSON.parse(startJson);
     // drop empty rules/templates
@@ -1862,7 +1896,9 @@
     }
     kept.push(...mergeForeignDomains(next, after, known));
     keptRules.push(...mergeForeignRules(next, after, known));
-    const switchCarried = carriedEnabled(next, after || stored, baseEnabled);
+    // Something elsewhere that spoke to the switch while the prompt was up is newer than this
+    // page's word, even one the save was built on.
+    carriedEnabled(next, after || stored, switchMine && switchSpoken === spokenMark);
     const refusalsSeen = refusals; // what this save has read; anything refused later is newer
     // A source whose URL was edited is a different file under the same name, and gets a new
     // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
@@ -1870,7 +1906,6 @@
     // Against what this page last loaded or saved, not against storage: a URL changed on another
     // device is not an edit made here, and renaming over it filed that device's source under a
     // fresh id and pruned the file it had fetched.
-    const baseline = JSON.parse(cleanJson || "{}");
     const savedUrl = new Map((((baseline || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
     const renamed = new Map();
     next.templateSync.sources = next.templateSync.sources.map((x) => {
@@ -1917,12 +1952,17 @@
           if (renamed.has(row.dataset.src)) row.dataset.src = renamed.get(row.dataset.src);
         });
         remember(base, true);
-        // The switch is one field, not a list the form would have to redraw: if it has not been
-        // touched since Save was pressed, it shows what was written, and the baseline says so.
-        if (switchCarried && state.enabled === base.enabled) {
-          state.enabled = base.enabled = next.enabled;
+        // The switch is one field, not a list the form would have to redraw. The baseline is what
+        // was written, always — leaving it at the value from before a carry made a saved switch
+        // read as an edit, and clicking it back read as none. The form shows what was written
+        // unless the switch was clicked while the save was out; then the click stays, and is an
+        // edit exactly when it differs from what was written.
+        if (state.enabled === base.enabled) {
+          state.enabled = next.enabled;
           el.enabled.checked = !!next.enabled;
+          switchOwn = false;
         }
+        base.enabled = next.enabled;
         cleanJson = canon(base);
         baseGen++;
       } else {
@@ -2084,6 +2124,7 @@
     state = peDeepMerge(PE_DEFAULTS, {});
     resetPending = true;
     resetSeq++;
+    switchOwn = true; // "every setting to its default" includes the switch
     render();
     scheduleMeter(); // the same as an import: drawn, not saved, so not settle()
     flash(peMsg("msgResetDone"));

@@ -404,7 +404,10 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   forget. Unsaved is now derived — `isDirty()` compares `state` with what was last loaded or
   saved — so there is nothing to call. The mirror image is `knownRuleIds` beside `knownDomains`:
   a dirty form refuses a foreign change, so Save has to carry across what the other surface
-  added and this page never showed, or it writes the older list over it. And Save itself is a
+  added and this page never showed, or it writes the older list over it. The master switch is
+  one value, not a list, so there the question is who spoke last (`switchOwn`,
+  `speaksToSwitch`): comparing it with the baseline let a baseline left stale by a refused
+  change decide what Restore defaults meant. And Save itself is a
   window: every await in it — the prompt, the write, the tidy-up after — leaves the form
   editable, so "was anything typed meanwhile?" is asked after the last one, and storage is read
   again after the prompt, which can stay up as long as the user likes. The write is a window
