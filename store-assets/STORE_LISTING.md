@@ -87,6 +87,7 @@ It only opens a URL, so it asks for no site access at all and works on any tab.
 Register a template once, drop it into any work item with one click — title and description together.
 A native "Template" button sits in the description toolbar and in the "Create work item" dialog (Alt/⌥+T).
 Bodies are Markdown: headings, lists, checkboxes.
+On a long menu the three templates you used last sit at the top, so a team pack is not a scroll every time.
 Variables fill themselves in on insert — {{date}}, {{date+7}} for a deadline, {{week}}, {{month}} — plus up to 5 of your own.
 Plane's own work item templates are a Pro feature; these run on any instance, including a free self-hosted one.
 
@@ -100,6 +101,7 @@ Plane cuts long names off in lists and dropdowns until you can't tell items apar
 One "selector → property → value" rule forces any width, and the names come back.
 It's a generic CSS engine, so if Plane's class names change between versions you just edit the selector.
 Settings tells you when a rule has stopped matching anything, so a redesign is one line to fix instead of a feature that quietly went away.
+Plane Cloud folds a long description behind "Show all" every time an item opens; two rules that ship switched on show all of it.
 
 🧘 Just the description — focus mode
 Alt+Shift+F (⌥+⇧+F on macOS) hides the properties panel and the left navigation, so the body is what is left.
@@ -279,6 +281,7 @@ URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, �
 템플릿을 한 번 등록해 두면 어떤 작업 항목에도 클릭 한 번으로 넣습니다 — 제목과 본문을 함께.
 설명 툴바와 "신규 작업항목 생성" 창에 네이티브 "Template" 버튼이 붙습니다(Alt/⌥+T).
 본문은 마크다운입니다 — 제목, 목록, 체크박스.
+메뉴가 길면 마지막으로 쓴 템플릿 세 개가 맨 위에 와서, 팀 템플릿이 많아도 매번 스크롤할 필요가 없습니다.
 삽입할 때 변수가 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}}, 그리고 직접 만든 변수 5개까지.
 Plane 자체의 작업 항목 템플릿은 Pro 기능입니다. 이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작합니다.
 
@@ -292,6 +295,7 @@ Plane은 목록과 드롭다운에서 긴 이름을 잘라 어느 항목인지 �
 "선택자 → 속성 → 값" 규칙 하나로 원하는 폭을 지정하면 이름이 돌아옵니다.
 범용 CSS 엔진이라 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
 규칙이 아무것도 찾지 못하게 되면 설정이 알려 줍니다. 개편이 있어도 기능이 조용히 사라지지 않고 고칠 줄 하나로 드러납니다.
+Plane Cloud는 항목을 열 때마다 긴 설명을 "모두 보기" 뒤로 접는데, 켜진 채로 들어 있는 규칙 두 개가 전부 보여 줍니다.
 
 🧘 본문만 남기기 — 집중 모드
 Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 본문만 남습니다. 작업 항목 번호 옆 토글과 팝업 스위치로도 됩니다.

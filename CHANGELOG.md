@@ -10,6 +10,36 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.13.0 — 2026-11-09
+
+Schema 9: the two description presets below are appended to existing settings. Nothing you
+deleted comes back, and no permission changes.
+
+### New
+- **A long work item description is shown whole.** Since 2026-11-02 Plane Cloud clips a
+  description taller than 140px behind a fade and **Show all**, on the item's page and in the
+  peek panel, every time the item opens, and has no setting to stop it. Two style rules that
+  ship switched on show all of it and take the fade and the toggle away. They are ordinary
+  rows in Settings ▸ Appearance, so switching both off brings Plane's clip back. A cycle's
+  description, which the same component clips, is left alone. Self-hosted Plane up to 1.4.3
+  does not clip, so there the rules match nothing until it does.
+- **The templates you used last come first on a long menu.** Once the template menu is long
+  enough to grow a filter box, the last three templates inserted on this device sit at the
+  top under **Recently used**, and stay in their own groups as well. A search lists each hit
+  once. Only the ids are kept, on this device; **Restore defaults** clears them on the save
+  that follows.
+
+### Internal
+- **Publishing a release sends it to the Chrome Web Store.** `store.yml` uploads the
+  release's zip and submits it for review, signing in to Google with the run's GitHub
+  identity rather than a stored key. When the listing changed since the version the store is
+  serving, it uploads, stops red and names each section and image to update by hand, because
+  the API cannot edit listing text. Notes for whoever publishes do not count as listing.
+- The harness seeds read the schema from `common.js` instead of carrying a number that had
+  gone stale.
+
+---
+
 ## v1.12.0 — 2026-10-31
 
 Schema unchanged.
