@@ -1133,7 +1133,11 @@
       return;
     }
     menuOwnerBtn = btn;
-    menuReturn = document.activeElement;
+    // Moved from one editor to the other with a row focused: the way back is still wherever
+    // it was opened from, and the redraw below takes the focused row away, so focus goes to
+    // the new first row instead of falling to <body>.
+    const focusInMenu = !!menu && menu.contains(document.activeElement);
+    if (!focusInMenu) menuReturn = document.activeElement;
     ensureMenu();
     if (mode === "copy") renderCopyMenu();
     else renderMenu();
@@ -1141,6 +1145,7 @@
     positionMenu(btn);
     menuOpen = true;
     setMenuActive(menuRows()[0] || null);
+    if (focusInMenu && menuRows()[0]) menuRows()[0].focus();
   }
   // A row can hold focus now (Tab reaches it), and hiding a focused element drops focus to
   // <body>: the next keystroke went nowhere. So focus goes back to what had it when the menu
@@ -1371,21 +1376,25 @@
     // inserted the template a second time by the next path down. Nor by the markup at large:
     // the editor redecorates itself as the caret moves — tiptap's placeholder is a class and an
     // attribute, a gap cursor or a collaborator's caret is a whole element — so an editor that
-    // ignored the paste but redrew on it read as inserted, and the template never arrived. So:
-    // the text and the number of elements the author can edit, skipping anything the editor
-    // marks contenteditable="false", which is how it draws what is not the document.
+    // ignored the paste but redrew on it read as inserted, and the template never arrived. Nor
+    // by the text and an element count: "ab|cd" replaced by "a|bcd" has the same of both. So:
+    // the document's outline — each element's tag where it opens and closes, and the text
+    // between — with attributes left out, and anything the editor marks
+    // contenteditable="false" skipped, which is how it draws what is not the document.
     const shape = () => {
-      const w = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-        acceptNode: (n) =>
-          n.nodeType === 1 && n.getAttribute("contenteditable") === "false" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
-      });
-      let els = 0;
-      let text = "";
-      while (w.nextNode()) {
-        if (w.currentNode.nodeType === 1) els++;
-        else text += w.currentNode.data;
-      }
-      return els + "\n" + text;
+      const out = [];
+      const walk = (node) => {
+        for (let c = node.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3) out.push(c.data);
+          else if (c.nodeType === 1 && c.getAttribute("contenteditable") !== "false") {
+            out.push("<" + c.tagName);
+            walk(c);
+            out.push(">");
+          }
+        }
+      };
+      walk(editor);
+      return out.join("\u0001");
     };
     const changed = (before) => shape() !== before;
     try {

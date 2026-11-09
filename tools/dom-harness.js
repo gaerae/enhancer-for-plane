@@ -1477,13 +1477,42 @@ const suites = [
       window.__SEED.peSettings = foreign;
       window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
       await sleep(50);
+      nm.value = nm.value + " again"; // and typing goes on while the prompt is up
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
       window.__answer();
       await waitFor(() => window.__written.length > 0, "the save to write");
       await sleep(100);
+      // What was carried is not on the form — the form has newer edits — so the message is the
+      // only place it is said at all.
+      check("and the message says what was kept, beside what is not saved", () => eq(document.getElementById("status").textContent,
+        [peMsg("msgSavedEditsPending"), peMsg("msgAlsoKeptSites", ["late.example.com"]), peMsg("msgAlsoKeptRules", ["“Late”"])].join(" ")));
       check("the rule and the site are both still in storage", () => {
         const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
         ok(w.rules.some((r) => r.id === "late"), "rules: " + w.rules.map((r) => r.id).join());
         ok(w.domains.indexOf("late.example.com") > -1, "domains: " + w.domains.join());
+      });`
+  },
+  {
+    // The same window with a clean form, which adopts what lands — and adopting put the new
+    // rule's id on the page's list of rules it has shown, so the save that then wrote its older
+    // list read the rule as one the user deleted.
+    name: "options · a rule added while a clean form's save waits on the prompt survives",
+    page: { name: "opt-save-prompt-clean", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.rules = foreign.rules.concat([{ id: "late", enabled: true, label: "Late", selector: ".late", property: "width", value: "10px" }]);
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the rule is still in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(w.rules.some((r) => r.id === "late"), "rules: " + w.rules.map((r) => r.id).join());
       });`
   },
   {
@@ -1561,6 +1590,9 @@ const suites = [
       window.__onChanged({ peSyncCache: { newValue: { bySource: { s1: ${JSON.stringify(SRC_ENTRY(2))} } } } }, "local");
       await sleep(50);
       const now = document.querySelector("#sourceList .src-url");
+      // Rebuilt and refocused is not the same as left alone: replacing the field mid-word ends
+      // an IME composition, and Korean typed into it splits a syllable — "하ㄴ" for "한".
+      check("the field being typed in is not replaced", () => ok(now === url, "the row was rebuilt under the caret"));
       check("the caret is still in the URL, where it was", () => {
         eq(document.activeElement, now, "focus is on " + document.activeElement.tagName);
         eq(now.selectionStart + "-" + now.selectionEnd, "8-13");
@@ -1600,6 +1632,32 @@ const suites = [
       check("one source left", () => eq([...document.querySelectorAll("#sourceList .src-name")].map((n) => n.value).join(), "Two"));
       check("and focus is not on its delete button", () => ok(!document.activeElement.classList.contains("src-del"), "focus is on the next source's ✕"));
       check("and its group list was not opened for it", () => ok(!document.querySelector("#sourceList .src-detail").open, "the deleted source's open list moved down"));`
+  },
+  {
+    // A cache entry from before URLs were recorded cannot say which file it holds, so a source
+    // whose URL is edited gets a new id on Save: the old entry is pruned with its templates
+    // instead of standing under the new address until that one is fetched — which, if it fails,
+    // is never.
+    name: "options · a source whose URL is edited starts afresh",
+    page: {
+      name: "opt-src-newurl",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      local: { peSyncCache: { bySource: { s1: { status: "ok", fetchedAt: 1, count: 1, templates: [{ id: "sync:s1:a", name: "A", content: "c" }] } } } }
+    },
+    body: `
+      ${TAB_READY}
+      const url = document.querySelector("#sourceList .src-url");
+      url.value = "https://plane.example.com/other.json";
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("it is saved under a new id", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        const src = w.templateSync.sources[0];
+        eq(src.url, "https://plane.example.com/other.json");
+        ok(src.id !== "s1", "kept the id of the old file's cache entry");
+      });`
   },
   {
     // Every value the worker wrote was English, prefixed with a translated "동기화 실패:". The
@@ -2393,6 +2451,17 @@ const suites = [
         ok(document.activeElement !== document.body, "focus fell to <body>");
         ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
       });
+      // Moving the menu to the other editor redraws its rows, and the focused one with them.
+      btn("box-a").click();
+      shown(".pe-menu-item")[1].focus();
+      btn("box-b").click();
+      check("moving the menu keeps focus in it", () => ok(menu().contains(document.activeElement), "focus went to " + document.activeElement.tagName));
+      key({ key: "Escape" });
+      await sleep(100);
+      check("and Escape still finds its way back", () => {
+        ok(document.activeElement !== document.body, "focus fell to <body>");
+        ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
+      });
 
       const sent = [];
       chrome.runtime.sendMessage = (m) => sent.push(m);
@@ -2446,6 +2515,25 @@ const suites = [
       });
       replaceAll();
       check("and through a paste", () => eq(times(), 1, edA.innerHTML));`
+  },
+  {
+    // Text and element count alone cannot see where a paragraph ends: "ab|cd" replaced by
+    // "a|bcd" reads the same, and a paste that worked was taken for one that did not, so the
+    // template went in a second time by the next path down.
+    name: "content · an insert that only moves a paragraph boundary goes in once",
+    page: {
+      name: "ct-menu-boundary",
+      plane: PLANE + anchorBox("box-q", `<div class="ProseMirror" contenteditable="true" id="ed-q"><p>ab</p><p>cd</p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Split", title: "", content: "zz" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-q");
+      ed.addEventListener("paste", (e) => { e.preventDefault(); ed.innerHTML = "<p>a</p><p>bcd</p>"; });
+      ed.focus();
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("the paste counted, so nothing went in after it", () => eq(ed.innerHTML, "<p>a</p><p>bcd</p>"));`
   },
   {
     // Whether a path inserted anything is judged by the text and the blocks, not by the markup

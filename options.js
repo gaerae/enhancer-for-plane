@@ -33,6 +33,17 @@
   // therefore a second event. Consuming only the first told the user "Loaded the rule
   // added by the picker" immediately after "Saved.", about their own deletion.
   let savingSelf = false;
+  // A save is between its first read and its last await. A change from elsewhere that lands
+  // then is not adopted even into a clean form: adopting it would put its ids on the known
+  // lists, and the save — built on what was there before — would read them as deleted here.
+  // The save reads storage again after the prompt and carries it instead.
+  let saveInFlight = false;
+  // A source row deleted by the user, so the rebuild that follows knows the row is gone on
+  // purpose — see restoreSourceListPlace.
+  let sourceDeleted = false;
+  // A sync landed while focus was in the source list, and the rows were left alone — see
+  // the storage listener and the list's focusout.
+  let sourcesStale = false;
   // The settings as they last stood in storage, serialized once at each authoritative
   // read/write (initial load, our own save, adopting a foreign change). A storage event
   // is then decided by stringifying only the incoming settings and comparing to this —
@@ -923,9 +934,14 @@
     const f = place.focus;
     if (!f) return;
     const row = byId(f.src);
-    // The row the focus was in is gone, so it was deleted: the way on is the Add button,
-    // not whichever row slid up into its place.
-    if (!row) return el.addSource.focus();
+    // The row the focus was in was deleted: the way on is the Add button, not whichever row
+    // slid up into its place. Gone for any other reason — a save dropping an empty row, a
+    // change adopted from elsewhere — and focus is left where the browser put it, rather than
+    // on a button whose Enter adds a source.
+    if (!row) {
+      if (place.deleted) el.addSource.focus();
+      return;
+    }
     const field = row.querySelectorAll(SRC_CONTROLS)[f.at];
     if (!field) return;
     field.focus();
@@ -938,8 +954,24 @@
 
   function renderSources() {
     const place = sourceListPlace();
+    place.deleted = sourceDeleted;
+    sourceDeleted = false;
+    sourcesStale = false;
     renderSourceRows();
     restoreSourceListPlace(place);
+  }
+
+  function refreshSourceStatuses() {
+    const list = ensureSync().sources || [];
+    el.sourceList.querySelectorAll(".src-item").forEach((row) => {
+      const src = list.find((x) => x && x.id === row.dataset.src);
+      const statusEl = row.querySelector(".src-status");
+      if (!src || !statusEl) return;
+      const st = sourceStatusText(src);
+      statusEl.textContent = st.text;
+      statusEl.title = st.raw || "";
+      statusEl.className = "src-status " + st.cls;
+    });
   }
 
   function renderSourceRows() {
@@ -983,6 +1015,7 @@
       del.addEventListener("click", () => {
         sync.sources.splice(idx, 1);
         scheduleMeter();
+        sourceDeleted = true;
         renderSources();
       });
 
@@ -1153,6 +1186,9 @@
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
+    el.sourceList.addEventListener("focusout", (e) => {
+      if (sourcesStale && !el.sourceList.contains(e.relatedTarget)) renderSources();
+    });
 
     el.addSource.addEventListener("click", () => {
       if (ensureSync().sources.length >= PE_SYNC_LIMITS.maxSources) {
@@ -1260,7 +1296,14 @@
         if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
           syncCache = { bySource: (nv && nv.bySource) || {} };
-          renderSources();
+          // Someone is in the source list — typing a URL, perhaps in Hangul mid-syllable. A
+          // rebuild replaces the field under them, and putting the caret back does not put an
+          // IME composition back. So the status lines change in place, and the rows are rebuilt
+          // once focus leaves the list.
+          if (el.sourceList.contains(document.activeElement)) {
+            refreshSourceStatuses();
+            sourcesStale = true;
+          } else renderSources();
           renderAnchorHealth(); // templates that arrive only from a source change its gate
           return;
         }
@@ -1289,7 +1332,7 @@
           const sJson = JSON.stringify(s);
           if (sJson === syncedJson) return;
           syncedJson = sJson; // adopt the new storage baseline either way
-          if (isDirty()) {
+          if (isDirty() || saveInFlight) {
             flash(peMsg("msgChangedElsewhere"), true);
             return;
           }
@@ -1301,8 +1344,7 @@
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           state = s;
           resetPending = false; // the reset this was waiting to save is gone
-          knownDomains = (s.domains || []).slice();
-          knownRuleIds = (s.rules || []).map((r) => r && r.id).filter(Boolean);
+          remember(s);
           render();
           settle();
           if (grew) showTab("appearance");
@@ -1496,10 +1538,10 @@
   //
   // `stored` is read once by the caller for this and mergeForeignRules both; null when storage
   // could not be read, and then the save goes ahead with what it has rather than refusing.
-  function mergeForeignDomains(target, stored) {
+  function mergeForeignDomains(target, stored, known) {
     if (!stored) return [];
     const mine = target.domains || [];
-    const added = (stored.domains || []).filter((d) => knownDomains.indexOf(d) === -1 && mine.indexOf(d) === -1);
+    const added = (stored.domains || []).filter((d) => known.domains.indexOf(d) === -1 && mine.indexOf(d) === -1);
     if (added.length) target.domains = mine.concat(added);
     return added;
   }
@@ -1510,13 +1552,22 @@
   // storage whose id this page has never shown cannot be one the user meant to delete, so it
   // is carried into the save; one that was on screen and deleted stays deleted. Returns the
   // carried rules.
-  function mergeForeignRules(target, stored) {
+  function mergeForeignRules(target, stored, known) {
     if (!stored) return [];
     const mine = new Set((target.rules || []).map((r) => r && r.id));
-    const added = (stored.rules || []).filter((r) => r && r.id && knownRuleIds.indexOf(r.id) === -1 && !mine.has(r.id));
+    const added = (stored.rules || []).filter((r) => r && r.id && known.rules.indexOf(r.id) === -1 && !mine.has(r.id));
     if (added.length) target.rules = (target.rules || []).concat(added);
     return added;
   }
+  // The page has had these on screen: the lists the merges above read. Every way the page takes
+  // its state from storage, or writes it there, goes through here, so none can forget one.
+  function remember(settings, add) {
+    const d = (settings.domains || []).slice();
+    const r = (settings.rules || []).map((x) => x && x.id).filter(Boolean);
+    knownDomains = add ? [...new Set(knownDomains.concat(d))] : d;
+    knownRuleIds = add ? [...new Set(knownRuleIds.concat(r))] : r;
+  }
+
   // “A”, “B” — the carried rules as the message names them, by label or else by selector.
   function quotedRules(rules) {
     return rules
@@ -1662,13 +1713,17 @@
           ? [...new Set(s.hiddenGroups.map((x) => peClampStr(String(x), PE_SYNC_LIMITS.maxFieldLen)))]
           : []
       }));
-    // Before the permission pass, because that is what would hand the origin back.
+    // Before the permission pass, because that is what would hand the origin back. What the
+    // page has shown is fixed as of now: the lists move when the page adopts something, and
+    // nothing adopted after this point is in `next`.
+    const known = { domains: knownDomains.slice(), rules: knownRuleIds.slice() };
+    saveInFlight = true;
     let stored = null;
     try {
       stored = await peGetSettings();
     } catch (_) {}
-    const kept = mergeForeignDomains(next, stored);
-    const keptRules = mergeForeignRules(next, stored);
+    const kept = mergeForeignDomains(next, stored, known);
+    const keptRules = mergeForeignRules(next, stored, known);
     const permOk = await requestHostPermissions(next);
     // Read again after the prompt, which can stay up as long as the user likes: a rule picked
     // or a site switched on meanwhile is in storage now, and a save built on the read above
@@ -1677,8 +1732,15 @@
     try {
       after = await peGetSettings();
     } catch (_) {}
-    kept.push(...mergeForeignDomains(next, after));
-    keptRules.push(...mergeForeignRules(next, after));
+    kept.push(...mergeForeignDomains(next, after, known));
+    keptRules.push(...mergeForeignRules(next, after, known));
+    // A source whose URL was edited is a different file under the same name, and gets a new
+    // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
+    // does the same for entries that recorded theirs, and those from before that cannot.
+    const savedUrl = new Map((((after || stored || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
+    next.templateSync.sources = next.templateSync.sources.map((x) =>
+      savedUrl.has(x.id) && savedUrl.get(x.id) !== x.url ? Object.assign({}, x, { id: uid("src") }) : x
+    );
     try {
       savingSelf = true;
       await peSaveSettings(next);
@@ -1704,14 +1766,11 @@
       // known lists, so the next save carries it again rather than reading it as deleted here.
       const editedSince = resetPending || JSON.stringify(state) !== startJson;
       if (editedSince) {
-        const shown = JSON.parse(startJson);
-        knownDomains = [...new Set(knownDomains.concat(shown.domains || []))];
-        knownRuleIds = [...new Set(knownRuleIds.concat((shown.rules || []).map((r) => r && r.id).filter(Boolean)))];
+        remember(JSON.parse(startJson), true);
         cleanJson = startJson;
       } else {
         state = next;
-        knownDomains = (state.domains || []).slice();
-        knownRuleIds = (state.rules || []).map((r) => r && r.id).filter(Boolean);
+        remember(state);
         render();
         settle();
       }
@@ -1722,7 +1781,16 @@
       // Both kinds at once is what the picker and the popup produce together, and naming only
       // one of them leaves the other arriving unexplained.
       if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
-      else if (editedSince) flash(peMsg("msgSavedEditsPending"), false, true);
+      else if (editedSince)
+        flash(
+          [
+            peMsg("msgSavedEditsPending"),
+            kept.length ? peMsg("msgAlsoKeptSites", [kept.join(", ")]) : "",
+            keptRules.length ? peMsg("msgAlsoKeptRules", [quotedRules(keptRules)]) : ""
+          ].filter(Boolean).join(" "),
+          false,
+          true
+        );
       else if (kept.length && keptRules.length)
         flash(peMsg("msgKeptDomains", [kept.join(", ")]) + " " + peMsg("msgKeptRulesToo", [quotedRules(keptRules)]));
       else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
@@ -1770,6 +1838,7 @@
       // Released a turn later than the save, so every event the save produced has landed
       // while the flag was still set.
       setTimeout(() => (savingSelf = false), 0);
+      saveInFlight = false;
     }
   }
 
@@ -1907,8 +1976,7 @@
   Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth(), peGetAnchorHealth()]).then(([s, c, h, a]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
-    knownDomains = (s.domains || []).slice();
-    knownRuleIds = (s.rules || []).map((r) => r && r.id).filter(Boolean);
+    remember(s);
     syncCache = c;
     ruleHealth = h;
     anchorHealth = a;

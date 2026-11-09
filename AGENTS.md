@@ -414,8 +414,9 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   `innerHTML` fixed that and broke the opposite case: tiptap moves a placeholder class and
   attribute as the caret moves, so an editor that ignored the paste but redecorated read as
   inserted, and nothing arrived. A second review found the same thing one level down: a gap
-  cursor or a collaborator's caret is a whole element. Compare the text and the count of
-  elements, skipping whatever the editor marks `contenteditable="false"`.
+  cursor or a collaborator's caret is a whole element; and a third, that text plus an element
+  count cannot see a paragraph boundary move ("ab|cd" → "a|bcd"). Compare the outline — tags
+  where they open and close, the text between — skipping `contenteditable="false"` subtrees.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

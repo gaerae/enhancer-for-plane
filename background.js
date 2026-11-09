@@ -214,7 +214,10 @@ async function fetchSource(src) {
     // not tell the user which of the two things went wrong, so name it here.
     if (e && e.name === "TimeoutError")
       return fail("Timed out after " + PE_FETCH_TIMEOUT_MS / 1000 + "s", "timeout", [PE_FETCH_TIMEOUT_MS / 1000]);
-    return fail((e && e.message) || "Fetch failed", "network");
+    // fetch() rejects with a TypeError when it cannot reach the server, and a body that breaks
+    // off mid-stream does the same. Anything else is not a connection failure, and calling it
+    // one sends the reader to debug their network: with no code the page shows these words.
+    return fail((e && e.message) || "Fetch failed", e && e.name === "TypeError" ? "network" : "");
   }
 }
 

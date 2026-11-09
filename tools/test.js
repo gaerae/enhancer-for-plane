@@ -999,7 +999,8 @@ test("sync: every failure carries a code both locales can say", async () => {
     { respond: () => jsonResponse(JSON.stringify({ templates: {} })) },
     { respond: () => jsonResponse(JSON.stringify({ name: "x" })) },
     { respond: () => jsonResponse(JSON.stringify({ templates: [{ group: "x" }] })) },
-    { respond: () => { throw new Error("Failed to fetch"); } }
+    // What Chrome's fetch throws when it cannot reach the server.
+    { respond: () => { throw new TypeError("Failed to fetch"); } }
   ];
   const seen = new Set();
   for (const c of cases) {
@@ -1021,6 +1022,17 @@ test("sync: every failure carries a code both locales can say", async () => {
     }
   }
   ok(seen.size >= 8, "codes collapsed into too few: " + [...seen].join());
+});
+
+// Anything else thrown is not a connection failure, and calling it one sends the reader off to
+// debug their network. With no code the page shows the worker's own words instead.
+test("sync: only a failed fetch is called a network failure", async () => {
+  const { ctx, state } = loadWorker({ settings: oneSource(), respond: () => { throw new RangeError("Invalid array length"); } });
+  await ctx.syncSources(true);
+  const e = state.cache.bySource.src1;
+  eq(e.status, "error");
+  eq(e.errorCode, "");
+  eq(e.lastError, "Invalid array length");
 });
 
 test("sync: disabled sources are not fetched", async () => {

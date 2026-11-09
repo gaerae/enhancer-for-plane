@@ -1455,5 +1455,23 @@
   },
   "msgSavedEditsPending": {
     "message": "저장을 누른 시점의 내용을 저장했습니다. 그 뒤에 고친 내용은 아직 저장하지 않았습니다."
+  },
+  "msgAlsoKeptSites": {
+    "message": "다른 곳에서 켠 사이트도 유지했습니다: $SITES$.",
+    "description": "Appended to msgSavedEditsPending when that save carried across sites enabled elsewhere.",
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgAlsoKeptRules": {
+    "message": "다른 곳에서 추가한 규칙도 유지했습니다: $RULES$.",
+    "description": "Appended to msgSavedEditsPending when that save carried across rules added elsewhere. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
   }
 }
