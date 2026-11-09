@@ -16,6 +16,12 @@ const { execFileSync } = require("child_process");
 const STORE = "https://chromewebstore.googleapis.com";
 const STORE_SCOPE = "https://www.googleapis.com/auth/chromewebstore";
 const LISTING_PATH = "store-assets";
+const LISTING_FILE = `${LISTING_PATH}/STORE_LISTING.md`;
+// The sections of STORE_LISTING.md written for whoever publishes rather than pasted into the
+// dashboard, by their `##` heading ("" is the text above the first one). Everything else
+// counts, a section added later included: a new heading is more likely a field than a note,
+// and guessing wrong that way costs a red run rather than a stale listing.
+const LISTING_NOTES = new Set(["", "Real captures vs drawn templates", "Assets checklist", "Packaging"]);
 const TOKEN_LIFETIME = "900s";
 const POLL_MS = 5000;
 const POLL_TRIES = 60;
@@ -103,12 +109,51 @@ async function download(asset, io) {
 
 const versionsOf = (revision) => ((revision && revision.distributionChannels) || []).map((c) => c.crxVersion);
 
-// Which of the files behind the listing changed between two tags. null when git could not
-// say: that has to stop a submission exactly as a real change would.
+// STORE_LISTING.md by section, keyed the way the dashboard is laid out: "Detailed
+// description", "한국어 ▸ 상세 설명". A heading's "(max 16,000)" is a note about the field,
+// not its name.
+function listingSections(text) {
+  const sections = new Map([["", { top: "", lines: [] }]]);
+  let top = "";
+  let current = sections.get("");
+  for (const line of text.split("\n")) {
+    const h = /^(##|###) (.+)$/.exec(line);
+    if (!h) {
+      current.lines.push(line);
+      continue;
+    }
+    const title = h[2].replace(/\s*\(.*\)\s*$/, "").trim();
+    if (h[1] === "##") top = title;
+    const name = h[1] === "##" ? title : `${top} ▸ ${title}`;
+    if (!sections.has(name)) sections.set(name, { top, lines: [] });
+    current = sections.get(name);
+  }
+  return sections;
+}
+
+// What a reviewer would see differently between two tags: the dashboard sections of
+// STORE_LISTING.md that changed, then the images. The rest of store-assets/ is the source the
+// images are rendered from, and a note in Packaging is not listing copy — counting either
+// stopped a release whose listing had not moved. null when git could not say: that has to
+// stop a submission exactly as a real change would.
 function listingChanges(from, to, cwd) {
+  const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" });
   try {
-    const out = execFileSync("git", ["diff", "--name-only", from, to, "--", LISTING_PATH], { cwd, encoding: "utf8", stdio: "pipe" });
-    return out.split("\n").filter(Boolean);
+    const files = git("diff", "--name-only", from, to, "--", LISTING_PATH).split("\n").filter(Boolean);
+    const changed = [];
+    if (files.includes(LISTING_FILE)) {
+      const before = listingSections(git("show", `${from}:${LISTING_FILE}`));
+      const after = listingSections(git("show", `${to}:${LISTING_FILE}`));
+      const body = (s) => (s ? s.lines.join("\n").trim() : null);
+      for (const name of new Set([...after.keys(), ...before.keys()])) {
+        const s = after.get(name) || before.get(name);
+        if (!LISTING_NOTES.has(s.top) && body(before.get(name)) !== body(after.get(name))) changed.push(name);
+      }
+    }
+    for (const f of files) {
+      if (/\.(png|jpe?g)$/i.test(f)) changed.push(f.slice(LISTING_PATH.length + 1));
+    }
+    return changed;
   } catch {
     return null;
   }
@@ -191,4 +236,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { submit, listingChanges };
+module.exports = { submit, listingChanges, LISTING_NOTES };

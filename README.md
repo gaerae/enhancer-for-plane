@@ -528,9 +528,10 @@ To ship a new version:
 5. Publishing also sends it to the store:
    [.github/workflows/store.yml](.github/workflows/store.yml) uploads that zip to
    the Chrome Web Store and submits it for review.
-6. If `store-assets/` changed since the version the store is serving, the run
-   uploads the zip and stops red, because the API cannot edit listing text. Update
-   the listing in the dashboard and press **Submit for review** there.
+6. If the listing changed since the version the store is serving, the run
+   uploads the zip and stops red, because the API cannot edit listing text. The
+   run names the sections and images that changed; update those in the dashboard
+   and press **Submit for review** there.
 
 You can also trigger the first step from **Actions ▸ Release extension ▸ Run
 workflow**, and send a published release again from **Actions ▸ Store ▸ Run
