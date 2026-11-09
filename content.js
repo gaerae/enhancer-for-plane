@@ -22,6 +22,8 @@
   let menuOwnerBtn = null;
   let menuReturn = null; // what had focus when the menu opened — see hideMenu
   let menuMode = ""; // "copy" or the template menu: which list a redraw has to rebuild
+  let filterComposing = false; // an IME composition is open in the menu's filter
+  let redrawPending = false; // a redraw that waited for it to end
   // The work item the copy menu was opened for, read once while the menu opens. A peek
   // panel over a list closes as soon as you mousedown outside it, and the menu is appended
   // to <body> — outside the panel — so by the time a format is clicked the panel, and its
@@ -866,6 +868,9 @@
 
   function renderMenu() {
     menu.innerHTML = "";
+    // A new filter box starts with no composition in it, whatever the old one was doing.
+    filterComposing = false;
+    redrawPending = false;
     const sections = peBuildTemplateSections(settings || {}, syncCache);
     const total = peCountTemplates(sections);
     const hasSynced = sections.some((s) => s.kind === "synced");
@@ -883,6 +888,16 @@
       filterInput.placeholder = peMsg("menuFilterPh");
       filterInput.className = "pe-menu-filter-input";
       filterInput.addEventListener("mousedown", (e) => e.stopPropagation());
+      filterInput.addEventListener("compositionstart", () => (filterComposing = true));
+      filterInput.addEventListener("compositionend", () => {
+        filterComposing = false;
+        if (!redrawPending) return;
+        redrawPending = false;
+        // After the input event that commits the text, so the redraw carries the whole query.
+        setTimeout(() => {
+          if (menuOpen && menu && menuMode === "templates") redrawMenu();
+        }, 0);
+      });
       fwrap.appendChild(filterInput);
       menu.appendChild(fwrap);
     }
@@ -1052,6 +1067,12 @@
   // place is carried across by which template it was on. A row whose template has gone takes
   // the highlight with it rather than handing it to a neighbour nobody picked.
   function redrawMenu() {
+    // An IME session belongs to the input it started in, and a new input cannot take it over: a
+    // Korean syllable being built in the filter was split in two. The redraw waits for commit.
+    if (filterComposing && menu.contains(document.activeElement)) {
+      redrawPending = true;
+      return;
+    }
     const keyOf = (r) => (r ? (r.classList.contains("pe-menu-config") ? "config" : r.dataset.key || "") : "");
     const find = (k) => (k ? menuRows().find((r) => keyOf(r) === k) || null : null);
     const a = document.activeElement;

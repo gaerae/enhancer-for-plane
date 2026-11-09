@@ -1791,6 +1791,40 @@ const suites = [
       });`
   },
   {
+    // A storage event's read is a window like any other. One started by an older save and
+    // answered after a newer one had gone through put the older settings back on the form,
+    // marked as saved, while storage held the newer ones.
+    name: "options · a storage event's read answered after a newer save is not taken",
+    page: { name: "opt-event-stale", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const content = () => document.querySelector("#templateList .tpl-content");
+      const type = (v) => { content().value = v; content().dispatchEvent(new Event("input", { bubbles: true })); };
+      const stored = () => {
+        const w = window.__written.filter((o) => o.peSettings).pop();
+        Object.assign(window.__SEED, JSON.parse(JSON.stringify(w)));
+      };
+      type("version A");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length === 1, "the first save");
+      stored();
+      await sleep(50);
+      // The event for that write, its read held back.
+      window.__holdReads = true;
+      window.__onChanged({ peSettings: { newValue: window.__SEED.peSettings } }, "sync");
+      await waitFor(() => (window.__reads || []).length === 1, "the event's read");
+      const late = window.__reads.shift();
+      window.__holdReads = false;
+      type("version B");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.filter((o) => o.peSettings).length === 2, "the second save");
+      stored();
+      await sleep(50);
+      late();
+      await sleep(200);
+      check("the form keeps the newer save", () => eq(content().value, "version B"));`
+  },
+  {
     // Our own write is a window too: a change from elsewhere landing in it was dropped as if it
     // were the write's own echo, and the page called itself saved and in step with storage.
     name: "options · a change landing during the page's own write is not taken for its echo",
@@ -2695,6 +2729,21 @@ const suites = [
         eq(document.activeElement, f, "focus left the filter");
         eq(f.selectionStart, 3, "the caret moved");
         eq(names().join(), "Deploy");
+      });
+      // Mid-composition the box is not redrawn at all: a new input cannot carry an IME session
+      // over, and a Korean syllable being built was split in two. It catches up on commit.
+      const fc = menu().querySelector(".pe-menu-filter-input");
+      fc.focus();
+      fc.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
+      check("a sync during IME composition leaves the filter box alone", () =>
+        ok(menu().querySelector(".pe-menu-filter-input") === fc, "the composing input was replaced"));
+      fc.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "" }));
+      await sleep(50);
+      check("and redraws once the composition ends", () => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        ok(f && f !== fc, "no redraw after the composition");
+        eq(f.value, "rollback");
       });
       filter("");
 

@@ -1387,7 +1387,14 @@
           return;
         }
         if (!peSettingsChanged(changes, area)) return;
+        // The read is a window like any other. One answered after the baseline moved — a newer
+        // save, an adoption — holds storage from before it, and taking that put older settings
+        // on the form, marked as saved. Such an answer is asked again rather than dropped: the
+        // change that started it may still be one this page has not seen.
+        const read = () => {
+        const gen = baseGen;
         peGetSettings().then((s) => {
+          if (gen !== baseGen) return read();
           // Our own write, while it is out, is only its echo when storage reads back as what
           // was written. Anything else landed in the same window from somewhere else, and
           // dropping it unseen left the page calling itself in step with storage it was not.
@@ -1417,6 +1424,8 @@
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
         });
+        };
+        read();
       });
     } catch (_) {}
 
