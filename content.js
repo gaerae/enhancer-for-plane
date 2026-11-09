@@ -775,6 +775,8 @@
       removeButtons();
       return;
     }
+    // On the page before anything is said into it — see ensureLive.
+    ensureLive();
     // The two buttons are gated separately: a user with no templates can still copy a
     // reference, and a user who deleted every copy format still gets the template menu.
     if (hasAnyTemplates()) {
@@ -824,6 +826,12 @@
     menu = document.createElement("div");
     menu.id = "pe-tmpl-menu";
     menu.addEventListener("mousedown", (e) => e.preventDefault());
+    // The rows are buttons, so Tab reaches them. The highlight follows focus, or the arrows
+    // would carry on from a row the reader has already left.
+    menu.addEventListener("focusin", (e) => {
+      const row = e.target && e.target.closest && e.target.closest(".pe-menu-item, .pe-menu-config");
+      if (row && !row.classList.contains("pe-menu-active")) setMenuActive(row);
+    });
     document.body.appendChild(menu);
   }
 
@@ -842,8 +850,15 @@
     document.body.appendChild(live);
     return live;
   }
+  // Emptied, then written a moment later. Setting the text it already holds is no change, so
+  // a second identical toast — or a row reached again — said nothing; and a region filled in
+  // the same task it was emptied in is read by some screen readers as one unchanged node.
+  let announceTimer = null;
   function announce(text) {
-    ensureLive().textContent = text || "";
+    const l = ensureLive();
+    l.textContent = "";
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => (l.textContent = text || ""), 50);
   }
 
   function renderMenu() {
@@ -1153,10 +1168,13 @@
     const rows = menuRows();
     if (!rows.length) return false;
     const cur = rows.indexOf(menu.querySelector(".pe-menu-active"));
+    // A row someone has tabbed to is a focused button, and Enter on it is that button's.
+    // Taking it over pressed whichever row the arrows had last highlighted instead.
+    const inMenu = menu.contains(document.activeElement);
     let to = null;
     if (e.key === "ArrowDown") to = rows[(cur + 1) % rows.length];
     else if (e.key === "ArrowUp") to = rows[cur < 1 ? rows.length - 1 : cur - 1];
-    else if (e.key === "Enter" && cur > -1) {
+    else if (e.key === "Enter" && cur > -1 && !inMenu) {
       e.preventDefault();
       e.stopPropagation();
       rows[cur].click();
@@ -1165,6 +1183,9 @@
     e.preventDefault();
     e.stopPropagation();
     setMenuActive(to);
+    // With focus already in the menu, the arrows move it: a highlight on one row and focus on
+    // another would make Enter press the one nobody can see.
+    if (inMenu && to) to.focus();
     return true;
   }
 
@@ -1331,12 +1352,22 @@
     // Rich insert, path 1: synthetic paste of HTML — the full detail-view editor
     // parses this into real headings/lists/checkboxes.
     const html = mdToHtml(text);
-    // Did a path insert anything? Asked of the markup, not of the text's length: replacing a
-    // selection with a shorter template shrinks the text, and judging by growth read that as
-    // a failure and inserted the template a second time by the next path down.
-    const changed = (before) => editor.innerHTML !== before;
+    // Did a path insert anything? Not judged by the text's length: replacing a selection with a
+    // shorter template shrinks the text, and judging by growth read that as a failure and
+    // inserted the template a second time by the next path down. Nor by the markup at large:
+    // the editor redecorates itself as the caret moves — tiptap's placeholder is a class and an
+    // attribute — so an editor that ignored the paste but restyled on it read as inserted, and
+    // the template never arrived. So: the text and the elements, with every attribute dropped.
+    const shape = () => {
+      const c = editor.cloneNode(true);
+      c.querySelectorAll("*").forEach((n) => {
+        for (const a of [...n.attributes]) n.removeAttribute(a.name);
+      });
+      return c.innerHTML;
+    };
+    const changed = (before) => shape() !== before;
     try {
-      const before = editor.innerHTML;
+      const before = shape();
       const dt = new DataTransfer();
       dt.setData("text/html", html);
       dt.setData("text/plain", text);
@@ -1352,7 +1383,7 @@
     // "Create work item" modal ignores the synthetic paste but renders this into
     // headings/lists (task-list checkboxes may degrade to plain list items there).
     try {
-      const before = editor.innerHTML;
+      const before = shape();
       if (document.execCommand("insertHTML", false, html) && changed(before)) {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
         return;

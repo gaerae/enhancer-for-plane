@@ -1291,8 +1291,8 @@
     "description": "Beside the Template sync card's own switch. Not optEnabled: that one names the whole extension in Korean."
   },
   "msgKeptRules": {
-    "message": "Saved — and kept the rule “$RULES$”, which was added elsewhere while this page was open.",
-    "description": "Shown instead of \"Saved\" when the save carried across a rule added by the element picker that this page had never displayed.",
+    "message": "Saved — and kept rules added elsewhere while this page was open: $RULES$.",
+    "description": "Shown instead of \"Saved\" when the save carried across rules added by the element picker that this page had never displayed. $RULES$ is a comma-separated list of quoted names.",
     "placeholders": {
       "rules": {
         "content": "$1"
@@ -1444,5 +1444,20 @@
   },
   "syncErrNetwork": {
     "message": "could not reach the server."
+  },
+  "msgKeptRulesToo": {
+    "message": "Rules added there were kept too: $RULES$.",
+    "description": "Appended to msgKeptDomains when the same save carried across both sites and rules. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgPresetEnabled": {
+    "message": "That rule was already in the list, switched off. It is on again."
+  },
+  "msgSavedEditsPending": {
+    "message": "Saved what was here when you pressed Save. Edits made since then are not saved yet."
   }
 }

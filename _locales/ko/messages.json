@@ -1287,8 +1287,8 @@
     "description": "Beside the Template sync card's own switch. Not optEnabled: that one names the whole extension in Korean."
   },
   "msgKeptRules": {
-    "message": "저장했습니다 — 이 페이지를 열어둔 사이 다른 곳에서 추가한 규칙 “$RULES$”도 함께 유지했습니다.",
-    "description": "Shown instead of \"Saved\" when the save carried across a rule added by the element picker that this page had never displayed.",
+    "message": "저장했습니다 — 이 페이지를 열어둔 사이 다른 곳에서 추가한 규칙도 함께 유지했습니다: $RULES$.",
+    "description": "Shown instead of \"Saved\" when the save carried across rules added by the element picker that this page had never displayed. $RULES$ is a comma-separated list of quoted names.",
     "placeholders": {
       "rules": {
         "content": "$1"
@@ -1440,5 +1440,20 @@
   },
   "syncErrNetwork": {
     "message": "서버에 연결하지 못했습니다."
+  },
+  "msgKeptRulesToo": {
+    "message": "그쪽에서 추가한 규칙도 유지했습니다: $RULES$.",
+    "description": "Appended to msgKeptDomains when the same save carried across both sites and rules. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgPresetEnabled": {
+    "message": "목록에 이미 있던 규칙이 꺼져 있어서 다시 켰습니다."
+  },
+  "msgSavedEditsPending": {
+    "message": "저장을 누른 시점의 내용을 저장했습니다. 그 뒤에 고친 내용은 아직 저장하지 않았습니다."
   }
 }

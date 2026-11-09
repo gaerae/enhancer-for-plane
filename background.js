@@ -280,8 +280,10 @@ async function commitSource(id, entry) {
         // and keeps its copy, as peSourceEntry assumes.
         const prev = out.bySource[id] || {};
         const same = !prev.url || prev.url === entry.url;
-        const fields = { status: "error", lastError: entry.error, errorCode: entry.code || "", errorArgs: entry.args || [], url: entry.url };
-        out.bySource[id] = same ? Object.assign({}, prev, fields) : fields;
+        // The URL stays whatever fetched the templates kept here. Stamping the failed one onto
+        // an entry that never recorded its own would vouch for templates from somewhere else.
+        const fields = { status: "error", lastError: entry.error, errorCode: entry.code || "", errorArgs: entry.args || [] };
+        out.bySource[id] = same ? Object.assign({}, prev, fields) : Object.assign(fields, { url: entry.url });
       } else {
         out.bySource[id] = entry;
       }

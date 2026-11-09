@@ -164,7 +164,14 @@ window.chrome = {
   // down the no-permission branch.
   permissions: {
     contains: (o, cb) => { const v = window.__ENV.granted !== false; return cb ? cb(v) : Promise.resolve(v); },
-    request: (o, cb) => { const v = window.__ENV.grant !== false; cb && cb(v); return Promise.resolve(v); },
+    // env.hold keeps the prompt open until the suite calls window.__answer(), the way Chrome's
+    // bubble does while the user decides — the window in which a Save is in the air.
+    request: (o, cb) => {
+      const v = window.__ENV.grant !== false;
+      if (window.__ENV.hold) return new Promise((r) => { window.__answer = () => { cb && cb(v); r(v); }; });
+      cb && cb(v);
+      return Promise.resolve(v);
+    },
     getAll: (cb) => { const v = { origins: (window.__ENV.origins || []).slice() }; cb && cb(v); return Promise.resolve(v); },
     remove: (o, cb) => { (window.__removed = window.__removed || []).push(...(o.origins || [])); cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
@@ -1123,8 +1130,11 @@ const suites = [
       ${TAB_READY}
       document.querySelector('#tabs .tab[data-tab="sites"]').click();
       // Make the form dirty first, so the storage change below is announced and NOT adopted.
-      const rules = document.querySelector('#tabs .tab[data-tab="appearance"]');
-      document.getElementById("domains").dispatchEvent(new Event("input", { bubbles: true }));
+      // A real edit: whether there is anything unsaved is read off the settings, so an input
+      // event that changes nothing leaves the form clean, and a clean form adopts.
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
       await sleep(50);
 
       // The popup's write: same shape as peSaveSettings, landing while this page is dirty.
@@ -1242,6 +1252,7 @@ const suites = [
       type(document.querySelector("#templateList .tpl-name"), "Bug, edited");
       const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
       foreign.rules = foreign.rules.concat([{ id: "picked", enabled: true, label: "Picked", selector: ".picked", property: "width", value: "10px" }]);
+      foreign.domains = foreign.domains.concat(["popup.example.com"]);
       window.__SEED.peSettings = foreign;
       window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
       await sleep(300);
@@ -1258,7 +1269,10 @@ const suites = [
         const written = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
         eq(written.rules.map((r) => r.id).join(), "picked");
       });
-      check("and the save says so", () => eq(document.getElementById("status").textContent, peMsg("msgKeptRules", ["Picked"])));
+      // Both at once is the case the picker and the popup produce together, and saying only one
+      // of them leaves the other arriving unexplained.
+      check("and the save says so, about both", () => eq(document.getElementById("status").textContent,
+        peMsg("msgKeptDomains", ["popup.example.com"]) + " " + peMsg("msgKeptRulesToo", ["“Picked”"])));
       check("and shows it", () => eq([...document.querySelectorAll("#ruleList .rule-label")].map((n) => n.value).join(), "Picked"));`
   },
   {
@@ -1325,8 +1339,21 @@ const suites = [
         eq(document.getElementById("status").textContent, peMsg("msgSyncOff"));
         eq(sent.length, 0, "it asked the worker anyway");
       });
+      // Sync was switched off by someone who has sources, so it was a decision: a fourth row to
+      // fill in later must not reverse it for the three already there.
       document.getElementById("addSource").click();
-      check("adding a source switches sync on", () => ok(document.getElementById("syncEnabled").checked, "still off"));`
+      check("adding to a list someone switched off leaves it off", () => ok(!document.getElementById("syncEnabled").checked, "switched on"));`
+  },
+  {
+    // The first source is the case the trap was about: a fresh install has sync off and no
+    // sources, and "Add source" is a request for sync.
+    name: "options · the first source switches sync on",
+    page: { name: "opt-first-source", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      document.getElementById("addSource").click();
+      check("adding the first source switches sync on", () => ok(document.getElementById("syncEnabled").checked, "still off"));`
   },
   {
     // A variable named in Korean, or a second "team", was dropped by Save with "Saved." on
@@ -1372,6 +1399,34 @@ const suites = [
       });`
   },
   {
+    // Save builds on a copy, awaits storage and the permission prompt, then replaced state with
+    // the copy — so anything typed while the prompt was up was thrown away, the form redrawn
+    // without it, and "Saved." on screen.
+    name: "options · an edit made while saving is not thrown away",
+    page: { name: "opt-save-inflight", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      type(body(), "before");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      type(body(), "typed while the prompt was up");
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the edit is still on screen", () => eq(body().value, "typed while the prompt was up"));
+      check("the save wrote what it was started with", () => {
+        const latest = Object.assign({}, ...window.__written);
+        const t = Object.keys(latest).filter((k) => k.indexOf("peTpl.") === 0).map((k) => latest[k]).flat();
+        eq(t[0].content, "before");
+      });
+      check("and the page says the newer edit is not saved yet", () => eq(document.getElementById("status").textContent, peMsg("msgSavedEditsPending")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("so leaving still asks", () => ok(leave(), "it let the newer edit go"));`
+  },
+  {
     // Edits live in this page until Save, and closing the tab threw them away without a word.
     name: "options · leaving with unsaved edits asks first",
     page: { name: "opt-leave", ...OPTIONS, seed: seedOf() },
@@ -1379,6 +1434,18 @@ const suites = [
       ${TAB_READY}
       const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
       check("a clean page lets you go", () => ok(!leave(), "it asked with nothing to lose"));
+      // Whether there is anything to lose is a fact about the settings, not about which events
+      // fired: a file the import refused, and a letter typed and taken back, change nothing.
+      const input = document.getElementById("importFile");
+      Object.defineProperty(input, "files", { value: [new File(["{}"], "x.json", { type: "application/json" })], configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await sleep(100);
+      check("a refused import leaves nothing to lose", () => ok(!leave(), "it asked after a refused import"));
+      const nm = document.querySelector("#templateList .tpl-name");
+      const was = nm.value;
+      nm.value = was + "x"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      nm.value = was; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      check("nor does a letter typed and taken back", () => ok(!leave(), "it asked about an edit that was undone"));
       document.querySelector("#templateList .tpl-del").click();
       check("a deletion not yet saved asks", () => ok(leave(), "it let the deletion go"));
       document.getElementById("save").click();
@@ -1411,7 +1478,40 @@ const suites = [
         eq(now.selectionStart + "-" + now.selectionEnd, "8-13");
       });
       check("the open group list stays open", () => ok(document.querySelector("#sourceList .src-detail").open, "closed"));
-      check("and the new result is what it shows", () => ok(document.querySelector("#sourceList .src-status").textContent.indexOf("2") > -1, document.querySelector("#sourceList .src-status").textContent));`
+      check("and the new result is what it shows", () => ok(document.querySelector("#sourceList .src-status").textContent.indexOf("2") > -1, document.querySelector("#sourceList .src-status").textContent));
+      // The group list is the other place a sync lands under you: a checkbox there had no
+      // class to be found again by.
+      const group = () => document.querySelectorAll("#sourceList .src-group input")[1];
+      group().focus();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: { s1: ${JSON.stringify(SRC_ENTRY(2))} } } } }, "local");
+      await sleep(50);
+      check("a group's checkbox keeps focus too", () => eq(document.activeElement, group(), "focus is on " + document.activeElement.tagName));`
+  },
+  {
+    // Deleting is not a re-render that should put you back: the row is gone. Restoring by
+    // position put focus on the next source's ✕, so a second Enter — or a held key — deleted
+    // that one too, and the open group list moved down onto a source nobody had opened.
+    name: "options · deleting a source does not hand you the next one's delete",
+    page: {
+      name: "opt-src-delete",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [
+        { id: "s1", url: "https://plane.example.com/t.json", name: "One", intervalMinutes: 360, enabled: true, hiddenGroups: [] },
+        { id: "s2", url: "https://plane.example.com/u.json", name: "Two", intervalMinutes: 360, enabled: true, hiddenGroups: [] }
+      ] } }),
+      local: { peSyncCache: { bySource: { s1: SRC_ENTRY(1), s2: Object.assign({}, SRC_ENTRY(1), { url: "https://plane.example.com/u.json" }) } } }
+    },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      document.querySelector("#sourceList .src-detail").open = true;
+      const del = document.querySelector("#sourceList .src-del");
+      del.focus();
+      del.click();
+      await sleep(50);
+      check("one source left", () => eq([...document.querySelectorAll("#sourceList .src-name")].map((n) => n.value).join(), "Two"));
+      check("and focus is not on its delete button", () => ok(!document.activeElement.classList.contains("src-del"), "focus is on the next source's ✕"));
+      check("and its group list was not opened for it", () => ok(!document.querySelector("#sourceList .src-detail").open, "the deleted source's open list moved down"));`
   },
   {
     // Every value the worker wrote was English, prefixed with a translated "동기화 실패:". The
@@ -1449,7 +1549,18 @@ const suites = [
         eq(document.activeElement, document.querySelector("#ruleList .rule-value"), "focus");
       });
       document.querySelector('.chip[data-preset="cyclename"]').click();
-      check("one that is not is added", () => eq(count(), before + 1));`
+      check("one that is not is added", () => eq(count(), before + 1));
+      // Clicking a preset is asking for it to apply. Pointing at a copy that is switched off
+      // left it off — the chip used to give you a working one.
+      const sw = document.querySelector("#ruleList .rule-enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      document.querySelector('.chip[data-preset="modulename"]').click();
+      check("one that is there but switched off is switched back on", () => {
+        eq(count(), before + 1, "copied");
+        ok(document.querySelector("#ruleList .rule-enabled").checked, "still off");
+        eq(document.getElementById("status").textContent, peMsg("msgPresetEnabled"));
+      });`
   },
   {
     // "Manage templates" under the template menu opened Settings wherever it last was — most
@@ -1998,6 +2109,13 @@ const suites = [
     },
     body: `
       await waitFor(() => document.querySelectorAll(".pe-body-tmpl-btn").length === 2, "both template buttons");
+      // A live region filled in the same moment it is inserted is not reliably read, so it has
+      // to be on the page before the first thing is said into it.
+      check("the live region is there before anything is said", () => {
+        const l = document.getElementById("pe-live");
+        ok(l, "no live region yet");
+        eq(l.textContent, "", "already holding text");
+      });
       const btn = (id) => document.querySelector("#" + id + " .pe-body-tmpl-btn");
       const menu = () => document.getElementById("pe-tmpl-menu");
       const isOpen = () => !!menu() && getComputedStyle(menu()).display !== "none";
@@ -2110,6 +2228,7 @@ const suites = [
       // The highlight is a class, which nothing but a sighted user can read, and focus stays in
       // the editor — so the row is announced through a live region of ours.
       const live = () => (document.getElementById("pe-live") || {}).textContent || "";
+      await waitFor(() => live() === "Bug", "the first row to be announced");
       check("and a screen reader is told which", () => {
         eq(live(), "Bug");
         eq((document.getElementById("pe-live") || { getAttribute: () => "" }).getAttribute("aria-live"), "polite");
@@ -2117,6 +2236,7 @@ const suites = [
       const down = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
       document.activeElement.dispatchEvent(down);
       key({ key: "ArrowDown" });
+      await waitFor(() => live() === "Body only", "the new row to be announced");
       check("the arrows move the highlight, not the caret", () => {
         eq(active(), "Body only");
         eq(live(), "Body only", "announced");
@@ -2144,6 +2264,17 @@ const suites = [
       check("the other editor's button moves it rather than closing it", () => ok(isOpen(), "closed"));
       key({ key: "Escape" });
       check("Escape closes it", () => ok(!isOpen(), "still open"));
+
+      // The rows are buttons, so Tab reaches them. Enter on a focused button belongs to that
+      // button; taking it over pressed whichever row the arrows had last highlighted instead.
+      btn("box-a").click();
+      const rowsNow = shown(".pe-menu-item");
+      rowsNow[2].focus();
+      check("a row focused by Tab becomes the highlighted one", () => eq(active(), "Body only"));
+      const enterOnRow = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      rowsNow[2].dispatchEvent(enterOnRow);
+      check("and Enter on it is left to the button", () => ok(!enterOnRow.defaultPrevented, "the menu took Enter from a focused button"));
+      key({ key: "Escape" });
 
       const sent = [];
       chrome.runtime.sendMessage = (m) => sent.push(m);
@@ -2197,6 +2328,26 @@ const suites = [
       });
       replaceAll();
       check("and through a paste", () => eq(times(), 1, edA.innerHTML));`
+  },
+  {
+    // Whether a path inserted anything is judged by the text and the blocks, not by the markup
+    // at large. Tiptap's placeholder moves a class and an attribute around as the caret moves,
+    // and an editor that ignored the synthetic paste but redecorated on it read as "inserted"
+    // when nothing had been — the template simply never arrived.
+    name: "content · an editor that only redecorates on paste still gets the template",
+    page: {
+      name: "ct-menu-placeholder",
+      plane: PLANE + anchorBox("box-p", `<div class="ProseMirror" contenteditable="true" id="ed-p"><p class="is-empty" data-placeholder="Add a description"><br></p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Body only", title: "", content: "- [ ] check" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-p");
+      ed.addEventListener("paste", () => ed.firstElementChild.classList.toggle("is-focused"));
+      ed.focus();
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("the template is in the editor", () => ok(ed.textContent.indexOf("check") > -1, ed.innerHTML));`
   },
   {
     // The value-level half of this lives in test.js; what only a browser can prove is the
@@ -3946,6 +4097,7 @@ const suites = [
         ok(t.indexOf("Alt+Shift+F") > -1, "and it names the shortcut: " + t);
       });
       // A toast is a div that appears and fades; nothing tells a screen reader it was there.
+      await waitFor(() => ((document.getElementById("pe-live") || {}).textContent || "").indexOf("Focus mode on") > -1, "the toast to be announced");
       check("and a screen reader hears it", () => {
         const live = document.getElementById("pe-live");
         ok(live, "no live region");

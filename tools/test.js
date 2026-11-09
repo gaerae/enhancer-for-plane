@@ -953,6 +953,18 @@ test("sync: a source whose URL changed is fetched at once, and never keeps the o
   eq(e.url, "https://y.test/t.json");
 });
 
+// An entry from before URLs were recorded is taken as matching, so its templates are kept on a
+// failure. Stamping the failed URL onto it would then vouch for templates from somewhere else.
+test("sync: a failure does not vouch for templates whose URL was never recorded", async () => {
+  const { ctx, state } = loadWorker({ settings: oneSource({ url: "https://y.test/t.json" }), respond: () => { throw new Error("offline"); } });
+  state.cache.bySource.src1 = { status: "ok", fetchedAt: 1, count: 1, templates: [{ id: "sync:src1:a", name: "A", content: "c" }] };
+  await ctx.syncSources(true);
+  const e = state.cache.bySource.src1;
+  eq(e.status, "error");
+  eq(e.templates.length, 1, "kept, as before");
+  eq(e.url, undefined, "and still not claimed for the new URL");
+});
+
 // The worker writes these, and in Korean they arrived as "동기화 실패: Site access not granted"
 // — the one line a first-time user has to act on, in the one language they may not read. So a
 // failure carries a code and its arguments, and the page words it. The English stays as the

@@ -398,13 +398,21 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
 - **An edit that is not typing is still an edit.** Settings marked itself dirty on `input` and
   `change` events only, so a deleted row, an import and a Restore defaults all left the form
   "clean" — and a clean form adopts the next change from the picker or another device, which
-  replaced the deletion, the import or the reset without a word. Anything that changes `state`
-  from a button calls `markDirty()`. The mirror image is `knownRuleIds` beside `knownDomains`:
+  replaced the deletion, the import or the reset without a word. The first fix added a
+  `markDirty()` to each button, and review found it wrong the other way inside a day: a refused
+  import still fired `change`, so it "had edits", while each new button was one more call to
+  forget. Unsaved is now derived — `isDirty()` compares `state` with what was last loaded or
+  saved — so there is nothing to call. The mirror image is `knownRuleIds` beside `knownDomains`:
   a dirty form refuses a foreign change, so Save has to carry across what the other surface
-  added and this page never showed, or it writes the older list over it.
-- **Judge an insert by whether the editor changed, not by whether it grew.** Replacing a
-  selection with a shorter template shrinks the text, and a length check read that as failure
-  and inserted the template again by the next path down.
+  added and this page never showed, or it writes the older list over it. And Save itself is a
+  window: the permission prompt leaves the form editable, so whatever is typed while it is up
+  is newer than what was written, and must stay on screen and stay unsaved.
+- **Judge an insert by whether the editor changed, not by whether it grew — and not by its
+  markup.** Replacing a selection with a shorter template shrinks the text, and a length check
+  read that as failure and inserted the template again by the next path down. Comparing
+  `innerHTML` fixed that and broke the opposite case: tiptap moves a placeholder class and
+  attribute as the caret moves, so an editor that ignored the paste but redecorated read as
+  inserted, and nothing arrived. Compare the text and the elements with attributes dropped.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and
