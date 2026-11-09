@@ -62,6 +62,30 @@ deleted comes back, and no permission changes.
 - **The description rules are not reported as never matched** on a Plane that does not clip
   descriptions, where a miss means only that nobody opened a long one. A copy you edited is
   judged like any other rule.
+- **A template replacing selected text goes in once.** Select a passage in a description and
+  insert a shorter template, and it used to land twice: the insert judged success by the text
+  growing, so a shorter replacement read as a failure and went in again.
+- **A rule picked while Settings has unsaved edits survives the save.** The picker's rule was
+  announced and then overwritten by the page's older list on Save. A deleted row, an import or
+  **Restore defaults** not yet saved is no longer replaced by a change from elsewhere either.
+- **Editing a template source's URL drops the old file's templates.** They used to stay in the
+  menu under the new name until the new URL was fetched — up to six hours, or for good if that
+  failed. A new URL is fetched on the next run.
+- **A variable Save cannot keep stops the save** and says which one. A Korean name or a second
+  `team` used to be dropped with "Saved." on screen.
+- **Adding a template source switches sync on**, and **Sync now** says so when it is off, where it
+  used to report "Synced 0 source(s)".
+- **Settings asks before closing with unsaved edits**, keeps an error on screen until it is dealt
+  with, and keeps your place in the source list when a sync lands while you type.
+- **A failed template source says why in your language.** Korean used to read
+  `동기화 실패: Site access not granted`.
+- **"Manage templates" opens Settings on Templates**, and the copy menu's link on Work items.
+- **Every field in Settings keeps a label once it is filled** — style rules, variables, quick
+  links, copy formats and sources — and every switch and box has a name a screen reader can read.
+- **The template menu's previews are readable** (2.5:1 contrast before), and the row the arrow
+  keys reach, like every toast, is announced to a screen reader.
+- **Quick add points at a preset already in the list** instead of adding it twice.
+- The sync card no longer claims to check when Settings opens; it checks on Save and **Sync now**.
 
 ### Internal
 - **Publishing a release sends it to the Chrome Web Store.** `store.yml` uploads the
@@ -73,6 +97,8 @@ deleted comes back, and no permission changes.
   gone stale.
 - `PE_ONLY=…` runs a subset of the browser harness, and its suites can set the popup's tab
   and whether the site is granted.
+- A template source's cache entry records the URL it came from, and a failure records a code
+  beside its English, so Settings can tell a stale file from this one and word the failure.
 
 ---
 
