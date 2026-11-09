@@ -45,6 +45,23 @@ deleted comes back, and no permission changes.
 - **A domain pasted as an address works.** `https://plane.acme.com/` or
   `plane.acme.com:8080` in Settings ▸ Sites saved without complaint and then ran nowhere.
   It now counts as its hostname, and the box shows the hostname once you leave it.
+- **The popup says "Active" only where the extension can run.** Settings sync and site
+  access does not, so a site added on another device, or one whose prompt was refused,
+  read as active over a page where nothing ran. The popup now says access is needed and
+  offers the grant. Refusing it no longer takes a synced site off the list for every device.
+- **The popup no longer offers to enable itself on browser pages** such as
+  `chrome://extensions` or a new tab.
+- **A failed save changes nothing.** When Settings could not save, it had already dropped
+  the empty rows from the form and handed back access to removed sites, so the rows below
+  edited the wrong template. It now writes a copy and touches nothing until storage takes it.
+- **Arrow keys and Enter work in the template and copy menus.** The first row is
+  highlighted when a menu opens, and the caret stays in the editor.
+- **A new copy format or quick link gets the caret** instead of the template list.
+- **A key sent to a quick link that still has a blank opens Settings**, as the address bar
+  does, instead of doing nothing.
+- **The description rules are not reported as never matched** on a Plane that does not clip
+  descriptions, where a miss means only that nobody opened a long one. A copy you edited is
+  judged like any other rule.
 
 ### Internal
 - **Publishing a release sends it to the Chrome Web Store.** `store.yml` uploads the
@@ -54,6 +71,8 @@ deleted comes back, and no permission changes.
   the API cannot edit listing text. Notes for whoever publishes do not count as listing.
 - The harness seeds read the schema from `common.js` instead of carrying a number that had
   gone stale.
+- `PE_ONLY=…` runs a subset of the browser harness, and its suites can set the popup's tab
+  and whether the site is granted.
 
 ---
 
