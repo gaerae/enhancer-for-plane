@@ -312,10 +312,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The preview is how two templates are told apart before one is picked, so it is text to read,
+   not decoration: #9ca3af on white was 2.5:1. This grey holds above 4.5:1 on white and on the
+   highlighted row's #f3f4f6; the dark block keeps its own lighter grey. */
 #pe-tmpl-menu .pe-menu-item-preview {
   margin-top: 2px;
   font-size: 11px;
-  color: #9ca3af;
+  color: #5f6673;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -324,7 +327,7 @@
 #pe-tmpl-menu .pe-menu-empty {
   padding: 14px 12px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #5f6673;
   text-align: center;
 }
 
@@ -374,6 +377,23 @@
   #pe-tmpl-menu .pe-menu-footer {
     border-color: rgba(255, 255, 255, 0.08);
   }
+  #pe-tmpl-menu .pe-menu-item-preview,
+  #pe-tmpl-menu .pe-menu-empty {
+    color: #9ca3af;
+  }
+}
+
+/* Read by a screen reader, never seen: the standard visually-hidden recipe. */
+.pe-sr {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 /* grouped picker: filter box, section headers, source markers */

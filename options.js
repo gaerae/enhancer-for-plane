@@ -10,19 +10,55 @@
   let ruleHealth = {};
   let anchorHealth = {}; // { toolbar, header } — see PE_ANCHOR_HEALTH_KEY
   let resetPending = false; // a confirmed Restore defaults not yet saved — see resetAll
-  let dirty = false; // whether the user has edited the form
+  let resetSeq = 0; // which confirm that was, so a save can tell its reset from a later one
+  // The settings as this page last took them from storage or wrote them there, serialized.
+  // Whether the form has unsaved edits is derived from it (see isDirty) rather than kept as a
+  // flag: a flag has to be set by every way of editing and cleared by every way of not, and it
+  // was wrong both ways — a deleted row, an import and a reset never set it, while a refused
+  // import, or a letter typed and taken back, set it with nothing to lose.
+  let cleanJson = "";
   // The active domains as they stood the last time this page took its state FROM storage.
   // Not the same thing as `syncedJson`, which tracks the newest storage we have *seen* —
   // it is updated even when a foreign change is refused because the form is dirty. This is
   // the list the user has actually had in front of them, which is the only list they can be
   // said to have an opinion about. See mergeForeignDomains.
   let knownDomains = [];
+  // The same, for rules: the ids of the rules this page has had on screen. The picker adds a
+  // rule from a Plane tab, and a dirty form refuses to adopt it — so without this the next Save
+  // wrote the page's older list over the rule the user had just picked. See mergeForeignRules.
+  let knownRuleIds = [];
   // Ignore the storage changes our own save triggers. It has to span the whole save, not
   // absorb a single event: one save writes the settings and — when the template shards
   // shrink — prunes the ones it no longer needs, which is a second storage operation and
   // therefore a second event. Consuming only the first told the user "Loaded the rule
   // added by the picker" immediately after "Saved.", about their own deletion.
   let savingSelf = false;
+  // A save is between its first read and its last await. A change from elsewhere that lands
+  // then is not adopted even into a clean form: adopting it would put its ids on the known
+  // lists, and the save — built on what was there before — would read them as deleted here.
+  // The save reads storage again after the prompt and carries it instead.
+  let saveInFlight = false;
+  // A change from elsewhere was refused because a save was out. If that save then fails with
+  // the form still clean, nothing else will ever announce the change — so it is taken then.
+  let refusedWhileSaving = false;
+  // Moves whenever the baseline does — a load, an adoption, a save. A read started before it
+  // moved answers a question about a form that has since been settled some other way.
+  let baseGen = 0;
+  // What our own write put in storage, while it is out: an event in that window is its echo
+  // only if storage reads back as this.
+  let writing = null;
+  // A change from elsewhere was refused and has not been saved over or taken since: the page is
+  // behind storage. That is unsaved state like an edit is — taking the edit back must not make
+  // a form showing older settings read as clean, because nothing will announce the change
+  // again. `refusals` counts them, so a save can tell one it built on from one that came later.
+  let behind = false;
+  let refusals = 0;
+  // A source row deleted by the user, so the rebuild that follows knows the row is gone on
+  // purpose — see restoreSourceListPlace.
+  let sourceDeleted = false;
+  // A sync landed while focus was in the source list, and the rows were left alone — see
+  // the storage listener and the list's focusout.
+  let sourcesStale = false;
   // The settings as they last stood in storage, serialized once at each authoritative
   // read/write (initial load, our own save, adopting a foreign change). A storage event
   // is then decided by stringifying only the incoming settings and comparing to this —
@@ -31,7 +67,7 @@
 
   // Section tabs. Grouping is presentation only: the page is still ONE form over one
   // settings object, and one Save commits every tab — so switching a tab shows a different
-  // part of the same edits and deliberately does NOT clear `dirty`. The ids are also the
+  // part of the same edits and is not a save. The ids are also the
   // URL hash (options.html#items), which makes a tab linkable and survives a reload.
   // Work items leads because Quick open lives there and needs no host permission — it is
   // the one thing a just-installed profile can use before granting anything. Order must
@@ -200,7 +236,40 @@
     renderSources();
     updateStorageMeter();
     refreshPermGap(); // async; the banner updates when it resolves
-    dirty = false; // just re-rendered the form from state, so it's clean
+  }
+
+  // Unsaved edits are a fact about the settings, not about which events fired. A confirmed
+  // reset counts even when the defaults are what was there: saving it still clears the lists
+  // the confirm promised to clear.
+  function isEdited() {
+    return resetPending || (!!state && canon(state) !== cleanJson);
+  }
+  function isDirty() {
+    return behind || isEdited();
+  }
+  // The settings as compared for "anything unsaved": a switch ticked and unticked writes
+  // `focus: false` onto a rule that was stored without the key, and a group hidden and shown
+  // again moves to the end of the list. Neither is an edit, and both used to read as one.
+  function canon(v) {
+    return JSON.stringify(v, (k, x) =>
+      k === "focus" && x === false ? undefined : k === "hiddenGroups" && Array.isArray(x) ? x.slice().sort() : x
+    );
+  }
+  // Whether two settings objects say the same thing. Key order is not part of what was said:
+  // storage hands back defaults merged in front of what was written, so a read of our own write
+  // need not stringify the way the write did.
+  function sameSettings(a, b) {
+    const sorted = (k, x) =>
+      x && typeof x === "object" && !Array.isArray(x)
+        ? Object.keys(x).sort().reduce((o, key) => ((o[key] = x[key]), o), {})
+        : x;
+    return JSON.stringify(a, sorted) === JSON.stringify(b, sorted);
+  }
+  // Called wherever state is taken from storage or written to it, after render() — which may
+  // fill in an absent section, and that is not an edit.
+  function settle() {
+    cleanJson = canon(state);
+    baseGen++;
   }
 
   // What the templates card and the copy card say about whether their button has been
@@ -264,6 +333,16 @@
       const del = node.querySelector(".rule-del");
 
       enabled.checked = rule.enabled !== false;
+      // The switch has no text of its own, so it carries the rule's name; a screen reader
+      // otherwise heard a row of identical unnamed checkboxes.
+      const nameSwitch = () =>
+        enabled.setAttribute(
+          "aria-label",
+          (state.rules[idx].label || "").trim()
+            ? peMsg("optRuleEnableAria", [state.rules[idx].label.trim()])
+            : peMsg("optRuleEnableUnnamed")
+        );
+      nameSwitch();
       focus.checked = rule.focus === true;
       label.value = rule.label || "";
       selector.value = rule.selector || "";
@@ -272,7 +351,10 @@
 
       enabled.addEventListener("change", () => (state.rules[idx].enabled = enabled.checked));
       focus.addEventListener("change", () => (state.rules[idx].focus = focus.checked));
-      label.addEventListener("input", () => (state.rules[idx].label = label.value));
+      label.addEventListener("input", () => {
+        state.rules[idx].label = label.value;
+        nameSwitch();
+      });
       selector.addEventListener("input", () => {
         state.rules[idx].selector = selector.value;
         markSelector(selector);
@@ -281,6 +363,7 @@
       value.addEventListener("input", () => (state.rules[idx].value = value.value));
       del.addEventListener("click", () => {
         state.rules.splice(idx, 1);
+        scheduleMeter();
         renderRules();
       });
 
@@ -377,6 +460,7 @@
       content.addEventListener("input", () => (state.templates[idx].content = content.value));
       del.addEventListener("click", () => {
         state.templates.splice(idx, 1);
+        scheduleMeter();
         renderTemplates();
       });
       el.templateList.appendChild(node);
@@ -418,6 +502,7 @@
       value.addEventListener("input", () => (state.variables[idx].value = value.value));
       del.addEventListener("click", () => {
         state.variables.splice(idx, 1);
+        scheduleMeter();
         renderVariables();
       });
 
@@ -469,6 +554,7 @@
       });
       del.addEventListener("click", () => {
         state.copyFormats.splice(idx, 1);
+        scheduleMeter();
         renderCopyFormats();
       });
 
@@ -526,10 +612,7 @@
     });
     el.quickExamples.hidden = true;
     renderQuickLinks();
-    // Pushed programmatically, so no input event fired to mark the form dirty — and an
-    // unmarked form adopts the next foreign storage change, taking the new row with it.
-    // Same reason the example-feed button sets this by hand.
-    dirty = true;
+    scheduleMeter();
     // Put the caret on the first thing left to replace, selected, so the next keystroke
     // overwrites it. With nothing left, send it to whichever field still needs a decision:
     // a numbered tracker needs a prefix to spend, and everything else needs a name.
@@ -765,6 +848,7 @@
       });
       del.addEventListener("click", () => {
         state.quickLinks.splice(idx, 1);
+        scheduleMeter();
         renderQuickLinks();
       });
 
@@ -834,19 +918,120 @@
 
   function sourceStatusText(src) {
     if (!src.url || !src.url.trim()) return { text: peMsg("msgSrcEnterUrl"), cls: "" };
-    const entry = (syncCache.bySource || {})[src.id];
+    const entry = peSourceEntry(src, syncCache);
     if (!entry) return { text: peMsg("msgSrcNotSynced"), cls: "" };
     if (entry.status === "ok") {
       let t = peMsg("msgSrcSynced", [fmtTime(entry.fetchedAt), String(entry.count || 0)]);
       if (entry.dropped) t += peMsg("msgSrcSkipped", [String(entry.dropped)]);
       return { text: t, cls: "ok" };
     }
-    let t = peMsg("msgSrcFailed", [entry.lastError || "error"]);
+    let t = peMsg("msgSrcFailed", [peSyncErrorText(entry)]);
     if (entry.fetchedAt) t += peMsg("msgSrcLastGood", [fmtTime(entry.fetchedAt)]);
-    return { text: t, cls: "err" };
+    // The worker's own English rides along as a tooltip: it is the line to paste into a bug
+    // report, and the sentence above is the one to act on.
+    return { text: t, cls: "err", raw: entry.lastError || "" };
+  }
+
+  // Where the reader is in the source list, so a rebuild can put them back. A cache update
+  // redraws every row — and Save starts a sync that commits per source — so typing a URL while
+  // a result landed lost the caret, the selection and any group list that was open.
+  //
+  // Keyed by the source's id, never by position: deleting a row is a rebuild too, and putting
+  // focus back "where it was" by index handed it to the next source's ✕ — a second Enter
+  // deleted that one as well — and moved an open group list onto a source nobody had opened.
+  // A control is found again by its place among the row's controls, which covers the group
+  // checkboxes and the summary as well as the classed fields.
+  const SRC_CONTROLS = "input, select, textarea, button, summary";
+  function sourceListPlace() {
+    const rows = [...el.sourceList.querySelectorAll(".src-item")];
+    const a = document.activeElement;
+    const row = a && a.closest ? a.closest(".src-item") : null;
+    const place = { open: {}, focus: null, lost: false };
+    rows.forEach((r) => {
+      if ((r.querySelector(".src-detail") || {}).open) place.open[r.dataset.src] = true;
+    });
+    if (row && rows.indexOf(row) > -1) {
+      const at = [...row.querySelectorAll(SRC_CONTROLS)].indexOf(a);
+      if (at > -1) {
+        place.focus = { src: row.dataset.src, at };
+        try {
+          place.focus.sel = [a.selectionStart, a.selectionEnd];
+        } catch (_) {}
+      }
+    }
+    return place;
+  }
+  function restoreSourceListPlace(place) {
+    const rows = [...el.sourceList.querySelectorAll(".src-item")];
+    const byId = (id) => rows.find((r) => r.dataset.src === id);
+    Object.keys(place.open).forEach((id) => {
+      const d = byId(id) && byId(id).querySelector(".src-detail");
+      if (d) d.open = true;
+    });
+    const f = place.focus;
+    if (!f) return;
+    const row = byId(f.src);
+    // The row the focus was in was deleted: the way on is the Add button, not whichever row
+    // slid up into its place. Gone for any other reason — a save dropping an empty row, a
+    // change adopted from elsewhere — and focus is left where the browser put it, rather than
+    // on a button whose Enter adds a source.
+    if (!row) {
+      if (place.deleted) el.addSource.focus();
+      return;
+    }
+    const field = row.querySelectorAll(SRC_CONTROLS)[f.at];
+    if (!field) return;
+    field.focus();
+    if (f.sel && f.sel[0] != null) {
+      try {
+        field.setSelectionRange(f.sel[0], f.sel[1]);
+      } catch (_) {}
+    }
   }
 
   function renderSources() {
+    const place = sourceListPlace();
+    place.deleted = sourceDeleted;
+    sourceDeleted = false;
+    sourcesStale = false;
+    renderSourceRows();
+    restoreSourceListPlace(place);
+  }
+
+  function paintSourceStatus(statusEl, src) {
+    const st = sourceStatusText(src);
+    statusEl.textContent = st.text;
+    statusEl.title = st.raw || "";
+    statusEl.className = "src-status " + st.cls;
+  }
+  function refreshSourceStatuses() {
+    const list = ensureSync().sources || [];
+    el.sourceList.querySelectorAll(".src-item").forEach((row) => {
+      const src = list.find((x) => x && x.id === row.dataset.src);
+      const statusEl = row.querySelector(".src-status");
+      if (src && statusEl) paintSourceStatus(statusEl, src);
+    });
+  }
+  // A new sync result, from the storage event or from the reply to Sync now and to Save. With
+  // someone in the source list — typing a URL, perhaps in Hangul mid-syllable — a rebuild
+  // replaces the field under them, and putting the caret back does not put an IME composition
+  // back. So the status lines change in place, and the rows are rebuilt once focus leaves.
+  function sourcesChanged() {
+    if (el.sourceList.contains(document.activeElement)) {
+      refreshSourceStatuses();
+      sourcesStale = true;
+    } else renderSources();
+  }
+  // Leaving the list is when a held-back rebuild happens — but not while a button is held: a
+  // press on a label in the list takes focus away before its click lands, and a rebuild in
+  // between replaces the label, so the click goes nowhere. Then it waits for the release.
+  let mouseHeld = false;
+  let rebuildOnRelease = false;
+  function rebuildIfLeft() {
+    if (sourcesStale && !el.sourceList.contains(document.activeElement)) renderSources();
+  }
+
+  function renderSourceRows() {
     const sync = ensureSync();
     el.syncEnabled.checked = !!sync.enabled;
     el.sourceList.innerHTML = "";
@@ -855,6 +1040,7 @@
     list.forEach((src, idx) => {
       const node = el.srcRow.content.firstElementChild.cloneNode(true);
       peApplyI18n(node);
+      node.dataset.src = src.id || "";
       const enabled = node.querySelector(".src-enabled");
       const nameInput = node.querySelector(".src-name");
       const url = node.querySelector(".src-url");
@@ -868,7 +1054,7 @@
       interval.value = String(src.intervalMinutes || 360);
       // Unnamed source → the placeholder IS the name the picker falls back to, so the
       // header is never a surprise.
-      const entry = (syncCache.bySource || {})[src.id];
+      const entry = peSourceEntry(src, syncCache);
       nameInput.placeholder = src.url ? peSourceDisplayName({ url: src.url }, entry) : peMsg("optSrcNamePh");
 
       enabled.addEventListener("change", () => (sync.sources[idx].enabled = enabled.checked));
@@ -877,19 +1063,25 @@
       url.addEventListener("input", () => {
         sync.sources[idx].url = url.value.trim();
         markSourceUrl(url);
-        const s = sourceStatusText(sync.sources[idx]);
-        statusEl.textContent = s.text;
-        statusEl.className = "src-status " + s.cls;
+        paintSourceStatus(statusEl, sync.sources[idx]);
       });
       interval.addEventListener("change", () => (sync.sources[idx].intervalMinutes = parseInt(interval.value, 10) || 360));
       del.addEventListener("click", () => {
         sync.sources.splice(idx, 1);
+        // The switch the first row turned on goes with the last one, back to where it was — a
+        // row added and taken away again is no edit, and sync on with nothing to fetch is not
+        // something anybody asked for.
+        const was = (JSON.parse(cleanJson || "{}") || {}).templateSync || {};
+        if (!sync.sources.length && !(was.sources || []).length) {
+          sync.enabled = !!was.enabled;
+          el.syncEnabled.checked = sync.enabled;
+        }
+        scheduleMeter();
+        sourceDeleted = true;
         renderSources();
       });
 
-      const s = sourceStatusText(src);
-      statusEl.textContent = s.text;
-      statusEl.className = "src-status " + s.cls;
+      paintSourceStatus(statusEl, src);
       renderSourceGroups(node, sync.sources[idx], entry);
       el.sourceList.appendChild(node);
     });
@@ -983,11 +1175,35 @@
     el.addRule.addEventListener("click", () => addRule({ label: "", selector: "", property: "max-width", value: "" }));
 
     document.querySelectorAll(".chip[data-preset]").forEach((chip) => {
-      chip.addEventListener("click", () => addRule(PRESETS[chip.dataset.preset]));
+      chip.addEventListener("click", () => {
+        const p = PRESETS[chip.dataset.preset];
+        // A preset already in the list is pointed at rather than copied: a second identical
+        // row is two places to keep in step, and the one that wins is whichever is last.
+        const at = state.rules.findIndex(
+          (r) => (r.selector || "").trim() === p.selector && (r.property || "").trim() === p.property
+        );
+        if (at > -1) {
+          // Clicking a preset asks for it to apply, so a copy that is switched off is switched
+          // on: pointing at it and leaving it off took away what the chip used to give you.
+          const wasOff = state.rules[at].enabled === false;
+          if (wasOff) {
+            state.rules[at].enabled = true;
+            renderRules();
+            scheduleMeter();
+          }
+          const row = el.ruleList.querySelectorAll(".rule-item")[at];
+          const field = row && row.querySelector(".rule-value");
+          if (field) field.focus();
+          flash(peMsg(wasOff ? "msgPresetEnabled" : "msgPresetExists"));
+          return;
+        }
+        addRule(p);
+      });
     });
 
     el.addTemplate.addEventListener("click", () => {
       state.templates.push({ id: uid("tpl"), name: "", title: "", content: "" });
+      scheduleMeter();
       renderTemplates();
       focusLast(".tpl-name");
     });
@@ -999,6 +1215,7 @@
         return;
       }
       state.variables.push({ name: "", value: "" });
+      scheduleMeter();
       renderVariables();
       focusLast(".var-name");
     });
@@ -1010,6 +1227,7 @@
         return;
       }
       state.copyFormats.push({ id: uid("cpy"), name: "", format: "" });
+      scheduleMeter();
       renderCopyFormats();
       focusLast(".cpy-name");
     });
@@ -1027,13 +1245,39 @@
     });
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
+    el.sourceList.addEventListener("focusout", (e) => {
+      if (!sourcesStale || el.sourceList.contains(e.relatedTarget)) return;
+      if (mouseHeld) rebuildOnRelease = true;
+      else renderSources();
+    });
+    document.addEventListener("mousedown", () => (mouseHeld = true), true);
+    document.addEventListener(
+      "mouseup",
+      () => {
+        mouseHeld = false;
+        if (!rebuildOnRelease) return;
+        rebuildOnRelease = false;
+        setTimeout(rebuildIfLeft, 0); // after the click this release produces
+      },
+      true
+    );
 
     el.addSource.addEventListener("click", () => {
       if (ensureSync().sources.length >= PE_SYNC_LIMITS.maxSources) {
         flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
         return;
       }
-      ensureSync().sources.push({
+      // The first source is a request for sync, so it switches sync on, as the example button
+      // always did. Left off, the row told the user to enter a URL and Save, they did, and "Sync
+      // now" then reported "Synced 0 source(s)" because nothing had run. Only the first: sync
+      // switched off by someone who has sources was a decision, and a row added to fill in
+      // later must not reverse it.
+      const sync = ensureSync();
+      if (!sync.sources.length) {
+        sync.enabled = true;
+        el.syncEnabled.checked = true;
+      }
+      sync.sources.push({
         id: uid("src"),
         url: "",
         name: "",
@@ -1041,6 +1285,7 @@
         enabled: true,
         hiddenGroups: []
       });
+      scheduleMeter();
       renderSources();
       focusLast(".src-name");
     });
@@ -1072,7 +1317,6 @@
         hiddenGroups: []
       });
       renderSources();
-      dirty = true; // pushed programmatically, so no input event fired to mark it
       scheduleMeter();
       flash(peMsg("msgExampleAdded"));
     });
@@ -1102,32 +1346,29 @@
       });
     }
 
-    // mark dirty on real user input (programmatic value sets don't fire these events)
-    document.addEventListener(
-      "input",
-      () => {
-        dirty = true;
-        scheduleMeter();
-      },
-      true
-    );
-    document.addEventListener(
-      "change",
-      () => {
-        dirty = true;
-        scheduleMeter();
-      },
-      true
-    );
+    // The meter follows every edit; whether there is anything unsaved is isDirty's to say.
+    document.addEventListener("input", scheduleMeter, true);
+    document.addEventListener("change", scheduleMeter, true);
 
     // reflect settings changed elsewhere (e.g. the picker)
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
+        // A page already open, asked to show a tab (see takeOpenTab).
+        if (area === "session") {
+          const c = changes[PE_OPEN_TAB_KEY];
+          if (c && c.newValue) {
+            openRequestedTab(c.newValue);
+            try {
+              chrome.storage.session.remove(PE_OPEN_TAB_KEY);
+            } catch (_) {}
+          }
+          return;
+        }
         // Synced-template cache updated by the service worker (scheduled/now) → refresh statuses.
         if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
           syncCache = { bySource: (nv && nv.bySource) || {} };
-          renderSources();
+          sourcesChanged();
           renderAnchorHealth(); // templates that arrive only from a source change its gate
           return;
         }
@@ -1146,8 +1387,18 @@
           return;
         }
         if (!peSettingsChanged(changes, area)) return;
-        if (savingSelf) return; // our own save; cleared once it has settled
+        // The read is a window like any other. One answered after the baseline moved — a newer
+        // save, an adoption — holds storage from before it, and taking that put older settings
+        // on the form, marked as saved. Such an answer is asked again rather than dropped: the
+        // change that started it may still be one this page has not seen.
+        const read = () => {
+        const gen = baseGen;
         peGetSettings().then((s) => {
+          if (gen !== baseGen) return read();
+          // Our own write, while it is out, is only its echo when storage reads back as what
+          // was written. Anything else landed in the same window from somewhere else, and
+          // dropping it unseen left the page calling itself in step with storage it was not.
+          if (savingSelf && writing && sameSettings(s, writing)) return;
           // A write that leaves storage identical to what we last synced is not news, and
           // announcing it is worse than saying nothing — our own save can land a late
           // event after savingSelf clears, and Chrome can fire the same change twice.
@@ -1156,7 +1407,10 @@
           const sJson = JSON.stringify(s);
           if (sJson === syncedJson) return;
           syncedJson = sJson; // adopt the new storage baseline either way
-          if (dirty) {
+          if (isDirty() || saveInFlight) {
+            if (saveInFlight) refusedWhileSaving = true;
+            behind = true;
+            refusals++;
             flash(peMsg("msgChangedElsewhere"), true);
             return;
           }
@@ -1166,13 +1420,12 @@
           // signature: a settings change synced from another device must not yank the
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
-          state = s;
-          resetPending = false; // the reset this was waiting to save is gone
-          knownDomains = (s.domains || []).slice();
-          render();
+          adoptSettings(s); // the reset this was waiting to save, if any, is gone with it
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
         });
+        };
+        read();
       });
     } catch (_) {}
 
@@ -1275,6 +1528,9 @@
         // what just changed. Leaving them there meant "review, then Save" pointed at panels
         // that were hidden. Send them to the first tab so reviewing can actually start.
         showTab(PE_TABS[0]);
+        // Not settle(): nothing is saved yet, so the form is dirty, and a dirty form refuses
+        // the next change from elsewhere rather than letting it replace the whole import.
+        scheduleMeter();
         flash(peMsg("msgImported"));
       } catch (e) {
         flash(peMsg("msgImportInvalid"), true);
@@ -1293,6 +1549,7 @@
       property: base.property || "max-width",
       value: base.value || ""
     });
+    scheduleMeter();
     renderRules();
     focusLast(base.selector ? ".rule-value" : ".rule-selector");
   }
@@ -1354,17 +1611,46 @@
   // meant to remove, so it is carried into the save rather than dropped. Deliberate removal
   // still works: a domain that WAS on screen is in knownDomains, so deleting it and saving
   // removes it, and Restore defaults still clears the list it just showed you.
-  async function mergeForeignDomains(target) {
-    let stored = null;
-    try {
-      stored = await peGetSettings();
-    } catch (_) {
-      return []; // cannot read storage: save what we have rather than refusing
-    }
+  //
+  // `stored` is read once by the caller for this and mergeForeignRules both; null when storage
+  // could not be read, and then the save goes ahead with what it has rather than refusing.
+  function mergeForeignDomains(target, stored, known) {
+    if (!stored) return [];
     const mine = target.domains || [];
-    const added = (stored.domains || []).filter((d) => knownDomains.indexOf(d) === -1 && mine.indexOf(d) === -1);
+    const added = (stored.domains || []).filter((d) => known.domains.indexOf(d) === -1 && mine.indexOf(d) === -1);
     if (added.length) target.domains = mine.concat(added);
     return added;
+  }
+
+  // The picker's version of the same thing. It adds a rule from a Plane tab while this page may
+  // be open with unsaved edits, and a dirty page announces the change without adopting it — so
+  // the Save that follows wrote this page's older list over the rule just picked. A rule in
+  // storage whose id this page has never shown cannot be one the user meant to delete, so it
+  // is carried into the save; one that was on screen and deleted stays deleted. Returns the
+  // carried rules.
+  function mergeForeignRules(target, stored, known) {
+    if (!stored) return [];
+    const mine = new Set((target.rules || []).map((r) => r && r.id));
+    const added = (stored.rules || []).filter((r) => r && r.id && known.rules.indexOf(r.id) === -1 && !mine.has(r.id));
+    if (added.length) target.rules = (target.rules || []).concat(added);
+    return added;
+  }
+  // The page has had these on screen: the lists the merges above read. Every way the page takes
+  // its state from storage, or writes it there, goes through here, so none can forget one.
+  function remember(settings, add) {
+    const d = (settings.domains || []).slice();
+    const r = (settings.rules || []).map((x) => x && x.id).filter(Boolean);
+    knownDomains = add ? [...new Set(knownDomains.concat(d))] : d;
+    knownRuleIds = add ? [...new Set(knownRuleIds.concat(r))] : r;
+  }
+
+  // “A”, “B” — the carried rules as the message names them, by label or else by selector.
+  function quotedRules(rules) {
+    return rules
+      .map((r) => (r.label || r.selector || "").trim())
+      .filter(Boolean)
+      .map((n) => "“" + n + "”")
+      .join(", ");
   }
 
   // Two halves, on either side of the write. Asking comes first, because the Save click is
@@ -1381,18 +1667,65 @@
     return !!ok;
   }
 
-  async function revokeStalePermissions(settings) {
+  async function revokeStalePermissions(settings, before) {
     const desired = desiredOrigins(settings);
     // Drop grants for origins no longer listed (domains or sources); no gesture needed.
     // Source origins may be specific hosts (https://host/*), so match those too.
     try {
       const perms = await chrome.permissions.getAll();
+      // An origin that appeared in storage since `before` — the read this save was built on — is
+      // a site switched on a moment ago (the popup writes it, then asks for access), not one
+      // this save removed, so it keeps its access. Only what is new counts: a site this save took off was
+      // in `before`, and still goes.
+      if (before) {
+        try {
+          const had = desiredOrigins(before);
+          desiredOrigins(await peGetSettings()).forEach((o) => had.indexOf(o) === -1 && desired.indexOf(o) === -1 && desired.push(o));
+        } catch (_) {}
+      }
       const stale = (perms.origins || []).filter((o) => /^(\*|https?):\/\//.test(o) && !desired.includes(o));
       if (stale.length) await chrome.permissions.remove({ origins: stale });
     } catch (_) {}
   }
 
+  // The first variable row Save could not keep, and what to say about it — or null.
+  function variableProblem() {
+    const seen = new Set();
+    const vars = state.variables || [];
+    for (let i = 0; i < vars.length; i++) {
+      const name = ((vars[i] && vars[i].name) || "").trim();
+      const value = (vars[i] && vars[i].value) || "";
+      if (!name) {
+        if (value.trim()) return { index: i, msg: peMsg("msgVarNoName") };
+        continue;
+      }
+      if (!PE_VAR_NAME_RE.test(name)) return { index: i, msg: peMsg("msgVarBadSave", [name]) };
+      const k = name.toLowerCase();
+      if (seen.has(k)) return { index: i, msg: peMsg("msgVarDupeSave", [name]) };
+      seen.add(k);
+    }
+    return null;
+  }
+
+  // One at a time: a second click while the first save is out ran a second save beside it,
+  // which read the first one's tidying as an edit of the user's. And the flag comes down
+  // however the save ends — a throw anywhere in it must not leave a page that can never save.
   async function saveAll() {
+    if (saveInFlight) return;
+    saveInFlight = true;
+    refusedWhileSaving = false;
+    let failed = false;
+    try {
+      failed = (await saveRun()) === false;
+    } finally {
+      saveInFlight = false;
+    }
+    // A change refused because this save was out, and the save failed with the form still
+    // clean: nothing else will announce it, so it is taken now — once the save is over.
+    if (failed && refusedWhileSaving && !isEdited()) adoptStored();
+  }
+
+  async function saveRun() {
     // Refuse BEFORE touching state. A URL we cannot turn into a host permission is one
     // the worker will never fetch, so the save cannot go ahead — but bailing out after
     // the filters below have already rebuilt state.rules/templates/variables leaves every
@@ -1409,6 +1742,20 @@
       return; // state untouched, so every row's bindings still line up
     }
 
+    // A variable Save cannot keep stops the save, the same way: it used to be dropped with
+    // "Saved." on screen, and a name in Korean, or a second "team", lost its value without a
+    // word beyond a tooltip on a red border. A row with neither a name nor a value is just an
+    // empty row and goes quietly, like any other.
+    const varBad = variableProblem();
+    if (varBad) {
+      showTab("templates");
+      const field = el.variableList.querySelectorAll(".var-item")[varBad.index];
+      const input = field && field.querySelector(".var-name");
+      if (input) input.focus();
+      flash(varBad.msg, true);
+      return;
+    }
+
     // Everything Save writes is built on a copy. State is replaced only once storage has taken
     // it, so a save that fails — a template too big for its item, a full quota — leaves every
     // rendered row bound to the entry it was drawn from, and the user can fix what the message
@@ -1416,7 +1763,12 @@
     // under their DOM: typing into one renamed the template below it, and editing the oversized
     // one threw, so its shrink never landed.
     ensureSync();
-    const next = JSON.parse(JSON.stringify(state));
+    // What the form held when Save was pressed. The awaits below — storage, the permission
+    // prompt — leave the form editable, and anything typed in that window is not in `next`.
+    const startJson = JSON.stringify(state);
+    const startCanon = canon(state);
+    const resetMark = resetPending ? resetSeq : -1; // the reset this save carries, if any
+    const next = JSON.parse(startJson);
     // drop empty rules/templates
     next.rules = (next.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
     next.templates = (next.templates || []).filter(
@@ -1466,32 +1818,126 @@
           ? [...new Set(s.hiddenGroups.map((x) => peClampStr(String(x), PE_SYNC_LIMITS.maxFieldLen)))]
           : []
       }));
-    // Before the permission pass, because that is what would hand the origin back.
-    const kept = await mergeForeignDomains(next);
+    // Before the permission pass, because that is what would hand the origin back. What the
+    // page has shown is fixed as of now: the lists move when the page adopts something, and
+    // nothing adopted after this point is in `next`.
+    const known = { domains: knownDomains.slice(), rules: knownRuleIds.slice() };
+    let stored = null;
+    try {
+      stored = await peGetSettings();
+    } catch (_) {}
+    let kept = mergeForeignDomains(next, stored, known);
+    let keptRules = mergeForeignRules(next, stored, known);
     const permOk = await requestHostPermissions(next);
+    // Read again after the prompt, which can stay up as long as the user likes: a rule picked
+    // or a site switched on meanwhile is in storage now, and a save built on the read above
+    // would write over it. The merges are idempotent, so the second only adds what is new.
+    let after = null;
+    try {
+      after = await peGetSettings();
+    } catch (_) {}
+    // What the first read carried may itself have changed meanwhile — edited or deleted on
+    // another page — so it is taken again from this read, not kept from the first.
+    if (after) {
+      const now = new Map((after.rules || []).filter((r) => r && r.id).map((r) => [r.id, r]));
+      const carried = new Set(keptRules.map((r) => r.id));
+      next.rules = next.rules.filter((r) => !carried.has(r.id) || now.has(r.id)).map((r) => (carried.has(r.id) ? now.get(r.id) : r));
+      keptRules = keptRules.filter((r) => now.has(r.id)).map((r) => now.get(r.id));
+      const nowDomains = after.domains || [];
+      next.domains = next.domains.filter((d) => kept.indexOf(d) === -1 || nowDomains.indexOf(d) !== -1);
+      kept = kept.filter((d) => nowDomains.indexOf(d) !== -1);
+    }
+    kept.push(...mergeForeignDomains(next, after, known));
+    keptRules.push(...mergeForeignRules(next, after, known));
+    const refusalsSeen = refusals; // what this save has read; anything refused later is newer
+    // A source whose URL was edited is a different file under the same name, and gets a new
+    // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
+    // does the same for entries that recorded theirs, and those from before that cannot.
+    // Against what this page last loaded or saved, not against storage: a URL changed on another
+    // device is not an edit made here, and renaming over it filed that device's source under a
+    // fresh id and pruned the file it had fetched.
+    const baseline = JSON.parse(cleanJson || "{}");
+    const savedUrl = new Map((((baseline || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
+    const renamed = new Map();
+    next.templateSync.sources = next.templateSync.sources.map((x) => {
+      if (!savedUrl.has(x.id) || savedUrl.get(x.id) === x.url) return x;
+      renamed.set(x.id, uid("src"));
+      return Object.assign({}, x, { id: renamed.get(x.id) });
+    });
     try {
       savingSelf = true;
+      writing = next;
       await peSaveSettings(next);
-      state = next;
-      if (permOk) await revokeStalePermissions(state);
+      if (permOk) await revokeStalePermissions(next, after || stored);
       // Only after the settings write succeeded: a failed save leaves the flag set, so the
-      // save that does go through is the one that clears it.
-      if (resetPending) {
+      // save that does go through is the one that clears it. And only for the reset this save
+      // carried: one confirmed while it was in flight is not in what was written.
+      if (resetPending && resetSeq === resetMark) {
         resetPending = false;
         await peSaveRecent([]);
         await peSavePins([]);
         await peSaveTplRecent([]);
       }
-      syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
-      knownDomains = (state.domains || []).slice();
-      render();
+      syncedJson = JSON.stringify(next); // storage now matches this; late events are no-ops
+      if (refusals === refusalsSeen) behind = false; // written over, with what it added carried
+      // Edited while the save was in flight — decided after the last await, because every one
+      // of them leaves the form open to typing. Storage has what Save was pressed on, and the
+      // form keeps what is on it now: replacing state with `next` threw the newer edit away and
+      // drew the form without it, under "Saved.". The form is not redrawn either, which would
+      // take the caret out of the field being typed in. Its baseline is what was written, so
+      // the newer edit reads as unsaved, and taking it back reads as nothing to lose.
+      //
+      // What the save carried across from elsewhere is left out of the form and out of the
+      // known lists, so the next save carries it again rather than reading it as deleted here.
+      const editedSince = resetPending || canon(state) !== startCanon;
+      if (editedSince) {
+        // A source saved under a new id takes it in the form too, and in the baseline, or the
+        // next save would write the old id back and the new file's cache would be pruned.
+        const base = JSON.parse(startJson);
+        [state, base].forEach((o) =>
+          ((o.templateSync || {}).sources || []).forEach((x) => {
+            if (x && renamed.has(x.id)) x.id = renamed.get(x.id);
+          })
+        );
+        el.sourceList.querySelectorAll(".src-item").forEach((row) => {
+          if (renamed.has(row.dataset.src)) row.dataset.src = renamed.get(row.dataset.src);
+        });
+        remember(base, true);
+        cleanJson = canon(base);
+        baseGen++;
+      } else {
+        state = next;
+        remember(state);
+        render();
+        settle();
+      }
       // A failed grant outranks the good news. These two can happen together — and when
       // they do it is not a coincidence: the origin Chrome refused is the one that was just
       // carried across, so reporting only "kept it" would be reporting the opposite of what
       // happened.
-      if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
-      else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
-      else flash(peMsg("msgSaved"));
+      // Both kinds at once is what the picker and the popup produce together, and naming only
+      // one of them leaves the other arriving unexplained.
+      let said;
+      if (!permOk) said = [peMsg("msgSavedNoPerm"), true];
+      else if (editedSince)
+        said = [
+          [
+            peMsg("msgSavedEditsPending"),
+            kept.length ? peMsg("msgAlsoKeptSites", [kept.join(", ")]) : "",
+            keptRules.length ? peMsg("msgAlsoKeptRules", [quotedRules(keptRules)]) : ""
+          ].filter(Boolean).join(" "),
+          false,
+          true
+        ];
+      else if (kept.length && keptRules.length)
+        said = [peMsg("msgKeptDomains", [kept.join(", ")]) + " " + peMsg("msgKeptRulesToo", [quotedRules(keptRules)])];
+      else if (kept.length) said = [peMsg("msgKeptDomains", [kept.join(", ")])];
+      else if (keptRules.length) said = [peMsg("msgKeptRules", [quotedRules(keptRules)])];
+      else said = [peMsg("msgSaved")];
+      // A change refused after this save last read storage is not in what it wrote, and saying
+      // only "Saved." would bury the line that told the user so.
+      if (refusals !== refusalsSeen) said = [said[0] + " " + peMsg("msgChangedElsewhere"), true];
+      flash(...said);
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
         try {
@@ -1530,24 +1976,57 @@
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
       }
+      return false; // failed; saveAll decides whether to take a change refused meanwhile
     } finally {
       // Released a turn later than the save, so every event the save produced has landed
       // while the flag was still set.
-      setTimeout(() => (savingSelf = false), 0);
+      setTimeout(() => {
+        savingSelf = false;
+        writing = null;
+      }, 0);
     }
+  }
+
+  // The page takes `s` as its state, as it does on load: every adoption goes through here.
+  function adoptSettings(s) {
+    syncedJson = JSON.stringify(s);
+    state = s;
+    resetPending = false;
+    behind = false;
+    remember(s);
+    render();
+    settle();
+  }
+  // Take what storage holds now. Quietly: whatever the caller just said — a failed save — is
+  // the message that matters. The read is a window like any other, so whether to take it is
+  // decided when it returns: typed into, reset, or saving again meanwhile, and it is dropped.
+  function adoptStored() {
+    const gen = baseGen;
+    peGetSettings()
+      .then((s) => {
+        if (gen !== baseGen || isEdited() || saveInFlight) return;
+        adoptSettings(s);
+      })
+      .catch(() => {});
   }
 
   function reloadSyncCache() {
     return peGetSyncCache().then((c) => {
       syncCache = c;
-      renderSources();
+      sourcesChanged();
     });
   }
 
   // Ask the service worker to fetch all sources now, then refresh the status lines.
   function syncNow() {
-    if (dirty) {
+    if (isDirty()) {
       flash(peMsg("msgSaveFirst"), true);
+      return;
+    }
+    // Asking the worker with sync off runs nothing and reports "Synced 0 source(s)", which
+    // reads as a sync that found nothing rather than one that never happened.
+    if (!ensureSync().enabled) {
+      flash(peMsg("msgSyncOff"), true);
       return;
     }
     flash(peMsg("msgSyncing"));
@@ -1584,16 +2063,22 @@
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});
     resetPending = true;
+    resetSeq++;
     render();
+    scheduleMeter(); // the same as an import: drawn, not saved, so not settle()
     flash(peMsg("msgResetDone"));
   }
 
   let flashTimer = null;
-  function flash(msg, isError) {
+  // A success may fade; an error stays until the next message replaces it. An error names
+  // something to go and change, often on another tab, and in Korean it is a sentence or two to
+  // read first — three seconds was gone before the reader had found the field it named.
+  // `stay` is for a success that still asks something of the reader — an edit not yet saved.
+  function flash(msg, isError, stay) {
     el.status.textContent = msg;
     el.status.style.color = isError ? "#dc2626" : "";
     clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => (el.status.textContent = ""), 3000);
+    if (!isError && !stay) flashTimer = setTimeout(() => (el.status.textContent = ""), 4000);
   }
 
   // header "about" line: show the version straight from the manifest (never goes stale).
@@ -1659,16 +2144,42 @@
   Promise.all([peGetSettings(), peGetSyncCache(), peGetRuleHealth(), peGetAnchorHealth()]).then(([s, c, h, a]) => {
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
-    knownDomains = (s.domains || []).slice();
+    remember(s);
     syncCache = c;
     ruleHealth = h;
     anchorHealth = a;
     render();
+    settle();
     bind();
     bindTabs();
     // After the first render, so the choice can look at the settings that just loaded.
     // Not inside render(): that also runs after every save, and it would throw the user
     // back to the default tab each time they pressed Save.
     showTab(initialTab());
+    takeOpenTab();
+  });
+
+  // "Open Settings on this tab", left in storage.session by the worker for a page that may not
+  // have existed yet — "Manage templates" asks for Templates. Used once, then removed, so a
+  // later plain open lands where it normally would. Only a tab this page has is honoured.
+  function openRequestedTab(tab) {
+    if (typeof tab === "string" && PE_TABS.indexOf(tab) !== -1) showTab(tab);
+  }
+  function takeOpenTab() {
+    try {
+      chrome.storage.session.get(PE_OPEN_TAB_KEY).then((o) => {
+        if (!o || !o[PE_OPEN_TAB_KEY]) return;
+        openRequestedTab(o[PE_OPEN_TAB_KEY]);
+        chrome.storage.session.remove(PE_OPEN_TAB_KEY);
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
+  // Edits live in this page until Save, and closing the tab used to drop them without a word.
+  window.addEventListener("beforeunload", (e) => {
+    // Mid-save, too: the edit being saved is not in storage until the save ends.
+    if (!isDirty() && !saveInFlight) return;
+    e.preventDefault();
+    e.returnValue = "";
   });
 })();

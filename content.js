@@ -20,6 +20,10 @@
   let menu = null;
   let menuOpen = false;
   let menuOwnerBtn = null;
+  let menuReturn = null; // what had focus when the menu opened — see hideMenu
+  let menuMode = ""; // "copy" or the template menu: which list a redraw has to rebuild
+  let filterComposing = false; // an IME composition is open in the menu's filter
+  let redrawPending = false; // a redraw that waited for it to end
   // The work item the copy menu was opened for, read once while the menu opens. A peek
   // panel over a list closes as soon as you mousedown outside it, and the menu is appended
   // to <body> — outside the panel — so by the time a format is clicked the panel, and its
@@ -775,6 +779,8 @@
       removeButtons();
       return;
     }
+    // On the page before anything is said into it — see ensureLive.
+    ensureLive();
     // The two buttons are gated separately: a user with no templates can still copy a
     // reference, and a user who deleted every copy format still gets the template menu.
     if (hasAnyTemplates()) {
@@ -819,15 +825,52 @@
 
   /* ---- menu ---- */
   function ensureMenu() {
+    ensureLive();
     if (menu) return;
     menu = document.createElement("div");
     menu.id = "pe-tmpl-menu";
     menu.addEventListener("mousedown", (e) => e.preventDefault());
+    // The rows are buttons, so Tab reaches them. The highlight follows focus, or the arrows
+    // would carry on from a row the reader has already left.
+    menu.addEventListener("focusin", (e) => {
+      const row = e.target && e.target.closest && e.target.closest(".pe-menu-item, .pe-menu-config");
+      // Quietly: a focused button is announced by the screen reader itself.
+      if (row && !row.classList.contains("pe-menu-active")) setMenuActive(row, true);
+    });
     document.body.appendChild(menu);
+  }
+
+  // One live region of ours, for everything this script says that is not focused: the row the
+  // arrows have reached (focus stays in the editor, so nothing else announces it) and every
+  // toast. It exists before anything is written to it, because a region inserted with its text
+  // already in it is not reliably read. Plane's own markup is never given an aria attribute.
+  let live = null;
+  function ensureLive() {
+    if (live && live.isConnected) return live;
+    live = document.createElement("div");
+    live.id = "pe-live";
+    live.className = "pe-sr";
+    live.setAttribute("role", "status");
+    live.setAttribute("aria-live", "polite");
+    document.body.appendChild(live);
+    return live;
+  }
+  // Emptied, then written a moment later. Setting the text it already holds is no change, so
+  // a second identical toast — or a row reached again — said nothing; and a region filled in
+  // the same task it was emptied in is read by some screen readers as one unchanged node.
+  let announceTimer = null;
+  function announce(text) {
+    const l = ensureLive();
+    l.textContent = "";
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => (l.textContent = text || ""), 50);
   }
 
   function renderMenu() {
     menu.innerHTML = "";
+    // A new filter box starts with no composition in it, whatever the old one was doing.
+    filterComposing = false;
+    redrawPending = false;
     const sections = peBuildTemplateSections(settings || {}, syncCache);
     const total = peCountTemplates(sections);
     const hasSynced = sections.some((s) => s.kind === "synced");
@@ -845,6 +888,16 @@
       filterInput.placeholder = peMsg("menuFilterPh");
       filterInput.className = "pe-menu-filter-input";
       filterInput.addEventListener("mousedown", (e) => e.stopPropagation());
+      filterInput.addEventListener("compositionstart", () => (filterComposing = true));
+      filterInput.addEventListener("compositionend", () => {
+        filterComposing = false;
+        if (!redrawPending) return;
+        redrawPending = false;
+        // After the input event that commits the text, so the redraw carries the whole query.
+        setTimeout(() => {
+          if (menuOpen && menu && menuMode === "templates") redrawMenu();
+        }, 0);
+      });
       fwrap.appendChild(filterInput);
       menu.appendChild(fwrap);
     }
@@ -893,6 +946,9 @@
         preview.className = "pe-menu-item-preview";
         preview.textContent = previewOf(t);
         item._haystack = ((t.name || "") + " " + (t.title || "") + " " + (t.content || "")).toLowerCase();
+        // Which template this row is, for a redraw to find it again; the recent block's copy
+        // is a different row with the same template.
+        item.dataset.key = (recent ? "recent:" : "") + (t.id || t.name || "");
         item.appendChild(title);
         item.appendChild(preview);
         item.addEventListener("mousedown", (e) => e.preventDefault());
@@ -972,7 +1028,7 @@
       noHits.textContent = peMsg("menuNoMatch");
       noHits.style.display = "none";
       list.appendChild(noHits);
-      filterInput.addEventListener("input", () => {
+      const applyFilter = (quiet) => {
         const q = filterInput.value.trim().toLowerCase();
         let shown = 0;
         const ownerHits = new Map(); // source header → surviving item count
@@ -994,11 +1050,65 @@
         ownerHits.forEach((n, el) => (el.style.display = n ? "" : "none"));
         noHits.style.display = shown ? "none" : "block";
         // The highlight may be on a row the filter just hid; Enter takes the first hit.
-        setMenuActive(menuRows()[0] || null);
-      });
+        setMenuActive(menuRows()[0] || null, quiet);
+      };
+      filterInput.addEventListener("input", () => applyFilter(false));
+      menu._applyFilter = applyFilter;
     }
 
-    menu.appendChild(makeMenuFooter(peMsg("menuManage")));
+    menu.appendChild(makeMenuFooter(peMsg("menuManage"), "templates"));
+  }
+
+  // A sync landing under an open template menu, redrawn without losing the reader's place. A
+  // plain redraw took the highlight, the focused row and the query typed in the filter with it,
+  // so the next Enter pressed a template nobody chose — or, with focus left in the editor, no
+  // template at all. Skipping the redraw while the menu was in use was the first answer, and it
+  // only covered a menu that had focus: Alt+T leaves focus in the editor on purpose. So the
+  // place is carried across by which template it was on. A row whose template has gone takes
+  // the highlight with it rather than handing it to a neighbour nobody picked.
+  function redrawMenu() {
+    // An IME session belongs to the input it started in, and a new input cannot take it over: a
+    // Korean syllable being built in the filter was split in two. The redraw waits for commit.
+    if (filterComposing && menu.contains(document.activeElement)) {
+      redrawPending = true;
+      return;
+    }
+    const keyOf = (r) => (r ? (r.classList.contains("pe-menu-config") ? "config" : r.dataset.key || "") : "");
+    // Only a row that is the one row with that key: two templates in a source may share an id,
+    // and the first of them is not necessarily the one the reader was on.
+    const find = (k) => {
+      const hits = k ? menuRows().filter((r) => keyOf(r) === k) : [];
+      return hits.length === 1 ? hits[0] : null;
+    };
+    const a = document.activeElement;
+    const inMenu = !!(a && menu.contains(a));
+    const activeKey = keyOf(menu.querySelector(".pe-menu-active"));
+    const focusKey = inMenu && a.closest ? keyOf(a.closest(".pe-menu-item, .pe-menu-config")) : "";
+    const oldFilter = menu.querySelector(".pe-menu-filter-input");
+    const query = oldFilter ? oldFilter.value : "";
+    const filterFocus = inMenu && a === oldFilter ? [oldFilter.selectionStart, oldFilter.selectionEnd] : null;
+    const scroll = (menu.querySelector(".pe-menu-list") || {}).scrollTop || 0;
+    renderMenu();
+    const filter = menu.querySelector(".pe-menu-filter-input");
+    if (filter && query) {
+      filter.value = query;
+      if (menu._applyFilter) menu._applyFilter(true);
+    }
+    const list = menu.querySelector(".pe-menu-list");
+    if (list) list.scrollTop = scroll;
+    setMenuActive(find(activeKey), true);
+    if (filterFocus && filter) {
+      filter.focus();
+      try {
+        filter.setSelectionRange(filterFocus[0], filterFocus[1]);
+      } catch (_) {}
+    } else if (inMenu) {
+      // The row that had focus, else the filter, else the editor the menu was opened from:
+      // focus must not drop to <body>, where Escape and the arrows no longer reach anything.
+      const row = find(focusKey);
+      const back = row || filter || (menuReturn && menuReturn.isConnected ? menuReturn : null);
+      if (back) back.focus();
+    }
   }
 
   // Read the stored list again rather than trusting `tplRecent`: another tab may have written
@@ -1014,7 +1124,7 @@
   // Shared by both menu modes. The door is the same Settings page, but the label is not:
   // "Manage templates" under a list of copy formats sends the user looking for the wrong
   // card.
-  function makeMenuFooter(label) {
+  function makeMenuFooter(label, tab) {
     const footer = document.createElement("div");
     footer.className = "pe-menu-footer";
     const cfg = document.createElement("button");
@@ -1025,7 +1135,7 @@
     cfg.addEventListener("click", (e) => {
       e.preventDefault();
       try {
-        chrome.runtime.sendMessage({ type: "pe-open-options" });
+        chrome.runtime.sendMessage({ type: "pe-open-options", tab });
       } catch (_) {}
       hideMenu();
     });
@@ -1071,7 +1181,7 @@
       wrap.appendChild(item);
     });
     menu.appendChild(wrap);
-    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy")));
+    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy"), "items"));
   }
 
   function positionMenu(btn) {
@@ -1096,17 +1206,33 @@
       return;
     }
     menuOwnerBtn = btn;
+    // Moved from one editor to the other with a row focused: the way back is still wherever
+    // it was opened from, and the redraw below takes the focused row away, so focus goes to
+    // the new first row instead of falling to <body>.
+    const focusInMenu = !!menu && menu.contains(document.activeElement);
+    if (!focusInMenu) menuReturn = document.activeElement;
     ensureMenu();
+    menuMode = mode === "copy" ? "copy" : "templates";
     if (mode === "copy") renderCopyMenu();
     else renderMenu();
     menu.style.display = "block";
     positionMenu(btn);
     menuOpen = true;
     setMenuActive(menuRows()[0] || null);
+    if (focusInMenu && menuRows()[0]) menuRows()[0].focus();
   }
+  // A row can hold focus now (Tab reaches it), and hiding a focused element drops focus to
+  // <body>: the next keystroke went nowhere. So focus goes back to what had it when the menu
+  // opened — the editor for Alt+T, the button for a click — and only when it was in the menu.
   function hideMenu() {
+    const hadFocus = !!menu && menu.contains(document.activeElement);
     if (menu) menu.style.display = "none";
     menuOpen = false;
+    if (!hadFocus) return;
+    const back = menuReturn && menuReturn !== document.body && menuReturn.isConnected ? menuReturn : menuOwnerBtn;
+    try {
+      if (back && back.isConnected) back.focus();
+    } catch (_) {}
   }
 
   // The keyboard half of both menus. The menu never takes focus: Alt+T is pressed while
@@ -1117,11 +1243,13 @@
     if (!menu) return [];
     return [...menu.querySelectorAll(".pe-menu-item, .pe-menu-config")].filter((r) => r.getClientRects().length > 0);
   }
-  function setMenuActive(row) {
+  function setMenuActive(row, quiet) {
     if (!menu) return;
     menu.querySelectorAll(".pe-menu-active").forEach((r) => r.classList.remove("pe-menu-active"));
     if (!row) return;
     row.classList.add("pe-menu-active");
+    const title = row.querySelector(".pe-menu-item-title");
+    if (!quiet) announce((title || row).textContent);
     try {
       row.scrollIntoView({ block: "nearest" });
     } catch (_) {}
@@ -1131,10 +1259,15 @@
     const rows = menuRows();
     if (!rows.length) return false;
     const cur = rows.indexOf(menu.querySelector(".pe-menu-active"));
+    // A row someone has tabbed to is a focused button, and Enter on it is that button's.
+    // Taking it over pressed whichever row the arrows had last highlighted instead. Only a row:
+    // the filter box is in the menu too, and Enter there takes the highlighted hit.
+    const a = document.activeElement;
+    const inMenu = !!(a && menu.contains(a) && a.closest && a.closest(".pe-menu-item, .pe-menu-config"));
     let to = null;
     if (e.key === "ArrowDown") to = rows[(cur + 1) % rows.length];
     else if (e.key === "ArrowUp") to = rows[cur < 1 ? rows.length - 1 : cur - 1];
-    else if (e.key === "Enter" && cur > -1) {
+    else if (e.key === "Enter" && cur > -1 && !inMenu) {
       e.preventDefault();
       e.stopPropagation();
       rows[cur].click();
@@ -1142,7 +1275,10 @@
     } else return false;
     e.preventDefault();
     e.stopPropagation();
-    setMenuActive(to);
+    // With a row focused, the arrows move focus — a highlight on one row and focus on another
+    // would make Enter press the one nobody can see — and the highlight follows it (focusin).
+    if (inMenu && to) to.focus();
+    else setMenuActive(to);
     return true;
   }
 
@@ -1309,15 +1445,57 @@
     // Rich insert, path 1: synthetic paste of HTML — the full detail-view editor
     // parses this into real headings/lists/checkboxes.
     const html = mdToHtml(text);
+    // Did a path insert anything? Not judged by the text's length: replacing a selection with a
+    // shorter template shrinks the text, and judging by growth read that as a failure and
+    // inserted the template a second time by the next path down. Nor by the markup at large:
+    // the editor redecorates itself as the caret moves — tiptap's placeholder is a class and an
+    // attribute, a gap cursor or a collaborator's caret is a whole element — so an editor that
+    // ignored the paste but redrew on it read as inserted, and the template never arrived. Nor
+    // by the text and an element count: "ab|cd" replaced by "a|bcd" has the same of both. So:
+    // the document's outline — each element's tag where it opens and closes, and the text
+    // between — with attributes left out, and anything the editor marks
+    // contenteditable="false" skipped, which is how it draws what is not the document.
+    //
+    // And one thing no comparison of the document can see: a selection replaced by exactly what
+    // it held. What does change is the selection — a range before, used up after — so a paste
+    // that collapsed a range it was given counts, or the fallback put a second copy at the caret.
+    const shape = () => {
+      const out = [];
+      let text = ""; // adjacent text nodes are one run: how the editor splits them is not content
+      const flush = () => {
+        if (text) out.push(text);
+        text = "";
+      };
+      const walk = (node) => {
+        for (let c = node.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3) text += c.data;
+          else if (c.nodeType === 1 && c.getAttribute("contenteditable") !== "false") {
+            flush();
+            out.push("<" + c.tagName);
+            walk(c);
+            flush();
+            out.push(">");
+          }
+        }
+      };
+      walk(editor);
+      flush();
+      const s = window.getSelection();
+      return { doc: out.join("\u0001"), range: !!(s && s.rangeCount && !s.isCollapsed && editor.contains(s.anchorNode)) };
+    };
+    const changed = (before) => {
+      const now = shape();
+      return now.doc !== before.doc || (before.range && !now.range);
+    };
     try {
-      const beforeLen = (editor.textContent || "").length;
+      const before = shape();
       const dt = new DataTransfer();
       dt.setData("text/html", html);
       dt.setData("text/plain", text);
       editor.dispatchEvent(
         new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })
       );
-      if ((editor.textContent || "").length > beforeLen) {
+      if (changed(before)) {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
         return; // rich content inserted
       }
@@ -1326,8 +1504,8 @@
     // "Create work item" modal ignores the synthetic paste but renders this into
     // headings/lists (task-list checkboxes may degrade to plain list items there).
     try {
-      const beforeLen = (editor.textContent || "").length;
-      if (document.execCommand("insertHTML", false, html) && (editor.textContent || "").length > beforeLen) {
+      const before = shape();
+      if (document.execCommand("insertHTML", false, html) && changed(before)) {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
         return;
       }
@@ -1512,6 +1690,7 @@
   }
 
   function toast(msg) {
+    announce(msg);
     const t = document.createElement("div");
     t.className = "pe-toast";
     t.textContent = msg;
@@ -1736,6 +1915,13 @@
     // Alt+T (macOS: ⌥ Option+T): open the template menu for the description being edited.
     // On macOS, Option+T changes e.key (e.g. "†"), so detect it via the layout-independent e.code.
     if (e.altKey && (e.code === "KeyT" || e.key === "t" || e.key === "T")) {
+      // From inside the open menu it is the toggle it is everywhere else: there is no editor
+      // in focus to match against, and falling back to the first one moved the menu instead.
+      if (menuOpen && menu && menu.contains(document.activeElement)) {
+        e.preventDefault();
+        hideMenu();
+        return;
+      }
       let btns = [...document.querySelectorAll(".pe-body-tmpl-btn")];
       if (!btns.length) {
         // self-heal: the toolbar may have mounted late — inject now and retry
@@ -2135,7 +2321,9 @@
         const nv = changes[PE_SYNC_CACHE_KEY].newValue;
         syncCache = { bySource: (nv && nv.bySource) || {} };
         recountTemplates();
-        if (menuOpen && menu) renderMenu();
+        // Only the template menu lists templates. Redrawing the copy menu as one replaced the
+        // formats under the reader's cursor with a list of templates.
+        if (menuOpen && menu && menuMode === "templates") redrawMenu();
         try {
           injectAll();
         } catch (_) {}

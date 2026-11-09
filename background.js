@@ -127,16 +127,23 @@ async function readCapped(resp, cap) {
   return text + decoder.decode();
 }
 
+// A failure as the worker records it: the English it has always written, for a reader of the
+// raw cache and for any build that predates codes, plus a code and its arguments that the
+// settings page words in the reader's language (peSyncErrorText).
+const fail = (lastError, code, args) => ({ status: "error", lastError, code, args: args || [] });
+
 async function fetchSource(src) {
   const pattern = peOriginPatternForUrl(src.url);
-  if (!pattern) return { status: "error", lastError: "Invalid URL" };
+  if (!pattern) return fail("Invalid URL", "badUrl");
   // Only fetch origins the user has actually granted (host permission).
   let allowed = false;
   try {
     allowed = await chrome.permissions.contains({ origins: [pattern] });
   } catch (_) {}
-  if (!allowed) return { status: "error", lastError: "Site access not granted" };
+  if (!allowed) return fail("Site access not granted", "noAccess");
 
+  // Which half failed: reaching the server and reading its reply, or making sense of the file.
+  let reading = true;
   try {
     const resp = await fetch(src.url, {
       method: "GET",
@@ -154,27 +161,28 @@ async function fetchSource(src) {
     // response for it — status 0, no headers, no Location — so we could not tell the
     // user where their source went, or even that it moved. Landing check it is.)
     const landed = peOriginPatternForUrl(resp.url || src.url);
-    if (!landed) return { status: "error", lastError: "Invalid redirect target" };
+    if (!landed) return fail("Invalid redirect target", "badRedirect");
     if (landed !== pattern) {
       let landedOk = false;
       try {
         landedOk = await chrome.permissions.contains({ origins: [landed] });
       } catch (_) {}
       if (!landedOk)
-        return { status: "error", lastError: "Redirected to " + peSourceLabel(resp.url) + ", which you have not granted" };
+        return fail("Redirected to " + peSourceLabel(resp.url) + ", which you have not granted", "redirect", [peSourceLabel(resp.url)]);
     }
 
-    if (!resp.ok) return { status: "error", lastError: "HTTP " + resp.status };
+    if (!resp.ok) return fail("HTTP " + resp.status, "http", [resp.status]);
     const declared = parseInt(resp.headers.get("content-length") || "", 10);
     if (declared && declared > PE_SYNC_LIMITS.maxResponseBytes)
-      return { status: "error", lastError: "Response too large" };
+      return fail("Response too large", "tooLarge", [Math.round(PE_SYNC_LIMITS.maxResponseBytes / 1024)]);
     const text = await readCapped(resp, PE_SYNC_LIMITS.maxResponseBytes);
-    if (text === null) return { status: "error", lastError: "Response too large" };
+    if (text === null) return fail("Response too large", "tooLarge", [Math.round(PE_SYNC_LIMITS.maxResponseBytes / 1024)]);
+    reading = false;
     let json;
     try {
       json = JSON.parse(text);
     } catch (_) {
-      return { status: "error", lastError: "Invalid JSON" };
+      return fail("Invalid JSON", "json");
     }
 
     // Shape check BEFORE normalizing: a payload that parses but carries no usable
@@ -183,28 +191,37 @@ async function fetchSource(src) {
     const arr = json && Array.isArray(json.templates) ? json.templates : Array.isArray(json) ? json : null;
     if (!arr) {
       let hint = "";
-      if (json && Array.isArray(json.groups)) hint = ' — found "groups"; use a flat "templates" array with a "group" field on each';
-      else if (json && Array.isArray(json.items)) hint = ' — found "items"; rename it to "templates"';
-      else if (json && json.templates) hint = ' — "templates" must be an array';
-      return { status: "error", lastError: 'No "templates" array' + hint };
+      let code = "shapeNone";
+      if (json && Array.isArray(json.groups)) {
+        hint = ' — found "groups"; use a flat "templates" array with a "group" field on each';
+        code = "shapeGroups";
+      } else if (json && Array.isArray(json.items)) {
+        hint = ' — found "items"; rename it to "templates"';
+        code = "shapeItems";
+      } else if (json && json.templates) {
+        hint = ' — "templates" must be an array';
+        code = "shapeNotList";
+      }
+      return fail('No "templates" array' + hint, code);
     }
 
     const version =
       json && typeof json.version === "string" ? json.version : text.length + ":" + peHash(text);
     const norm = peNormalizeRemoteTemplates(json, src.id);
     if (!norm.templates.length && arr.length) {
-      return {
-        status: "error",
-        lastError: "0 usable templates — " + arr.length + " entries all missing name/title/content"
-      };
+      return fail("0 usable templates — " + arr.length + " entries all missing name/title/content", "noUsable", [arr.length]);
     }
     return { status: "ok", version, templates: norm.templates, dropped: norm.dropped, name: norm.name };
   } catch (e) {
     // AbortSignal.timeout raises TimeoutError; its own message ("signal timed out") does
     // not tell the user which of the two things went wrong, so name it here.
     if (e && e.name === "TimeoutError")
-      return { status: "error", lastError: "Timed out after " + PE_FETCH_TIMEOUT_MS / 1000 + "s" };
-    return { status: "error", lastError: (e && e.message) || "Fetch failed" };
+      return fail("Timed out after " + PE_FETCH_TIMEOUT_MS / 1000 + "s", "timeout", [PE_FETCH_TIMEOUT_MS / 1000]);
+    // fetch() rejects with a TypeError when it cannot reach the server, and a body that breaks
+    // off mid-stream does the same. Anything else — and anything once the file is in hand — is
+    // not a connection failure, and calling it one sends the reader to debug their network:
+    // with no code the page shows these words.
+    return fail((e && e.message) || "Fetch failed", reading && e && e.name === "TypeError" ? "network" : "");
   }
 }
 
@@ -264,8 +281,18 @@ async function commitSource(id, entry) {
     if (live.has(id)) {
       // deleted mid-fetch → its result is not ours to store
       if (entry.error) {
-        // Keep the last good templates; only flip status/error.
-        out.bySource[id] = Object.assign({}, out.bySource[id], { status: "error", lastError: entry.error });
+        // Keep the last good templates, but only if they came from this URL: a failure at a
+        // URL the source has just been pointed at must not leave the old file's templates
+        // standing under the new one's name. An entry from before URLs were recorded has none
+        // and keeps its copy, as peSourceEntry assumes.
+        // With no entry before it there is nothing to be the same as: a first failure records
+        // its URL, or it would match whatever URL the source is given next.
+        const prev = out.bySource[id] || {};
+        const same = !!out.bySource[id] && (!prev.url || prev.url === entry.url);
+        // The URL stays whatever fetched the templates kept here. Stamping the failed one onto
+        // an entry that never recorded its own would vouch for templates from somewhere else.
+        const fields = { status: "error", lastError: entry.error, errorCode: entry.code || "", errorArgs: entry.args || [] };
+        out.bySource[id] = same ? Object.assign({}, prev, fields) : Object.assign(fields, { url: entry.url });
       } else {
         out.bySource[id] = entry;
       }
@@ -295,7 +322,9 @@ async function syncOnce(force) {
       if (!src || !src.id || !src.url || src.enabled === false) continue;
       const prev = cache.bySource[src.id];
       const interval = Math.max(30, src.intervalMinutes || 360) * 60000;
-      if (!force && prev && prev.fetchedAt && now - prev.fetchedAt < interval) {
+      // A source pointed at a new URL is due now: what is cached is some other file.
+      const sameUrl = !!prev && (!prev.url || prev.url === src.url);
+      if (!force && sameUrl && prev.fetchedAt && now - prev.fetchedAt < interval) {
         skipped++;
         continue;
       }
@@ -306,6 +335,7 @@ async function syncOnce(force) {
         // diverge whenever a file was edited without bumping `version` — and it only
         // ever saved one storage write per interval, which is not worth the risk.
         const stored = await commitSource(src.id, {
+          url: src.url,
           version: res.version,
           remoteName: res.name || "",
           fetchedAt: Date.now(),
@@ -320,7 +350,7 @@ async function syncOnce(force) {
         if (stored) ok++;
         else err++;
       } else {
-        await commitSource(src.id, { error: res.lastError || "Error" });
+        await commitSource(src.id, { error: res.lastError || "Error", code: res.code, args: res.args, url: src.url });
         err++;
       }
     }
@@ -544,8 +574,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // A tab can be asked for by name — "Manage templates" wants Templates, not wherever the page
+  // last was. The note goes through storage.session because the page may not exist yet, and an
+  // open one hears the change. The name comes from a content script, so it has to look like a
+  // tab id to be passed on at all; the page then accepts only a tab it has.
   if (msg && msg.type === "pe-open-options") {
-    chrome.runtime.openOptionsPage();
+    const tab = typeof msg.tab === "string" && /^[a-z]{1,20}$/.test(msg.tab) ? msg.tab : "";
+    (async () => {
+      if (tab) {
+        try {
+          await chrome.storage.session.set({ [PE_OPEN_TAB_KEY]: tab });
+        } catch (_) {}
+      }
+      chrome.runtime.openOptionsPage();
+    })();
     return;
   }
   // The popup asking us to remember a jump it is about to make. It has to be us: the popup

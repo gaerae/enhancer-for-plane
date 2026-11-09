@@ -395,6 +395,31 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   rather than against intuition: the first such filter dropped "```" at a paragraph's start,
   but the rule only fires when a space follows it, and the filter hid exactly the deletion a
   code review found next.
+- **An edit that is not typing is still an edit.** Settings marked itself dirty on `input` and
+  `change` events only, so a deleted row, an import and a Restore defaults all left the form
+  "clean" — and a clean form adopts the next change from the picker or another device, which
+  replaced the deletion, the import or the reset without a word. The first fix added a
+  `markDirty()` to each button, and review found it wrong the other way inside a day: a refused
+  import still fired `change`, so it "had edits", while each new button was one more call to
+  forget. Unsaved is now derived — `isDirty()` compares `state` with what was last loaded or
+  saved — so there is nothing to call. The mirror image is `knownRuleIds` beside `knownDomains`:
+  a dirty form refuses a foreign change, so Save has to carry across what the other surface
+  added and this page never showed, or it writes the older list over it. And Save itself is a
+  window: every await in it — the prompt, the write, the tidy-up after — leaves the form
+  editable, so "was anything typed meanwhile?" is asked after the last one, and storage is read
+  again after the prompt, which can stay up as long as the user likes. The write is a window
+  too: an event during it is the write's own echo only if storage reads back as what was
+  written (`writing`), and a read started before the baseline last moved (`baseGen`) answers a
+  question nobody is asking any more.
+- **Judge an insert by whether the editor changed, not by whether it grew — and not by its
+  markup.** Replacing a selection with a shorter template shrinks the text, and a length check
+  read that as failure and inserted the template again by the next path down. Comparing
+  `innerHTML` fixed that and broke the opposite case: tiptap moves a placeholder class and
+  attribute as the caret moves, so an editor that ignored the paste but redecorated read as
+  inserted, and nothing arrived. A second review found the same thing one level down: a gap
+  cursor or a collaborator's caret is a whole element; and a third, that text plus an element
+  count cannot see a paragraph boundary move ("ab|cd" → "a|bcd"). Compare the outline — tags
+  where they open and close, the text between — skipping `contenteditable="false"` subtrees.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

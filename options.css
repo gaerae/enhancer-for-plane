@@ -264,6 +264,18 @@ body {
   flex: 1;
   min-width: 0;
 }
+/* The caption above rather than beside: for fields that share a row in a grid, where a tag
+   at the side would take the width the value needs. Same element, same accessible name. */
+.fld-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
+}
+.fld-stack > .fld-tag {
+  flex: none;
+  font-size: 11.5px;
+}
 
 textarea,
 input[type="text"],
@@ -374,8 +386,10 @@ input[type="number"]:focus {
   flex: 1;
   min-width: 0;
 }
-.rule-label {
+.rule-label-fld {
   margin-bottom: 7px;
+}
+.rule-label {
   font-weight: 600;
 }
 .rule-grid {
@@ -634,11 +648,14 @@ input:checked + .switch.sm::after {
   font-size: 11.5px;
   color: var(--muted);
 }
-.var-name {
+.var-name-fld {
+  flex: 0 0 auto;
+}
+.fld > .var-name {
   flex: 0 0 150px;
   font-weight: 600;
 }
-.var-value {
+.var-value-fld {
   flex: 1;
   min-width: 0;
 }
@@ -660,13 +677,18 @@ input:checked + .switch.sm::after {
   align-items: center;
   gap: 8px;
 }
-.cpy-name {
+.cpy-name-fld {
+  flex: 0 0 auto;
+}
+.fld > .cpy-name {
   flex: 0 0 150px;
   font-weight: 600;
 }
-.cpy-format {
+.cpy-format-fld {
   flex: 1;
   min-width: 0;
+}
+.cpy-format {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
@@ -823,11 +845,15 @@ input:checked + .switch.sm::after {
   order: 1;
   margin-left: auto;
 }
-.qlk-name {
+.qlk-name-fld,
+.qlk-prefix-fld {
+  flex: 0 0 auto;
+}
+.fld > .qlk-name {
   flex: 0 0 130px;
   font-weight: 600;
 }
-.qlk-prefix {
+.fld > .qlk-prefix {
   flex: 0 0 90px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -867,14 +893,17 @@ input:checked + .switch.sm::after {
   align-items: center;
   gap: 8px;
 }
-.src-name {
+.src-name-fld {
   flex: 1;
   min-width: 0;
+}
+.src-name {
   font-weight: 600;
 }
-.src-url {
-  width: 100%;
+.src-url-fld {
   margin-top: 8px;
+}
+.src-url {
   font-size: 12.5px;
 }
 .src-interval {

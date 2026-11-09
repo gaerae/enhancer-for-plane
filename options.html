@@ -202,7 +202,7 @@
             <input type="checkbox" id="allDomains" />
             <span data-i18n="optDomainsAll">Run on all sites (ignore the list below)</span>
           </label>
-          <textarea id="domains" rows="4" placeholder="plane.example.com&#10;plane.your-company.com"></textarea>
+          <textarea id="domains" rows="4" data-i18n-aria-label="optDomainsAria" aria-label="Domains, one per line" placeholder="plane.example.com&#10;plane.your-company.com"></textarea>
           <p class="desc" style="margin-top:8px" data-i18n-html="optDomainsTip">Tip: to enable the current tab's Plane instance, open the toolbar popup and click <b>“Enable on this site.”</b></p>
         </section>
       </div>
@@ -289,7 +289,7 @@
       </div>
 
       <footer class="foot">
-        <span id="status" class="status"></span>
+        <span id="status" class="status" role="status" aria-live="polite"></span>
         <div class="foot-actions">
           <button class="ghost" id="reset" data-i18n="optRestoreDefaults">Restore defaults</button>
           <button class="primary" id="save" data-i18n="optSave">Save</button>
@@ -305,11 +305,11 @@
           <span class="switch sm"></span>
         </label>
         <div class="rule-fields">
-          <input class="rule-label" type="text" data-i18n-placeholder="optRuleLabelPh" placeholder="Description (e.g. Module name width)" />
+          <label class="fld fld-stack rule-label-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="rule-label" type="text" data-i18n-placeholder="optRuleLabelPh" placeholder="Description (e.g. Module name width)" /></label>
           <div class="rule-grid">
-            <input class="rule-selector mono" type="text" data-i18n-placeholder="optRuleSelectorPh" placeholder="CSS selector (e.g. .max-w-40)" />
-            <input class="rule-property mono" type="text" data-i18n-placeholder="optRulePropPh" placeholder="Property" list="propList" />
-            <input class="rule-value mono" type="text" data-i18n-placeholder="optRuleValuePh" placeholder="Value (e.g. 320px)" />
+            <label class="fld fld-stack"><span class="fld-tag" data-i18n="optFieldSelector">Selector</span><input class="rule-selector mono" type="text" data-i18n-placeholder="optRuleSelectorPh" placeholder="CSS selector (e.g. .max-w-40)" /></label>
+            <label class="fld fld-stack"><span class="fld-tag" data-i18n="optFieldProperty">Property</span><input class="rule-property mono" type="text" data-i18n-placeholder="optRulePropPh" placeholder="Property" list="propList" /></label>
+            <label class="fld fld-stack"><span class="fld-tag" data-i18n="optFieldValue">Value</span><input class="rule-value mono" type="text" data-i18n-placeholder="optRuleValuePh" placeholder="Value (e.g. 320px)" /></label>
           </div>
           <label class="inline-check rule-focus-check">
             <input type="checkbox" class="rule-focus" />
@@ -337,8 +337,8 @@
     <template id="varRow">
       <div class="var-item">
         <code class="var-token"></code>
-        <input class="var-name" type="text" data-i18n-placeholder="optVarNamePh" placeholder="name (e.g. team)" />
-        <input class="var-value" type="text" data-i18n-placeholder="optVarValuePh" placeholder="value inserted in its place" />
+        <label class="fld var-name-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="var-name" type="text" data-i18n-placeholder="optVarNamePh" placeholder="name (e.g. team)" /></label>
+        <label class="fld var-value-fld"><span class="fld-tag" data-i18n="optFieldValue">Value</span><input class="var-value" type="text" data-i18n-placeholder="optVarValuePh" placeholder="value inserted in its place" /></label>
         <button class="icon-btn var-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
       </div>
     </template>
@@ -347,8 +347,8 @@
     <template id="cpyRow">
       <div class="cpy-item">
         <div class="cpy-fields">
-          <input class="cpy-name" type="text" data-i18n-placeholder="optCopyNamePh" placeholder="name (e.g. Chat)" />
-          <input class="cpy-format" type="text" spellcheck="false" data-i18n-placeholder="optCopyFormatPh" placeholder="{{item.key}} {{item.title}}" />
+          <label class="fld cpy-name-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="cpy-name" type="text" data-i18n-placeholder="optCopyNamePh" placeholder="name (e.g. Chat)" /></label>
+          <label class="fld cpy-format-fld"><span class="fld-tag" data-i18n="optFieldFormat">Format</span><input class="cpy-format" type="text" spellcheck="false" data-i18n-placeholder="optCopyFormatPh" placeholder="{{item.key}} {{item.title}}" /></label>
           <button class="icon-btn cpy-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
         </div>
         <div class="cpy-preview"></div>
@@ -359,8 +359,8 @@
     <template id="qlkRow">
       <div class="cpy-item">
         <div class="cpy-fields qlk-fields">
-          <input class="qlk-name" type="text" data-i18n-placeholder="optQuickNamePh" placeholder="name (e.g. Jira)" />
-          <input class="qlk-prefix" type="text" spellcheck="false" data-i18n-placeholder="optQuickPrefixPh" placeholder="prefix" />
+          <label class="fld qlk-name-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="qlk-name" type="text" data-i18n-placeholder="optQuickNamePh" placeholder="name (e.g. Jira)" /></label>
+          <label class="fld qlk-prefix-fld"><span class="fld-tag" data-i18n="optFieldPrefix">Prefix</span><input class="qlk-prefix" type="text" spellcheck="false" data-i18n-placeholder="optQuickPrefixPh" placeholder="prefix" /></label>
           <label class="fld qlk-url-fld"><span class="fld-tag" data-i18n="optFieldOpen">Open</span><input class="qlk-url" type="text" spellcheck="false" data-i18n-placeholder="optQuickUrlPh" placeholder="https://…/browse/{{key}}" /></label>
           <label class="fld qlk-search-fld"><span class="fld-tag" data-i18n="optFieldSearch">Search</span><input class="qlk-search" type="text" spellcheck="false" data-i18n-placeholder="optQuickSearchPh" placeholder="search URL (optional): https://…/search?q={{q}}" /></label>
           <button class="icon-btn qlk-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
@@ -374,10 +374,10 @@
       <div class="src-item">
         <div class="src-fields">
           <label class="row-toggle" data-i18n-title="optSrcEnableTitle" title="Enable this source">
-            <input type="checkbox" class="src-enabled" />
+            <input type="checkbox" class="src-enabled" data-i18n-aria-label="optSrcEnableAria" aria-label="Use this source" />
             <span class="switch sm"></span>
           </label>
-          <input class="src-name" type="text" data-i18n-placeholder="optSrcNamePh" placeholder="Name (e.g. QA standards)" />
+          <label class="fld src-name-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="src-name" type="text" data-i18n-placeholder="optSrcNamePh" placeholder="Name (e.g. QA standards)" /></label>
           <select class="src-interval" data-i18n-aria-label="optSrcInterval" aria-label="Sync interval">
             <option value="60" data-i18n="optInterval1h">Every hour</option>
             <option value="360" data-i18n="optInterval6h">Every 6 hours</option>
@@ -386,7 +386,7 @@
           </select>
           <button class="icon-btn src-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
         </div>
-        <input class="src-url mono" type="url" data-i18n-placeholder="optSrcUrlPh" placeholder="https://plane.example.com/templates.json" />
+        <label class="fld src-url-fld"><span class="fld-tag" data-i18n="optFieldUrl">URL</span><input class="src-url mono" type="url" data-i18n-placeholder="optSrcUrlPh" placeholder="https://plane.example.com/templates.json" /></label>
         <div class="src-status"></div>
       </div>
     </template>

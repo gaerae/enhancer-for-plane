@@ -271,7 +271,7 @@
     "message": "Pulls shared templates from a URL and keeps them up to date.\nThey are read-only here.\nEdit them at the source."
   },
   "optSyncFormatDesc": {
-    "message": "Checked when the browser starts, on each source's schedule, and when this page opens.\nA file on the same domain as Plane needs no separate access prompt.\nThe file is a flat list of templates, each with its own <code>group</code>.\nThe top-level <code>name</code> is used when a source's name is left blank."
+    "message": "Checked when the browser starts, on each source's schedule, when you Save, and on “Sync now”.\nA file on the same domain as Plane needs no separate access prompt.\nThe file is a flat list of templates, each with its own <code>group</code>.\nThe top-level <code>name</code> is used when a source's name is left blank."
   },
   "optSyncEmpty": {
     "message": "No sources yet. Click “Add source”."
@@ -415,7 +415,7 @@
     }
   },
   "msgChangedElsewhere": {
-    "message": "Settings changed elsewhere (e.g. the picker). Reload this page to apply them — unsaved edits will be lost."
+    "message": "Settings changed elsewhere (e.g. the element picker). Saving keeps the sites and rules added there and replaces anything else with this page. Reload to see them first — unsaved edits will be lost."
   },
   "msgLoadedPicked": {
     "message": "Loaded the rule added by the picker."
@@ -1105,7 +1105,7 @@
     "message": "name (e.g. Jira)"
   },
   "optQuickPrefixPh": {
-    "message": "prefix"
+    "message": "optional"
   },
   "optQuickUrlPh": {
     "message": "https://…/browse/{{key}}",
@@ -1289,5 +1289,193 @@
   "optSyncEnabled": {
     "message": "Enabled",
     "description": "Beside the Template sync card's own switch. Not optEnabled: that one names the whole extension in Korean."
+  },
+  "msgKeptRules": {
+    "message": "Saved — and kept rules added elsewhere while this page was open: $RULES$.",
+    "description": "Shown instead of \"Saved\" when the save carried across rules added by the element picker that this page had never displayed. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgSyncOff": {
+    "message": "Template sync is off. Switch it on, then Save."
+  },
+  "msgVarBadSave": {
+    "message": "Not saved: the variable “$NAME$” can use only letters, numbers, hyphen and underscore.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgVarNoName": {
+    "message": "Not saved: a variable has a value but no name."
+  },
+  "msgVarDupeSave": {
+    "message": "Not saved: two variables are named “$NAME$”.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgPresetExists": {
+    "message": "That rule is already in the list."
+  },
+  "optFieldSelector": {
+    "message": "Selector",
+    "description": "Short label above a style rule's CSS selector field."
+  },
+  "optFieldProperty": {
+    "message": "Property",
+    "description": "Short label above a style rule's CSS property field."
+  },
+  "optFieldValue": {
+    "message": "Value",
+    "description": "Short label above a style rule's value field, and a template variable's value field."
+  },
+  "optFieldPrefix": {
+    "message": "Prefix",
+    "description": "Short label beside a quick link's key prefix field."
+  },
+  "optFieldFormat": {
+    "message": "Format",
+    "description": "Short label above a copy format's format string."
+  },
+  "optFieldUrl": {
+    "message": "URL",
+    "description": "Short label beside a sync source's file URL."
+  },
+  "optRuleEnableAria": {
+    "message": "Apply “$RULE$”",
+    "description": "Accessible name of a style rule's on/off switch. The switch has no visible text, so it carries the rule's own name.",
+    "placeholders": {
+      "rule": {
+        "content": "$1"
+      }
+    }
+  },
+  "optRuleEnableUnnamed": {
+    "message": "Apply this rule",
+    "description": "The same, for a rule with no name yet."
+  },
+  "optSrcEnableAria": {
+    "message": "Use this source",
+    "description": "Accessible name of a sync source's on/off switch."
+  },
+  "optDomainsAria": {
+    "message": "Domains, one per line",
+    "description": "Accessible name of the domain list box, which has a heading but no label."
+  },
+  "popJumpTargetAria": {
+    "message": "Where to open it",
+    "description": "Accessible name of the popup's tracker selector beside the key box."
+  },
+  "popJumpKeyAria": {
+    "message": "Work item key or search",
+    "description": "Accessible name of the popup's key box. The placeholder disappears once something is typed."
+  },
+  "syncErrBadUrl": {
+    "message": "the URL is not an http(s) address.",
+    "description": "Completes msgSrcFailed. Every syncErr message is a sentence that follows \"Sync failed: \"."
+  },
+  "syncErrNoAccess": {
+    "message": "site access was not granted. Save again and allow it."
+  },
+  "syncErrBadRedirect": {
+    "message": "it redirected to an address that is not http(s)."
+  },
+  "syncErrRedirect": {
+    "message": "it redirected to $HOST$, which has no site access.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
+  "syncErrHttp": {
+    "message": "the server answered HTTP $STATUS$.",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "syncErrTooLarge": {
+    "message": "the file is larger than $KB$ KB.",
+    "placeholders": {
+      "kb": {
+        "content": "$1"
+      }
+    }
+  },
+  "syncErrJson": {
+    "message": "the file is not valid JSON."
+  },
+  "syncErrShapeGroups": {
+    "message": "the file has \"groups\". Use one flat \"templates\" list with a \"group\" on each item."
+  },
+  "syncErrShapeItems": {
+    "message": "the file has \"items\". Rename it to \"templates\"."
+  },
+  "syncErrShapeNotList": {
+    "message": "\"templates\" has to be a list."
+  },
+  "syncErrShapeNone": {
+    "message": "the file has no \"templates\" list."
+  },
+  "syncErrNoUsable": {
+    "message": "none of its $COUNT$ entries has a name, title or body.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "syncErrTimeout": {
+    "message": "no answer within $SECONDS$ seconds.",
+    "placeholders": {
+      "seconds": {
+        "content": "$1"
+      }
+    }
+  },
+  "syncErrNetwork": {
+    "message": "could not reach the server."
+  },
+  "msgKeptRulesToo": {
+    "message": "Rules added there were kept too: $RULES$.",
+    "description": "Appended to msgKeptDomains when the same save carried across both sites and rules. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgPresetEnabled": {
+    "message": "That rule was already in the list, switched off. It is on again."
+  },
+  "msgSavedEditsPending": {
+    "message": "Saved what was here when you pressed Save. Edits made since then are not saved yet."
+  },
+  "msgAlsoKeptSites": {
+    "message": "Also kept sites switched on elsewhere: $SITES$.",
+    "description": "Appended to msgSavedEditsPending when that save carried across sites enabled elsewhere.",
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
+  },
+  "msgAlsoKeptRules": {
+    "message": "Also kept rules added elsewhere: $RULES$.",
+    "description": "Appended to msgSavedEditsPending when that save carried across rules added elsewhere. $RULES$ is a comma-separated list of quoted names.",
+    "placeholders": {
+      "rules": {
+        "content": "$1"
+      }
+    }
   }
 }

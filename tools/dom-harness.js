@@ -124,7 +124,15 @@ window.chrome = {
     // Writes are kept, for the same reason local's are: a save that carries a domain across
     // from another surface is only provable by reading back what was actually written.
     sync: {
-      get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__SEED))),
+      // window.__holdReads queues each read until the suite releases it (window.__reads), so a
+      // suite can act while a read the page started is still out.
+      get: (k, cb) => {
+        // What storage held when the read was made, as a real read returns, even if held.
+        const snap = JSON.parse(JSON.stringify(window.__SEED));
+        const answer = () => cb(snap);
+        if (window.__holdReads) (window.__reads = window.__reads || []).push(answer);
+        else answer();
+      },
       set: (o, cb) => { window.__written.push(JSON.parse(JSON.stringify(o))); cb && cb(); },
       remove: (k, cb) => cb && cb()
     },
@@ -136,6 +144,13 @@ window.chrome = {
     local: {
       get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__LOCAL))),
       set: (o, cb) => { Object.assign(window.__LOCAL, JSON.parse(JSON.stringify(o))); window.__localWrites++; cb && cb(); }
+    },
+    // Extension pages only — content scripts cannot reach it. The worker leaves a one-shot
+    // note here ("open on this tab") for a Settings page that may not exist yet.
+    session: {
+      get: (k, cb) => { const v = JSON.parse(JSON.stringify(window.__ENV.session || {})); cb && cb(v); return Promise.resolve(v); },
+      set: (o, cb) => { window.__ENV.session = Object.assign(window.__ENV.session || {}, o); cb && cb(); return Promise.resolve(); },
+      remove: (k, cb) => { const s = window.__ENV.session || {}; [].concat(k).forEach((x) => delete s[x]); cb && cb(); return Promise.resolve(); }
     },
     onChanged: { addListener: (f) => { window.__onChanged = f; } }
   },
@@ -157,8 +172,22 @@ window.chrome = {
   // down the no-permission branch.
   permissions: {
     contains: (o, cb) => { const v = window.__ENV.granted !== false; return cb ? cb(v) : Promise.resolve(v); },
-    request: (o, cb) => { const v = window.__ENV.grant !== false; cb && cb(v); return Promise.resolve(v); },
-    getAll: (cb) => { const v = { origins: (window.__ENV.origins || []).slice() }; cb && cb(v); return Promise.resolve(v); },
+    // env.hold keeps the prompt open until the suite calls window.__answer(), the way Chrome's
+    // bubble does while the user decides — the window in which a Save is in the air.
+    request: (o, cb) => {
+      const v = window.__ENV.grant !== false;
+      if (window.__ENV.hold) return new Promise((r) => { window.__answer = () => { cb && cb(v); r(v); }; });
+      cb && cb(v);
+      return Promise.resolve(v);
+    },
+    // env.holdCleanup does the same for the tidy-up after a save has written: storage already
+    // has the settings, and the form is still open to typing.
+    getAll: (cb) => {
+      const v = { origins: (window.__ENV.origins || []).slice() };
+      if (window.__ENV.holdCleanup) return new Promise((r) => { window.__cleanup = () => { cb && cb(v); r(v); }; });
+      cb && cb(v);
+      return Promise.resolve(v);
+    },
     remove: (o, cb) => { (window.__removed = window.__removed || []).push(...(o.origins || [])); cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
     onRemoved: { addListener: () => {} }
@@ -455,6 +484,38 @@ const settings = (over) =>
 const seedOf = (over) => ({ peSettings: settings(over) });
 
 const OPTIONS = { html: "options.html", css: "options.css", js: "options.js" };
+
+// A change from another surface — the popup enabling a site — landing on a page that has edits
+// it has not saved. Shared by the suites that prove each kind of edit counts as one.
+const FOREIGN_DOMAIN = `
+      {
+        const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+        foreign.domains = (foreign.domains || []).concat(["elsewhere.example.com"]);
+        window.__SEED.peSettings = foreign;
+        window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+        await sleep(300);
+      }`;
+
+// A source's cached result, as the worker writes it. `n` lands in the time and the count so a
+// suite can tell a re-render with new data from the one before it.
+const SRC_ENTRY = (n) => ({
+  status: "ok", url: "https://plane.example.com/t.json", fetchedAt: 1700000000000 + n * 60000, count: n + 1, dropped: 0,
+  templates: Array.from({ length: n + 1 }, (_, i) => ({ id: "sync:s1:t" + i, name: "T" + i, group: i ? "B" : "A", title: "", content: "c" }))
+});
+
+// Fields with no accessible name: no aria-label, no <label> with text. A placeholder is not a
+// name — it is gone the moment the field holds anything, which is when it is needed.
+const FIELD_NAMES = `
+      const nameless = () => [...document.querySelectorAll("input, select, textarea")]
+        .filter((f) => f.type !== "hidden" && f.type !== "file" && !f.closest("template"))
+        .filter((f) => {
+          if ((f.getAttribute("aria-label") || "").trim()) return false;
+          const by = f.getAttribute("aria-labelledby");
+          if (by && by.split(" ").some((id) => (document.getElementById(id) || {}).textContent)) return false;
+          return ![...(f.labels || [])].some((l) => l.textContent.trim());
+        })
+        .map((f) => (f.id ? "#" + f.id : "." + String(f.className).split(" ")[0]));`;
+
 const POPUP = { html: "popup.html", css: "popup.css", js: "popup.js" };
 
 // The classes and the id are copied from Plane's own markup — the properties panel is a
@@ -872,9 +933,10 @@ const suites = [
         ok(peMsg("msgResetConfirm").indexOf("pinned") > -1, "the confirm does not mention pins");
       });
 
-      // A reset, then settings arriving from another surface before Save. The page adopts
-      // them (a reset leaves the form clean), so the reset is gone — and an unrelated Save
-      // afterwards must not carry out the clearing it was waiting for.
+      // A reset, then settings arriving from another surface before Save. A reset is an edit
+      // nobody has saved yet, so the page keeps it rather than adopting the change — it used to
+      // adopt, which threw the reset away — and the Save that follows is the user saving the
+      // reset still on screen, so it clears what the reset said it would.
       window.__LOCAL.peRecent = [{ key: "PROJ-2", url: "https://plane.example.com/acme/browse/PROJ-2", name: "Plane", at: 2 }];
       document.getElementById("reset").click();
       await sleep(100);
@@ -882,10 +944,13 @@ const suites = [
       foreign.domains = ["elsewhere.example.com"];
       window.__SEED.peSettings = foreign;
       window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
-      await waitFor(() => document.getElementById("domains").value.indexOf("elsewhere.example.com") > -1, "the change to be adopted");
+      await sleep(300);
+      check("a change from elsewhere does not replace the reset", () => {
+        eq(document.getElementById("domains").value.trim(), "", "the reset's empty list was replaced");
+      });
       await save();
-      check("a reset replaced by settings from elsewhere clears nothing on the next save", () => {
-        eq(recent().length, 1, "the list was wiped by a reset that no longer existed");
+      check("so the save that follows carries the reset out", () => {
+        eq(recent().length, 0, "the reset on screen was saved without its clearing: " + JSON.stringify(recent()));
       });`
   },
   {
@@ -1080,8 +1145,11 @@ const suites = [
       ${TAB_READY}
       document.querySelector('#tabs .tab[data-tab="sites"]').click();
       // Make the form dirty first, so the storage change below is announced and NOT adopted.
-      const rules = document.querySelector('#tabs .tab[data-tab="appearance"]');
-      document.getElementById("domains").dispatchEvent(new Event("input", { bubbles: true }));
+      // A real edit: whether there is anything unsaved is read off the settings, so an input
+      // event that changes nothing leaves the form clean, and a clean form adopts.
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
       await sleep(50);
 
       // The popup's write: same shape as peSaveSettings, landing while this page is dirty.
@@ -1110,7 +1178,11 @@ const suites = [
       });
       check("and the save says it did that, rather than just Saved", () => {
         eq(document.getElementById("status").textContent, peMsg("msgKeptDomains", ["app.plane.so"]));
-      });`
+      });
+      // The save wrote over the change it refused, carrying what it added, so the page is no
+      // longer behind storage and has nothing left to lose.
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and afterwards there is nothing unsaved", () => ok(!leave(), "still behind after the save"));`
   },
   {
     // A save that fails must leave the page as it was. It used to drop empty rows from state
@@ -1184,6 +1256,885 @@ const suites = [
       blank.focus();
       blank.click();
       check("a blank quick link", () => eq(document.activeElement, last("#quickList .qlk-name"), "focus is on " + document.activeElement.tagName));`
+  },
+  {
+    // The picker's half of the domain problem above. A rule picked in a Plane tab while this
+    // form is dirty is announced and not adopted, and the Save that follows wrote the page's
+    // older list over it: the rule the user had just picked was gone, with "Saved." on screen.
+    // A rule this page has never shown is one the user cannot have meant to delete, so it is
+    // carried into the save; one it did show and the user deleted stays deleted.
+    name: "options · a rule picked while the form is dirty survives the save",
+    page: { name: "opt-foreign-rule", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      type(document.querySelector("#templateList .tpl-name"), "Bug, edited");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.rules = foreign.rules.concat([{ id: "picked", enabled: true, label: "Picked", selector: ".picked", property: "width", value: "10px" }]);
+      foreign.domains = foreign.domains.concat(["popup.example.com"]);
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(300);
+      check("the page keeps the edit rather than adopting", () => {
+        eq(document.querySelector("#templateList .tpl-name").value, "Bug, edited");
+        eq(document.querySelectorAll("#ruleList .rule-item").length, 1, "the picked rule was rendered over the edit");
+      });
+      document.querySelector("#ruleList .rule-del").click(); // one the user can see, and deletes
+      document.getElementById("status").textContent = "";
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await waitFor(() => (document.getElementById("status").textContent || "").length > 0, "the save to report");
+      check("the picked rule survives, and the deleted one stays deleted", () => {
+        const written = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(written.rules.map((r) => r.id).join(), "picked");
+      });
+      // Both at once is the case the picker and the popup produce together, and saying only one
+      // of them leaves the other arriving unexplained.
+      check("and the save says so, about both", () => eq(document.getElementById("status").textContent,
+        peMsg("msgKeptDomains", ["popup.example.com"]) + " " + peMsg("msgKeptRulesToo", ["“Picked”"])));
+      check("and shows it", () => eq([...document.querySelectorAll("#ruleList .rule-label")].map((n) => n.value).join(), "Picked"));`
+  },
+  {
+    // Only typing marked the form dirty. Deleting a row, importing a backup and restoring
+    // defaults are all edits too, and none of them counted — import and reset even cleared the
+    // flag on their way through render(). So a change from the picker or another device that
+    // arrived before Save was adopted wholesale, and the import, the reset or the deletion was
+    // simply gone. Each of the three gets its own page, because each is a different way to lose.
+    name: "options · a deleted row is not replaced by a change from elsewhere",
+    page: { name: "opt-dirty-delete", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.querySelector("#templateList .tpl-del").click();
+      ${FOREIGN_DOMAIN}
+      check("the page keeps the deletion", () => eq(document.querySelectorAll("#templateList .tpl-item").length, 0));
+      check("and says something changed", () => eq(document.getElementById("status").textContent, peMsg("msgChangedElsewhere")));`
+  },
+  {
+    name: "options · an import is not replaced by a change from elsewhere",
+    page: { name: "opt-dirty-import", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const file = new File([JSON.stringify({ _app: "enhancer-for-plane", settings: {
+        schema: 6, enabled: true, allDomains: false, domains: ["imported.example.com"], rules: [], templates: [],
+        variables: [], copyFormats: [], quickLinks: [], templateSync: { enabled: false, sources: [] } } })],
+        "backup.json", { type: "application/json" });
+      const input = document.getElementById("importFile");
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => document.getElementById("domains").value.indexOf("imported.example.com") !== -1, "the import");
+      ${FOREIGN_DOMAIN}
+      check("the imported settings are still the ones on screen", () => {
+        eq(document.getElementById("domains").value.trim(), "imported.example.com");
+      });`
+  },
+  {
+    name: "options · a reset is not replaced by a change from elsewhere",
+    page: { name: "opt-dirty-reset", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      ${FOREIGN_DOMAIN}
+      check("the reset is still what is on screen", () => eq(document.getElementById("domains").value.trim(), ""));`
+  },
+  {
+    // "Add source" left sync switched off, and the row told the user to enter a URL and Save —
+    // which they did, and then Sync now answered "Synced 0 source(s)" because nothing ran. The
+    // example button already turned sync on for exactly this reason; the plain one did not.
+    name: "options · a source is added with sync on, and Sync now says when it is off",
+    page: {
+      name: "opt-sync-off",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: false, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } })
+    },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const sent = [];
+      chrome.runtime.sendMessage = (m, cb) => { sent.push(m); cb && cb({ ok: 0, err: 0 }); };
+      document.getElementById("syncNow").click();
+      await sleep(50);
+      check("Sync now with sync off says so instead of reporting zero", () => {
+        eq(document.getElementById("status").textContent, peMsg("msgSyncOff"));
+        eq(sent.length, 0, "it asked the worker anyway");
+      });
+      // Sync was switched off by someone who has sources, so it was a decision: a fourth row to
+      // fill in later must not reverse it for the three already there.
+      document.getElementById("addSource").click();
+      check("adding to a list someone switched off leaves it off", () => ok(!document.getElementById("syncEnabled").checked, "switched on"));`
+  },
+  {
+    // The first source is the case the trap was about: a fresh install has sync off and no
+    // sources, and "Add source" is a request for sync.
+    name: "options · the first source switches sync on",
+    page: { name: "opt-first-source", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      document.getElementById("addSource").click();
+      check("adding the first source switches sync on", () => ok(document.getElementById("syncEnabled").checked, "still off"));
+      // Taking the row away again takes the switch with it: it was the row's doing, and left on
+      // it was an unsaved edit nobody made, saved by the next Save as sync with no source.
+      document.querySelector("#sourceList .src-del").click();
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and deleting it again leaves nothing changed", () => {
+        ok(!document.getElementById("syncEnabled").checked, "sync left on");
+        ok(!leave(), "an edit nobody made");
+      });`
+  },
+  {
+    // A variable named in Korean, or a second "team", was dropped by Save with "Saved." on
+    // screen; the only warning was a tooltip on a red border. Save now refuses, says which one
+    // and why, and puts the caret on it — the same as every other value Save cannot keep.
+    name: "options · a variable Save cannot keep stops the save",
+    page: { name: "opt-var-bad", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      document.getElementById("addVariable").click();
+      const rows = () => [...document.querySelectorAll("#variableList .var-item")];
+      const mine = rows()[rows().length - 1];
+      type(mine.querySelector(".var-name"), "팀");
+      type(mine.querySelector(".var-value"), "Payments");
+      const status = () => document.getElementById("status").textContent;
+      document.getElementById("save").click();
+      await sleep(100);
+      check("a name Save cannot use stops the save and says which", () => {
+        eq(window.__written.length, 0, "it saved");
+        eq(status(), peMsg("msgVarBadSave", ["팀"]));
+        eq(document.activeElement, mine.querySelector(".var-name"), "the caret is not on it");
+      });
+      // An error is something to act on, and in Korean it is a sentence or two to read first:
+      // it stays until the next message replaces it, where a success may fade.
+      await sleep(5000);
+      check("and the message is still there to read", () => eq(status(), peMsg("msgVarBadSave", ["팀"])));
+      check("where a screen reader hears it", () => eq(document.getElementById("status").getAttribute("aria-live"), "polite"));
+      type(mine.querySelector(".var-name"), "TEAM");
+      document.getElementById("save").click();
+      await sleep(100);
+      check("so does a second one with the same name", () => {
+        eq(window.__written.length, 0, "it saved");
+        eq(status(), peMsg("msgVarDupeSave", ["TEAM"]));
+      });
+      type(mine.querySelector(".var-name"), "squad");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("a usable one saves", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.variables.map((v) => v.name).join(), "team,squad");
+      });`
+  },
+  {
+    // Save builds on a copy, awaits storage and the permission prompt, then replaced state with
+    // the copy — so anything typed while the prompt was up was thrown away, the form redrawn
+    // without it, and "Saved." on screen.
+    name: "options · an edit made while saving is not thrown away",
+    page: { name: "opt-save-inflight", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      type(body(), "before");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      type(body(), "typed while the prompt was up");
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the edit is still on screen", () => eq(body().value, "typed while the prompt was up"));
+      check("the save wrote what it was started with", () => {
+        const latest = Object.assign({}, ...window.__written);
+        const t = Object.keys(latest).filter((k) => k.indexOf("peTpl.") === 0).map((k) => latest[k]).flat();
+        eq(t[0].content, "before");
+      });
+      check("and the page says the newer edit is not saved yet", () => eq(document.getElementById("status").textContent, peMsg("msgSavedEditsPending")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("so leaving still asks", () => ok(leave(), "it let the newer edit go"));`
+  },
+  {
+    // The same window after the write: storage has the settings and the page tidies host access,
+    // with the form still open to typing. Deciding "was anything typed?" before that await
+    // marked the newer edit clean, with "Saved." on screen.
+    name: "options · an edit made while access is tidied after a save is not marked saved",
+    page: { name: "opt-save-cleanup", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      type(body(), "before");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      type(body(), "typed while access was tidied");
+      window.__cleanup();
+      await sleep(200);
+      check("the edit is still on screen", () => eq(body().value, "typed while access was tidied"));
+      check("and the page says it is not saved yet", () => eq(document.getElementById("status").textContent, peMsg("msgSavedEditsPending")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("so leaving still asks", () => ok(leave(), "it let the newer edit go"));
+      // Taking the edit back leaves nothing unsaved: the baseline is what was written.
+      type(body(), "before");
+      check("and taking it back leaves nothing to lose", () => ok(!leave(), "it asked about what is already saved"));`
+  },
+  {
+    // Storage was read once, before the permission prompt. A rule picked, or a site switched
+    // on, while the prompt was up was in storage by the time Save wrote — and Save wrote the
+    // list it had read before, over it.
+    name: "options · a rule added while the permission prompt is up survives the save",
+    page: { name: "opt-save-prompt-foreign", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.rules = foreign.rules.concat([{ id: "late", enabled: true, label: "Late", selector: ".late", property: "width", value: "10px" }]);
+      foreign.domains = foreign.domains.concat(["late.example.com"]);
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      nm.value = nm.value + " again"; // and typing goes on while the prompt is up
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      // What was carried is not on the form — the form has newer edits — so the message is the
+      // only place it is said at all.
+      check("and the message says what was kept, beside what is not saved", () => eq(document.getElementById("status").textContent,
+        [peMsg("msgSavedEditsPending"), peMsg("msgAlsoKeptSites", ["late.example.com"]), peMsg("msgAlsoKeptRules", ["“Late”"])].join(" ")));
+      check("the rule and the site are both still in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(w.rules.some((r) => r.id === "late"), "rules: " + w.rules.map((r) => r.id).join());
+        ok(w.domains.indexOf("late.example.com") > -1, "domains: " + w.domains.join());
+      });`
+  },
+  {
+    // The same window with a clean form, which adopts what lands — and adopting put the new
+    // rule's id on the page's list of rules it has shown, so the save that then wrote its older
+    // list read the rule as one the user deleted.
+    name: "options · a rule added while a clean form's save waits on the prompt survives",
+    page: { name: "opt-save-prompt-clean", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.rules = foreign.rules.concat([{ id: "late", enabled: true, label: "Late", selector: ".late", property: "width", value: "10px" }]);
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the rule is still in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(w.rules.some((r) => r.id === "late"), "rules: " + w.rules.map((r) => r.id).join());
+      });`
+  },
+  {
+    // A rule carried by the first read can still change while the prompt is up — edited, or
+    // deleted, on another page. Keeping the first read's copy wrote the old value back over it.
+    name: "options · a carried rule edited while the prompt is up is saved as edited",
+    page: { name: "opt-save-prompt-edit", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const put = (rules) => {
+        const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+        f.rules = rules;
+        window.__SEED.peSettings = f;
+        window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      };
+      const base = window.__SEED.peSettings.rules;
+      put(base.concat([{ id: "R", enabled: true, label: "R", selector: ".r", property: "width", value: "320px" }]));
+      await sleep(50);
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      put(base.concat([{ id: "R", enabled: true, label: "R", selector: ".r", property: "width", value: "640px" }]));
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the newer value is what is saved", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq((w.rules.find((r) => r.id === "R") || {}).value, "640px");
+      });`
+  },
+  {
+    // A second click on Save while the first is still out ran a second save beside it, which
+    // then read the first one's tidying as an edit of the user's: "not saved yet", and a form
+    // that asked before closing over settings already in storage.
+    name: "options · a double-click on Save is one save",
+    page: { name: "opt-save-twice", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + "  "; // trailing space: Save tidies it, so state and copy differ
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("addTemplate").click(); // and an empty row Save drops
+      document.getElementById("save").click();
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(300);
+      check("it reports one plain save", () => eq(document.getElementById("status").textContent, peMsg("msgSaved")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and leaves nothing unsaved", () => ok(!leave(), "it asks before closing over a saved form"));`
+  },
+  {
+    // A source saved under a new id while newer edits were pending kept its old id in the form,
+    // and the next save wrote the old one back: the new file's cache pruned, fetched again.
+    name: "options · a source's new id survives a save made with edits pending",
+    page: {
+      name: "opt-src-newid-pending",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      const url = document.querySelector("#sourceList .src-url");
+      url.value = "https://plane.example.com/other.json";
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the first save");
+      await sleep(100);
+      const ids = () => window.__written.map((o) => o.peSettings).filter(Boolean).map((w) => w.templateSync.sources[0].id);
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the second prompt");
+      window.__answer();
+      await waitFor(() => ids().length > 1, "the second save");
+      check("both saves wrote the same new id", () => {
+        const all = ids();
+        ok(all[0] !== "s1", "first save kept the old id");
+        eq(all[1], all[0], "the second save wrote " + all[1]);
+      });`
+  },
+  {
+    // The tidy-up after a write hands back access to origins the settings no longer list —
+    // judged against what this save wrote. A site switched on from the popup in that window is
+    // in storage and was not in the write, and its access was taken away a moment after it was
+    // granted.
+    name: "options · a site switched on while access is tidied keeps its access",
+    page: {
+      name: "opt-save-cleanup-site",
+      ...OPTIONS,
+      seed: seedOf(),
+      env: { holdCleanup: true, origins: ["*://plane.example.com/*"] }
+    },
+    body: `
+      ${TAB_READY}
+      // The popup writes the site and then asks for access. When the grant is through before the
+      // tidy-up asks Chrome what is granted, and the write landed after this save read storage,
+      // the site is granted and listed — and missing from what this save wrote.
+      window.__ENV.origins.push("*://b.example.com/*");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.domains = f.domains.concat(["b.example.com"]);
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      window.__cleanup();
+      await sleep(200);
+      check("its access is still granted", () => ok((window.__removed || []).indexOf("*://b.example.com/*") === -1, "removed: " + (window.__removed || []).join()));`
+  },
+  {
+    // Closing while the save is still out: the edit being saved is not in storage until the
+    // save ends, and an edit back to what was there before reads as clean against the old
+    // baseline — so the page let itself be closed over a value storage no longer held.
+    name: "options · closing while a save is out asks first",
+    page: { name: "opt-save-leave", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      const was = body().value;
+      type(body(), "B");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      type(body(), was);
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("it asks", () => ok(leave(), "it let the page close mid-save"));
+      window.__cleanup();`
+  },
+  {
+    // A clean form whose save fails had refused the change that landed meanwhile — refusing is
+    // right while a save is out — and then never took it: nothing else would ever announce it,
+    // and the next Save wrote the older settings back.
+    name: "options · a change refused during a save that then fails is taken afterwards",
+    page: {
+      name: "opt-save-fail-adopt",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await sleep(300);
+      check("the save failed", () => eq(window.__written.length, 0));
+      check("and the form now shows the change from elsewhere", () =>
+        ok([...document.querySelectorAll("#quickList input")].some((i) => i.value.indexOf("elsewhere.example.com") > -1), "not adopted"));`
+  },
+  {
+    // Unsaved is derived from the settings, so taking an edit back makes the form clean — but a
+    // change from elsewhere refused while it was dirty has already moved the page's idea of
+    // storage, and nothing announces it again. A clean form showing older settings then closed
+    // without asking, and its next Save wrote them back over the change.
+    name: "options · a change refused while editing still counts once the edit is undone",
+    page: { name: "opt-behind", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      const was = nm.value;
+      nm.value = was + "x"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      ${FOREIGN_DOMAIN}
+      nm.value = was; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("leaving still asks", () => ok(leave(), "a page behind storage let itself close"));
+      check("and Sync now still asks for a save first", () => {
+        document.getElementById("syncNow").click();
+        eq(document.getElementById("status").textContent, peMsg("msgSaveFirst"));
+      });`
+  },
+  {
+    // Taking the refused change after a failed save is a read, and a read is a window: typing
+    // in it was replaced by what storage held, and the form marked clean over it.
+    name: "options · an edit made while a failed save's recovery reads is kept",
+    page: {
+      name: "opt-save-fail-adopt-race",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__holdReads = true;
+      window.__answer();
+      await waitFor(() => (window.__reads || []).length === 1, "the read after the prompt");
+      window.__reads.shift()();
+      await waitFor(() => (window.__reads || []).length === 1, "the recovery read");
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = "Newer"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__holdReads = false;
+      window.__reads.shift()();
+      await sleep(200);
+      check("the newer edit is still there", () => eq(document.querySelector("#templateList .tpl-name").value, "Newer"));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and still unsaved", () => ok(leave(), "marked clean over the edit"));`
+  },
+  {
+    // A recovery read that comes back after a newer save has gone through holds settings older
+    // than that save. Taking it put them on the form, marked clean.
+    name: "options · a failed save's recovery read is dropped once a newer save went through",
+    page: {
+      name: "opt-save-fail-stale",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      const reads = () => (window.__reads || []).length;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__holdReads = true;
+      window.__answer();
+      await waitFor(() => reads() === 1, "the read after the prompt");
+      window.__reads.shift()();
+      await waitFor(() => reads() === 1, "the recovery read");
+      const recovery = window.__reads.shift(); // held back until a newer save is through
+      window.__holdReads = false; // it answers with what storage held when it was asked
+      const content = document.querySelector("#templateList .tpl-content");
+      content.value = "small"; content.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the newer save's prompt");
+      window.__answer();
+      await waitFor(() => document.getElementById("status").textContent !== "" && !/failed/i.test(document.getElementById("status").textContent), "the newer save to finish");
+      check("the newer save went through", () => eq(window.__written.length, 1));
+      recovery();
+      await sleep(200);
+      check("the form keeps what the newer save wrote", () => {
+        const v = document.querySelector("#templateList .tpl-content").value;
+        eq(v.length > 40 ? v.slice(0, 12) + "… (" + v.length + ")" : v, "small");
+      });`
+  },
+  {
+    // A storage event's read is a window like any other. One started by an older save and
+    // answered after a newer one had gone through put the older settings back on the form,
+    // marked as saved, while storage held the newer ones.
+    name: "options · a storage event's read answered after a newer save is not taken",
+    page: { name: "opt-event-stale", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const content = () => document.querySelector("#templateList .tpl-content");
+      const type = (v) => { content().value = v; content().dispatchEvent(new Event("input", { bubbles: true })); };
+      const stored = () => {
+        const w = window.__written.filter((o) => o.peSettings).pop();
+        Object.assign(window.__SEED, JSON.parse(JSON.stringify(w)));
+      };
+      type("version A");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length === 1, "the first save");
+      stored();
+      await sleep(50);
+      // The event for that write, its read held back.
+      window.__holdReads = true;
+      window.__onChanged({ peSettings: { newValue: window.__SEED.peSettings } }, "sync");
+      await waitFor(() => (window.__reads || []).length === 1, "the event's read");
+      const late = window.__reads.shift();
+      window.__holdReads = false;
+      type("version B");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.filter((o) => o.peSettings).length === 2, "the second save");
+      stored();
+      await sleep(50);
+      late();
+      await sleep(200);
+      check("the form keeps the newer save", () => eq(content().value, "version B"));`
+  },
+  {
+    // Our own write is a window too: a change from elsewhere landing in it was dropped as if it
+    // were the write's own echo, and the page called itself saved and in step with storage.
+    name: "options · a change landing during the page's own write is not taken for its echo",
+    page: { name: "opt-save-echo", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__cleanup();
+      await sleep(200);
+      check("the page says something changed elsewhere", () =>
+        ok(document.getElementById("status").textContent.includes(peMsg("msgChangedElsewhere")), document.getElementById("status").textContent));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and does not call itself in step", () => ok(leave(), "a page behind storage let itself close"));`
+  },
+  {
+    // A new id is for a URL edited on this page. One changed on another device, arriving while
+    // this page had edits, is not this page's edit — renaming over it filed the other device's
+    // source under a fresh id and pruned the file it had fetched.
+    name: "options · a source URL changed elsewhere is not renamed by this page's save",
+    page: {
+      name: "opt-src-url-elsewhere",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } })
+    },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.templateSync.sources[0].url = "https://plane.example.com/elsewhere.json";
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("the source keeps its id", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.templateSync.sources[0].id, "s1");
+      });`
+  },
+  {
+    // A reset confirmed while a save is in flight is not part of what that save wrote, so that
+    // save must not clear what the reset promised to clear — the recents and the pins go when
+    // the reset itself is saved, and not before.
+    name: "options · a reset confirmed while a save is in flight waits for its own save",
+    page: {
+      name: "opt-save-reset-inflight",
+      ...OPTIONS,
+      seed: seedOf(),
+      env: { hold: true },
+      local: { peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }] }
+    },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the recently-opened list is still there", () => eq((window.__LOCAL.peRecent || []).length, 1));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and the reset is still waiting to be saved", () => ok(leave(), "the reset reads as saved"));`
+  },
+  {
+    // Edits live in this page until Save, and closing the tab threw them away without a word.
+    name: "options · leaving with unsaved edits asks first",
+    page: { name: "opt-leave", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("a clean page lets you go", () => ok(!leave(), "it asked with nothing to lose"));
+      // Whether there is anything to lose is a fact about the settings, not about which events
+      // fired: a file the import refused, and a letter typed and taken back, change nothing.
+      const input = document.getElementById("importFile");
+      Object.defineProperty(input, "files", { value: [new File(["{}"], "x.json", { type: "application/json" })], configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await sleep(100);
+      check("a refused import leaves nothing to lose", () => ok(!leave(), "it asked after a refused import"));
+      const nm = document.querySelector("#templateList .tpl-name");
+      const was = nm.value;
+      nm.value = was + "x"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      nm.value = was; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      check("nor does a letter typed and taken back", () => ok(!leave(), "it asked about an edit that was undone"));
+      // A switch ticked and unticked is no edit either, even on a rule stored without the key.
+      const fsw = document.querySelector("#ruleList .rule-focus");
+      fsw.checked = true; fsw.dispatchEvent(new Event("change", { bubbles: true }));
+      fsw.checked = false; fsw.dispatchEvent(new Event("change", { bubbles: true }));
+      check("nor a switch flipped and flipped back", () => ok(!leave(), "it asked about a switch put back"));
+      document.querySelector("#templateList .tpl-del").click();
+      check("a deletion not yet saved asks", () => ok(leave(), "it let the deletion go"));
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("and once saved it lets you go again", () => ok(!leave(), "it asked after the save"));`
+  },
+  {
+    // A cache update rebuilt every source row. Typing a URL while a sync landed — and Save starts
+    // one, committing per source — lost the caret, the selection and any open group list.
+    name: "options · a sync landing while a source is edited keeps your place",
+    page: {
+      name: "opt-src-focus",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      local: { peSyncCache: { bySource: { s1: SRC_ENTRY(1) } } }
+    },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const url = document.querySelector("#sourceList .src-url");
+      url.focus();
+      url.setSelectionRange(8, 13);
+      document.querySelector("#sourceList .src-detail").open = true;
+      window.__onChanged({ peSyncCache: { newValue: { bySource: { s1: ${JSON.stringify(SRC_ENTRY(2))} } } } }, "local");
+      await sleep(50);
+      const now = document.querySelector("#sourceList .src-url");
+      // Rebuilt and refocused is not the same as left alone: replacing the field mid-word ends
+      // an IME composition, and Korean typed into it splits a syllable — "하ㄴ" for "한".
+      check("the field being typed in is not replaced", () => ok(now === url, "the row was rebuilt under the caret"));
+      check("the caret is still in the URL, where it was", () => {
+        eq(document.activeElement, now, "focus is on " + document.activeElement.tagName);
+        eq(now.selectionStart + "-" + now.selectionEnd, "8-13");
+      });
+      check("the open group list stays open", () => ok(document.querySelector("#sourceList .src-detail").open, "closed"));
+      check("and the new result is what it shows", () => ok(document.querySelector("#sourceList .src-status").textContent.indexOf("2") > -1, document.querySelector("#sourceList .src-status").textContent));
+      // The group list is the other place a sync lands under you: a checkbox there had no
+      // class to be found again by.
+      const group = () => document.querySelectorAll("#sourceList .src-group input")[1];
+      group().focus();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: { s1: ${JSON.stringify(SRC_ENTRY(2))} } } } }, "local");
+      await sleep(50);
+      check("a group's checkbox keeps focus too", () => eq(document.activeElement, group(), "focus is on " + document.activeElement.tagName));
+      // Sync now, and the sync Save starts, end in a reply that reloads the cache — the other
+      // way a result reaches the list while someone types in it.
+      const field = document.querySelector("#sourceList .src-name");
+      field.focus();
+      chrome.runtime.sendMessage = (m, cb) => setTimeout(() => cb && cb({ ok: 1, err: 0 }), 0);
+      document.getElementById("syncNow").click();
+      await sleep(100);
+      check("a sync's reply does not replace the field either", () => ok(field.isConnected && document.activeElement === field, "rebuilt under the caret"));
+      // Leaving the list rebuilds it — but a press on a label in it takes focus away before its
+      // click lands, and a rebuild in between swallows the click.
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      field.blur();
+      check("not while a button is held", () => ok(field.isConnected, "rebuilt between mousedown and click"));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      await sleep(50);
+      check("but once it is let go", () => ok(!field.isConnected, "never rebuilt"));`
+  },
+  {
+    // Deleting is not a re-render that should put you back: the row is gone. Restoring by
+    // position put focus on the next source's ✕, so a second Enter — or a held key — deleted
+    // that one too, and the open group list moved down onto a source nobody had opened.
+    name: "options · deleting a source does not hand you the next one's delete",
+    page: {
+      name: "opt-src-delete",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [
+        { id: "s1", url: "https://plane.example.com/t.json", name: "One", intervalMinutes: 360, enabled: true, hiddenGroups: [] },
+        { id: "s2", url: "https://plane.example.com/u.json", name: "Two", intervalMinutes: 360, enabled: true, hiddenGroups: [] }
+      ] } }),
+      local: { peSyncCache: { bySource: { s1: SRC_ENTRY(1), s2: Object.assign({}, SRC_ENTRY(1), { url: "https://plane.example.com/u.json" }) } } }
+    },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      document.querySelector("#sourceList .src-detail").open = true;
+      const del = document.querySelector("#sourceList .src-del");
+      del.focus();
+      del.click();
+      await sleep(50);
+      check("one source left", () => eq([...document.querySelectorAll("#sourceList .src-name")].map((n) => n.value).join(), "Two"));
+      check("and focus is not on its delete button", () => ok(!document.activeElement.classList.contains("src-del"), "focus is on the next source's ✕"));
+      check("and its group list was not opened for it", () => ok(!document.querySelector("#sourceList .src-detail").open, "the deleted source's open list moved down"));`
+  },
+  {
+    // A cache entry from before URLs were recorded cannot say which file it holds, so a source
+    // whose URL is edited gets a new id on Save: the old entry is pruned with its templates
+    // instead of standing under the new address until that one is fetched — which, if it fails,
+    // is never.
+    name: "options · a source whose URL is edited starts afresh",
+    page: {
+      name: "opt-src-newurl",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      local: { peSyncCache: { bySource: { s1: { status: "ok", fetchedAt: 1, count: 1, templates: [{ id: "sync:s1:a", name: "A", content: "c" }] } } } }
+    },
+    body: `
+      ${TAB_READY}
+      const url = document.querySelector("#sourceList .src-url");
+      url.value = "https://plane.example.com/other.json";
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("it is saved under a new id", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        const src = w.templateSync.sources[0];
+        eq(src.url, "https://plane.example.com/other.json");
+        ok(src.id !== "s1", "kept the id of the old file's cache entry");
+      });`
+  },
+  {
+    // Every value the worker wrote was English, prefixed with a translated "동기화 실패:". The
+    // first time a Korean user adds a source is the time they most need to read why it failed.
+    name: "options · a failed source says why in the reader's language",
+    page: {
+      name: "opt-src-err-ko",
+      lang: "ko",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      local: { peSyncCache: { bySource: { s1: { status: "error", lastError: "Site access not granted", errorCode: "noAccess", errorArgs: [] } } } }
+    },
+    body: `
+      ${TAB_READY}
+      const t = document.querySelector("#sourceList .src-status").textContent;
+      check("in Korean, with no English left in it", () => {
+        ok(t.indexOf("Site access") === -1, t);
+        ok(t.indexOf(peMsg("syncErrNoAccess")) > -1, t);
+      });`
+  },
+  {
+    // The chips add a preset, and adding one that is already in the list made a second copy of
+    // the same rule — two rows to keep in step, and the first one is the one you edit.
+    name: "options · quick add does not add a rule twice",
+    page: { name: "opt-chip-dupe", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="appearance"]').click();
+      const count = () => document.querySelectorAll("#ruleList .rule-item").length;
+      const before = count();
+      document.querySelector('.chip[data-preset="modulename"]').click();
+      check("a preset already in the list is pointed at, not copied", () => {
+        eq(count(), before);
+        eq(document.getElementById("status").textContent, peMsg("msgPresetExists"));
+        eq(document.activeElement, document.querySelector("#ruleList .rule-value"), "focus");
+      });
+      document.querySelector('.chip[data-preset="cyclename"]').click();
+      check("one that is not is added", () => eq(count(), before + 1));
+      // Clicking a preset is asking for it to apply. Pointing at a copy that is switched off
+      // left it off — the chip used to give you a working one.
+      const sw = document.querySelector("#ruleList .rule-enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      document.querySelector('.chip[data-preset="modulename"]').click();
+      check("one that is there but switched off is switched back on", () => {
+        eq(count(), before + 1, "copied");
+        ok(document.querySelector("#ruleList .rule-enabled").checked, "still off");
+        eq(document.getElementById("status").textContent, peMsg("msgPresetEnabled"));
+      });`
+  },
+  {
+    // "Manage templates" under the template menu opened Settings wherever it last was — most
+    // often Work items — and left the user to find the card they had just asked for.
+    name: "options · a page asked to open on a tab does",
+    page: { name: "opt-open-tab", ...OPTIONS, seed: seedOf(), env: { session: { peOpenTab: "templates" } } },
+    body: `
+      ${TAB_READY}
+      await waitFor(() => sel() === "templates", "the requested tab");
+      check("and the request is used up", () => ok(!("peOpenTab" in (window.__ENV.session || {})), JSON.stringify(window.__ENV.session)));
+      window.__onChanged({ peOpenTab: { newValue: "items" } }, "session");
+      await sleep(50);
+      check("a request to a page already open moves it too", () => eq(sel(), "items"));
+      window.__onChanged({ peOpenTab: { newValue: "javascript:alert(1)" } }, "session");
+      await sleep(50);
+      check("and one that names no tab is ignored", () => eq(sel(), "items"));`
+  },
+  {
+    // A filled field has no placeholder left to say what it is. #29 gave the template rows a
+    // label and stopped there, so a style rule still read as three unlabelled boxes holding
+    // ".max-w-40", "max-width" and "320px", and its switch had no name at all.
+    name: "options · every field has a name, and a filled one keeps its label",
+    page: {
+      name: "opt-field-names",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      local: { peSyncCache: { bySource: { s1: SRC_ENTRY(1) } } }
+    },
+    body: `
+      ${TAB_READY}
+      ${FIELD_NAMES}
+      check("every field has an accessible name", () => eq(nameless().join(", "), ""));
+      check("a field in a list keeps a visible label once filled", () => {
+        const bare = [...document.querySelectorAll("#ruleList, #variableList, #copyList, #quickList, #sourceList, #templateList")]
+          .flatMap((l) => [...l.querySelectorAll('input[type="text"], input[type="url"], input:not([type]), textarea')])
+          .filter((f) => { const tag = f.closest(".fld") && f.closest(".fld").querySelector(".fld-tag"); return !(tag && tag.textContent.trim()); })
+          .map((f) => f.className);
+        eq(bare.join(", "), "");
+      });
+      check("a rule's switch says which rule", () => {
+        ok(document.querySelector("#ruleList .rule-enabled").getAttribute("aria-label").indexOf("Module name") > -1,
+           document.querySelector("#ruleList .rule-enabled").getAttribute("aria-label"));
+      });`
+  },
+  {
+    name: "popup · every field has a name",
+    page: { name: "pop-field-names", ...POPUP, seed: seedOf() },
+    body: `
+      await sleep(300);
+      ${FIELD_NAMES}
+      check("every field has an accessible name", () => eq(nameless().join(", "), ""));`
   },
   {
     // What people paste into the domain box is the address bar. peNormalizeDomain makes such a
@@ -1681,6 +2632,13 @@ const suites = [
     },
     body: `
       await waitFor(() => document.querySelectorAll(".pe-body-tmpl-btn").length === 2, "both template buttons");
+      // A live region filled in the same moment it is inserted is not reliably read, so it has
+      // to be on the page before the first thing is said into it.
+      check("the live region is there before anything is said", () => {
+        const l = document.getElementById("pe-live");
+        ok(l, "no live region yet");
+        eq(l.textContent, "", "already holding text");
+      });
       const btn = (id) => document.querySelector("#" + id + " .pe-body-tmpl-btn");
       const menu = () => document.getElementById("pe-tmpl-menu");
       const isOpen = () => !!menu() && getComputedStyle(menu()).display !== "none";
@@ -1730,6 +2688,25 @@ const suites = [
       check("so does your own block", () => {
         eq(shown(".pe-menu-section-label").map((n) => n.textContent).join(), '<img src=x id="hostile">Team pack');
       });
+      // The filter box is inside the menu, so "focus is in the menu" is not the same as "a row
+      // is focused": typing a query and pressing Enter is how a long menu is meant to be used.
+      const fin = menu().querySelector(".pe-menu-filter-input");
+      fin.focus();
+      const downInFilter = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+      fin.dispatchEvent(downInFilter);
+      check("the arrows in the filter move the highlight and leave the caret there", () => {
+        ok(downInFilter.defaultPrevented, "the arrow reached the input");
+        eq(document.activeElement, fin, "focus left the filter");
+      });
+      fin.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+      const enterInFilter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      fin.dispatchEvent(enterInFilter);
+      check("Enter in the filter takes the highlighted hit", () => {
+        ok(enterInFilter.defaultPrevented, "Enter was left to the input");
+        ok(document.getElementById("ed-a").textContent.indexOf("the rollback plan") > -1, document.getElementById("ed-a").textContent);
+      });
+      btn("box-a").click();
+      const allRows = names().length; // Deploy now heads the list as well, under Recently used
       filter("nothing has this");
       check("no hits at all says so, and drops the source's header too", () => {
         eq(names().length, 0, "rows");
@@ -1737,7 +2714,58 @@ const suites = [
         eq(shown(".pe-menu-section-label").length, 0, "headers left over an empty list");
       });
       filter("");
-      check("clearing it brings everything back", () => eq(names().length, 9));
+      check("clearing it brings everything back", () => eq(names().length, allRows));
+
+      // A sync that lands while a query is being typed keeps the query, the caret and the hits.
+      // A redraw that did not wiped the box, and Enter then took the first row of the full list.
+      const fq = menu().querySelector(".pe-menu-filter-input");
+      fq.focus();
+      filter("rollback");
+      fq.setSelectionRange(3, 3);
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
+      check("a sync keeps a query typed in the filter, and the caret in it", () => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        eq(f.value, "rollback");
+        eq(document.activeElement, f, "focus left the filter");
+        eq(f.selectionStart, 3, "the caret moved");
+        eq(names().join(), "Deploy");
+      });
+      // Mid-composition the box is not redrawn at all: a new input cannot carry an IME session
+      // over, and a Korean syllable being built was split in two. It catches up on commit.
+      const fc = menu().querySelector(".pe-menu-filter-input");
+      fc.focus();
+      fc.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
+      check("a sync during IME composition leaves the filter box alone", () =>
+        ok(menu().querySelector(".pe-menu-filter-input") === fc, "the composing input was replaced"));
+      fc.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "" }));
+      await sleep(50);
+      check("and redraws once the composition ends", () => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        ok(f && f !== fc, "no redraw after the composition");
+        eq(f.value, "rollback");
+      });
+      filter("");
+
+      // Two templates in one source may share an id. A redraw that found "the row with this id"
+      // took the first, and Enter then inserted the other group's template. Ambiguous is no
+      // place to put the reader back, so the highlight goes rather than move.
+      const dupCache = JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache));
+      dupCache.bySource.s1.templates.push(
+        { id: "dup", name: "Dup Ops", group: "Ops", title: "", content: "x" },
+        { id: "dup", name: "Dup Review", group: "Review", title: "", content: "y" }
+      );
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(dupCache)) } }, "local");
+      shown(".pe-menu-item").find((n) => n.querySelector(".pe-menu-item-title").textContent === "Dup Review").focus();
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(dupCache)) } }, "local");
+      check("a redraw does not move the reader to another template with the same id", () => {
+        const hl = menu().querySelector(".pe-menu-active .pe-menu-item-title");
+        ok(!hl || hl.textContent === "Dup Review", "highlight moved to " + (hl && hl.textContent));
+        const fr = document.activeElement.closest && document.activeElement.closest(".pe-menu-item");
+        const ft = fr && fr.querySelector(".pe-menu-item-title").textContent;
+        ok(!ft || ft === "Dup Review", "focus moved to " + ft);
+      });
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
 
       // The service worker finishes a sync while the menu is up.
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
@@ -1790,11 +2818,21 @@ const suites = [
       // the editor — that is where the template lands — so the arrows move a highlight.
       const active = () => shown(".pe-menu-active .pe-menu-item-title").map((n) => n.textContent).join();
       check("the first row is highlighted, so Enter takes it", () => eq(active(), "Bug"));
+      // The highlight is a class, which nothing but a sighted user can read, and focus stays in
+      // the editor — so the row is announced through a live region of ours.
+      const live = () => (document.getElementById("pe-live") || {}).textContent || "";
+      await waitFor(() => live() === "Bug", "the first row to be announced");
+      check("and a screen reader is told which", () => {
+        eq(live(), "Bug");
+        eq((document.getElementById("pe-live") || { getAttribute: () => "" }).getAttribute("aria-live"), "polite");
+      });
       const down = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
       document.activeElement.dispatchEvent(down);
       key({ key: "ArrowDown" });
+      await waitFor(() => live() === "Body only", "the new row to be announced");
       check("the arrows move the highlight, not the caret", () => {
         eq(active(), "Body only");
+        eq(live(), "Body only", "announced");
         ok(down.defaultPrevented, "the editor would have moved its caret too");
         eq(document.activeElement.id, "ed-b", "focus");
       });
@@ -1820,6 +2858,70 @@ const suites = [
       key({ key: "Escape" });
       check("Escape closes it", () => ok(!isOpen(), "still open"));
 
+      // The rows are buttons, so Tab reaches them. Enter on a focused button belongs to that
+      // button; taking it over pressed whichever row the arrows had last highlighted instead.
+      btn("box-a").click();
+      const rowsNow = shown(".pe-menu-item");
+      rowsNow[2].focus();
+      check("a row focused by Tab becomes the highlighted one", () => eq(active(), "Body only"));
+      const enterOnRow = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      rowsNow[2].dispatchEvent(enterOnRow);
+      check("and Enter on it is left to the button", () => ok(!enterOnRow.defaultPrevented, "the menu took Enter from a focused button"));
+      // A focused button is announced by the screen reader itself; saying its title again
+      // through the live region read every row twice.
+      await sleep(100);
+      check("a focused row is not announced a second time", () => ok(live() !== "Body only", live()));
+      key({ key: "Escape" });
+      // Chrome drops focus from a hidden element at its next rendering step, not at once.
+      await sleep(100);
+      check("Escape from a focused row puts focus back where the menu came from", () => {
+        ok(!isOpen(), "still open");
+        ok(document.activeElement !== document.body, "focus fell to <body>");
+        ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
+      });
+      // A sync landing under the open menu redraws it, and the focused row with it.
+      // Not redrawn at all while it is being used: a redraw moved focus to another row, and the
+      // next Enter pressed a template nobody chose (or wiped a query typed in the filter).
+      btn("box-a").click();
+      const focusedRow = shown(".pe-menu-item")[1];
+      focusedRow.focus();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("a sync under a focused row leaves that row focused", () =>
+        eq(document.activeElement.querySelector && (document.activeElement.querySelector(".pe-menu-item-title") || {}).textContent, focusedRow.querySelector(".pe-menu-item-title").textContent));
+      key({ key: "Escape" });
+      await sleep(50);
+      // The keyboard path keeps focus in the editor, so the highlight is all there is — and a
+      // redraw that dropped it left Enter to the editor, which took it as a new line.
+      title().value = "";
+      edB.focus();
+      key({ altKey: true, code: "KeyT", key: "\\u2020" });
+      key({ key: "ArrowDown" });
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("a sync keeps the row the arrows reached", () => eq(active(), "Title only"));
+      key({ key: "Enter" });
+      check("so Enter takes it", () => eq(title().value, "Release notes"));
+      await sleep(50);
+      key({ key: "Escape" });
+      await sleep(50);
+      // Alt+T is a toggle. With a row focused there is no editor in focus to match it against,
+      // and it used to move the menu to the first editor on the page instead of closing it.
+      btn("box-b").click();
+      shown(".pe-menu-item")[1].focus();
+      key({ altKey: true, code: "KeyT", key: "\\u2020" });
+      check("Alt+T on a focused row closes the menu", () => ok(!isOpen(), "it moved instead"));
+      await sleep(50);
+      // Moving the menu to the other editor redraws its rows, and the focused one with them.
+      btn("box-a").click();
+      shown(".pe-menu-item")[1].focus();
+      btn("box-b").click();
+      check("moving the menu keeps focus in it", () => ok(menu().contains(document.activeElement), "focus went to " + document.activeElement.tagName));
+      key({ key: "Escape" });
+      await sleep(100);
+      check("and Escape still finds its way back", () => {
+        ok(document.activeElement !== document.body, "focus fell to <body>");
+        ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
+      });
+
       const sent = [];
       chrome.runtime.sendMessage = (m) => sent.push(m);
       btn("box-a").click();
@@ -1827,7 +2929,126 @@ const suites = [
       check("the footer goes to Settings and shuts the menu", () => {
         eq(sent.map((m) => m.type).join(), "pe-open-options");
         ok(!isOpen(), "still open");
-      });`
+      });
+      check("on the Templates tab, which is what it said", () => eq(sent.map((m) => m.tab).join(), "templates"));
+
+      // The preview is how you tell two templates apart before you pick one, and it was grey
+      // #9ca3af on white: 2.5:1.
+      btn("box-a").click();
+      const bgOf = (n) => { for (; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") return c; } return "rgb(255, 255, 255)"; };
+      check("a row's preview is readable", () => {
+        const p = shown(".pe-menu-item-preview")[1];
+        const ratio = contrast(getComputedStyle(p).color, bgOf(p));
+        ok(ratio >= 4.5, "contrast " + ratio.toFixed(2));
+        // On the highlighted row as well, which is where the eye is when Enter is pressed.
+        const a = menu().querySelector(".pe-menu-active .pe-menu-item-preview");
+        if (a) ok(contrast(getComputedStyle(a).color, bgOf(a)) >= 4.5, "highlighted contrast " + contrast(getComputedStyle(a).color, bgOf(a)).toFixed(2));
+      });
+      key({ key: "Escape" });
+
+      // Replacing a selection with a template. The insert judged success by the text growing,
+      // so a template shorter than what it replaced looked like a failure and went in a second
+      // time by the next path down. Both paths are here: the editor that ignores the synthetic
+      // paste, and one that takes it the way ProseMirror does, replacing the selection.
+      const edA = document.getElementById("ed-a");
+      const replaceAll = () => {
+        edA.innerHTML = "<p>a long passage the template is meant to replace</p>";
+        edA.focus();
+        const r = document.createRange();
+        r.selectNodeContents(edA.firstChild);
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+        btn("box-a").click();
+        pick("Body only");
+      };
+      const times = () => edA.textContent.split("check").length - 1;
+      replaceAll();
+      check("a longer selection is replaced by the template once", () => eq(times(), 1, edA.innerHTML));
+      edA.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const r = getSelection().getRangeAt(0);
+        r.deleteContents();
+        const t = document.createElement("template");
+        t.innerHTML = e.clipboardData.getData("text/html");
+        r.insertNode(t.content);
+      });
+      replaceAll();
+      check("and through a paste", () => eq(times(), 1, edA.innerHTML));`
+  },
+  {
+    // Replacing a selection with exactly what it held leaves the document as it was, so no
+    // comparison of the document can see it worked — and the fallback put a second copy at the
+    // caret. What does change is the selection: it was a range, and the paste used it up.
+    name: "content · replacing a selection with the same text goes in once",
+    page: {
+      name: "ct-menu-same",
+      plane: PLANE + anchorBox("box-s", `<div class="ProseMirror" contenteditable="true" id="ed-s"><p>same</p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Same", title: "", content: "same" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-s");
+      ed.addEventListener("paste", (e) => {
+        e.preventDefault();
+        ed.innerHTML = "<p>same</p>";
+        const r = document.createRange();
+        r.selectNodeContents(ed.firstChild);
+        r.collapse(false);
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+      });
+      ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.firstChild);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("one copy, not two", () => eq(ed.textContent, "same"));`
+  },
+  {
+    // Text and element count alone cannot see where a paragraph ends: "ab|cd" replaced by
+    // "a|bcd" reads the same, and a paste that worked was taken for one that did not, so the
+    // template went in a second time by the next path down.
+    name: "content · an insert that only moves a paragraph boundary goes in once",
+    page: {
+      name: "ct-menu-boundary",
+      plane: PLANE + anchorBox("box-q", `<div class="ProseMirror" contenteditable="true" id="ed-q"><p>ab</p><p>cd</p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Split", title: "", content: "zz" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-q");
+      ed.addEventListener("paste", (e) => { e.preventDefault(); ed.innerHTML = "<p>a</p><p>bcd</p>"; });
+      ed.focus();
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("the paste counted, so nothing went in after it", () => eq(ed.innerHTML, "<p>a</p><p>bcd</p>"));`
+  },
+  {
+    // Whether a path inserted anything is judged by the text and the blocks, not by the markup
+    // at large. Tiptap's placeholder moves a class and an attribute around as the caret moves,
+    // and an editor that ignored the synthetic paste but redecorated on it read as "inserted"
+    // when nothing had been — the template simply never arrived.
+    name: "content · an editor that only redecorates on paste still gets the template",
+    page: {
+      name: "ct-menu-placeholder",
+      plane: PLANE + anchorBox("box-p", `<div class="ProseMirror" contenteditable="true" id="ed-p"><p class="is-empty" data-placeholder="Add a description"><br></p></div>`),
+      seed: seedOf({ allDomains: true, templates: [{ id: "t1", name: "Body only", title: "", content: "- [ ] check" }] })
+    },
+    body: `
+      await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
+      const ed = document.getElementById("ed-p");
+      // A class moved and a widget drawn — a gap cursor, a collaborator's caret — which is all
+      // an editor that ignored the paste may have done in answer to it.
+      ed.addEventListener("paste", () => {
+        ed.firstElementChild.classList.toggle("is-focused");
+        ed.insertAdjacentHTML("beforeend", '<div contenteditable="false" class="widget"><span></span></div>');
+      });
+      ed.focus();
+      document.querySelector(".pe-body-tmpl-btn").click();
+      document.querySelector("#pe-tmpl-menu .pe-menu-item").click();
+      check("the template is in the editor", () => ok(ed.textContent.indexOf("check") > -1, ed.innerHTML));`
   },
   {
     // The value-level half of this lives in test.js; what only a browser can prove is the
@@ -3414,6 +4635,22 @@ const suites = [
       });`
   },
   {
+    // A sync lands while the copy menu is open. The handler redrew "the menu", which was the
+    // template list: the formats were replaced under the reader's cursor.
+    name: "content · a sync under the copy menu leaves the copy menu",
+    page: { name: "browse/PROJ-143", plane: PLANE + ANCHOR_EDITOR, seed: seedOf({ allDomains: true }) },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await waitFor(() => document.querySelector(".pe-copy-ref-btn"), "the copy button");
+      document.querySelector(".pe-copy-ref-btn").click();
+      const menu = () => document.getElementById("pe-tmpl-menu");
+      await waitFor(() => menu() && menu().style.display === "block", "the copy menu");
+      const titles = () => [...menu().querySelectorAll(".pe-menu-item-title")].map((t) => t.textContent).join("|");
+      const before = titles();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("the copy menu still lists the formats", () => eq(titles(), before));`
+  },
+  {
     // The feature end to end, in the script that performs it. allDomains rather than a host,
     // because a file:// page has no hostname to match; schema 6 because that is how the
     // presets reach an existing install, and this asserts what they do once they arrive.
@@ -3575,6 +4812,14 @@ const suites = [
         const t = toasts().join(" | ");
         ok(t.indexOf("Focus mode on") > -1, "toast: " + t);
         ok(t.indexOf("Alt+Shift+F") > -1, "and it names the shortcut: " + t);
+      });
+      // A toast is a div that appears and fades; nothing tells a screen reader it was there.
+      await waitFor(() => ((document.getElementById("pe-live") || {}).textContent || "").indexOf("Focus mode on") > -1, "the toast to be announced");
+      check("and a screen reader hears it", () => {
+        const live = document.getElementById("pe-live");
+        ok(live, "no live region");
+        eq(live.getAttribute("aria-live"), "polite");
+        ok(live.textContent.indexOf("Focus mode on") > -1, live.textContent);
       });
       check("the tab remembers, so a reload lands in the same place", () => eq(stored(), "1"));
       const state = await send({ type: "pe-focus-state" });

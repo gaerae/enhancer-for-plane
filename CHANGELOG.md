@@ -10,7 +10,7 @@ first read, never rewritten by hand.
 
 ---
 
-## v1.13.0 — 2026-11-09
+## v1.13.0 — 2026-11-10
 
 Schema 9: the two description presets below are appended to existing settings. Nothing you
 deleted comes back, and no permission changes.
@@ -55,7 +55,9 @@ deleted comes back, and no permission changes.
   the empty rows from the form and handed back access to removed sites, so the rows below
   edited the wrong template. It now writes a copy and touches nothing until storage takes it.
 - **Arrow keys and Enter work in the template and copy menus.** The first row is
-  highlighted when a menu opens, and the caret stays in the editor.
+  highlighted when a menu opens, and the caret stays in the editor. A template sync landing
+  while the menu is open keeps the highlighted row and what you typed in the filter, and no
+  longer swaps an open copy menu for the template list.
 - **A new copy format or quick link gets the caret** instead of the template list.
 - **A key sent to a quick link that still has a blank opens Settings**, as the address bar
   does, instead of doing nothing.
@@ -68,13 +70,16 @@ deleted comes back, and no permission changes.
 - **A rule picked while Settings has unsaved edits survives the save.** The picker's rule was
   announced and then overwritten by the page's older list on Save. A deleted row, an import or
   **Restore defaults** not yet saved is no longer replaced by a change from elsewhere either.
+- **What you type while Save waits for Chrome's permission prompt is kept.** It used to be
+  dropped from the form under "Saved."; it now stays on screen, marked as not saved yet.
 - **Editing a template source's URL drops the old file's templates.** They used to stay in the
   menu under the new name until the new URL was fetched — up to six hours, or for good if that
   failed. A new URL is fetched on the next run.
 - **A variable Save cannot keep stops the save** and says which one. A Korean name or a second
   `team` used to be dropped with "Saved." on screen.
-- **Adding a template source switches sync on**, and **Sync now** says so when it is off, where it
-  used to report "Synced 0 source(s)".
+- **Adding the first template source switches sync on**, and **Sync now** says so when it is
+  off, where it used to report "Synced 0 source(s)". Sync you switched off stays off, and
+  deleting that first row again switches it back.
 - **Settings asks before closing with unsaved edits**, keeps an error on screen until it is dealt
   with, and keeps your place in the source list when a sync lands while you type.
 - **A failed template source says why in your language.** Korean used to read
@@ -84,7 +89,8 @@ deleted comes back, and no permission changes.
   links, copy formats and sources — and every switch and box has a name a screen reader can read.
 - **The template menu's previews are readable** (2.5:1 contrast before), and the row the arrow
   keys reach, like every toast, is announced to a screen reader.
-- **Quick add points at a preset already in the list** instead of adding it twice.
+- **Quick add points at a preset already in the list** instead of adding it twice, and switches
+  it back on if it was off.
 - The sync card no longer claims to check when Settings opens; it checks on Save and **Sync now**.
 
 ### Internal
