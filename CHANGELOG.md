@@ -29,6 +29,23 @@ deleted comes back, and no permission changes.
   once. Only the ids are kept, on this device; **Restore defaults** clears them on the save
   that follows.
 
+### Improved
+- **Settings say what each card does, and keep the rest behind More.** Every card leads with
+  at most four lines; tokens, edge cases and the reasons a shortcut cannot be rebound open
+  from a **More** under it. A filled field keeps a label beside it (**Open**, **Search**,
+  **Name**, **Title**, **Body**), where a placeholder used to vanish the moment you typed.
+  The Template sync switch no longer reads "Enabled" for the whole extension in Korean.
+
+### Fixed
+- **A new install gets every default style rule.** Since v1.7.0 a fresh install was missing
+  the module-name and search-dropdown width presets, because empty storage was read as a
+  first-generation install. An existing install is left as it is: once settings have been
+  saved, a preset that never arrived cannot be told from one you deleted. Add either back
+  from **Quick add** in Settings ▸ Appearance.
+- **A domain pasted as an address works.** `https://plane.acme.com/` or
+  `plane.acme.com:8080` in Settings ▸ Sites saved without complaint and then ran nowhere.
+  It now counts as its hostname, and the box shows the hostname once you leave it.
+
 ### Internal
 - **Publishing a release sends it to the Chrome Web Store.** `store.yml` uploads the
   release's zip and submits it for review, signing in to Google with the run's GitHub
