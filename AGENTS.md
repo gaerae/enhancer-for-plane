@@ -587,6 +587,14 @@ lies:
   width and reads as a mistake. `test.js` holds both, and the harness measures that the sentence
   after a break actually starts a new line — only the stylesheet decides that, and the source
   looks identical either way.
+- **A settings card says what it does, and the rest waits behind "More".** The page once carried
+  4,400 Korean characters of description, and the complaint was not that any of it was wrong: it
+  read as a page of text, and what each card was *for* got lost in how it worked. So a card leads
+  with at most four lines, the tokens, edge cases and reasons go in a closed `<details class="more">`,
+  and a filled field keeps a visible label (`.fld`) because a placeholder vanishes the moment it
+  matters. `test.js` counts the lead per card; when it fails, move a sentence, do not raise the cap.
+  Why something cannot be done is the first thing to move there — the Shortcuts tab spent five
+  open paragraphs on it.
 - **One shortcut, one spelling.** `Alt+Shift+F` was written for macOS as `⌥⇧F` in eleven
   places while the Windows form kept its plus signs, and three settings cards marked a
   keystroke up three ways (`<kbd>`, `<b>`, `<code>`). Both are now rules in `test.js`: a

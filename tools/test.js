@@ -1765,7 +1765,7 @@ test("selection: the card states the cap the code enforces, in both locales", ()
   const ctx = loadCommon();
   for (const lang of ["en", "ko"]) {
     const msg = JSON.parse(read("_locales/" + lang + "/messages.json"));
-    ok(msg.optQuickDesc.message.indexOf(String(ctx.__MAX_SELECTION_KEYS)) > -1, lang + " does not state the cap");
+    ok(msg.optQuickMore.message.indexOf(String(ctx.__MAX_SELECTION_KEYS)) > -1, lang + " does not state the cap");
   }
 });
 
@@ -3226,6 +3226,31 @@ test("i18n: a message with a line break is only used where a break renders", () 
 // Second: a break belongs at the end of a sentence, not wherever a line got long. This is what
 // stops the convention from decaying into hand-wrapped text, which would re-wrap at every window
 // width and look like a mistake.
+// Settings once carried 4,400 Korean characters of description, and the complaint was not that
+// any one paragraph was wrong: it was that every card explained everything it could, so the page
+// read as text and the controls were the last thing anyone found. A card now leads with what it
+// does and puts the rest in a closed "More". This holds the lead to that: what a card shows before
+// anything is opened, counted in sentences (one per line, as the copy is written).
+test("settings: what a card shows before More is opened stays short", () => {
+  const MAX_LINES = 4;
+  const html = read("options.html").replace(/<details[\s\S]*?<\/details>/g, "");
+  const cards = html.split('<section class="card">').slice(1);
+  ok(cards.length >= 10, "found " + cards.length + " cards");
+  const bad = [];
+  for (const loc of ["en", "ko"]) {
+    const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
+    for (const card of cards) {
+      const title = (/data-i18n="(opt\w+Title)"/.exec(card) || [])[1];
+      let lines = 0;
+      for (const m of card.matchAll(/<p class="desc"[^>]*data-i18n(?:-html)?="(\w+)"/g)) {
+        lines += String(cat[m[1]].message).split("\n").length;
+      }
+      if (lines > MAX_LINES) bad.push(`${loc}/${title}: ${lines} lines`);
+    }
+  }
+  eq(bad, [], "a card's lead grew past " + MAX_LINES + " lines; move the rest into its More");
+});
+
 test("i18n: every line break sits at the end of a sentence", () => {
   const bad = [];
   for (const loc of ["en", "ko"]) {

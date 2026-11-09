@@ -43,7 +43,7 @@
     "message": "Active domains"
   },
   "optDomainsDesc": {
-    "message": "Runs only on the domains listed below.\nOne per line.\nWildcards like <code>*.example.com</code> are supported.\nSaving prompts Chrome to grant access to each newly added domain."
+    "message": "The extension runs only on these domains, one per line.\n<code>*.example.com</code> covers every subdomain, and a pasted address is cut down to its hostname.\nSaving asks Chrome for access to each new one."
   },
   "optDomainsAll": {
     "message": "Run on all sites (ignore the list below)"
@@ -55,13 +55,7 @@
     "message": "Focus mode"
   },
   "optFocusDesc": {
-    "message": "A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it.\nTwo ship ready to use: hide a work item's properties panel, and hide the left navigation.\nA third caps the reading width and starts switched off."
-  },
-  "optFocusHow": {
-    "message": "Three ways in: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> (macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), the toggle beside a work item's key, and the switch in the toolbar popup.\nTo rebind the shortcut, open <code>chrome://extensions/shortcuts</code>."
-  },
-  "optFocusScope": {
-    "message": "It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab.\nIt never syncs to your other devices."
+    "message": "Hides what you do not need while you read or write a work item.\nTurn it on with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> (macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), the toggle beside the item's key, or the popup switch.\nIt switches on the rules below marked <b>“Only while focus mode is on”</b>."
   },
   "optRulesTitle": {
     "message": "Style rules",
@@ -71,7 +65,7 @@
     "message": "＋ Add rule"
   },
   "optRulesDesc": {
-    "message": "Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>).\nIf Plane's class names change, just edit the selector.\nType the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
+    "message": "Changes how a page looks: a CSS selector, a property and a value, applied with <code>!important</code>.\nType the value with its unit, such as <code>320px</code>.\nIf Plane renames a class, edit the selector."
   },
   "optRulesEmpty": {
     "message": "No rules yet. Click “Add rule” to start."
@@ -115,7 +109,11 @@
   "optRuleHealthOk": {
     "message": "Last applied $TIME$",
     "description": "Beside a rule that is working. An absolute time, like the sync status uses — a redesign shows up as one stale date beside rules that all read today.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optRuleHealthCold": {
     "message": "Has never matched anything yet",
@@ -124,37 +122,71 @@
   "optRuleHealthWarn": {
     "message": "Never matched anything yet: $COUNT$ of these rules. Plane's markup may have changed — edit the selector, or pick the element again.",
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorOk": {
     "message": "Template button last placed $TIME$",
     "description": "In the templates card, when the button has found a description toolbar to sit on. Same shape as optRuleHealthOk.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorCold": {
     "message": "The Template button has not found a toolbar to sit on yet, on $COUNT$ work item pages. Plane's layout may have changed.",
     "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorLost": {
     "message": "The Template button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
     "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
-    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
   },
   "optCopyAnchorOk": {
     "message": "Copy button last placed $TIME$",
     "description": "In the copy reference card, when the button has found a work item header to sit beside.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optCopyAnchorCold": {
     "message": "The copy button has not found a work item header yet, on $COUNT$ work item pages. Plane's layout may have changed.",
     "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optCopyAnchorLost": {
     "message": "The copy button was last placed $TIME$, and has not been on the last $COUNT$ work item pages. Plane's layout may have changed.",
     "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
-    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
   },
   "optRuleLabelPh": {
     "message": "Description (e.g. Module name width)"
@@ -175,22 +207,13 @@
     "message": "＋ Add template"
   },
   "optTplDesc1": {
-    "message": "Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together.\nThe title is optional."
-  },
-  "optTplDesc2": {
-    "message": "The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>."
-  },
-  "optTplDesc3": {
-    "message": "Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>.\nShortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description."
+    "message": "Fills a work item's title and description in one go, from the <b>“Template”</b> button beside “Attach” in the description toolbar, or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> while you type."
   },
   "optTplEmpty": {
     "message": "No templates yet. Click “Add template” to start."
   },
   "optTplShare": {
     "message": "↓ Share with your team…"
-  },
-  "optTplShareDesc": {
-    "message": "<b>Share with your team</b> saves your own templates as a file your teammates can subscribe to.\nHost it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below.\nTemplates you received from a source are not included."
   },
   "optTplNamePh": {
     "message": "Template name (e.g. 🐞 Bug report)"
@@ -208,10 +231,7 @@
     "message": "＋ Add variable"
   },
   "optVarsDesc": {
-    "message": "Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>.\nA synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it."
-  },
-  "optVarsUndefined": {
-    "message": "The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>.\nA variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string."
+    "message": "Your own values for <code>{{var.name}}</code>, in your templates and synced ones alike.\nA synced template that says <code>{{var.team}}</code> fills in each person's own value."
   },
   "optVarsEmpty": {
     "message": "No variables yet. Click “Add variable” to start."
@@ -248,13 +268,10 @@
     "message": "Template sync"
   },
   "optSyncDesc": {
-    "message": "Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page.\nSynced templates are <b>read-only</b> — edit them at the source.\nHost the file on the <b>same domain as Plane</b> to avoid a separate access prompt."
-  },
-  "optSyncFormat": {
-    "message": "File format"
+    "message": "Pulls shared templates from a URL and keeps them up to date.\nThey are read-only here.\nEdit them at the source."
   },
   "optSyncFormatDesc": {
-    "message": "A flat list; each item carries its own <code>group</code> string.\nThe top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank."
+    "message": "Checked when the browser starts, on each source's schedule, and when this page opens.\nA file on the same domain as Plane needs no separate access prompt.\nThe file is a flat list of templates, each with its own <code>group</code>.\nThe top-level <code>name</code> is used when a source's name is left blank."
   },
   "optSyncEmpty": {
     "message": "No sources yet. Click “Add source”."
@@ -294,10 +311,10 @@
     "message": "Backup"
   },
   "optBackupDesc1": {
-    "message": "Export all settings (domains, style rules, templates, <b>variables</b>, <b>sync source URLs</b>, and <b>quick open links</b>) to a JSON file, or import a previously exported file.\nImported settings load into the form — review, then <b>Save</b> to apply."
+    "message": "Export every setting to a JSON file, or import one.\nAn import fills the form, and applies when you <b>Save</b>."
   },
   "optBackupDesc2": {
-    "message": "The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal.\nSynced templates are <b>not</b> included: they re-download from their source after you Save."
+    "message": "The file holds your domains, source addresses and variable values in plain text, so if any of them is private, keep the file internal.\nSynced templates are not in it: they download again from their source after you Save."
   },
   "optBackupExport": {
     "message": "↓ Export JSON"
@@ -496,7 +513,11 @@
   "msgKeptDomains": {
     "message": "Saved — and kept $SITES$, which was switched on elsewhere while this page was open.",
     "description": "Shown instead of \"Saved\" when the save carried across a domain enabled from the popup or another tab that this page had never displayed. Worth its own message: the alternative was that site quietly going dark, with nothing to connect it to this save.",
-    "placeholders": { "sites": { "content": "$1" } }
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
   },
   "msgResetConfirm": {
     "message": "Reset every setting to its default — including the list of sites this runs on, which empties.\nThe work items you opened recently or pinned are forgotten too.\nNothing changes until you press Save. When you do, Chrome's access to those sites is handed back as well, so switching one on again means approving it again.\nContinue?"
@@ -713,14 +734,30 @@
     "message": "May not last — generated by the build",
     "description": "Heading over the demoted picker candidates: hashes, uuids, counters. Still pickable — this is a guess about someone else's markup."
   },
-  "pickKindId": { "message": "id" },
-  "pickKindIdPrefix": { "message": "id prefix" },
-  "pickKindData": { "message": "data attribute" },
-  "pickKindLabel": { "message": "label" },
-  "pickKindRole": { "message": "role" },
-  "pickKindClass": { "message": "class" },
-  "pickKindTagClasses": { "message": "tag + classes" },
-  "pickKindPath": { "message": "position" },
+  "pickKindId": {
+    "message": "id"
+  },
+  "pickKindIdPrefix": {
+    "message": "id prefix"
+  },
+  "pickKindData": {
+    "message": "data attribute"
+  },
+  "pickKindLabel": {
+    "message": "label"
+  },
+  "pickKindRole": {
+    "message": "role"
+  },
+  "pickKindClass": {
+    "message": "class"
+  },
+  "pickKindTagClasses": {
+    "message": "tag + classes"
+  },
+  "pickKindPath": {
+    "message": "position"
+  },
   "pickMatches": {
     "message": "matches $COUNT$",
     "placeholders": {
@@ -750,10 +787,10 @@
     "message": "＋ Add format"
   },
   "optCopyDesc": {
-    "message": "On a work item — its own page, or the panel a list opens — the button beside its ID (or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>) copies that item to your clipboard in one of the formats below.\nUse it to hand a work item to a chat message, a pull request, or a branch name."
+    "message": "The button beside a work item's key, or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>, copies the item in one of these formats.\nThe line under each format is exactly what gets copied."
   },
   "optCopyTokens": {
-    "message": "Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>.\nEverything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard."
+    "message": "Three values are filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>.\nEverything else is copied exactly as typed."
   },
   "optCopyEmpty": {
     "message": "No formats yet. Click “Add format” to start."
@@ -893,7 +930,7 @@
     "message": "Keyboard shortcuts"
   },
   "optKeysDesc": {
-    "message": "Everything the keyboard reaches, in one place.\nOn macOS, <kbd>Alt</kbd> is <kbd>⌥</kbd> Option."
+    "message": "On macOS, <kbd>Alt</kbd> is the <kbd>⌥</kbd> Option key."
   },
   "optKeysColWhat": {
     "message": "Does"
@@ -946,30 +983,13 @@
     "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
   },
   "optKeysRebind": {
-    "message": "Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The two <kbd>Alt</kbd> shortcuts are handled inside the page and are fixed."
-  },
-  "optKeysKeyword": {
-    "message": "<kbd>issue</kbd> is fixed as well, for a different reason: an extension declares its address-bar keyword in its manifest and there is no API to change it.\nChrome lists it under <code>chrome://settings/searchEngines</code> → Extensions, but offers only <b>Manage</b> and <b>Deactivate</b> there — no rename.",
-    "description": "Answers a question asked directly: the omnibox keyword looks like a setting because Chrome lists it among the search engines. Verified on Chrome 151 — the row's menu has Manage and Deactivate and nothing else."
-  },
-  "optKeysKeywordDiy": {
-    "message": "If you want a shorter one, add your own on that same page under <b>Site search</b>: any keyword you like, pointing at <code>https://your-plane/your-workspace/browse/%s</code>.\nThat is Chrome's own feature, not this extension's, so it opens one fixed address — no prefix routing to a second tracker, no recent items, and no falling back to a search when what you typed is not a key.",
-    "description": "The thing you can actually do instead, with its limits stated. A Chrome site-search shortcut is one URL: it skips the prefix routing, the recents and the search fallback, and saying so is the difference between an alternative and a disappointment."
-  },
-  "optKeysWhyTyping": {
-    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type.\n<kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives."
-  },
-  "optKeysWhyCommand": {
-    "message": "Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key."
+    "message": "Only the focus mode shortcut can be changed, at <code>chrome://extensions/shortcuts</code>."
   },
   "optQuickTitle": {
     "message": "Quick open"
   },
   "optQuickDesc": {
-    "message": "In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it.\nThe key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default.\nIt is on the toolbar popup too, and both places offer the items you opened last, so a key you cannot remember is usually already on screen.\nA key almost never arrives on its own — it arrives inside a sentence. Select it anywhere, right-click, and choose <b>“Open work items from selection”</b>. Several keys open in their own tabs, up to 10 at a time.\nChrome hands over the selected text and nothing else; the page is never read."
-  },
-  "optQuickTokens": {
-    "message": "Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nA URL with no <code>{{key}}</code> gets the key appended to the end.\nThe second line is optional: give it a search URL with <code>{{q}}</code> and typing words instead of a key goes there. Give it the page, not the <code>/api/</code> address behind it — and note that some trackers only pre-fill the box rather than run the search.\nThe lines under each row show where a sample key and a sample phrase would land."
+    "message": "Type <code>issue</code>, a space and a work item key such as <code>PROJ-123</code> in the address bar, and Enter opens it.\nThe toolbar popup does the same, and so does “Open work items from selection” when you right-click selected text."
   },
   "optQuickEmpty": {
     "message": "No quick links yet. Click “Add quick link”."
@@ -979,7 +999,7 @@
     "description": "Label over the paste box at the top of the quick-link chooser. The examples can only cover trackers we thought of; the reader already has theirs open."
   },
   "optQuickPastePlaceholder": {
-    "message": "https://\u2026/browse/PROJ-123",
+    "message": "https://…/browse/PROJ-123",
     "description": "Placeholder in the paste box. An address shaped like the ones it reads, rather than a sentence."
   },
   "optQuickPasteGo": {
@@ -989,35 +1009,55 @@
   "optQuickPasteKnown": {
     "message": "Read as $NAME$. The search address is filled in too.",
     "description": "Shown when a pasted address matched one of the known shapes, so nothing is left to type.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteKnownNoSearch": {
     "message": "Read as $NAME$, which has no address you can search from.",
-    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL \u2014 Linear.",
-    "placeholders": { "name": { "content": "$1" } }
+    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL — Linear.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteGuess": {
     "message": "Not a tracker we know — built from where the key sits in $NAME$'s address. No search address.",
     "description": "Shown when no known shape matched but a key-shaped path segment was found. Says plainly which part is a guess.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteGuessNumbered": {
     "message": "Not a tracker we know, and its items are numbered ($NAME$) — choose a prefix to type before the number, like RM-1234.",
     "description": "The numbered variant of optQuickPasteGuess. A bare number is not a key, so this one leaves the prefix field to fill.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteUnread": {
     "message": "No item key found in that address. Open a work item and copy its address, or pick an example below.",
     "description": "Shown when the pasted text yields nothing. Refusing matters: a template built from a page that is not a work item opens the wrong address forever, silently."
   },
   "optQuickExamplesLegend": {
-    "message": "\u27e8\u2026\u27e9 is yours to fill in. {{key}} is filled in by the extension.",
+    "message": "⟨…⟩ is yours to fill in. {{key}} is filled in by the extension.",
     "description": "One line at the top of the chooser. The two look alike and mean opposite things, and nothing said so."
   },
   "optQuickExampleSearchLine": {
     "message": "Search: $URL$",
     "description": "The second address on a chooser row. Picking a row fills two fields and the panel was showing one.",
-    "placeholders": { "url": { "content": "$1" } }
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickExamplesFromSites": {
     "message": "From a site you already added",
@@ -1040,13 +1080,27 @@
   "optQuickExampleNoteNumbered": {
     "message": "Issues are numbered, not keyed — type the prefix and the number, e.g. GH-1234."
   },
-  "optQuickPartHost": { "message": "host" },
-  "optQuickPartWorkspace": { "message": "workspace" },
-  "optQuickPartSite": { "message": "site" },
-  "optQuickPartOwner": { "message": "owner" },
-  "optQuickPartRepo": { "message": "repo" },
-  "optQuickPartGroup": { "message": "group" },
-  "optQuickPartProject": { "message": "project" },
+  "optQuickPartHost": {
+    "message": "host"
+  },
+  "optQuickPartWorkspace": {
+    "message": "workspace"
+  },
+  "optQuickPartSite": {
+    "message": "site"
+  },
+  "optQuickPartOwner": {
+    "message": "owner"
+  },
+  "optQuickPartRepo": {
+    "message": "repo"
+  },
+  "optQuickPartGroup": {
+    "message": "group"
+  },
+  "optQuickPartProject": {
+    "message": "project"
+  },
   "optQuickNamePh": {
     "message": "name (e.g. Jira)"
   },
@@ -1068,7 +1122,14 @@
   "optQuickSearchPreview": {
     "message": "“$Q$” → $URL$",
     "description": "Layout only — a phrase, an arrow, the URL it lands on. No words to translate.",
-    "placeholders": { "q": { "content": "$1" }, "url": { "content": "$2" } }
+    "placeholders": {
+      "q": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
+    }
   },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
@@ -1118,12 +1179,20 @@
   "popPinFull": {
     "message": "Up to $MAX$ items can be pinned",
     "description": "Tooltip and accessible name for the pin button when the list is full and the button is disabled. The button itself shows the count. Plain text.",
-    "placeholders": { "max": { "content": "$1" } }
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "popPinRemove": {
     "message": "Unpin $KEY$",
     "description": "Tooltip and accessible name for the × on a pinned row. Plain text: a title, not a pre-line sink.",
-    "placeholders": { "key": { "content": "$1" } }
+    "placeholders": {
+      "key": {
+        "content": "$1"
+      }
+    }
   },
   "popJumpAuto": {
     "message": "Auto"
@@ -1135,12 +1204,26 @@
   "omniboxSearch": {
     "message": "Search · $NAME$ · “$Q$”",
     "description": "Omnibox row when what was typed is words rather than a key.",
-    "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "q": {
+        "content": "$2"
+      }
+    }
   },
   "omniboxRecent": {
     "message": "Recent · $KEY$ · $NAME$",
     "description": "Omnibox row for a key opened before. The leading word is the only thing that distinguishes these from Chrome's own history rows: the omnibox API offers no per-row icon, so a label is all there is.",
-    "placeholders": { "key": { "content": "$1" }, "name": { "content": "$2" } }
+    "placeholders": {
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
+    }
   },
   "omniboxHint": {
     "message": "Type a work item key to open it, or words to search"
@@ -1158,5 +1241,53 @@
         "content": "$2"
       }
     }
+  },
+  "optQuickMore": {
+    "message": "The key's prefix picks the link, so <code>ENG-</code> can go to Linear while the rest stays on Plane.\nThe link with an empty prefix takes every other key.\nIn the address, <code>{{key}}</code> is where the key goes, and <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves.\nThe search address is optional: with <code>{{q}}</code> in it, words that are not a key are searched there.\nA selection can hold several keys, and each opens in its own tab, up to 10 at once.",
+    "description": "Settings › Quick open, inside More. One sentence per line."
+  },
+  "optTplMore": {
+    "message": "The body is Markdown: <code>##</code> headings, <code>-</code> and <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code> and <code>`code`</code>.\nFilled in on insert: <code>{{date}}</code>, <code>{{date+7}}</code> or any other number of days, <code>{{week}}</code> for Monday to Sunday, <code>{{month}}</code>, and your own <code>{{var.name}}</code>.\n<b>Share with your team</b> saves your own templates as a file.\nPut it anywhere your teammates can reach over <code>https</code>, and they add that address under <b>Template sync</b>.",
+    "description": "Settings › Body templates, inside More."
+  },
+  "optFocusMore": {
+    "message": "Hiding the properties panel and hiding the left navigation are on from the start, and a reading-width rule ships switched off.\nFocus mode lasts for the tab you turned it on in, survives a reload, and ends when you close the tab.\nIt never syncs to your other devices.\nTo rebind the shortcut, open <code>chrome://extensions/shortcuts</code>.",
+    "description": "Settings › Focus mode, inside More."
+  },
+  "optKeysWhyTitle": {
+    "message": "Why can't the others be changed?",
+    "description": "Summary of a disclosure on the Shortcuts tab."
+  },
+  "optKeysWhy": {
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd> and <kbd>Alt</kbd>+<kbd>C</kbd> are handled inside the page, where Chrome offers no way to rebind them.\n<kbd>Alt</kbd>+<kbd>C</kbd> does nothing while you type, because on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”.\nChrome has no way to rename the <kbd>issue</kbd> keyword either.\nFor a shorter one, add your own under <b>Site search</b> at <code>chrome://settings/searchEngines</code>, pointing at <code>https://your-plane/your-workspace/browse/%s</code>.\nThat opens one fixed address: no prefixes, no recent items and no search.",
+    "description": "Inside the disclosure on the Shortcuts tab. One sentence per line."
+  },
+  "optMore": {
+    "message": "More",
+    "description": "Summary of the collapsed details under a settings card's description."
+  },
+  "optFieldOpen": {
+    "message": "Open",
+    "description": "Short label beside a quick link's address field."
+  },
+  "optFieldSearch": {
+    "message": "Search",
+    "description": "Short label beside a quick link's search address field."
+  },
+  "optFieldTitle": {
+    "message": "Title",
+    "description": "Short label beside a template's title field."
+  },
+  "optFieldBody": {
+    "message": "Body",
+    "description": "Short label beside a template's body field."
+  },
+  "optFieldName": {
+    "message": "Name",
+    "description": "Short label beside a template's name field."
+  },
+  "optSyncEnabled": {
+    "message": "Enabled",
+    "description": "Beside the Template sync card's own switch. Not optEnabled: that one names the whole extension in Korean."
   }
 }
