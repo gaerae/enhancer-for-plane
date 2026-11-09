@@ -973,6 +973,12 @@
     el.domains.addEventListener("input", () => {
       state.domains = el.domains.value.split("\n").map((s) => s.trim()).filter(Boolean);
     });
+    // Rewritten on leaving the box, never while typing: a pasted address shows as the hostname
+    // that will be used, and the caret is not yanked mid-word by a rewrite on every keystroke.
+    el.domains.addEventListener("change", () => {
+      state.domains = state.domains.map(peNormalizeDomain).filter(Boolean);
+      el.domains.value = state.domains.join("\n");
+    });
 
     el.addRule.addEventListener("click", () => addRule({ label: "", selector: "", property: "max-width", value: "" }));
 

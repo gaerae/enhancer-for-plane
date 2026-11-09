@@ -42,6 +42,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__DEFAULTS = PE_DEFAULTS;" +
   "\n;globalThis.__LIMITS = PE_SYNC_LIMITS;" +
   "\n;globalThis.__SCHEMA = PE_SCHEMA;" +
+  "\n;globalThis.PE_STORAGE_KEY = PE_STORAGE_KEY;" +
   "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
   "\n;globalThis.__V7_DROPDOWN_SELECTOR = PE_V7_DROPDOWN_SELECTOR;" +
   "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
@@ -2844,6 +2845,38 @@ test("description: a fresh install and an upgraded one get the same presets", ()
   eq(pick(ctx.__DEFAULTS.rules), ctx.peDescriptionPresetRules(), "fresh");
   eq(pick(ctx.peMigrate({ schema: 8, rules: [] }).rules), ctx.peDescriptionPresetRules(), "from v8");
   eq(pick(ctx.peMigrate({ widths: { moduleName: { px: 320 } } }).rules), ctx.peDescriptionPresetRules(), "from the oldest shape");
+});
+
+// The three tests above compare PE_DEFAULTS against the migration, and every one of them passed
+// while a new install got neither width preset: an empty storage read went through peMigrate as
+// "schema 1", came out with `rules` holding only the appended presets, and peDeepMerge does not
+// backfill an array that is present. Asserted against the assembler, which is what every
+// surface actually reads.
+test("a fresh install is assembled with every default rule", () => {
+  const ctx = loadCommon();
+  const ids = (s) => s.rules.map((r) => r.id);
+  eq(ids(ctx.peAssembleSettings({})), ids(ctx.__DEFAULTS), "empty sync storage");
+  eq(ids(ctx.peAssembleSettings({ [ctx.PE_STORAGE_KEY]: {} })), ids(ctx.__DEFAULTS), "an empty core item");
+  ok(ids(ctx.__DEFAULTS).indexOf("rule-module-name") > -1, "and the width presets are among them");
+});
+
+// A domain line is a hostname, and the natural thing to paste is the address bar: scheme, port
+// and all. Those lines used to save with "Saved." and then do nothing anywhere — no grant asked
+// for, no script registered, no banner — because the pattern builder skipped what it could not
+// read and the matcher compared it to a bare host. Self-hosted Plane on a port is exactly who
+// pastes one. A match pattern ignores the port, so dropping it loses nothing.
+test("domains: a pasted address works the same as the hostname it names", () => {
+  const ctx = loadCommon();
+  for (const line of ["https://Plane.Acme.com/", "plane.acme.com:8080", "http://plane.acme.com:8080/acme/projects/", " plane.acme.com/ "]) {
+    eq(ctx.peNormalizeDomain(line), "plane.acme.com", JSON.stringify(line));
+    eq(ctx.peOriginPatterns({ domains: [line] }), ["*://plane.acme.com/*"], "pattern for " + JSON.stringify(line));
+    ok(ctx.peDomainMatches([line], "plane.acme.com"), "matches for " + JSON.stringify(line));
+  }
+  eq(ctx.peNormalizeDomain("*.acme.com"), "*.acme.com", "a wildcard is left alone");
+  eq(ctx.peNormalizeDomain("https://*.acme.com/"), "*.acme.com", "and so is one pasted with a scheme");
+  eq(ctx.peNormalizeDomain("not a domain"), "not a domain", "what it cannot read is returned as typed, to be refused later");
+  eq(ctx.peOriginPatterns({ domains: ["not a domain"] }), [], "and refused");
+  eq(ctx.peSanitizeSettings({ domains: ["https://plane.acme.com:8080/x"] }).domains, ["plane.acme.com"], "an import is cleaned the same way");
 });
 
 test("description: the presets are always on, and switched on", () => {
