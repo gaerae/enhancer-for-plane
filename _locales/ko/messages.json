@@ -87,6 +87,14 @@
   "optPresetDropdown": {
     "message": "검색 드롭다운 폭"
   },
+  "optPresetDescFull": {
+    "message": "작업 항목 설명: 잘리지 않게 전부 보이기",
+    "description": "Plane clips a long description behind a Show all toggle; this preset undoes the clipping."
+  },
+  "optPresetDescToggle": {
+    "message": "작업 항목 설명: 흐림 효과와 모두 보기 버튼 숨기기",
+    "description": "Show all is Plane's own label for that toggle (모두 보기 in Plane's Korean UI)."
+  },
   "optPresetFocusProps": {
     "message": "집중: 작업 항목 속성 패널 숨기기"
   },

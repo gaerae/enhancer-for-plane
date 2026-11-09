@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 8;
+const PE_SCHEMA = 9;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -286,6 +286,43 @@ const PE_V7_FOCUS_SELECTORS = {
   "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"
 };
 const PE_V7_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
+
+// Plane's "Show all". Since makeplane/plane efa46d284 (2026-11-02), a work item description
+// taller than 140px is clipped to that height behind a fade and a toggle, on the item's own
+// page and in the peek panel, every time the item opens. People asked Plane for a way to keep
+// it open (makeplane/plane#10196) and there is none, so it is ours to add.
+//
+// The component calls itself presentational — the description is always mounted, cut off by
+// an inline `height` that a rule's !important outranks — so this is CSS, not a click on
+// Plane's toggle. Its handles are the ones it writes for its own sake rather than for
+// styling: the clipping box carries an inline height only while it clips, and the toggle
+// right after it is a button with aria-expanded and aria-controls. The editor inside is what
+// keeps this to work items: the same component clips a cycle's description, a plain
+// textarea, which is not what the preset's name promises. The fade is the box's second child.
+// Self-hosted 1.4.3 does not have the component at all, so there the presets match nothing.
+const PE_DESCRIPTION_BOX = 'div.relative[style*="height"]:has(.ProseMirror)';
+const PE_DESCRIPTION_TOGGLE = "button[aria-expanded][aria-controls]";
+
+function peDescriptionPresetRules() {
+  return [
+    {
+      id: "rule-description-full",
+      enabled: true,
+      label: peMsg("optPresetDescFull") || "Work item description: show all of it",
+      selector: `${PE_DESCRIPTION_BOX}:has(+ ${PE_DESCRIPTION_TOGGLE})`,
+      property: "height",
+      value: "auto"
+    },
+    {
+      id: "rule-description-toggle",
+      enabled: true,
+      label: peMsg("optPresetDescToggle") || "Work item description: hide the fade and Show all",
+      selector: `${PE_DESCRIPTION_BOX}:has(+ ${PE_DESCRIPTION_TOGGLE}) > div + div, ${PE_DESCRIPTION_BOX} + ${PE_DESCRIPTION_TOGGLE}`,
+      property: "display",
+      value: "none"
+    }
+  ];
+}
 
 function peFocusPresetRules() {
   return [
@@ -692,6 +729,8 @@ const PE_DEFAULTS = {
       property: "width",
       value: "320px" // Plane default 192px (w-48) → widened to 320px
     },
+    // Existing installs get these from the v8 → v9 migration, for the same reason as below.
+    ...peDescriptionPresetRules(),
     // Same list, but each of these waits for focus mode. Existing installs get them from
     // the v6 → v7 migration, not from here — peDeepMerge only backfills an absent array.
     ...peFocusPresetRules()
@@ -851,6 +890,9 @@ function peDeepMerge(def, cur) {
 //            character-for-character what v7 shipped. Anyone who edited theirs — including
 //            anyone who already worked out Cloud's selector by hand — keeps it. A rule the
 //            user deleted stays deleted; this appends nothing.
+//   v8 → v9: the description presets (see peDescriptionPresetRules), appended the way
+//            v6 → v7 appended the focus ones and for the same reason. New ids, so nothing
+//            deleted comes back; an install that already carries one keeps its copy.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -904,6 +946,14 @@ function peMigrate(raw) {
       if (!r || typeof r !== "object") return;
       if (was[r.id] && r.selector === was[r.id]) r.selector = shipped[r.id];
     });
+  }
+  if (from < 9) {
+    const rules = Array.isArray(raw.rules) ? raw.rules : [];
+    const have = new Set(rules.map((r) => (r && typeof r === "object" ? r.id : null)));
+    peDescriptionPresetRules().forEach((r) => {
+      if (!have.has(r.id)) rules.push(r);
+    });
+    raw.rules = rules;
   }
   raw.schema = PE_SCHEMA;
   return raw;

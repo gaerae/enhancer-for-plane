@@ -75,6 +75,13 @@ function loadCommon() {
   return ctx;
 }
 
+// The v9 presets reach every install older than 9, so a test about an earlier step sees them
+// arrive too. This is how such a test leaves them out of its counts; the v9 step has its own.
+const notV9Preset = (ctx) => {
+  const ids = new Set(ctx.peDescriptionPresetRules().map((r) => r.id));
+  return (r) => !ids.has(r.id);
+};
+
 // common.js against a chrome.storage.sync that behaves like the real one: several keys,
 // a per-item cap, a total cap, and errors reported through runtime.lastError rather than
 // thrown. Settings live across many items now, so a stub that stores a single blob would
@@ -1019,9 +1026,10 @@ test("defaults: seed labels fall back to English when i18n is unavailable", () =
 test("migrate: a v1 widths object becomes rules", () => {
   const ctx = loadCommon();
   const out = ctx.peMigrate({ widths: { moduleName: { px: 400 }, dropdown: { px: 300 } } });
-  // Count the always-on rules, not every rule: the same call also appends the focus
-  // presets (v6 → v7), and this test is about the two widths becoming two rules.
-  const widths = out.rules.filter((r) => !r.focus);
+  // Count the width rules, not every rule: the same call also appends the focus presets
+  // (v6 → v7) and the description ones (v8 → v9), and this test is about the two widths
+  // becoming two rules.
+  const widths = out.rules.filter((r) => !r.focus).filter(notV9Preset(ctx));
   eq(widths.length, 2);
   eq(widths[0].value, "400px");
   ok(!out.widths, "old shape removed");
@@ -1043,7 +1051,7 @@ test("migrate: a v2 user keeps their rules and gains the sync defaults", () => {
   const stored = { schema: 2, rules: [{ id: "r", selector: ".x", property: "width", value: "1px" }], templates: [], domains: ["a.com"] };
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate(stored));
   eq(merged.rules[0].id, "r", "the user's rule is still theirs, and still first");
-  eq(merged.rules.filter((r) => !r.focus).length, 1, "nothing new applies unconditionally");
+  eq(merged.rules.filter((r) => !r.focus).filter(notV9Preset(ctx)).length, 1, "nothing but the v9 presets applies unconditionally");
   eq(merged.domains, ["a.com"], "domains preserved");
   eq(merged.templateSync, { enabled: false, sources: [] }, "sync backfilled");
 });
@@ -1629,7 +1637,7 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 8, "PE_SCHEMA is 8");
+  eq(ctx.__SCHEMA, 9, "PE_SCHEMA is 9");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
@@ -2662,7 +2670,7 @@ test("focus: an id already present is not appended twice", () => {
   eq(out.rules.filter((r) => r.id === first.id).length, 1, "the edited copy is the only one");
   eq(out.rules[0].value, "block", "and the edit survives");
   // Without this the test would also pass on a migration that appended nothing at all.
-  eq(out.rules.length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
+  eq(out.rules.filter(notV9Preset(ctx)).length, ctx.peFocusPresetRules().length, "the presets it did not have still arrived");
 });
 
 // v7 → v8 rewrites a selector that is already in the user's storage, which no earlier
@@ -2692,7 +2700,7 @@ test("focus: v8 repoints the two presets that stopped matching Plane Cloud", () 
     eq(out.rules.find((r) => r.id === id).selector, shipped[id], id + " now carries both shapes");
   });
   eq(out.rules.find((r) => r.id === nav).selector, "#main-sidebar", "the nav preset is untouched");
-  eq(out.rules.length, 3, "and nothing was appended");
+  eq(out.rules.filter(notV9Preset(ctx)).length, 3, "and the v8 step appended nothing");
 });
 
 test("focus: v8 leaves a selector the user edited alone", () => {
@@ -2705,7 +2713,7 @@ test("focus: v8 leaves a selector the user edited alone", () => {
   eq(out.rules[0].selector, mine, "their selector survives the migration");
   // And a preset the user deleted stays deleted — v8 repoints, it never appends.
   const empty = ctx.peMigrate({ schema: 7, rules: [] });
-  eq(empty.rules.length, 0, "nothing comes back");
+  eq(empty.rules.filter(notV9Preset(ctx)).length, 0, "nothing comes back");
 });
 
 // A v6 install crosses both steps in one read. The v7 step appends the CURRENT presets, so
@@ -2716,7 +2724,7 @@ test("focus: a v6 install lands on the current selectors in one pass", () => {
   const out = ctx.peMigrate({ schema: 6, rules: [] });
   const shipped = {};
   ctx.peFocusPresetRules().forEach((r) => (shipped[r.id] = r.selector));
-  out.rules.forEach((r) => eq(r.selector, shipped[r.id], r.id));
+  out.rules.filter((r) => r.focus).forEach((r) => eq(r.selector, shipped[r.id], r.id));
   Object.keys(ctx.__V7_FOCUS_SELECTORS).forEach((id) => {
     ok(out.rules.some((r) => r.id === id), id + " is there to have been checked");
   });
@@ -2746,7 +2754,7 @@ test("dropdown: v8 repoints the search dropdown preset onto both generations", (
   eq(out.rules.find((r) => r.id === "rule-combobox-dropdown").selector, now, "repointed");
   eq(out.rules.find((r) => r.id === "rule-module-name").selector, ".max-w-40",
     "the rule that never broke is untouched");
-  eq(out.rules.length, 2, "and nothing was appended");
+  eq(out.rules.filter(notV9Preset(ctx)).length, 2, "and the v8 step appended nothing");
 });
 
 test("dropdown: v8 leaves an edited selector, and a deleted preset, alone", () => {
@@ -2757,7 +2765,7 @@ test("dropdown: v8 leaves an edited selector, and a deleted preset, alone", () =
     rules: [{ id: "rule-combobox-dropdown", selector: mine, property: "width", value: "400px" }]
   });
   eq(out.rules[0].selector, mine, "someone who already worked it out keeps their fix");
-  eq(ctx.peMigrate({ schema: 7, rules: [] }).rules.length, 0, "and a deleted preset stays deleted");
+  eq(ctx.peMigrate({ schema: 7, rules: [] }).rules.filter(notV9Preset(ctx)).length, 0, "and a deleted preset stays deleted");
 });
 
 // The two places that ship this preset must agree, or half the users get the dead selector.
@@ -2783,6 +2791,48 @@ test("focus: a fresh install and an upgraded one get the same presets", () => {
   const ids = (rules) => rules.filter((r) => r.focus).map((r) => r.id);
   eq(ids(ctx.__DEFAULTS.rules), ids(ctx.peMigrate({ schema: 6, rules: [] }).rules));
   ok(ids(ctx.__DEFAULTS.rules).length > 0, "and there is something to compare");
+});
+
+// Plane's "Show all" collapse, undone by two presets. They are new content, so the migration
+// appends them the way v7 appended the focus ones — and the same three things have to hold:
+// everyone gets them, nobody gets them twice, and a deletion after the stamp moves is final.
+test("description: a v8 install gains the presets, and only once", () => {
+  const ctx = loadCommon();
+  const mine = { id: "mine", enabled: true, selector: ".x", property: "width", value: "1px" };
+  const out = ctx.peMigrate({ schema: 8, rules: [mine] });
+  eq(out.rules[0], mine, "the user's rule keeps its place");
+  eq(out.rules.slice(1), ctx.peDescriptionPresetRules(), "both presets arrived, as shipped");
+  eq(out.schema, 9, "and the stamp moved");
+  eq(ctx.peMigrate({ schema: 9, rules: [mine] }).rules.length, 1, "a deletion after that is final");
+});
+
+test("description: a copy the user already has is not appended twice", () => {
+  const ctx = loadCommon();
+  const [full] = ctx.peDescriptionPresetRules();
+  const edited = Object.assign({}, full, { enabled: false });
+  const out = ctx.peMigrate({ schema: 8, rules: [edited] });
+  eq(out.rules.filter((r) => r.id === full.id).length, 1, "one copy");
+  eq(out.rules[0].enabled, false, "and it is theirs");
+  eq(out.rules.length, 2, "the other one still arrived");
+});
+
+test("description: a fresh install and an upgraded one get the same presets", () => {
+  const ctx = loadCommon();
+  const pick = (rules) => rules.filter((r) => !notV9Preset(ctx)(r));
+  eq(pick(ctx.__DEFAULTS.rules), ctx.peDescriptionPresetRules(), "fresh");
+  eq(pick(ctx.peMigrate({ schema: 8, rules: [] }).rules), ctx.peDescriptionPresetRules(), "from v8");
+  eq(pick(ctx.peMigrate({ widths: { moduleName: { px: 320 } } }).rules), ctx.peDescriptionPresetRules(), "from the oldest shape");
+});
+
+test("description: the presets are always on, and switched on", () => {
+  const ctx = loadCommon();
+  for (const r of ctx.peDescriptionPresetRules()) {
+    ok(r.enabled, r.id + " ships on: the clip is in the way on every item that has one");
+    ok(!r.focus, r.id + " does not wait for focus mode");
+  }
+  const css = ctx.peBuildRuleCss(ctx.peDescriptionPresetRules()).always;
+  match(css, /height: auto !important/, "the inline height Plane writes is outranked");
+  match(css, /display: none !important/, "and the toggle goes");
 });
 
 test("focus: the flag survives an import, and its absence means always-on", () => {

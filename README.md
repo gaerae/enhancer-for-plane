@@ -162,6 +162,11 @@ Plane cuts long names off in lists and dropdowns until you cannot tell items apa
   **Quick add** chip seeds the cycle / breadcrumb width in one click. Because the engine is
   generic, anything else Plane truncates is the same one-rule fix, and a class name that
   shifts between versions is one selector to edit.
+- **A long description is not cut off.** Plane Cloud clips a work item description at 140px
+  behind a **Show all** toggle, on the item's page and in the peek panel, every time it opens.
+  Two more rules that ship switched on show it whole and take the fade and the toggle away.
+  Switch both off in the list to have Plane's clip back. Self-hosted Plane up to 1.4.3 does not
+  clip, so there they match nothing.
 - **Each rule says whether it is actually doing anything.** A selector that matches nothing
   is a no-op — that is what stops a Plane redesign from breaking the extension — so every
   row reads when it last applied, or that it has never matched anything. A redesign shows up
