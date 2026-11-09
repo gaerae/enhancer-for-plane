@@ -1099,6 +1099,29 @@ const suites = [
       });`
   },
   {
+    // What people paste into the domain box is the address bar. peNormalizeDomain makes such a
+    // line work wherever it is read; this is the half only a page can show — that the box says
+    // what will actually be used, and that the hostname is what gets saved.
+    name: "options · a pasted address becomes its hostname",
+    page: { name: "opt-domain-paste", ...OPTIONS, seed: seedOf({ domains: ["plane.example.com"] }) },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="sites"]').click();
+      const box = document.getElementById("domains");
+      box.value = "plane.example.com\\nhttps://Plane.Acme.com:8080/acme/projects/";
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+      box.dispatchEvent(new Event("change", { bubbles: true }));
+      check("leaving the box shows the hostname that will be used", () => {
+        eq(box.value, "plane.example.com\\nplane.acme.com");
+      });
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("and the hostname is what is saved", () => {
+        const written = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(written.domains, ["plane.example.com", "plane.acme.com"]);
+      });`
+  },
+  {
     name: "options · tabs",
     page: { name: "opt-tabs", ...OPTIONS, seed: seedOf() },
     body: `

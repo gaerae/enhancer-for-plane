@@ -898,6 +898,11 @@ function peDeepMerge(def, cur) {
 // every future migration and left the stored `schema` stamp stuck at its old value.)
 function peMigrate(raw) {
   if (!raw || typeof raw !== "object") return {};
+  // Nothing stored is a new install, not a v1 one: there is nothing to migrate, and PE_DEFAULTS
+  // has to fill the whole object. Read as v1, the append steps below created a `rules` holding
+  // only their own presets, and peDeepMerge never backfills an array that exists — so from
+  // v1.7.0 on, a new install was missing both width presets for good once it first saved.
+  if (!Object.keys(raw).length) return raw;
   const from = raw.schema || (raw.rules ? 2 : 1);
   if (from >= PE_SCHEMA) return raw;
   if (from < 2 && raw.widths) {
@@ -979,7 +984,7 @@ function peSanitizeSettings(raw) {
   out.enabled = bool(raw.enabled, true);
   out.allDomains = bool(raw.allDomains, false);
   out.domains = arr(raw.domains)
-    .map((d) => str(d, L.maxFieldLen).trim())
+    .map((d) => peNormalizeDomain(str(d, L.maxFieldLen)))
     .filter(Boolean)
     .slice(0, PE_IMPORT_LIMITS.maxDomains);
 
@@ -1293,10 +1298,23 @@ function peSettingsChanged(changes, area) {
   return Object.keys(changes).some((k) => k === PE_STORAGE_KEY || k.indexOf(PE_TPL_KEY_PREFIX) === 0);
 }
 
+// A domain line is a hostname, but what people paste is an address: a scheme, a port, a path.
+// Each of those used to make the line silently inert — saved, never granted, never matched — so
+// every reader of the list goes through this. The port is dropped rather than kept because a
+// match pattern cannot carry one: `*://host/*` already covers every port on that host. Anything
+// still not a hostname afterwards is returned as typed, for the pattern builder to refuse.
+function peNormalizeDomain(raw) {
+  const d = String(raw == null ? "" : raw).trim().toLowerCase();
+  const m = /^(?:[a-z][a-z0-9+.-]*:\/\/)?([^/?#\s]+)(?:[/?#].*)?$/.exec(d);
+  if (!m) return d;
+  const host = m[1].replace(/:\d*$/, "");
+  return /^[a-z0-9.*-]+$/.test(host) ? host : d;
+}
+
 function peDomainMatches(domains, host) {
   host = (host || "").toLowerCase();
   return (domains || []).some((raw) => {
-    const d = (raw || "").trim().toLowerCase();
+    const d = peNormalizeDomain(raw);
     if (!d) return false;
     if (d.startsWith("*.")) {
       const base = d.slice(2);
@@ -2603,7 +2621,7 @@ function peOriginPatterns(settings) {
   if (settings.allDomains) return ["*://*/*"];
   const out = [];
   for (const raw of settings.domains || []) {
-    const d = (raw || "").trim().toLowerCase();
+    const d = peNormalizeDomain(raw);
     // Allow host chars and a leading "*." wildcard only; skip anything malformed.
     if (!d || /[^a-z0-9.*-]/.test(d)) continue;
     out.push("*://" + d + "/*");
