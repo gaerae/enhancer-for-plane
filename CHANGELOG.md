@@ -10,6 +10,98 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.13.0 — 2026-11-09
+
+Schema 9: the two description presets below are appended to existing settings. Nothing you
+deleted comes back, and no permission changes.
+
+### New
+- **A long work item description is shown whole.** Since 2026-11-02 Plane Cloud clips a
+  description taller than 140px behind a fade and **Show all**, on the item's page and in the
+  peek panel, every time the item opens, and has no setting to stop it. Two style rules that
+  ship switched on show all of it and take the fade and the toggle away. They are ordinary
+  rows in Settings ▸ Appearance, so switching both off brings Plane's clip back. A cycle's
+  description, which the same component clips, is left alone. Self-hosted Plane up to 1.4.3
+  does not clip, so there the rules match nothing until it does.
+- **The templates you used last come first on a long menu.** Once the template menu is long
+  enough to grow a filter box, the last three templates inserted on this device sit at the
+  top under **Recently used**, and stay in their own groups as well. A search lists each hit
+  once. Only the ids are kept, on this device; **Restore defaults** clears them on the save
+  that follows.
+
+### Improved
+- **Settings say what each card does, and keep the rest behind More.** Every card leads with
+  at most four lines; tokens, edge cases and the reasons a shortcut cannot be rebound open
+  from a **More** under it. A filled field keeps a label beside it (**Open**, **Search**,
+  **Name**, **Title**, **Body**), where a placeholder used to vanish the moment you typed.
+  The Template sync switch no longer reads "Enabled" for the whole extension in Korean.
+
+### Fixed
+- **A new install gets every default style rule.** Since v1.7.0 a fresh install was missing
+  the module-name and search-dropdown width presets, because empty storage was read as a
+  first-generation install. An existing install is left as it is: once settings have been
+  saved, a preset that never arrived cannot be told from one you deleted. Add either back
+  from **Quick add** in Settings ▸ Appearance.
+- **A domain pasted as an address works.** `https://plane.acme.com/` or
+  `plane.acme.com:8080` in Settings ▸ Sites saved without complaint and then ran nowhere.
+  It now counts as its hostname, and the box shows the hostname once you leave it.
+- **The popup says "Active" only where the extension can run.** Settings sync and site
+  access does not, so a site added on another device, or one whose prompt was refused,
+  read as active over a page where nothing ran. The popup now says access is needed and
+  offers the grant. Refusing it no longer takes a synced site off the list for every device.
+- **The popup no longer offers to enable itself on browser pages** such as
+  `chrome://extensions` or a new tab.
+- **A failed save changes nothing.** When Settings could not save, it had already dropped
+  the empty rows from the form and handed back access to removed sites, so the rows below
+  edited the wrong template. It now writes a copy and touches nothing until storage takes it.
+- **Arrow keys and Enter work in the template and copy menus.** The first row is
+  highlighted when a menu opens, and the caret stays in the editor.
+- **A new copy format or quick link gets the caret** instead of the template list.
+- **A key sent to a quick link that still has a blank opens Settings**, as the address bar
+  does, instead of doing nothing.
+- **The description rules are not reported as never matched** on a Plane that does not clip
+  descriptions, where a miss means only that nobody opened a long one. A copy you edited is
+  judged like any other rule.
+- **A template replacing selected text goes in once.** Select a passage in a description and
+  insert a shorter template, and it used to land twice: the insert judged success by the text
+  growing, so a shorter replacement read as a failure and went in again.
+- **A rule picked while Settings has unsaved edits survives the save.** The picker's rule was
+  announced and then overwritten by the page's older list on Save. A deleted row, an import or
+  **Restore defaults** not yet saved is no longer replaced by a change from elsewhere either.
+- **Editing a template source's URL drops the old file's templates.** They used to stay in the
+  menu under the new name until the new URL was fetched — up to six hours, or for good if that
+  failed. A new URL is fetched on the next run.
+- **A variable Save cannot keep stops the save** and says which one. A Korean name or a second
+  `team` used to be dropped with "Saved." on screen.
+- **Adding a template source switches sync on**, and **Sync now** says so when it is off, where it
+  used to report "Synced 0 source(s)".
+- **Settings asks before closing with unsaved edits**, keeps an error on screen until it is dealt
+  with, and keeps your place in the source list when a sync lands while you type.
+- **A failed template source says why in your language.** Korean used to read
+  `동기화 실패: Site access not granted`.
+- **"Manage templates" opens Settings on Templates**, and the copy menu's link on Work items.
+- **Every field in Settings keeps a label once it is filled** — style rules, variables, quick
+  links, copy formats and sources — and every switch and box has a name a screen reader can read.
+- **The template menu's previews are readable** (2.5:1 contrast before), and the row the arrow
+  keys reach, like every toast, is announced to a screen reader.
+- **Quick add points at a preset already in the list** instead of adding it twice.
+- The sync card no longer claims to check when Settings opens; it checks on Save and **Sync now**.
+
+### Internal
+- **Publishing a release sends it to the Chrome Web Store.** `store.yml` uploads the
+  release's zip and submits it for review, signing in to Google with the run's GitHub
+  identity rather than a stored key. When the listing changed since the version the store is
+  serving, it uploads, stops red and names each section and image to update by hand, because
+  the API cannot edit listing text. Notes for whoever publishes do not count as listing.
+- The harness seeds read the schema from `common.js` instead of carrying a number that had
+  gone stale.
+- `PE_ONLY=…` runs a subset of the browser harness, and its suites can set the popup's tab
+  and whether the site is granted.
+- A template source's cache entry records the URL it came from, and a failure records a code
+  beside its English, so Settings can tell a stale file from this one and word the failure.
+
+---
+
 ## v1.12.0 — 2026-10-31
 
 Schema unchanged.
