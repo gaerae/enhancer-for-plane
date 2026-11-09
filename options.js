@@ -41,6 +41,12 @@
   // A change from elsewhere was refused because a save was out. If that save then fails with
   // the form still clean, nothing else will ever announce the change — so it is taken then.
   let refusedWhileSaving = false;
+  // Moves whenever the baseline does — a load, an adoption, a save. A read started before it
+  // moved answers a question about a form that has since been settled some other way.
+  let baseGen = 0;
+  // What our own write put in storage, while it is out: an event in that window is its echo
+  // only if storage reads back as this.
+  let writing = null;
   // A change from elsewhere was refused and has not been saved over or taken since: the page is
   // behind storage. That is unsaved state like an edit is — taking the edit back must not make
   // a form showing older settings read as clean, because nothing will announce the change
@@ -249,10 +255,21 @@
       k === "focus" && x === false ? undefined : k === "hiddenGroups" && Array.isArray(x) ? x.slice().sort() : x
     );
   }
+  // Whether two settings objects say the same thing. Key order is not part of what was said:
+  // storage hands back defaults merged in front of what was written, so a read of our own write
+  // need not stringify the way the write did.
+  function sameSettings(a, b) {
+    const sorted = (k, x) =>
+      x && typeof x === "object" && !Array.isArray(x)
+        ? Object.keys(x).sort().reduce((o, key) => ((o[key] = x[key]), o), {})
+        : x;
+    return JSON.stringify(a, sorted) === JSON.stringify(b, sorted);
+  }
   // Called wherever state is taken from storage or written to it, after render() — which may
   // fill in an absent section, and that is not an edit.
   function settle() {
     cleanJson = canon(state);
+    baseGen++;
   }
 
   // What the templates card and the copy card say about whether their button has been
@@ -1051,6 +1068,14 @@
       interval.addEventListener("change", () => (sync.sources[idx].intervalMinutes = parseInt(interval.value, 10) || 360));
       del.addEventListener("click", () => {
         sync.sources.splice(idx, 1);
+        // The switch the first row turned on goes with the last one, back to where it was — a
+        // row added and taken away again is no edit, and sync on with nothing to fetch is not
+        // something anybody asked for.
+        const was = (JSON.parse(cleanJson || "{}") || {}).templateSync || {};
+        if (!sync.sources.length && !(was.sources || []).length) {
+          sync.enabled = !!was.enabled;
+          el.syncEnabled.checked = sync.enabled;
+        }
         scheduleMeter();
         sourceDeleted = true;
         renderSources();
@@ -1362,8 +1387,11 @@
           return;
         }
         if (!peSettingsChanged(changes, area)) return;
-        if (savingSelf) return; // our own save; cleared once it has settled
         peGetSettings().then((s) => {
+          // Our own write, while it is out, is only its echo when storage reads back as what
+          // was written. Anything else landed in the same window from somewhere else, and
+          // dropping it unseen left the page calling itself in step with storage it was not.
+          if (savingSelf && writing && sameSettings(s, writing)) return;
           // A write that leaves storage identical to what we last synced is not news, and
           // announcing it is worse than saying nothing — our own save can land a late
           // event after savingSelf clears, and Chrome can fire the same change twice.
@@ -1816,7 +1844,11 @@
     // A source whose URL was edited is a different file under the same name, and gets a new
     // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
     // does the same for entries that recorded theirs, and those from before that cannot.
-    const savedUrl = new Map((((after || stored || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
+    // Against what this page last loaded or saved, not against storage: a URL changed on another
+    // device is not an edit made here, and renaming over it filed that device's source under a
+    // fresh id and pruned the file it had fetched.
+    const baseline = JSON.parse(cleanJson || "{}");
+    const savedUrl = new Map((((baseline || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
     const renamed = new Map();
     next.templateSync.sources = next.templateSync.sources.map((x) => {
       if (!savedUrl.has(x.id) || savedUrl.get(x.id) === x.url) return x;
@@ -1825,6 +1857,7 @@
     });
     try {
       savingSelf = true;
+      writing = next;
       await peSaveSettings(next);
       if (permOk) await revokeStalePermissions(next, after || stored);
       // Only after the settings write succeeded: a failed save leaves the flag set, so the
@@ -1862,6 +1895,7 @@
         });
         remember(base, true);
         cleanJson = canon(base);
+        baseGen++;
       } else {
         state = next;
         remember(state);
@@ -1874,9 +1908,10 @@
       // happened.
       // Both kinds at once is what the picker and the popup produce together, and naming only
       // one of them leaves the other arriving unexplained.
-      if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
+      let said;
+      if (!permOk) said = [peMsg("msgSavedNoPerm"), true];
       else if (editedSince)
-        flash(
+        said = [
           [
             peMsg("msgSavedEditsPending"),
             kept.length ? peMsg("msgAlsoKeptSites", [kept.join(", ")]) : "",
@@ -1884,12 +1919,16 @@
           ].filter(Boolean).join(" "),
           false,
           true
-        );
+        ];
       else if (kept.length && keptRules.length)
-        flash(peMsg("msgKeptDomains", [kept.join(", ")]) + " " + peMsg("msgKeptRulesToo", [quotedRules(keptRules)]));
-      else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
-      else if (keptRules.length) flash(peMsg("msgKeptRules", [quotedRules(keptRules)]));
-      else flash(peMsg("msgSaved"));
+        said = [peMsg("msgKeptDomains", [kept.join(", ")]) + " " + peMsg("msgKeptRulesToo", [quotedRules(keptRules)])];
+      else if (kept.length) said = [peMsg("msgKeptDomains", [kept.join(", ")])];
+      else if (keptRules.length) said = [peMsg("msgKeptRules", [quotedRules(keptRules)])];
+      else said = [peMsg("msgSaved")];
+      // A change refused after this save last read storage is not in what it wrote, and saying
+      // only "Saved." would bury the line that told the user so.
+      if (refusals !== refusalsSeen) said = [said[0] + " " + peMsg("msgChangedElsewhere"), true];
+      flash(...said);
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
         try {
@@ -1932,7 +1971,10 @@
     } finally {
       // Released a turn later than the save, so every event the save produced has landed
       // while the flag was still set.
-      setTimeout(() => (savingSelf = false), 0);
+      setTimeout(() => {
+        savingSelf = false;
+        writing = null;
+      }, 0);
     }
   }
 
@@ -1950,9 +1992,10 @@
   // the message that matters. The read is a window like any other, so whether to take it is
   // decided when it returns: typed into, reset, or saving again meanwhile, and it is dropped.
   function adoptStored() {
+    const gen = baseGen;
     peGetSettings()
       .then((s) => {
-        if (isEdited() || saveInFlight) return;
+        if (gen !== baseGen || isEdited() || saveInFlight) return;
         adoptSettings(s);
       })
       .catch(() => {});

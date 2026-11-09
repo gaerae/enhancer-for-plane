@@ -55,7 +55,9 @@ deleted comes back, and no permission changes.
   the empty rows from the form and handed back access to removed sites, so the rows below
   edited the wrong template. It now writes a copy and touches nothing until storage takes it.
 - **Arrow keys and Enter work in the template and copy menus.** The first row is
-  highlighted when a menu opens, and the caret stays in the editor.
+  highlighted when a menu opens, and the caret stays in the editor. A template sync landing
+  while the menu is open keeps the highlighted row and what you typed in the filter, and no
+  longer swaps an open copy menu for the template list.
 - **A new copy format or quick link gets the caret** instead of the template list.
 - **A key sent to a quick link that still has a blank opens Settings**, as the address bar
   does, instead of doing nothing.
@@ -76,7 +78,8 @@ deleted comes back, and no permission changes.
 - **A variable Save cannot keep stops the save** and says which one. A Korean name or a second
   `team` used to be dropped with "Saved." on screen.
 - **Adding the first template source switches sync on**, and **Sync now** says so when it is
-  off, where it used to report "Synced 0 source(s)". Sync you switched off stays off.
+  off, where it used to report "Synced 0 source(s)". Sync you switched off stays off, and
+  deleting that first row again switches it back.
 - **Settings asks before closing with unsaved edits**, keeps an error on screen until it is dealt
   with, and keeps your place in the source list when a sync lands while you type.
 - **A failed template source says why in your language.** Korean used to read

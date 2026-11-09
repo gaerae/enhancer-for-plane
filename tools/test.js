@@ -1748,6 +1748,28 @@ test("copy: formats survive a save/read round trip", async () => {
   eq(back.copyFormats[0].format, "{{item.key}} {{item.url}}");
 });
 
+// The settings page tells its own write's echo from somebody else's change by reading storage
+// back during the write and comparing — so the comparison it makes (keys in any order) has to
+// hold for every write. If a read of our own write ever said something else, every Save would
+// end announcing a change from elsewhere.
+test("settings: what Save writes reads back as the same settings, key order aside", async () => {
+  const { ctx } = loadCommonWithSyncStorage();
+  const sorted = (k, x) =>
+    x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, key) => ((o[key] = x[key]), o), {}) : x;
+  const first = await ctx.peGetSettings(); // what the page loads, and so what it edits
+  const next = clone(first);
+  next.templates = [
+    { id: "t1", name: "Bug", title: "[Bug] ", content: "x".repeat(5000) },
+    { id: "t2", name: "\uae30\ub2a5", title: "", content: "\ud55c".repeat(2000) }
+  ];
+  next.rules = (next.rules || []).concat([{ id: "r9", label: "Mine", selector: ".a", property: "max-width", value: "1px", enabled: true }]);
+  next.templateSync = { enabled: true, sources: [{ id: "s1", url: "https://example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: ["b", "a"] }] };
+  next.domains = ["plane.example.com"];
+  await ctx.peSaveSettings(next);
+  const back = await ctx.peGetSettings();
+  eq(JSON.stringify(back, sorted), JSON.stringify(next, sorted));
+});
+
 /* ------------------------------------------------------------------ */
 /* quick open                                                         */
 /* ------------------------------------------------------------------ */

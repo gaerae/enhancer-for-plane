@@ -21,6 +21,7 @@
   let menuOpen = false;
   let menuOwnerBtn = null;
   let menuReturn = null; // what had focus when the menu opened — see hideMenu
+  let menuMode = ""; // "copy" or the template menu: which list a redraw has to rebuild
   // The work item the copy menu was opened for, read once while the menu opens. A peek
   // panel over a list closes as soon as you mousedown outside it, and the menu is appended
   // to <body> — outside the panel — so by the time a format is clicked the panel, and its
@@ -930,6 +931,9 @@
         preview.className = "pe-menu-item-preview";
         preview.textContent = previewOf(t);
         item._haystack = ((t.name || "") + " " + (t.title || "") + " " + (t.content || "")).toLowerCase();
+        // Which template this row is, for a redraw to find it again; the recent block's copy
+        // is a different row with the same template.
+        item.dataset.key = (recent ? "recent:" : "") + (t.id || t.name || "");
         item.appendChild(title);
         item.appendChild(preview);
         item.addEventListener("mousedown", (e) => e.preventDefault());
@@ -1009,7 +1013,7 @@
       noHits.textContent = peMsg("menuNoMatch");
       noHits.style.display = "none";
       list.appendChild(noHits);
-      filterInput.addEventListener("input", () => {
+      const applyFilter = (quiet) => {
         const q = filterInput.value.trim().toLowerCase();
         let shown = 0;
         const ownerHits = new Map(); // source header → surviving item count
@@ -1031,11 +1035,54 @@
         ownerHits.forEach((n, el) => (el.style.display = n ? "" : "none"));
         noHits.style.display = shown ? "none" : "block";
         // The highlight may be on a row the filter just hid; Enter takes the first hit.
-        setMenuActive(menuRows()[0] || null);
-      });
+        setMenuActive(menuRows()[0] || null, quiet);
+      };
+      filterInput.addEventListener("input", () => applyFilter(false));
+      menu._applyFilter = applyFilter;
     }
 
     menu.appendChild(makeMenuFooter(peMsg("menuManage"), "templates"));
+  }
+
+  // A sync landing under an open template menu, redrawn without losing the reader's place. A
+  // plain redraw took the highlight, the focused row and the query typed in the filter with it,
+  // so the next Enter pressed a template nobody chose — or, with focus left in the editor, no
+  // template at all. Skipping the redraw while the menu was in use was the first answer, and it
+  // only covered a menu that had focus: Alt+T leaves focus in the editor on purpose. So the
+  // place is carried across by which template it was on. A row whose template has gone takes
+  // the highlight with it rather than handing it to a neighbour nobody picked.
+  function redrawMenu() {
+    const keyOf = (r) => (r ? (r.classList.contains("pe-menu-config") ? "config" : r.dataset.key || "") : "");
+    const find = (k) => (k ? menuRows().find((r) => keyOf(r) === k) || null : null);
+    const a = document.activeElement;
+    const inMenu = !!(a && menu.contains(a));
+    const activeKey = keyOf(menu.querySelector(".pe-menu-active"));
+    const focusKey = inMenu && a.closest ? keyOf(a.closest(".pe-menu-item, .pe-menu-config")) : "";
+    const oldFilter = menu.querySelector(".pe-menu-filter-input");
+    const query = oldFilter ? oldFilter.value : "";
+    const filterFocus = inMenu && a === oldFilter ? [oldFilter.selectionStart, oldFilter.selectionEnd] : null;
+    const scroll = (menu.querySelector(".pe-menu-list") || {}).scrollTop || 0;
+    renderMenu();
+    const filter = menu.querySelector(".pe-menu-filter-input");
+    if (filter && query) {
+      filter.value = query;
+      if (menu._applyFilter) menu._applyFilter(true);
+    }
+    const list = menu.querySelector(".pe-menu-list");
+    if (list) list.scrollTop = scroll;
+    setMenuActive(find(activeKey), true);
+    if (filterFocus && filter) {
+      filter.focus();
+      try {
+        filter.setSelectionRange(filterFocus[0], filterFocus[1]);
+      } catch (_) {}
+    } else if (inMenu) {
+      // The row that had focus, else the filter, else the editor the menu was opened from:
+      // focus must not drop to <body>, where Escape and the arrows no longer reach anything.
+      const row = find(focusKey);
+      const back = row || filter || (menuReturn && menuReturn.isConnected ? menuReturn : null);
+      if (back) back.focus();
+    }
   }
 
   // Read the stored list again rather than trusting `tplRecent`: another tab may have written
@@ -1139,6 +1186,7 @@
     const focusInMenu = !!menu && menu.contains(document.activeElement);
     if (!focusInMenu) menuReturn = document.activeElement;
     ensureMenu();
+    menuMode = mode === "copy" ? "copy" : "templates";
     if (mode === "copy") renderCopyMenu();
     else renderMenu();
     menu.style.display = "block";
@@ -2247,10 +2295,9 @@
         const nv = changes[PE_SYNC_CACHE_KEY].newValue;
         syncCache = { bySource: (nv && nv.bySource) || {} };
         recountTemplates();
-        // Not while it is being used: a redraw takes the focused row — or the query typed in
-        // the filter — with it, and the next Enter pressed a template nobody chose. The menu is
-        // drawn afresh each time it opens, so the next opening shows the new list.
-        if (menuOpen && menu && !menu.contains(document.activeElement)) renderMenu();
+        // Only the template menu lists templates. Redrawing the copy menu as one replaced the
+        // formats under the reader's cursor with a list of templates.
+        if (menuOpen && menu && menuMode === "templates") redrawMenu();
         try {
           injectAll();
         } catch (_) {}

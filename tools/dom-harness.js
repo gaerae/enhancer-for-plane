@@ -127,7 +127,9 @@ window.chrome = {
       // window.__holdReads queues each read until the suite releases it (window.__reads), so a
       // suite can act while a read the page started is still out.
       get: (k, cb) => {
-        const answer = () => cb(JSON.parse(JSON.stringify(window.__SEED)));
+        // What storage held when the read was made, as a real read returns, even if held.
+        const snap = JSON.parse(JSON.stringify(window.__SEED));
+        const answer = () => cb(snap);
         if (window.__holdReads) (window.__reads = window.__reads || []).push(answer);
         else answer();
       },
@@ -1370,7 +1372,15 @@ const suites = [
       ${TAB_READY}
       document.querySelector('#tabs .tab[data-tab="templates"]').click();
       document.getElementById("addSource").click();
-      check("adding the first source switches sync on", () => ok(document.getElementById("syncEnabled").checked, "still off"));`
+      check("adding the first source switches sync on", () => ok(document.getElementById("syncEnabled").checked, "still off"));
+      // Taking the row away again takes the switch with it: it was the row's doing, and left on
+      // it was an unsaved edit nobody made, saved by the next Save as sync with no source.
+      document.querySelector("#sourceList .src-del").click();
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and deleting it again leaves nothing changed", () => {
+        ok(!document.getElementById("syncEnabled").checked, "sync left on");
+        ok(!leave(), "an edit nobody made");
+      });`
   },
   {
     // A variable named in Korean, or a second "team", was dropped by Save with "Saved." on
@@ -1737,6 +1747,95 @@ const suites = [
       check("the newer edit is still there", () => eq(document.querySelector("#templateList .tpl-name").value, "Newer"));
       const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
       check("and still unsaved", () => ok(leave(), "marked clean over the edit"));`
+  },
+  {
+    // A recovery read that comes back after a newer save has gone through holds settings older
+    // than that save. Taking it put them on the form, marked clean.
+    name: "options · a failed save's recovery read is dropped once a newer save went through",
+    page: {
+      name: "opt-save-fail-stale",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      const reads = () => (window.__reads || []).length;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__holdReads = true;
+      window.__answer();
+      await waitFor(() => reads() === 1, "the read after the prompt");
+      window.__reads.shift()();
+      await waitFor(() => reads() === 1, "the recovery read");
+      const recovery = window.__reads.shift(); // held back until a newer save is through
+      window.__holdReads = false; // it answers with what storage held when it was asked
+      const content = document.querySelector("#templateList .tpl-content");
+      content.value = "small"; content.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the newer save's prompt");
+      window.__answer();
+      await waitFor(() => document.getElementById("status").textContent !== "" && !/failed/i.test(document.getElementById("status").textContent), "the newer save to finish");
+      check("the newer save went through", () => eq(window.__written.length, 1));
+      recovery();
+      await sleep(200);
+      check("the form keeps what the newer save wrote", () => {
+        const v = document.querySelector("#templateList .tpl-content").value;
+        eq(v.length > 40 ? v.slice(0, 12) + "… (" + v.length + ")" : v, "small");
+      });`
+  },
+  {
+    // Our own write is a window too: a change from elsewhere landing in it was dropped as if it
+    // were the write's own echo, and the page called itself saved and in step with storage.
+    name: "options · a change landing during the page's own write is not taken for its echo",
+    page: { name: "opt-save-echo", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__cleanup();
+      await sleep(200);
+      check("the page says something changed elsewhere", () =>
+        ok(document.getElementById("status").textContent.includes(peMsg("msgChangedElsewhere")), document.getElementById("status").textContent));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and does not call itself in step", () => ok(leave(), "a page behind storage let itself close"));`
+  },
+  {
+    // A new id is for a URL edited on this page. One changed on another device, arriving while
+    // this page had edits, is not this page's edit — renaming over it filed the other device's
+    // source under a fresh id and pruned the file it had fetched.
+    name: "options · a source URL changed elsewhere is not renamed by this page's save",
+    page: {
+      name: "opt-src-url-elsewhere",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } })
+    },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.templateSync.sources[0].url = "https://plane.example.com/elsewhere.json";
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      check("the source keeps its id", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.templateSync.sources[0].id, "s1");
+      });`
   },
   {
     // A reset confirmed while a save is in flight is not part of what that save wrote, so that
@@ -2583,6 +2682,22 @@ const suites = [
       filter("");
       check("clearing it brings everything back", () => eq(names().length, allRows));
 
+      // A sync that lands while a query is being typed keeps the query, the caret and the hits.
+      // A redraw that did not wiped the box, and Enter then took the first row of the full list.
+      const fq = menu().querySelector(".pe-menu-filter-input");
+      fq.focus();
+      filter("rollback");
+      fq.setSelectionRange(3, 3);
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
+      check("a sync keeps a query typed in the filter, and the caret in it", () => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        eq(f.value, "rollback");
+        eq(document.activeElement, f, "focus left the filter");
+        eq(f.selectionStart, 3, "the caret moved");
+        eq(names().join(), "Deploy");
+      });
+      filter("");
+
       // The service worker finishes a sync while the menu is up.
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
       check("a sync that lands under an open menu redraws it", () => eq(names().join(), "Bug,Title only,Body only"));
@@ -2702,7 +2817,21 @@ const suites = [
       const focusedRow = shown(".pe-menu-item")[1];
       focusedRow.focus();
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
-      check("a sync under a focused row leaves that row focused", () => ok(document.activeElement === focusedRow, "focus went to " + document.activeElement.textContent));
+      check("a sync under a focused row leaves that row focused", () =>
+        eq(document.activeElement.querySelector && (document.activeElement.querySelector(".pe-menu-item-title") || {}).textContent, focusedRow.querySelector(".pe-menu-item-title").textContent));
+      key({ key: "Escape" });
+      await sleep(50);
+      // The keyboard path keeps focus in the editor, so the highlight is all there is — and a
+      // redraw that dropped it left Enter to the editor, which took it as a new line.
+      title().value = "";
+      edB.focus();
+      key({ altKey: true, code: "KeyT", key: "\\u2020" });
+      key({ key: "ArrowDown" });
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("a sync keeps the row the arrows reached", () => eq(active(), "Title only"));
+      key({ key: "Enter" });
+      check("so Enter takes it", () => eq(title().value, "Release notes"));
+      await sleep(50);
       key({ key: "Escape" });
       await sleep(50);
       // Alt+T is a toggle. With a row focused there is no editor in focus to match it against,
@@ -4435,6 +4564,22 @@ const suites = [
         eq(rec().toolbar.checks, 1, "the Template button was counted beside an editor with no toolbar");
         eq(rec().header.hits, 1, "the one placement still stands");
       });`
+  },
+  {
+    // A sync lands while the copy menu is open. The handler redrew "the menu", which was the
+    // template list: the formats were replaced under the reader's cursor.
+    name: "content · a sync under the copy menu leaves the copy menu",
+    page: { name: "browse/PROJ-143", plane: PLANE + ANCHOR_EDITOR, seed: seedOf({ allDomains: true }) },
+    body: `
+      await waitFor(() => window.__peLoaded, "the content script to load");
+      await waitFor(() => document.querySelector(".pe-copy-ref-btn"), "the copy button");
+      document.querySelector(".pe-copy-ref-btn").click();
+      const menu = () => document.getElementById("pe-tmpl-menu");
+      await waitFor(() => menu() && menu().style.display === "block", "the copy menu");
+      const titles = () => [...menu().querySelectorAll(".pe-menu-item-title")].map((t) => t.textContent).join("|");
+      const before = titles();
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("the copy menu still lists the formats", () => eq(titles(), before));`
   },
   {
     // The feature end to end, in the script that performs it. allDomains rather than a host,

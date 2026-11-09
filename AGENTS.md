@@ -407,7 +407,10 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   added and this page never showed, or it writes the older list over it. And Save itself is a
   window: every await in it — the prompt, the write, the tidy-up after — leaves the form
   editable, so "was anything typed meanwhile?" is asked after the last one, and storage is read
-  again after the prompt, which can stay up as long as the user likes.
+  again after the prompt, which can stay up as long as the user likes. The write is a window
+  too: an event during it is the write's own echo only if storage reads back as what was
+  written (`writing`), and a read started before the baseline last moved (`baseGen`) answers a
+  question nobody is asking any more.
 - **Judge an insert by whether the editor changed, not by whether it grew — and not by its
   markup.** Replacing a selection with a shorter template shrinks the text, and a length check
   read that as failure and inserted the template again by the next path down. Comparing
