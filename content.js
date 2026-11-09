@@ -1074,7 +1074,12 @@
       return;
     }
     const keyOf = (r) => (r ? (r.classList.contains("pe-menu-config") ? "config" : r.dataset.key || "") : "");
-    const find = (k) => (k ? menuRows().find((r) => keyOf(r) === k) || null : null);
+    // Only a row that is the one row with that key: two templates in a source may share an id,
+    // and the first of them is not necessarily the one the reader was on.
+    const find = (k) => {
+      const hits = k ? menuRows().filter((r) => keyOf(r) === k) : [];
+      return hits.length === 1 ? hits[0] : null;
+    };
     const a = document.activeElement;
     const inMenu = !!(a && menu.contains(a));
     const activeKey = keyOf(menu.querySelector(".pe-menu-active"));

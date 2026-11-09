@@ -2747,6 +2747,26 @@ const suites = [
       });
       filter("");
 
+      // Two templates in one source may share an id. A redraw that found "the row with this id"
+      // took the first, and Enter then inserted the other group's template. Ambiguous is no
+      // place to put the reader back, so the highlight goes rather than move.
+      const dupCache = JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache));
+      dupCache.bySource.s1.templates.push(
+        { id: "dup", name: "Dup Ops", group: "Ops", title: "", content: "x" },
+        { id: "dup", name: "Dup Review", group: "Review", title: "", content: "y" }
+      );
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(dupCache)) } }, "local");
+      shown(".pe-menu-item").find((n) => n.querySelector(".pe-menu-item-title").textContent === "Dup Review").focus();
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(dupCache)) } }, "local");
+      check("a redraw does not move the reader to another template with the same id", () => {
+        const hl = menu().querySelector(".pe-menu-active .pe-menu-item-title");
+        ok(!hl || hl.textContent === "Dup Review", "highlight moved to " + (hl && hl.textContent));
+        const fr = document.activeElement.closest && document.activeElement.closest(".pe-menu-item");
+        const ft = fr && fr.querySelector(".pe-menu-item-title").textContent;
+        ok(!ft || ft === "Dup Review", "focus moved to " + ft);
+      });
+      window.__onChanged({ peSyncCache: { newValue: JSON.parse(JSON.stringify(window.__LOCAL.peSyncCache)) } }, "local");
+
       // The service worker finishes a sync while the menu is up.
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
       check("a sync that lands under an open menu redraws it", () => eq(names().join(), "Bug,Title only,Body only"));
