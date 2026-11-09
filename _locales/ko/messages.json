@@ -40,7 +40,7 @@
     "message": "적용 도메인"
   },
   "optDomainsDesc": {
-    "message": "아래 나열한 도메인에서만 동작합니다.\n한 줄에 하나씩 입력하세요.\n<code>*.example.com</code> 같은 와일드카드를 지원합니다.\n저장하면 새로 추가한 도메인마다 Chrome이 접근 권한을 요청합니다."
+    "message": "확장 프로그램은 여기 적은 도메인에서만 동작하며, 한 줄에 하나씩 적습니다.\n<code>*.example.com</code>은 모든 하위 도메인을 포함하고, 주소를 붙여 넣으면 호스트 이름만 남습니다.\n저장하면 새로 추가한 도메인마다 Chrome이 접근 권한을 묻습니다."
   },
   "optDomainsAll": {
     "message": "모든 사이트에서 실행 (아래 목록 무시)"
@@ -52,13 +52,7 @@
     "message": "집중 모드"
   },
   "optFocusDesc": {
-    "message": "규칙에 <b>“집중 모드에서만 적용”</b>을 켜 두면 평소에는 적용되지 않고, 집중 모드를 켤 때만 적용됩니다.\n작업 항목의 속성 패널을 숨기는 규칙과 왼쪽 내비게이션을 숨기는 규칙이 바로 쓸 수 있게 들어 있습니다.\n본문 읽기 폭을 잡아 주는 규칙도 하나 있고, 이것만 꺼진 채로 시작합니다."
-  },
-  "optFocusHow": {
-    "message": "켜는 길은 셋입니다 — <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>(macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), 작업 항목 번호 옆의 토글 버튼, 그리고 툴바 팝업의 스위치.\n단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요."
-  },
-  "optFocusScope": {
-    "message": "켠 탭에서만 적용되고, 그 탭에서는 새로 고쳐도 유지되며, 탭을 닫으면 사라집니다.\n다른 기기로는 동기화되지 않습니다."
+    "message": "작업 항목을 읽고 쓸 때 필요 없는 화면을 숨깁니다.\n<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>(macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), 작업 항목 키 옆 토글, 팝업 스위치 중 하나로 켭니다.\n켜면 아래 규칙 중 <b>“집중 모드에서만 적용”</b>을 켠 것이 적용됩니다."
   },
   "optRulesTitle": {
     "message": "스타일 규칙"
@@ -67,7 +61,7 @@
     "message": "＋ 규칙 추가"
   },
   "optRulesDesc": {
-    "message": "원하는 <b>CSS 선택자</b>에 <b>속성 : 값</b>을 <code>!important</code>로 강제 적용합니다.\nPlane의 클래스명이 바뀌면 선택자만 고치면 됩니다.\n값은 단위까지 함께 입력하세요.\n예: <code>320px</code>, <code>30rem</code>, <code>55ch</code>."
+    "message": "CSS 선택자에 속성과 값을 <code>!important</code>로 덮어써 화면을 바꿉니다.\n값은 <code>320px</code>처럼 단위까지 적습니다.\nPlane의 클래스 이름이 바뀌면 선택자만 고치면 됩니다."
   },
   "optRulesEmpty": {
     "message": "규칙이 없습니다. “규칙 추가”를 눌러 시작하세요."
@@ -111,7 +105,11 @@
   "optRuleHealthOk": {
     "message": "마지막 적용 $TIME$",
     "description": "Beside a rule that is working. An absolute time, like the sync status uses — a redesign shows up as one stale date beside rules that all read today.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optRuleHealthCold": {
     "message": "아직 아무 요소도 찾지 못했습니다",
@@ -120,37 +118,71 @@
   "optRuleHealthWarn": {
     "message": "아직 아무 요소도 찾지 못한 규칙이 $COUNT$개 있습니다. Plane 마크업이 바뀌었을 수 있으니 셀렉터를 고치거나 요소를 다시 집어 보세요.",
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorOk": {
     "message": "템플릿 버튼 마지막 표시 $TIME$",
     "description": "In the templates card, when the button has found a description toolbar to sit on. Same shape as optRuleHealthOk.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorCold": {
     "message": "작업 항목 페이지 $COUNT$곳에서 템플릿 버튼이 놓일 툴바를 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
     "description": "In the templates card, once enough work item pages (by address, with an editable description) have gone by without the button being placed. One line, no break: a status line is not a pre-line sink.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optTplAnchorLost": {
     "message": "템플릿 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
     "description": "In the templates card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
-    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
   },
   "optCopyAnchorOk": {
     "message": "복사 버튼 마지막 표시 $TIME$",
     "description": "In the copy reference card, when the button has found a work item header to sit beside.",
-    "placeholders": { "time": { "content": "$1" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
   },
   "optCopyAnchorCold": {
     "message": "작업 항목 페이지 $COUNT$곳에서 복사 버튼이 놓일 머리글을 아직 찾지 못했습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
     "description": "In the copy reference card, once enough work item pages (by address) have gone by without the button being placed. One line, no break.",
-    "placeholders": { "count": { "content": "$1" } }
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "optCopyAnchorLost": {
     "message": "복사 버튼은 $TIME$에 마지막으로 표시된 뒤 최근 작업 항목 페이지 $COUNT$곳에서 보이지 않았습니다. Plane 레이아웃이 바뀌었을 수 있습니다.",
     "description": "In the copy reference card: the button worked before, and a run of work item pages since has gone by without it. One line, no break.",
-    "placeholders": { "time": { "content": "$1" }, "count": { "content": "$2" } }
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
   },
   "optRuleLabelPh": {
     "message": "설명 (예: 모듈 이름 폭)"
@@ -171,22 +203,13 @@
     "message": "＋ 템플릿 추가"
   },
   "optTplDesc1": {
-    "message": "작업 항목 설명 툴바의 <b>“첨부” 옆 “템플릿” 버튼</b>에서 선택하면 <b>제목</b>과 <b>본문</b>이 함께 채워집니다.\n제목은 선택 사항입니다."
-  },
-  "optTplDesc2": {
-    "message": "본문은 <b>마크다운</b>으로 작성하며 에디터에 서식으로 변환되어 들어갑니다: <code>##</code> 제목, <code>-</code> / <code>1.</code> 목록, <code>- [ ]</code> 체크박스, <code>**굵게**</code>, <code>`코드`</code>."
-  },
-  "optTplDesc3": {
-    "message": "변수 (삽입 시 치환): <code>{{date}}</code> 오늘, <code>{{date+N}}</code>/<code>{{date-N}}</code> 오늘부터 N일 (예: <code>{{date+7}}</code>), <code>{{week}}</code> 이번 주 범위 (월–일), <code>{{month}}</code> <code>YYYY-MM</code> 형식.\n단축키: 설명 편집 중 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd>로 템플릿을 엽니다."
+    "message": "설명 툴바의 “첨부” 옆 <b>“템플릿”</b> 버튼이나, 입력 중에 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd>를 누르면 제목과 본문을 한 번에 채웁니다."
   },
   "optTplEmpty": {
     "message": "템플릿이 없습니다. “템플릿 추가”를 눌러 시작하세요."
   },
   "optTplShare": {
     "message": "↓ 팀에 공유…"
-  },
-  "optTplShareDesc": {
-    "message": "<b>팀에 공유</b>를 누르면 내 템플릿을 팀원이 구독할 수 있는 파일로 저장합니다.\n팀원이 <code>https</code>로 열 수 있는 곳에 올리고 주소를 알려주면, 팀원은 아래 <b>템플릿 동기화</b>에 소스로 추가합니다.\n소스에서 받은 템플릿은 포함되지 않습니다."
   },
   "optTplNamePh": {
     "message": "템플릿 이름 (예: 🐞 버그 리포트)"
@@ -204,10 +227,7 @@
     "message": "＋ 변수 추가"
   },
   "optVarsDesc": {
-    "message": "내 템플릿과 동기화된 템플릿 어디에나 <code>{{var.name}}</code> 형태로 넣을 수 있는 값입니다.\n동기화된 템플릿이 <code>{{var.team}}</code>을 쓰면, 삽입하는 사람마다 각자의 값으로 해석됩니다."
-  },
-  "optVarsUndefined": {
-    "message": "<code>var.</code> 접두어 덕분에 내장 변수 <code>{{date}}</code>, <code>{{week}}</code>, <code>{{month}}</code>와 이름이 겹칠 수 없습니다.\n정의하지 않은 변수는 빈 문자열이 되지 않고 <code>{{var.name}}</code> 그대로 남아 눈에 보입니다."
+    "message": "내 템플릿과 동기화된 템플릿의 <code>{{var.name}}</code> 자리에 들어갈 내 값입니다.\n동기화된 템플릿이 <code>{{var.team}}</code>을 쓰면 사람마다 각자의 값으로 채워집니다."
   },
   "optVarsEmpty": {
     "message": "변수가 없습니다. “변수 추가”를 눌러 시작하세요."
@@ -244,13 +264,10 @@
     "message": "템플릿 동기화"
   },
   "optSyncDesc": {
-    "message": "하나 이상의 URL에서 공유 템플릿을 받아옵니다.\n브라우저 시작 시, 설정한 주기마다, 그리고 이 페이지를 열 때 확인합니다.\n동기화된 템플릿은 <b>읽기 전용</b>입니다.\n수정은 소스에서 하세요.\n별도 접근 권한 요청을 피하려면 <b>Plane과 같은 도메인</b>에 파일을 두세요."
-  },
-  "optSyncFormat": {
-    "message": "파일 형식"
+    "message": "URL에서 공유 템플릿을 받아와 최신으로 유지합니다.\n받은 템플릿은 여기서 읽기만 할 수 있습니다.\n수정은 소스에서 하세요."
   },
   "optSyncFormatDesc": {
-    "message": "중첩이 없는 단순한 목록입니다.\n항목마다 <code>group</code> 문자열을 하나씩 넣습니다.\n최상위 <code>name</code>은 이 묶음 전체의 이름이며, 소스 이름을 비워두면 이 값이 쓰입니다."
+    "message": "브라우저를 시작할 때, 소스마다 정한 주기에, 그리고 이 페이지를 열 때 확인합니다.\nPlane과 같은 도메인에 파일을 두면 접근 권한을 따로 묻지 않습니다.\n파일은 중첩이 없는 단순한 템플릿 목록이고, 항목마다 <code>group</code>을 넣습니다.\n최상위 <code>name</code>은 소스 이름을 비워 두었을 때 쓰입니다."
   },
   "optSyncEmpty": {
     "message": "소스가 없습니다. “소스 추가”를 누르세요."
@@ -290,10 +307,10 @@
     "message": "백업"
   },
   "optBackupDesc1": {
-    "message": "모든 설정(도메인, 스타일 규칙, 템플릿, <b>변수</b>, <b>동기화 소스 URL</b>, <b>바로 열기 링크</b>)을 JSON 파일로 내보내거나, 이전에 내보낸 파일을 가져옵니다.\n가져온 설정은 양식에 불러오기만 하므로, 확인한 뒤 <b>저장</b>해야 적용됩니다."
+    "message": "모든 설정을 JSON 파일로 내보내거나 가져옵니다.\n가져온 설정은 양식에 채워지고, <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
-    "message": "파일에는 도메인, 소스 URL, 변수 값이 평문으로 들어갑니다.\n변수에 이름을 넣어두었거나 주소가 비공개라면 내부 자료로 취급하세요.\n동기화된 템플릿은 <b>포함되지 않으며</b>, 저장 후 소스에서 다시 받아옵니다."
+    "message": "파일에는 도메인, 소스 주소, 변수 값이 평문으로 들어가므로, 비공개인 값이 있다면 파일도 내부 자료로 다루세요.\n동기화된 템플릿은 들어가지 않으며, 저장한 뒤 소스에서 다시 받아옵니다."
   },
   "optBackupExport": {
     "message": "↓ JSON 내보내기"
@@ -492,7 +509,11 @@
   "msgKeptDomains": {
     "message": "저장했습니다 — 이 페이지를 열어둔 사이 다른 곳에서 켠 $SITES$도 함께 유지했습니다.",
     "description": "Shown instead of \"Saved\" when the save carried across a domain enabled from the popup or another tab that this page had never displayed. Worth its own message: the alternative was that site quietly going dark, with nothing to connect it to this save.",
-    "placeholders": { "sites": { "content": "$1" } }
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
   },
   "msgResetConfirm": {
     "message": "모든 설정을 기본값으로 되돌립니다. 실행 중인 사이트 목록도 함께 비워집니다.\n최근에 열었거나 고정한 작업 항목도 지워집니다.\n저장을 누르기 전까지는 아무것도 바뀌지 않습니다. 저장하면 해당 사이트에 대한 Chrome 접근 권한도 함께 반납되므로, 다시 켜려면 승인을 새로 받아야 합니다.\n계속할까요?"
@@ -709,14 +730,30 @@
     "message": "곧 바뀔 수 있음 — 빌드가 만든 이름",
     "description": "Heading over the demoted picker candidates: hashes, uuids, counters. Still pickable — this is a guess about someone else's markup."
   },
-  "pickKindId": { "message": "id" },
-  "pickKindIdPrefix": { "message": "id 접두사" },
-  "pickKindData": { "message": "data 속성" },
-  "pickKindLabel": { "message": "라벨" },
-  "pickKindRole": { "message": "역할" },
-  "pickKindClass": { "message": "클래스" },
-  "pickKindTagClasses": { "message": "태그 + 클래스" },
-  "pickKindPath": { "message": "위치" },
+  "pickKindId": {
+    "message": "id"
+  },
+  "pickKindIdPrefix": {
+    "message": "id 접두사"
+  },
+  "pickKindData": {
+    "message": "data 속성"
+  },
+  "pickKindLabel": {
+    "message": "라벨"
+  },
+  "pickKindRole": {
+    "message": "역할"
+  },
+  "pickKindClass": {
+    "message": "클래스"
+  },
+  "pickKindTagClasses": {
+    "message": "태그 + 클래스"
+  },
+  "pickKindPath": {
+    "message": "위치"
+  },
   "pickMatches": {
     "message": "$COUNT$개 일치",
     "placeholders": {
@@ -746,10 +783,10 @@
     "message": "＋ 형식 추가"
   },
   "optCopyDesc": {
-    "message": "작업 항목에서 — 항목 화면이든 목록에서 열리는 패널이든 — 번호 옆 버튼 또는 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>를 누르면 아래 형식 중 하나로 클립보드에 복사합니다.\n메신저, 풀 리퀘스트 본문, 브랜치명으로 넘길 때 씁니다."
+    "message": "작업 항목 키 옆 버튼이나 <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd>를 누르면 아래 형식 중 하나로 복사합니다.\n형식마다 아래 줄이 실제로 복사되는 내용입니다."
   },
   "optCopyTokens": {
-    "message": "치환되는 값은 세 가지입니다: <code>{{item.key}}</code>, <code>{{item.title}}</code>, <code>{{item.url}}</code>.\n나머지는 적은 그대로 복사되므로, 각 줄 아래 미리보기가 곧 클립보드에 들어갈 내용입니다."
+    "message": "채워지는 값은 <code>{{item.key}}</code>, <code>{{item.title}}</code>, <code>{{item.url}}</code> 세 가지입니다.\n나머지는 적은 그대로 복사됩니다."
   },
   "optCopyEmpty": {
     "message": "형식이 없습니다. “형식 추가”를 눌러 시작하세요."
@@ -889,7 +926,7 @@
     "message": "키보드 단축키"
   },
   "optKeysDesc": {
-    "message": "단축키를 한자리에 모았습니다.\nmacOS에서 <kbd>Alt</kbd>는 <kbd>⌥</kbd> Option 키입니다."
+    "message": "macOS에서 <kbd>Alt</kbd>는 <kbd>⌥</kbd> Option 키입니다."
   },
   "optKeysColWhat": {
     "message": "동작"
@@ -942,78 +979,81 @@
     "description": "Follows the literal omnibox keyword: “issue” then the key. Not a modifier combination, which is why it reads as words."
   },
   "optKeysRebind": {
-    "message": "집중 모드는 브라우저 명령이라 <code>chrome://extensions/shortcuts</code>에서 다시 지정하거나 해제할 수 있습니다. <kbd>Alt</kbd> 단축키 두 개는 페이지 안에서 처리되며 고정입니다."
-  },
-  "optKeysKeyword": {
-    "message": "<kbd>issue</kbd>도 고정인데, 이유는 다릅니다. 확장 프로그램의 주소창 키워드는 매니페스트에 선언하며 바꾸는 API가 없습니다.\nChrome은 <code>chrome://settings/searchEngines</code> → 확장 프로그램에 이 키워드를 보여주지만, 거기서 제공하는 건 <b>관리</b>와 <b>사용 중지</b>뿐입니다 — 이름 바꾸기는 없습니다.",
-    "description": "Answers a question asked directly: the omnibox keyword looks like a setting because Chrome lists it among the search engines. Verified on Chrome 151 — the row's menu has Manage and Deactivate and nothing else."
-  },
-  "optKeysKeywordDiy": {
-    "message": "더 짧은 걸 쓰고 싶다면 같은 페이지의 <b>사이트 검색</b>에 직접 추가하세요. 원하는 키워드에 <code>https://내-plane/내-워크스페이스/browse/%s</code>를 넣으면 됩니다.\n이건 이 확장이 아니라 Chrome의 기능이라 주소 하나만 엽니다 — 접두사로 다른 트래커에 보내는 것도, 최근 항목도, 키가 아닐 때 검색으로 넘기는 것도 없습니다.",
-    "description": "The thing you can actually do instead, with its limits stated. A Chrome site-search shortcut is one URL: it skips the prefix routing, the recents and the search fallback, and saying so is the difference between an alternative and a disappointment."
-  },
-  "optKeysWhyTyping": {
-    "message": "<kbd>Alt</kbd>+<kbd>T</kbd>는 문장을 쓰는 중에 쓰는 것이 목적이라 입력 중에도 동작합니다.\n<kbd>Alt</kbd>+<kbd>C</kbd>는 일부러 그렇게 하지 않았습니다.\nmacOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이고, 제목에서 그 글자를 삼키는 단축키는 얻는 것보다 잃는 것이 큽니다."
-  },
-  "optKeysWhyCommand": {
-    "message": "집중 모드는 페이지 안의 키 핸들러가 아니라 브라우저 명령이라 이 선택을 하지 않아도 됩니다 — Chrome이 페이지보다 먼저 키를 가로챕니다."
+    "message": "바꿀 수 있는 단축키는 집중 모드뿐이며, <code>chrome://extensions/shortcuts</code>에서 바꿉니다."
   },
   "optQuickTitle": {
     "message": "바로 열기"
   },
   "optQuickDesc": {
-    "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 작업 항목 키(예: <code>PROJ-123</code>)를 입력하면 Enter로 바로 열립니다.\n키의 <b>접두사</b>가 대상을 고르므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.\n접두사가 빈 대상이 기본값입니다.\n툴바 팝업에서도 되고, 두 곳 모두 최근에 연 항목을 함께 보여 줍니다. 기억나지 않는 키도 대개 이미 화면에 있습니다.\n키는 키의 모습으로 오지 않습니다. 문장 속에 섞여 옵니다. 어디서든 그 부분을 드래그하고 우클릭해 <b>“선택한 텍스트에서 작업 항목 열기”</b>를 고르세요. 키가 여러 개면 각각 새 탭으로, 한 번에 10개까지 열립니다.\nChrome이 선택한 텍스트만 넘겨주고 페이지는 읽지 않습니다."
-  },
-  "optQuickTokens": {
-    "message": "URL에서 키가 들어갈 자리에 <code>{{key}}</code>를 넣으세요. <code>{{key.proj}}</code>와 <code>{{key.num}}</code>는 키를 둘로 나눈 조각입니다.\n<code>{{key}}</code>가 없는 URL은 끝에 키가 덧붙습니다.\n둘째 줄은 선택입니다. <code>{{q}}</code>가 들어간 검색 주소를 넣으면 키 대신 낱말을 입력했을 때 그리로 갑니다. <code>/api/</code> 주소가 아니라 화면 주소를 넣으세요. 트래커에 따라 검색을 실행하지 않고 입력칸만 채워 주기도 합니다.\n각 행 아래 줄이 예시 키와 예시 검색어가 어디로 가는지 보여 줍니다."
+    "message": "주소창에 <code>issue</code>를 입력하고 한 칸 띄운 뒤 <code>PROJ-123</code> 같은 작업 항목 키를 입력하면 Enter로 바로 열립니다.\n툴바 팝업에서도 되고, 텍스트를 선택한 뒤 우클릭해 “선택한 텍스트에서 작업 항목 열기”를 골라도 됩니다."
   },
   "optQuickEmpty": {
     "message": "아직 링크가 없습니다. “링크 추가”를 누르세요."
   },
   "optQuickPasteLabel": {
-    "message": "\uc0ac\uc6a9 \uc911\uc778 \ud2b8\ub798\ucee4\uc758 \uc8fc\uc18c\ub97c \ubd99\uc5ec\ub123\uc73c\uc138\uc694",
+    "message": "사용 중인 트래커의 주소를 붙여넣으세요",
     "description": "Label over the paste box at the top of the quick-link chooser. The examples can only cover trackers we thought of; the reader already has theirs open."
   },
   "optQuickPastePlaceholder": {
-    "message": "https://\u2026/browse/PROJ-123",
+    "message": "https://…/browse/PROJ-123",
     "description": "Placeholder in the paste box. An address shaped like the ones it reads, rather than a sentence."
   },
   "optQuickPasteGo": {
-    "message": "\ub9cc\ub4e4\uae30",
+    "message": "만들기",
     "description": "Button beside the paste box."
   },
   "optQuickPasteKnown": {
-    "message": "$NAME$ \uc8fc\uc18c\ub85c \uc77d\uc5c8\uc2b5\ub2c8\ub2e4. \uac80\uc0c9 \uc8fc\uc18c\uae4c\uc9c0 \ucc44\uc6c1\ub2c8\ub2e4.",
+    "message": "$NAME$ 주소로 읽었습니다. 검색 주소까지 채웁니다.",
     "description": "Shown when a pasted address matched one of the known shapes, so nothing is left to type.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteKnownNoSearch": {
-    "message": "$NAME$ \uc8fc\uc18c\ub85c \uc77d\uc5c8\uc2b5\ub2c8\ub2e4. \uc774 \ud2b8\ub798\ucee4\ub294 \uc8fc\uc18c\ub85c \uac80\uc0c9\ud560 \ubc29\ubc95\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
-    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL \u2014 Linear.",
-    "placeholders": { "name": { "content": "$1" } }
+    "message": "$NAME$ 주소로 읽었습니다. 이 트래커는 주소로 검색할 방법이 없습니다.",
+    "description": "Same as optQuickPasteKnown for a tracker whose example carries no search URL — Linear.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteGuess": {
     "message": "알려진 트래커가 아니라, 주소에서 키가 놓인 자리로 만들었습니다 ($NAME$). 검색 주소는 비어 둡니다.",
     "description": "Shown when no known shape matched but a key-shaped path segment was found. Says plainly which part is a guess.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteGuessNumbered": {
     "message": "알려진 트래커가 아니고 항목이 번호로만 되어 있습니다 ($NAME$) — 번호 앞에 붙일 접두사를 정하세요. 예: RM-1234",
     "description": "The numbered variant of optQuickPasteGuess. A bare number is not a key, so this one leaves the prefix field to fill.",
-    "placeholders": { "name": { "content": "$1" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickPasteUnread": {
-    "message": "\uc8fc\uc18c\uc5d0\uc11c \ud56d\ubaa9 \ud0a4\ub97c \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \uc791\uc5c5 \ud56d\ubaa9\uc744 \uc5f4\uc5b4 \uadf8 \uc8fc\uc18c\ub97c \ubcf5\uc0ac\ud558\uac70\ub098, \uc544\ub798 \uc608\uc2dc\ub97c \uace0\ub974\uc138\uc694.",
+    "message": "주소에서 항목 키를 찾지 못했습니다. 작업 항목을 열어 그 주소를 복사하거나, 아래 예시를 고르세요.",
     "description": "Shown when the pasted text yields nothing. Refusing matters: a template built from a page that is not a work item opens the wrong address forever, silently."
   },
   "optQuickExamplesLegend": {
-    "message": "\u27e8\u2026\u27e9\ub294 \uc9c1\uc811 \ucc44\uc6b0\uace0, {{key}}\ub294 \ud655\uc7a5\uc774 \ucc44\uc6c1\ub2c8\ub2e4.",
+    "message": "⟨…⟩는 직접 채우고, {{key}}는 확장이 채웁니다.",
     "description": "One line at the top of the chooser. The two look alike and mean opposite things, and nothing said so."
   },
   "optQuickExampleSearchLine": {
-    "message": "\uac80\uc0c9: $URL$",
+    "message": "검색: $URL$",
     "description": "The second address on a chooser row. Picking a row fills two fields and the panel was showing one.",
-    "placeholders": { "url": { "content": "$1" } }
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
   },
   "optQuickExamplesFromSites": {
     "message": "이미 추가한 사이트에서",
@@ -1036,13 +1076,27 @@
   "optQuickExampleNoteNumbered": {
     "message": "이슈에 키가 없고 번호만 있습니다. 접두사와 번호를 함께 입력하세요. 예: GH-1234"
   },
-  "optQuickPartHost": { "message": "호스트" },
-  "optQuickPartWorkspace": { "message": "워크스페이스" },
-  "optQuickPartSite": { "message": "사이트" },
-  "optQuickPartOwner": { "message": "소유자" },
-  "optQuickPartRepo": { "message": "저장소" },
-  "optQuickPartGroup": { "message": "그룹" },
-  "optQuickPartProject": { "message": "프로젝트" },
+  "optQuickPartHost": {
+    "message": "호스트"
+  },
+  "optQuickPartWorkspace": {
+    "message": "워크스페이스"
+  },
+  "optQuickPartSite": {
+    "message": "사이트"
+  },
+  "optQuickPartOwner": {
+    "message": "소유자"
+  },
+  "optQuickPartRepo": {
+    "message": "저장소"
+  },
+  "optQuickPartGroup": {
+    "message": "그룹"
+  },
+  "optQuickPartProject": {
+    "message": "프로젝트"
+  },
   "optQuickNamePh": {
     "message": "이름 (예: Jira)"
   },
@@ -1064,7 +1118,14 @@
   "optQuickSearchPreview": {
     "message": "“$Q$” → $URL$",
     "description": "Layout only — a phrase, an arrow, the URL it lands on. No words to translate.",
-    "placeholders": { "q": { "content": "$1" }, "url": { "content": "$2" } }
+    "placeholders": {
+      "q": {
+        "content": "$1"
+      },
+      "url": {
+        "content": "$2"
+      }
+    }
   },
   "optQuickPreview": {
     "message": "$KEY$ → $URL$",
@@ -1114,12 +1175,20 @@
   "popPinFull": {
     "message": "최대 $MAX$개까지 고정할 수 있습니다",
     "description": "Tooltip and accessible name for the pin button when the list is full and the button is disabled. The button itself shows the count. Plain text.",
-    "placeholders": { "max": { "content": "$1" } }
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
   },
   "popPinRemove": {
     "message": "$KEY$ 고정 해제",
     "description": "Tooltip and accessible name for the × on a pinned row. Plain text: a title, not a pre-line sink.",
-    "placeholders": { "key": { "content": "$1" } }
+    "placeholders": {
+      "key": {
+        "content": "$1"
+      }
+    }
   },
   "popJumpAuto": {
     "message": "자동"
@@ -1131,12 +1200,26 @@
   "omniboxSearch": {
     "message": "검색 · $NAME$ · “$Q$”",
     "description": "Omnibox row when what was typed is words rather than a key.",
-    "placeholders": { "name": { "content": "$1" }, "q": { "content": "$2" } }
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "q": {
+        "content": "$2"
+      }
+    }
   },
   "omniboxRecent": {
     "message": "최근 · $KEY$ · $NAME$",
     "description": "Omnibox row for a key opened before. The leading word is the only thing that distinguishes these from Chrome's own history rows: the omnibox API offers no per-row icon, so a label is all there is.",
-    "placeholders": { "key": { "content": "$1" }, "name": { "content": "$2" } }
+    "placeholders": {
+      "key": {
+        "content": "$1"
+      },
+      "name": {
+        "content": "$2"
+      }
+    }
   },
   "omniboxHint": {
     "message": "작업 항목 키를 입력하면 열고, 여러 낱말을 입력하면 검색합니다"
@@ -1154,5 +1237,53 @@
         "content": "$2"
       }
     }
+  },
+  "optQuickMore": {
+    "message": "키의 접두사가 갈 곳을 정하므로, <code>ENG-</code>는 Linear로 보내고 나머지는 Plane에 둘 수 있습니다.\n접두사가 빈 링크가 나머지 키를 모두 받습니다.\n주소의 <code>{{key}}</code> 자리에 키가 들어가고, <code>{{key.proj}}</code>와 <code>{{key.num}}</code>는 키를 둘로 나눈 조각입니다.\n검색 주소는 선택입니다. <code>{{q}}</code>를 넣어 두면 키가 아닌 낱말은 그 주소에서 검색합니다.\n선택한 텍스트에 키가 여러 개면 각각 새 탭으로, 한 번에 10개까지 열립니다.",
+    "description": "Settings › Quick open, inside More. One sentence per line."
+  },
+  "optTplMore": {
+    "message": "본문은 마크다운입니다: <code>##</code> 제목, <code>-</code>와 <code>1.</code> 목록, <code>- [ ]</code> 체크박스, <code>**굵게**</code>, <code>`코드`</code>.\n삽입할 때 <code>{{date}}</code>, <code>{{date+7}}</code>처럼 날수를 더하거나 뺀 날짜, <code>{{week}}</code>(월–일), <code>{{month}}</code>, 그리고 직접 정한 <code>{{var.name}}</code>이 채워집니다.\n<b>팀에 공유</b>는 내 템플릿을 파일로 저장합니다.\n팀원이 <code>https</code>로 열 수 있는 곳에 올리면, 팀원은 <b>템플릿 동기화</b>에 그 주소를 추가합니다.",
+    "description": "Settings › Body templates, inside More."
+  },
+  "optFocusMore": {
+    "message": "속성 패널 숨기기와 왼쪽 내비게이션 숨기기 규칙은 처음부터 켜져 있고, 본문 읽기 폭 규칙은 꺼진 채로 들어 있습니다.\n집중 모드는 켠 탭에서만 적용되고, 새로 고쳐도 유지되며, 탭을 닫으면 끝납니다.\n다른 기기로는 동기화되지 않습니다.\n단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요.",
+    "description": "Settings › Focus mode, inside More."
+  },
+  "optKeysWhyTitle": {
+    "message": "나머지는 왜 바꿀 수 없나요?",
+    "description": "Summary of a disclosure on the Shortcuts tab."
+  },
+  "optKeysWhy": {
+    "message": "<kbd>Alt</kbd>+<kbd>T</kbd>와 <kbd>Alt</kbd>+<kbd>C</kbd>는 페이지 안에서 처리하므로 Chrome에서 다시 지정할 수 없습니다.\n<kbd>Alt</kbd>+<kbd>C</kbd>는 입력 중에는 동작하지 않습니다. macOS에서 <kbd>⌥</kbd>+<kbd>C</kbd>는 문자 “ç”이기 때문입니다.\n주소창 키워드 <kbd>issue</kbd>도 Chrome에서 이름을 바꿀 수 없습니다.\n더 짧은 키워드를 원하면 <code>chrome://settings/searchEngines</code>의 <b>사이트 검색</b>에 직접 추가하고, 주소에 <code>https://내-plane/내-워크스페이스/browse/%s</code>를 넣으세요.\n이렇게 만든 키워드는 정해진 주소 하나만 엽니다. 접두사, 최근 항목, 검색은 쓸 수 없습니다.",
+    "description": "Inside the disclosure on the Shortcuts tab. One sentence per line."
+  },
+  "optMore": {
+    "message": "자세히",
+    "description": "Summary of the collapsed details under a settings card's description."
+  },
+  "optFieldOpen": {
+    "message": "열기",
+    "description": "Short label beside a quick link's address field."
+  },
+  "optFieldSearch": {
+    "message": "검색",
+    "description": "Short label beside a quick link's search address field."
+  },
+  "optFieldTitle": {
+    "message": "제목",
+    "description": "Short label beside a template's title field."
+  },
+  "optFieldBody": {
+    "message": "본문",
+    "description": "Short label beside a template's body field."
+  },
+  "optFieldName": {
+    "message": "이름",
+    "description": "Short label beside a template's name field."
+  },
+  "optSyncEnabled": {
+    "message": "사용",
+    "description": "Beside the Template sync card's own switch. Not optEnabled: that one names the whole extension in Korean."
   }
 }

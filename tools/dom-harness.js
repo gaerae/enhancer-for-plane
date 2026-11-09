@@ -2410,6 +2410,9 @@ const suites = [
       // The descriptions carry a newline at every sentence end; only the stylesheet decides
       // whether that is a line break or a space, and the difference is invisible in the source.
       // So measure it: the characters either side of a newline have to land on different lines.
+      // Most of the copy now sits in a closed disclosure, and closed text has no layout to
+      // measure — it would be skipped here and below, which is the copy most likely to grow.
+      for (const d of document.querySelectorAll("details")) d.open = true;
       check("each sentence of a description starts its own line", () => {
         const measured = [];
         for (const el of document.querySelectorAll(".panel:not([hidden]) .desc, #panel-items .desc")) {
@@ -2542,6 +2545,7 @@ const suites = [
       for (const tab of [...document.querySelectorAll("#tabs .tab")].map((t) => t.dataset.tab)) {
         check("ko: " + tab + " breaks Korean lines at spaces, not mid-word", () => {
           document.getElementById("tab-" + tab).click();
+          for (const d of document.querySelectorAll("details")) d.open = true;
           const bad = [];
           for (const el of document.querySelectorAll("#panel-" + tab + " .desc, #panel-" + tab + " td, .brand p")) {
             if (!el.getClientRects().length) continue;

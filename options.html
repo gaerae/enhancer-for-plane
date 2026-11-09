@@ -53,8 +53,11 @@
             <h2 data-i18n="optQuickTitle">Quick open</h2>
             <button class="primary sm" id="addQuickLink" data-i18n="optQuickAddLink">＋ Add quick link</button>
           </div>
-          <p class="desc" data-i18n-html="optQuickDesc">In the address bar type <code>issue</code>, a space, then a work item key such as <code>PROJ-123</code> — Enter opens it. The key’s <b>prefix</b> picks the target, so you can point <code>ENG-</code> at Linear and leave the rest on Plane; a target with an empty prefix is the default. Also on the toolbar popup.</p>
-          <p class="desc" data-i18n-html="optQuickTokens">Put <code>{{key}}</code> where the key belongs in the URL — <code>{{key.proj}}</code> and <code>{{key.num}}</code> are its two halves. A URL with no <code>{{key}}</code> gets the key appended to the end. The line under each row shows where a sample key would land.</p>
+          <p class="desc" data-i18n-html="optQuickDesc"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n-html="optQuickMore"></p>
+          </details>
           <!-- Starting points, rather than an empty row. An empty row is where a wrong URL
                gets typed — an API address, a search that ignores its parameter — and none of
                that is detectable afterwards. Built by options.js from PE_QUICK_EXAMPLES and
@@ -70,8 +73,11 @@
             <h2 data-i18n="optCopyTitle">Copy reference</h2>
             <button class="primary sm" id="addCopyFormat" data-i18n="optCopyAdd">＋ Add format</button>
           </div>
-          <p class="desc" data-i18n-html="optCopyDesc">On a work item page, the button beside its ID — or <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>C</kbd> — copies that item to your clipboard in one of the formats below. Use it to hand a work item to a chat message, a pull request, or a branch name.</p>
-          <p class="desc" data-i18n-html="optCopyTokens">Three values can be filled in: <code>{{item.key}}</code>, <code>{{item.title}}</code> and <code>{{item.url}}</code>. Everything else in a format is copied exactly as you typed it, so the preview under each row is what lands on the clipboard.</p>
+          <p class="desc" data-i18n-html="optCopyDesc"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n-html="optCopyTokens"></p>
+          </details>
           <p class="rule-health anchor-health" id="copyAnchorHealth" hidden></p>
           <div id="copyList" class="copy-list"></div>
           <div id="copyEmpty" class="tpl-empty" hidden data-i18n="optCopyEmpty">No formats yet. Click “Add format” to start.</div>
@@ -88,10 +94,11 @@
               <button class="primary sm" id="addTemplate" data-i18n="optTplAdd">＋ Add template</button>
             </div>
           </div>
-          <p class="desc" data-i18n-html="optTplDesc1">Pick one from the <b>“Template” button next to “Attach”</b> in an item's description toolbar — it fills the <b>title</b> and the <b>body</b> together. The title is optional.</p>
-          <p class="desc" data-i18n-html="optTplDesc2">The body is written in <b>Markdown</b> and rendered into the editor: <code>##</code> headings, <code>-</code> / <code>1.</code> lists, <code>- [ ]</code> checkboxes, <code>**bold**</code>, <code>`code`</code>.</p>
-          <p class="desc" data-i18n-html="optTplDesc3">Variables (filled on insert): <code>{{date}}</code> today, <code>{{date+N}}</code>/<code>{{date-N}}</code> N days from today (e.g. <code>{{date+7}}</code>), <code>{{week}}</code> this week's range (Mon–Sun), <code>{{month}}</code> as <code>YYYY-MM</code>. Shortcut: <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> opens templates while editing a description.</p>
-          <p class="desc" data-i18n-html="optTplShareDesc"><b>Share with your team</b> saves your own templates as a file your teammates can subscribe to. Host it where they can reach it over <code>https</code> and give them the URL — they add it under <b>Template sync</b> below. Templates you received from a source are not included.</p>
+          <p class="desc" data-i18n-html="optTplDesc1"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n-html="optTplMore"></p>
+          </details>
           <p class="rule-health anchor-health" id="tplAnchorHealth" hidden></p>
           <div id="templateList" class="tpl-list"></div>
           <div id="templateEmpty" class="tpl-empty" hidden data-i18n="optTplEmpty">No templates yet. Click “Add template” to start.</div>
@@ -103,8 +110,7 @@
             <h2 data-i18n="optVarsTitle">Template variables</h2>
             <button class="primary sm" id="addVariable" data-i18n="optVarsAdd">＋ Add variable</button>
           </div>
-          <p class="desc" data-i18n-html="optVarsDesc">Values you can drop into any template — your own and synced ones alike — as <code>{{var.name}}</code>. A synced template can say <code>{{var.team}}</code> and resolve to a different value for each person who inserts it.</p>
-          <p class="desc" data-i18n-html="optVarsUndefined">The <code>var.</code> prefix keeps your names from ever clashing with the built-in <code>{{date}}</code>, <code>{{week}}</code> and <code>{{month}}</code>. A variable you have not defined stays visible as <code>{{var.name}}</code> rather than turning into an empty string.</p>
+          <p class="desc" data-i18n-html="optVarsDesc"></p>
           <div id="variableList" class="var-list"></div>
           <div id="variableEmpty" class="tpl-empty" hidden data-i18n="optVarsEmpty">No variables yet. Click “Add variable” to start.</div>
         </section>
@@ -116,13 +122,13 @@
             <label class="row-toggle sync-toggle">
               <input type="checkbox" id="syncEnabled" />
               <span class="switch"></span>
-              <span class="sync-toggle-label" data-i18n="optEnabled">Enabled</span>
+              <span class="sync-toggle-label" data-i18n="optSyncEnabled">Enabled</span>
             </label>
           </div>
-          <p class="desc" data-i18n-html="optSyncDesc">Pull shared templates from one or more URLs, checked on browser start, on a schedule, and when you open this page. Synced templates are <b>read-only</b> — edit them at the source. Host the file on the <b>same domain as Plane</b> to avoid a separate access prompt.</p>
-          <details class="fmt">
-            <summary data-i18n="optSyncFormat">File format</summary>
-            <p class="desc" data-i18n-html="optSyncFormatDesc">A flat list; each item carries its own <code>group</code> string. The top-level <code>name</code> labels the whole collection and is used when you leave a source's name blank.</p>
+          <p class="desc" data-i18n="optSyncDesc"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n-html="optSyncFormatDesc"></p>
             <pre class="fmt-pre">{
     "schema": 1,
     "name": "QA &amp; Delivery standards",
@@ -153,9 +159,11 @@
              is the only place the shortcut is written down. -->
         <section class="card">
           <h2 data-i18n="optFocusTitle">Focus mode</h2>
-          <p class="desc" data-i18n-html="optFocusDesc">A rule marked <b>“Only while focus mode is on”</b> stays out of the way until you ask for it. Two ship ready to use: hide a work item's properties panel, and hide the left navigation. A third caps the reading width and starts switched off.</p>
-          <p class="desc" data-i18n-html="optFocusHow">Three ways in: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> (macOS <kbd>⌥</kbd>+<kbd>⇧</kbd>+<kbd>F</kbd>), the toggle beside a work item's key, and the switch in the toolbar popup. To rebind the shortcut, open <code>chrome://extensions/shortcuts</code>.</p>
-          <p class="desc" data-i18n="optFocusScope">It applies to the tab you turned it on in, survives a reload there, and is gone once you close that tab. It never syncs to your other devices.</p>
+          <p class="desc" data-i18n-html="optFocusDesc"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n-html="optFocusMore"></p>
+          </details>
         </section>
 
         <!-- Style rules -->
@@ -164,7 +172,7 @@
             <h2 data-i18n="optRulesTitle">Style rules</h2>
             <button class="primary sm" id="addRule" data-i18n="optRulesAdd">＋ Add rule</button>
           </div>
-          <p class="desc" data-i18n-html="optRulesDesc">Force a <b>property : value</b> onto any <b>CSS selector</b> (with <code>!important</code>). If Plane's class names change, just edit the selector. Type the full value with units, e.g. <code>320px</code>, <code>30rem</code>, <code>55ch</code>.</p>
+          <p class="desc" data-i18n-html="optRulesDesc"></p>
           <div id="ruleHealthSummary" class="rule-health-summary" hidden></div>
           <div id="ruleList" class="rule-list"></div>
           <div id="ruleEmpty" class="tpl-empty" hidden data-i18n="optRulesEmpty">No rules yet. Click “Add rule” to start.</div>
@@ -189,7 +197,7 @@
         <!-- Active domains -->
         <section class="card">
           <h2 data-i18n="optDomainsTitle">Active domains</h2>
-          <p class="desc" data-i18n-html="optDomainsDesc">Runs only on the domains listed below. One per line. Wildcards like <code>*.example.com</code> are supported. Saving prompts Chrome to grant access to each newly added domain.</p>
+          <p class="desc" data-i18n-html="optDomainsDesc"></p>
           <label class="inline-check">
             <input type="checkbox" id="allDomains" />
             <span data-i18n="optDomainsAll">Run on all sites (ignore the list below)</span>
@@ -203,8 +211,11 @@
         <!-- Backup -->
         <section class="card">
           <h2 data-i18n="optBackupTitle">Backup</h2>
-          <p class="desc" data-i18n-html="optBackupDesc1">Export all settings (domains, style rules, templates, <b>variables</b>, and <b>sync source URLs</b>) to a JSON file, or import a previously exported file. Imported settings load into the form — review, then <b>Save</b> to apply.</p>
-          <p class="desc" data-i18n-html="optBackupDesc2">The file lists your domains, source URLs and variable values in plain text — so if a variable holds your name, or those addresses are private, treat the file as internal. Synced templates are <b>not</b> included: they re-download from their source after you Save.</p>
+          <p class="desc" data-i18n-html="optBackupDesc1"></p>
+          <details class="more">
+            <summary data-i18n="optMore">More</summary>
+            <p class="desc" data-i18n="optBackupDesc2"></p>
+          </details>
           <div class="backup-actions">
             <button class="ghost" id="exportBtn" data-i18n="optBackupExport">↓ Export JSON</button>
             <button class="ghost" id="importBtn" data-i18n="optBackupImport">↑ Import JSON…</button>
@@ -221,7 +232,7 @@
       <div class="panel" id="panel-keys" data-tab="keys" role="tabpanel" aria-labelledby="tab-keys" tabindex="0" hidden>
         <section class="card">
           <h2 data-i18n="optKeysTitle">Keyboard shortcuts</h2>
-          <p class="desc" data-i18n-html="optKeysDesc">Everything the keyboard reaches, in one place. On macOS, <kbd>Alt</kbd> is <kbd>⌥</kbd> Option.</p>
+          <p class="desc" data-i18n-html="optKeysDesc"></p>
           <div class="keys-scroll">
             <table class="keys">
               <thead>
@@ -266,14 +277,14 @@
               </tbody>
             </table>
           </div>
-          <p class="desc" data-i18n-html="optKeysRebind">Focus mode is a browser command, so you can rebind it — or clear it — at <code>chrome://extensions/shortcuts</code>. The two <kbd>Alt</kbd> shortcuts are handled inside the page and are fixed.</p>
+          <p class="desc" data-i18n-html="optKeysRebind"></p>
           <!-- Asked directly, and the answer is not guessable from the outside: the keyword
                looks like a setting because Chrome lists it among the search engines. It is
                not, and the honest reply comes with the thing you can do instead. -->
-          <p class="desc" data-i18n-html="optKeysKeyword"><kbd>issue</kbd> is fixed as well, for a different reason: an extension declares its address-bar keyword in its manifest and there is no API to change it. Chrome lists it under <code>chrome://settings/searchEngines</code> → Extensions, but offers only <b>Manage</b> and <b>Deactivate</b> there — no rename.</p>
-          <p class="desc" data-i18n-html="optKeysKeywordDiy">If you want a shorter one, add your own on that same page under <b>Site search</b>: any keyword you like, pointing at <code>https://your-plane/your-workspace/browse/%s</code>. That is Chrome's own feature, not this extension's, so it opens one fixed address — no prefix routing to a second tracker, no recent items, and no falling back to a search when what you typed is not a key.</p>
-          <p class="desc" data-i18n-html="optKeysWhyTyping"><kbd>Alt</kbd>+<kbd>T</kbd> is meant to be used mid-sentence, so it works while you type. <kbd>Alt</kbd>+<kbd>C</kbd> deliberately does not: on macOS <kbd>⌥</kbd>+<kbd>C</kbd> is the character “ç”, and a shortcut that swallows it out of a title would take more than it gives.</p>
-          <p class="desc" data-i18n="optKeysWhyCommand">Focus mode escapes that trade-off by being a browser command rather than a key handler in the page — Chrome intercepts it before the page ever sees the key.</p>
+          <details class="more">
+            <summary data-i18n="optKeysWhyTitle">Why can't the others be changed?</summary>
+            <p class="desc" data-i18n-html="optKeysWhy"></p>
+          </details>
         </section>
       </div>
 
@@ -314,11 +325,11 @@
     <template id="tplRow">
       <div class="tpl-item">
         <div class="tpl-item-head">
-          <input class="tpl-name" type="text" data-i18n-placeholder="optTplNamePh" placeholder="Template name (e.g. 🐞 Bug report)" />
+          <label class="fld tpl-name-fld"><span class="fld-tag" data-i18n="optFieldName">Name</span><input class="tpl-name" type="text" data-i18n-placeholder="optTplNamePh" placeholder="Template name (e.g. 🐞 Bug report)" /></label>
           <button class="icon-btn tpl-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
         </div>
-        <input class="tpl-title" type="text" data-i18n-placeholder="optTplTitlePh" placeholder="Title (e.g. [Bug] — leave empty to skip the title)" />
-        <textarea class="tpl-content" rows="4" data-i18n-placeholder="optTplContentPh" placeholder="Body content"></textarea>
+        <label class="fld tpl-title-fld"><span class="fld-tag" data-i18n="optFieldTitle">Title</span><input class="tpl-title" type="text" data-i18n-placeholder="optTplTitlePh" placeholder="Title (e.g. [Bug] — leave empty to skip the title)" /></label>
+        <label class="fld fld-top"><span class="fld-tag" data-i18n="optFieldBody">Body</span><textarea class="tpl-content" rows="4" data-i18n-placeholder="optTplContentPh" placeholder="Body content"></textarea></label>
       </div>
     </template>
 
@@ -350,8 +361,8 @@
         <div class="cpy-fields qlk-fields">
           <input class="qlk-name" type="text" data-i18n-placeholder="optQuickNamePh" placeholder="name (e.g. Jira)" />
           <input class="qlk-prefix" type="text" spellcheck="false" data-i18n-placeholder="optQuickPrefixPh" placeholder="prefix" />
-          <input class="qlk-url" type="text" spellcheck="false" data-i18n-placeholder="optQuickUrlPh" placeholder="https://…/browse/{{key}}" />
-          <input class="qlk-search" type="text" spellcheck="false" data-i18n-placeholder="optQuickSearchPh" placeholder="search URL (optional): https://…/search?q={{q}}" />
+          <label class="fld qlk-url-fld"><span class="fld-tag" data-i18n="optFieldOpen">Open</span><input class="qlk-url" type="text" spellcheck="false" data-i18n-placeholder="optQuickUrlPh" placeholder="https://…/browse/{{key}}" /></label>
+          <label class="fld qlk-search-fld"><span class="fld-tag" data-i18n="optFieldSearch">Search</span><input class="qlk-search" type="text" spellcheck="false" data-i18n-placeholder="optQuickSearchPh" placeholder="search URL (optional): https://…/search?q={{q}}" /></label>
           <button class="icon-btn qlk-del" data-i18n-title="optDelete" data-i18n-aria-label="optDelete" title="Delete" aria-label="Delete">✕</button>
         </div>
         <div class="cpy-preview qlk-preview"></div>
