@@ -32,6 +32,10 @@ deterministically instead of being slept on. A suite can ask for either locale
 differently, and the header that wrapped in Korean at full width fit perfectly in
 English. Reach for it whenever a layout has to hold text it did not choose.
 
+`PE_ONLY=popup node tools/dom-harness.js` runs only the suites whose name contains the
+string, for a quick loop on one surface; a filter that matches nothing fails. CI runs all of
+them, and so should you before you push.
+
 Do not give it `--user-data-dir` unless you have measured it on your platform: a
 fresh profile directory never finishes initialising on macOS and every launch hangs.
 

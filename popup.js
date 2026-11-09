@@ -39,13 +39,41 @@
     }
     const matched = state.allDomains || peDomainMatches(state.domains, currentHost);
     const active = state.enabled && matched;
-    pickBtn.hidden = !active; // picker is only offered on active sites
-    rescanBtn.hidden = !active; // re-scan/self-heal is only relevant on active sites
-    refreshFocusToggle(active);
     if (active) {
-      setStatus(peMsg("popActive", [currentHost]), "on");
+      // Listed is not the same as running: settings sync and host access does not, and a
+      // refused prompt closes this popup before its rollback can run. So the line waits for
+      // the grant, and only a granted host gets "Active" and the controls that need the
+      // script — a line written from settings alone said "Active" over a page doing nothing.
+      pickBtn.hidden = true;
+      rescanBtn.hidden = true;
       addBtn.hidden = true;
-    } else if (!state.enabled) {
+      refreshFocusToggle(false);
+      const mine = setStatus(peMsg("popChecking"));
+      const answer = (granted) => {
+        if (mine !== statusQuery) return; // the line has said something newer since
+        pickBtn.hidden = !granted;
+        rescanBtn.hidden = !granted;
+        refreshFocusToggle(granted);
+        if (granted) setStatus(peMsg("popActive", [currentHost]), "on");
+        else setStatus(peMsg("popPermNeeded", [currentHost]), "off");
+        // The same button the unlisted case shows: it adds nothing twice and asks for exactly
+        // this host, which is the grant that is missing.
+        addBtn.hidden = granted;
+      };
+      try {
+        chrome.permissions.contains({ origins: ["*://" + currentHost + "/*"] }, (granted) => {
+          const failed = chrome.runtime.lastError; // read, or Chrome logs it unchecked
+          answer(!failed && !!granted);
+        });
+      } catch (_) {
+        answer(false);
+      }
+      return;
+    }
+    pickBtn.hidden = true;
+    rescanBtn.hidden = true;
+    refreshFocusToggle(false);
+    if (!state.enabled) {
       // The master switch is off everywhere, so this says nothing about the host — naming
       // it here was what made the switch above read as a per-site one.
       setStatus(peMsg("popDisabled"), "off");
@@ -142,7 +170,16 @@
         window.close();
         return;
       }
-      jumpTo({ key, url: link ? peExpandQuickLink(link, key) : "", name: link && link.name });
+      const url = link ? peExpandQuickLink(link, key) : "";
+      // No link takes this key, or the one that does still has a ⟨blank⟩ in it. jumpTo would
+      // return without a word, which is the same silent Enter the search case above was fixed
+      // for; the omnibox and the context menu send this case to Settings too.
+      if (!peIsHttpUrl(url)) {
+        chrome.runtime.openOptionsPage();
+        window.close();
+        return;
+      }
+      jumpTo({ key, url, name: link && link.name });
     });
     input.focus();
   }
@@ -413,11 +450,14 @@
 
     $("addDomain").addEventListener("click", () => {
       if (!currentHost) return;
+      // The same button grants a site that is listed but not approved on this device. That
+      // list is synced, so a refusal here must not take the site off it for every machine.
+      const wasListed = state.allDomains || peDomainMatches(state.domains, currentHost);
       // Persist the domain FIRST. Requesting a permission from a popup closes the
       // popup when the prompt appears, which would kill anything after an await —
       // so we don't await. storage.set is dispatched synchronously and completes
       // in the browser process even after the popup is gone.
-      if (!state.domains.includes(currentHost)) state.domains.push(currentHost);
+      if (!wasListed) state.domains.push(currentHost);
       state.enabled = true;
       peSaveSettings(state);
       // Request access to just this origin. Called synchronously (no prior await)
@@ -425,10 +465,12 @@
       // service worker (permissions.onAdded) registers the script + injects the tab.
       try {
         chrome.permissions.request({ origins: ["*://" + currentHost + "/*"] }, (granted) => {
-          // Runs only if the popup is still open. If denied, roll back the domain.
+          // Runs only if the popup is still open. If denied, roll back what this click added.
           if (!granted) {
-            state.domains = (state.domains || []).filter((d) => d !== currentHost);
-            peSaveSettings(state);
+            if (!wasListed) {
+              state.domains = (state.domains || []).filter((d) => d !== currentHost);
+              peSaveSettings(state);
+            }
             setStatus(peMsg("popPermNeeded", [currentHost]), "off");
             return;
           }
@@ -446,7 +488,10 @@
         currentTabId = tab.id;
         currentTabUrl = tab.url || "";
         currentTabTitle = tab.title || "";
-        if (tab.url) currentHost = new URL(tab.url).hostname;
+        // Only a web page is a site. chrome://extensions has the hostname "extensions" and our
+        // own pages have the extension id, and both used to be offered "Enable on this site".
+        const u = tab.url ? new URL(tab.url) : null;
+        if (u && /^https?:$/.test(u.protocol)) currentHost = u.hostname;
       }
     } catch (_) {}
     Promise.all([peGetSettings(), peGetSyncCache(), peGetRecent(), peGetPins()]).then(([s, c, r, p]) => {

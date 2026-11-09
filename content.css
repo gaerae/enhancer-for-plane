@@ -300,7 +300,8 @@
   cursor: pointer;
   color: inherit;
 }
-#pe-tmpl-menu .pe-menu-item:hover {
+#pe-tmpl-menu .pe-menu-item:hover,
+#pe-tmpl-menu .pe-menu-active {
   background: #f3f4f6;
 }
 #pe-tmpl-menu .pe-menu-item-title {
@@ -344,7 +345,8 @@
   text-align: left;
   cursor: pointer;
 }
-#pe-tmpl-menu .pe-menu-config:hover {
+#pe-tmpl-menu .pe-menu-config:hover,
+#pe-tmpl-menu .pe-menu-config.pe-menu-active {
   background: #f2f2f3;
 }
 
@@ -358,13 +360,15 @@
   #pe-tmpl-menu .pe-menu-item-title {
     color: #f3f4f6;
   }
-  #pe-tmpl-menu .pe-menu-item:hover {
+  #pe-tmpl-menu .pe-menu-item:hover,
+  #pe-tmpl-menu .pe-menu-active {
     background: #262b31;
   }
   #pe-tmpl-menu .pe-menu-config {
     color: #f4f4f5;
   }
-  #pe-tmpl-menu .pe-menu-config:hover {
+  #pe-tmpl-menu .pe-menu-config:hover,
+  #pe-tmpl-menu .pe-menu-config.pe-menu-active {
     background: #262b31;
   }
   #pe-tmpl-menu .pe-menu-footer {
