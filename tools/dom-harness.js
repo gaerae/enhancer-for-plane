@@ -124,7 +124,13 @@ window.chrome = {
     // Writes are kept, for the same reason local's are: a save that carries a domain across
     // from another surface is only provable by reading back what was actually written.
     sync: {
-      get: (k, cb) => cb(JSON.parse(JSON.stringify(window.__SEED))),
+      // window.__holdReads queues each read until the suite releases it (window.__reads), so a
+      // suite can act while a read the page started is still out.
+      get: (k, cb) => {
+        const answer = () => cb(JSON.parse(JSON.stringify(window.__SEED)));
+        if (window.__holdReads) (window.__reads = window.__reads || []).push(answer);
+        else answer();
+      },
       set: (o, cb) => { window.__written.push(JSON.parse(JSON.stringify(o))); cb && cb(); },
       remove: (k, cb) => cb && cb()
     },
@@ -1170,7 +1176,11 @@ const suites = [
       });
       check("and the save says it did that, rather than just Saved", () => {
         eq(document.getElementById("status").textContent, peMsg("msgKeptDomains", ["app.plane.so"]));
-      });`
+      });
+      // The save wrote over the change it refused, carrying what it added, so the page is no
+      // longer behind storage and has nothing left to lose.
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and afterwards there is nothing unsaved", () => ok(!leave(), "still behind after the save"));`
   },
   {
     // A save that fails must leave the page as it was. It used to drop empty rows from state
@@ -1615,8 +1625,9 @@ const suites = [
     },
     body: `
       ${TAB_READY}
-      // The popup grants first and writes second, so the grant is already there when the
-      // tidy-up asks Chrome what is granted; the write lands while it decides.
+      // The popup writes the site and then asks for access. When the grant is through before the
+      // tidy-up asks Chrome what is granted, and the write landed after this save read storage,
+      // the site is granted and listed — and missing from what this save wrote.
       window.__ENV.origins.push("*://b.example.com/*");
       document.getElementById("save").click();
       await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
@@ -1672,6 +1683,60 @@ const suites = [
       check("the save failed", () => eq(window.__written.length, 0));
       check("and the form now shows the change from elsewhere", () =>
         ok([...document.querySelectorAll("#quickList input")].some((i) => i.value.indexOf("elsewhere.example.com") > -1), "not adopted"));`
+  },
+  {
+    // Unsaved is derived from the settings, so taking an edit back makes the form clean — but a
+    // change from elsewhere refused while it was dirty has already moved the page's idea of
+    // storage, and nothing announces it again. A clean form showing older settings then closed
+    // without asking, and its next Save wrote them back over the change.
+    name: "options · a change refused while editing still counts once the edit is undone",
+    page: { name: "opt-behind", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      const was = nm.value;
+      nm.value = was + "x"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      ${FOREIGN_DOMAIN}
+      nm.value = was; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("leaving still asks", () => ok(leave(), "a page behind storage let itself close"));
+      check("and Sync now still asks for a save first", () => {
+        document.getElementById("syncNow").click();
+        eq(document.getElementById("status").textContent, peMsg("msgSaveFirst"));
+      });`
+  },
+  {
+    // Taking the refused change after a failed save is a read, and a read is a window: typing
+    // in it was replaced by what storage held, and the form marked clean over it.
+    name: "options · an edit made while a failed save's recovery reads is kept",
+    page: {
+      name: "opt-save-fail-adopt-race",
+      ...OPTIONS,
+      seed: seedOf({ templates: [{ id: "t1", name: "Huge", title: "", content: "x".repeat(12288) }] }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      f.quickLinks = [{ id: "q1", name: "Elsewhere", url: "https://elsewhere.example.com/{key}", searchUrl: "", enabled: true }];
+      window.__SEED.peSettings = f;
+      window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      await sleep(50);
+      window.__holdReads = true;
+      window.__answer();
+      await waitFor(() => (window.__reads || []).length === 1, "the read after the prompt");
+      window.__reads.shift()();
+      await waitFor(() => (window.__reads || []).length === 1, "the recovery read");
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = "Newer"; nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__holdReads = false;
+      window.__reads.shift()();
+      await sleep(200);
+      check("the newer edit is still there", () => eq(document.querySelector("#templateList .tpl-name").value, "Newer"));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and still unsaved", () => ok(leave(), "marked clean over the edit"));`
   },
   {
     // A reset confirmed while a save is in flight is not part of what that save wrote, so that
@@ -2631,10 +2696,13 @@ const suites = [
         ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
       });
       // A sync landing under the open menu redraws it, and the focused row with it.
+      // Not redrawn at all while it is being used: a redraw moved focus to another row, and the
+      // next Enter pressed a template nobody chose (or wiped a query typed in the filter).
       btn("box-a").click();
-      shown(".pe-menu-item")[1].focus();
+      const focusedRow = shown(".pe-menu-item")[1];
+      focusedRow.focus();
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
-      check("a redraw under a focused row keeps focus in the menu", () => ok(menu().contains(document.activeElement), "focus went to " + document.activeElement.tagName));
+      check("a sync under a focused row leaves that row focused", () => ok(document.activeElement === focusedRow, "focus went to " + document.activeElement.textContent));
       key({ key: "Escape" });
       await sleep(50);
       // Alt+T is a toggle. With a row focused there is no editor in focus to match it against,

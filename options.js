@@ -41,6 +41,12 @@
   // A change from elsewhere was refused because a save was out. If that save then fails with
   // the form still clean, nothing else will ever announce the change — so it is taken then.
   let refusedWhileSaving = false;
+  // A change from elsewhere was refused and has not been saved over or taken since: the page is
+  // behind storage. That is unsaved state like an edit is — taking the edit back must not make
+  // a form showing older settings read as clean, because nothing will announce the change
+  // again. `refusals` counts them, so a save can tell one it built on from one that came later.
+  let behind = false;
+  let refusals = 0;
   // A source row deleted by the user, so the rebuild that follows knows the row is gone on
   // purpose — see restoreSourceListPlace.
   let sourceDeleted = false;
@@ -229,8 +235,11 @@
   // Unsaved edits are a fact about the settings, not about which events fired. A confirmed
   // reset counts even when the defaults are what was there: saving it still clears the lists
   // the confirm promised to clear.
-  function isDirty() {
+  function isEdited() {
     return resetPending || (!!state && canon(state) !== cleanJson);
+  }
+  function isDirty() {
+    return behind || isEdited();
   }
   // The settings as compared for "anything unsaved": a switch ticked and unticked writes
   // `focus: false` onto a rule that was stored without the key, and a group hidden and shown
@@ -1365,6 +1374,8 @@
           syncedJson = sJson; // adopt the new storage baseline either way
           if (isDirty() || saveInFlight) {
             if (saveInFlight) refusedWhileSaving = true;
+            behind = true;
+            refusals++;
             flash(peMsg("msgChangedElsewhere"), true);
             return;
           }
@@ -1374,11 +1385,7 @@
           // signature: a settings change synced from another device must not yank the
           // page to a tab the user was not working in.
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
-          state = s;
-          resetPending = false; // the reset this was waiting to save is gone
-          remember(s);
-          render();
-          settle();
+          adoptSettings(s); // the reset this was waiting to save, if any, is gone with it
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
         });
@@ -1630,8 +1637,8 @@
     try {
       const perms = await chrome.permissions.getAll();
       // An origin that appeared in storage since `before` — the read this save was built on — is
-      // a site switched on a moment ago (the popup grants, then writes), not one this save
-      // removed, so it keeps its access. Only what is new counts: a site this save took off was
+      // a site switched on a moment ago (the popup writes it, then asks for access), not one
+      // this save removed, so it keeps its access. Only what is new counts: a site this save took off was
       // in `before`, and still goes.
       if (before) {
         try {
@@ -1663,10 +1670,25 @@
     return null;
   }
 
+  // One at a time: a second click while the first save is out ran a second save beside it,
+  // which read the first one's tidying as an edit of the user's. And the flag comes down
+  // however the save ends — a throw anywhere in it must not leave a page that can never save.
   async function saveAll() {
-    // One at a time: a second click while the first save is out ran a second save beside it,
-    // which read the first one's tidying as an edit of the user's.
     if (saveInFlight) return;
+    saveInFlight = true;
+    refusedWhileSaving = false;
+    let failed = false;
+    try {
+      failed = (await saveRun()) === false;
+    } finally {
+      saveInFlight = false;
+    }
+    // A change refused because this save was out, and the save failed with the form still
+    // clean: nothing else will announce it, so it is taken now — once the save is over.
+    if (failed && refusedWhileSaving && !isEdited()) adoptStored();
+  }
+
+  async function saveRun() {
     // Refuse BEFORE touching state. A URL we cannot turn into a host permission is one
     // the worker will never fetch, so the save cannot go ahead — but bailing out after
     // the filters below have already rebuilt state.rules/templates/variables leaves every
@@ -1763,8 +1785,6 @@
     // page has shown is fixed as of now: the lists move when the page adopts something, and
     // nothing adopted after this point is in `next`.
     const known = { domains: knownDomains.slice(), rules: knownRuleIds.slice() };
-    saveInFlight = true;
-    refusedWhileSaving = false;
     let stored = null;
     try {
       stored = await peGetSettings();
@@ -1792,6 +1812,7 @@
     }
     kept.push(...mergeForeignDomains(next, after, known));
     keptRules.push(...mergeForeignRules(next, after, known));
+    const refusalsSeen = refusals; // what this save has read; anything refused later is newer
     // A source whose URL was edited is a different file under the same name, and gets a new
     // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
     // does the same for entries that recorded theirs, and those from before that cannot.
@@ -1816,6 +1837,7 @@
         await peSaveTplRecent([]);
       }
       syncedJson = JSON.stringify(next); // storage now matches this; late events are no-ops
+      if (refusals === refusalsSeen) behind = false; // written over, with what it added carried
       // Edited while the save was in flight — decided after the last await, because every one
       // of them leaves the form open to typing. Storage has what Save was pressed on, and the
       // form keeps what is on it now: replacing state with `next` threw the newer edit away and
@@ -1906,26 +1928,32 @@
       } else {
         flash(peMsg("msgSaveFailed", [msg]), true);
       }
-      if (refusedWhileSaving && !isDirty()) adoptStored();
+      return false; // failed; saveAll decides whether to take a change refused meanwhile
     } finally {
       // Released a turn later than the save, so every event the save produced has landed
       // while the flag was still set.
       setTimeout(() => (savingSelf = false), 0);
-      saveInFlight = false;
     }
   }
 
-  // Take what storage holds now, as the page does on load. Quietly: whatever the caller just
-  // said — a failed save — is the message that matters.
+  // The page takes `s` as its state, as it does on load: every adoption goes through here.
+  function adoptSettings(s) {
+    syncedJson = JSON.stringify(s);
+    state = s;
+    resetPending = false;
+    behind = false;
+    remember(s);
+    render();
+    settle();
+  }
+  // Take what storage holds now. Quietly: whatever the caller just said — a failed save — is
+  // the message that matters. The read is a window like any other, so whether to take it is
+  // decided when it returns: typed into, reset, or saving again meanwhile, and it is dropped.
   function adoptStored() {
     peGetSettings()
       .then((s) => {
-        syncedJson = JSON.stringify(s);
-        state = s;
-        resetPending = false;
-        remember(s);
-        render();
-        settle();
+        if (isEdited() || saveInFlight) return;
+        adoptSettings(s);
       })
       .catch(() => {});
   }

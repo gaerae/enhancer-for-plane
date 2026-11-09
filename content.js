@@ -2247,12 +2247,10 @@
         const nv = changes[PE_SYNC_CACHE_KEY].newValue;
         syncCache = { bySource: (nv && nv.bySource) || {} };
         recountTemplates();
-        if (menuOpen && menu) {
-          // The redraw takes a focused row away with it; focus stays in the menu.
-          const hadFocus = menu.contains(document.activeElement);
-          renderMenu();
-          if (hadFocus && menuRows()[0]) menuRows()[0].focus();
-        }
+        // Not while it is being used: a redraw takes the focused row — or the query typed in
+        // the filter — with it, and the next Enter pressed a template nobody chose. The menu is
+        // drawn afresh each time it opens, so the next opening shows the new list.
+        if (menuOpen && menu && !menu.contains(document.activeElement)) renderMenu();
         try {
           injectAll();
         } catch (_) {}
