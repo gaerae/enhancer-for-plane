@@ -405,14 +405,17 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   saved — so there is nothing to call. The mirror image is `knownRuleIds` beside `knownDomains`:
   a dirty form refuses a foreign change, so Save has to carry across what the other surface
   added and this page never showed, or it writes the older list over it. And Save itself is a
-  window: the permission prompt leaves the form editable, so whatever is typed while it is up
-  is newer than what was written, and must stay on screen and stay unsaved.
+  window: every await in it — the prompt, the write, the tidy-up after — leaves the form
+  editable, so "was anything typed meanwhile?" is asked after the last one, and storage is read
+  again after the prompt, which can stay up as long as the user likes.
 - **Judge an insert by whether the editor changed, not by whether it grew — and not by its
   markup.** Replacing a selection with a shorter template shrinks the text, and a length check
   read that as failure and inserted the template again by the next path down. Comparing
   `innerHTML` fixed that and broke the opposite case: tiptap moves a placeholder class and
   attribute as the caret moves, so an editor that ignored the paste but redecorated read as
-  inserted, and nothing arrived. Compare the text and the elements with attributes dropped.
+  inserted, and nothing arrived. A second review found the same thing one level down: a gap
+  cursor or a collaborator's caret is a whole element. Compare the text and the count of
+  elements, skipping whatever the editor marks `contenteditable="false"`.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

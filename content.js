@@ -20,6 +20,7 @@
   let menu = null;
   let menuOpen = false;
   let menuOwnerBtn = null;
+  let menuReturn = null; // what had focus when the menu opened — see hideMenu
   // The work item the copy menu was opened for, read once while the menu opens. A peek
   // panel over a list closes as soon as you mousedown outside it, and the menu is appended
   // to <body> — outside the panel — so by the time a format is clicked the panel, and its
@@ -830,7 +831,8 @@
     // would carry on from a row the reader has already left.
     menu.addEventListener("focusin", (e) => {
       const row = e.target && e.target.closest && e.target.closest(".pe-menu-item, .pe-menu-config");
-      if (row && !row.classList.contains("pe-menu-active")) setMenuActive(row);
+      // Quietly: a focused button is announced by the screen reader itself.
+      if (row && !row.classList.contains("pe-menu-active")) setMenuActive(row, true);
     });
     document.body.appendChild(menu);
   }
@@ -1131,6 +1133,7 @@
       return;
     }
     menuOwnerBtn = btn;
+    menuReturn = document.activeElement;
     ensureMenu();
     if (mode === "copy") renderCopyMenu();
     else renderMenu();
@@ -1139,9 +1142,18 @@
     menuOpen = true;
     setMenuActive(menuRows()[0] || null);
   }
+  // A row can hold focus now (Tab reaches it), and hiding a focused element drops focus to
+  // <body>: the next keystroke went nowhere. So focus goes back to what had it when the menu
+  // opened — the editor for Alt+T, the button for a click — and only when it was in the menu.
   function hideMenu() {
+    const hadFocus = !!menu && menu.contains(document.activeElement);
     if (menu) menu.style.display = "none";
     menuOpen = false;
+    if (!hadFocus) return;
+    const back = menuReturn && menuReturn !== document.body && menuReturn.isConnected ? menuReturn : menuOwnerBtn;
+    try {
+      if (back && back.isConnected) back.focus();
+    } catch (_) {}
   }
 
   // The keyboard half of both menus. The menu never takes focus: Alt+T is pressed while
@@ -1152,13 +1164,13 @@
     if (!menu) return [];
     return [...menu.querySelectorAll(".pe-menu-item, .pe-menu-config")].filter((r) => r.getClientRects().length > 0);
   }
-  function setMenuActive(row) {
+  function setMenuActive(row, quiet) {
     if (!menu) return;
     menu.querySelectorAll(".pe-menu-active").forEach((r) => r.classList.remove("pe-menu-active"));
     if (!row) return;
     row.classList.add("pe-menu-active");
     const title = row.querySelector(".pe-menu-item-title");
-    announce((title || row).textContent);
+    if (!quiet) announce((title || row).textContent);
     try {
       row.scrollIntoView({ block: "nearest" });
     } catch (_) {}
@@ -1169,8 +1181,10 @@
     if (!rows.length) return false;
     const cur = rows.indexOf(menu.querySelector(".pe-menu-active"));
     // A row someone has tabbed to is a focused button, and Enter on it is that button's.
-    // Taking it over pressed whichever row the arrows had last highlighted instead.
-    const inMenu = menu.contains(document.activeElement);
+    // Taking it over pressed whichever row the arrows had last highlighted instead. Only a row:
+    // the filter box is in the menu too, and Enter there takes the highlighted hit.
+    const a = document.activeElement;
+    const inMenu = !!(a && menu.contains(a) && a.closest && a.closest(".pe-menu-item, .pe-menu-config"));
     let to = null;
     if (e.key === "ArrowDown") to = rows[(cur + 1) % rows.length];
     else if (e.key === "ArrowUp") to = rows[cur < 1 ? rows.length - 1 : cur - 1];
@@ -1182,10 +1196,10 @@
     } else return false;
     e.preventDefault();
     e.stopPropagation();
-    setMenuActive(to);
-    // With focus already in the menu, the arrows move it: a highlight on one row and focus on
-    // another would make Enter press the one nobody can see.
+    // With a row focused, the arrows move focus — a highlight on one row and focus on another
+    // would make Enter press the one nobody can see — and the highlight follows it (focusin).
     if (inMenu && to) to.focus();
+    else setMenuActive(to);
     return true;
   }
 
@@ -1356,14 +1370,22 @@
     // shorter template shrinks the text, and judging by growth read that as a failure and
     // inserted the template a second time by the next path down. Nor by the markup at large:
     // the editor redecorates itself as the caret moves — tiptap's placeholder is a class and an
-    // attribute — so an editor that ignored the paste but restyled on it read as inserted, and
-    // the template never arrived. So: the text and the elements, with every attribute dropped.
+    // attribute, a gap cursor or a collaborator's caret is a whole element — so an editor that
+    // ignored the paste but redrew on it read as inserted, and the template never arrived. So:
+    // the text and the number of elements the author can edit, skipping anything the editor
+    // marks contenteditable="false", which is how it draws what is not the document.
     const shape = () => {
-      const c = editor.cloneNode(true);
-      c.querySelectorAll("*").forEach((n) => {
-        for (const a of [...n.attributes]) n.removeAttribute(a.name);
+      const w = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) =>
+          n.nodeType === 1 && n.getAttribute("contenteditable") === "false" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
       });
-      return c.innerHTML;
+      let els = 0;
+      let text = "";
+      while (w.nextNode()) {
+        if (w.currentNode.nodeType === 1) els++;
+        else text += w.currentNode.data;
+      }
+      return els + "\n" + text;
     };
     const changed = (before) => shape() !== before;
     try {

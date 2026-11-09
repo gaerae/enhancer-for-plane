@@ -172,7 +172,14 @@ window.chrome = {
       cb && cb(v);
       return Promise.resolve(v);
     },
-    getAll: (cb) => { const v = { origins: (window.__ENV.origins || []).slice() }; cb && cb(v); return Promise.resolve(v); },
+    // env.holdCleanup does the same for the tidy-up after a save has written: storage already
+    // has the settings, and the form is still open to typing.
+    getAll: (cb) => {
+      const v = { origins: (window.__ENV.origins || []).slice() };
+      if (window.__ENV.holdCleanup) return new Promise((r) => { window.__cleanup = () => { cb && cb(v); r(v); }; });
+      cb && cb(v);
+      return Promise.resolve(v);
+    },
     remove: (o, cb) => { (window.__removed = window.__removed || []).push(...(o.origins || [])); cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
     onRemoved: { addListener: () => {} }
@@ -1427,6 +1434,87 @@ const suites = [
       check("so leaving still asks", () => ok(leave(), "it let the newer edit go"));`
   },
   {
+    // The same window after the write: storage has the settings and the page tidies host access,
+    // with the form still open to typing. Deciding "was anything typed?" before that await
+    // marked the newer edit clean, with "Saved." on screen.
+    name: "options · an edit made while access is tidied after a save is not marked saved",
+    page: { name: "opt-save-cleanup", ...OPTIONS, seed: seedOf(), env: { holdCleanup: true } },
+    body: `
+      ${TAB_READY}
+      document.querySelector('#tabs .tab[data-tab="templates"]').click();
+      const body = () => document.querySelector("#templateList .tpl-content");
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      type(body(), "before");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__cleanup === "function", "the tidy-up after the write");
+      type(body(), "typed while access was tidied");
+      window.__cleanup();
+      await sleep(200);
+      check("the edit is still on screen", () => eq(body().value, "typed while access was tidied"));
+      check("and the page says it is not saved yet", () => eq(document.getElementById("status").textContent, peMsg("msgSavedEditsPending")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("so leaving still asks", () => ok(leave(), "it let the newer edit go"));
+      // Taking the edit back leaves nothing unsaved: the baseline is what was written.
+      type(body(), "before");
+      check("and taking it back leaves nothing to lose", () => ok(!leave(), "it asked about what is already saved"));`
+  },
+  {
+    // Storage was read once, before the permission prompt. A rule picked, or a site switched
+    // on, while the prompt was up was in storage by the time Save wrote — and Save wrote the
+    // list it had read before, over it.
+    name: "options · a rule added while the permission prompt is up survives the save",
+    page: { name: "opt-save-prompt-foreign", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.rules = foreign.rules.concat([{ id: "late", enabled: true, label: "Late", selector: ".late", property: "width", value: "10px" }]);
+      foreign.domains = foreign.domains.concat(["late.example.com"]);
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the rule and the site are both still in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        ok(w.rules.some((r) => r.id === "late"), "rules: " + w.rules.map((r) => r.id).join());
+        ok(w.domains.indexOf("late.example.com") > -1, "domains: " + w.domains.join());
+      });`
+  },
+  {
+    // A reset confirmed while a save is in flight is not part of what that save wrote, so that
+    // save must not clear what the reset promised to clear — the recents and the pins go when
+    // the reset itself is saved, and not before.
+    name: "options · a reset confirmed while a save is in flight waits for its own save",
+    page: {
+      name: "opt-save-reset-inflight",
+      ...OPTIONS,
+      seed: seedOf(),
+      env: { hold: true },
+      local: { peRecent: [{ key: "PROJ-1", url: "https://plane.example.com/acme/browse/PROJ-1", name: "Plane", at: 1 }] }
+    },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the recently-opened list is still there", () => eq((window.__LOCAL.peRecent || []).length, 1));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and the reset is still waiting to be saved", () => ok(leave(), "the reset reads as saved"));`
+  },
+  {
     // Edits live in this page until Save, and closing the tab threw them away without a word.
     name: "options · leaving with unsaved edits asks first",
     page: { name: "opt-leave", ...OPTIONS, seed: seedOf() },
@@ -2165,6 +2253,25 @@ const suites = [
       check("so does your own block", () => {
         eq(shown(".pe-menu-section-label").map((n) => n.textContent).join(), '<img src=x id="hostile">Team pack');
       });
+      // The filter box is inside the menu, so "focus is in the menu" is not the same as "a row
+      // is focused": typing a query and pressing Enter is how a long menu is meant to be used.
+      const fin = menu().querySelector(".pe-menu-filter-input");
+      fin.focus();
+      const downInFilter = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+      fin.dispatchEvent(downInFilter);
+      check("the arrows in the filter move the highlight and leave the caret there", () => {
+        ok(downInFilter.defaultPrevented, "the arrow reached the input");
+        eq(document.activeElement, fin, "focus left the filter");
+      });
+      fin.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+      const enterInFilter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      fin.dispatchEvent(enterInFilter);
+      check("Enter in the filter takes the highlighted hit", () => {
+        ok(enterInFilter.defaultPrevented, "Enter was left to the input");
+        ok(document.getElementById("ed-a").textContent.indexOf("the rollback plan") > -1, document.getElementById("ed-a").textContent);
+      });
+      btn("box-a").click();
+      const allRows = names().length; // Deploy now heads the list as well, under Recently used
       filter("nothing has this");
       check("no hits at all says so, and drops the source's header too", () => {
         eq(names().length, 0, "rows");
@@ -2172,7 +2279,7 @@ const suites = [
         eq(shown(".pe-menu-section-label").length, 0, "headers left over an empty list");
       });
       filter("");
-      check("clearing it brings everything back", () => eq(names().length, 9));
+      check("clearing it brings everything back", () => eq(names().length, allRows));
 
       // The service worker finishes a sync while the menu is up.
       window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
@@ -2274,7 +2381,18 @@ const suites = [
       const enterOnRow = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
       rowsNow[2].dispatchEvent(enterOnRow);
       check("and Enter on it is left to the button", () => ok(!enterOnRow.defaultPrevented, "the menu took Enter from a focused button"));
+      // A focused button is announced by the screen reader itself; saying its title again
+      // through the live region read every row twice.
+      await sleep(100);
+      check("a focused row is not announced a second time", () => ok(live() !== "Body only", live()));
       key({ key: "Escape" });
+      // Chrome drops focus from a hidden element at its next rendering step, not at once.
+      await sleep(100);
+      check("Escape from a focused row puts focus back where the menu came from", () => {
+        ok(!isOpen(), "still open");
+        ok(document.activeElement !== document.body, "focus fell to <body>");
+        ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
+      });
 
       const sent = [];
       chrome.runtime.sendMessage = (m) => sent.push(m);
@@ -2343,7 +2461,12 @@ const suites = [
     body: `
       await waitFor(() => document.querySelector(".pe-body-tmpl-btn"), "the template button");
       const ed = document.getElementById("ed-p");
-      ed.addEventListener("paste", () => ed.firstElementChild.classList.toggle("is-focused"));
+      // A class moved and a widget drawn — a gap cursor, a collaborator's caret — which is all
+      // an editor that ignored the paste may have done in answer to it.
+      ed.addEventListener("paste", () => {
+        ed.firstElementChild.classList.toggle("is-focused");
+        ed.insertAdjacentHTML("beforeend", '<div contenteditable="false" class="widget"><span></span></div>');
+      });
       ed.focus();
       document.querySelector(".pe-body-tmpl-btn").click();
       document.querySelector("#pe-tmpl-menu .pe-menu-item").click();

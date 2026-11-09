@@ -965,10 +965,6 @@ test("sync: a failure does not vouch for templates whose URL was never recorded"
   eq(e.url, undefined, "and still not claimed for the new URL");
 });
 
-// The worker writes these, and in Korean they arrived as "동기화 실패: Site access not granted"
-// — the one line a first-time user has to act on, in the one language they may not read. So a
-// failure carries a code and its arguments, and the page words it. The English stays as the
-// fallback for an entry written before codes existed.
 // "Manage templates" asks for a tab by name. The name comes from a content script, which runs
 // in a page we do not control, so only a known tab is passed on and anything else just opens
 // Settings — the same page, never a different one.
@@ -986,6 +982,10 @@ test("settings: a request to open on a tab names a known one, or none", async ()
   eq(await ask({ type: "pe-open-options" }), { tab: undefined, opened: true });
 });
 
+// The worker writes these, and in Korean they arrived as "동기화 실패: Site access not granted"
+// — the one line a first-time user has to act on, in the one language they may not read. So a
+// failure carries a code and its arguments, and the page words it. The English stays as the
+// fallback for an entry written before codes existed.
 test("sync: every failure carries a code both locales can say", async () => {
   const cats = { en: JSON.parse(read("_locales/en/messages.json")), ko: JSON.parse(read("_locales/ko/messages.json")) };
   const big = "x".repeat(10);

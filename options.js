@@ -10,6 +10,7 @@
   let ruleHealth = {};
   let anchorHealth = {}; // { toolbar, header } — see PE_ANCHOR_HEALTH_KEY
   let resetPending = false; // a confirmed Restore defaults not yet saved — see resetAll
+  let resetSeq = 0; // which confirm that was, so a save can tell its reset from a later one
   // The settings as this page last took them from storage or wrote them there, serialized.
   // Whether the form has unsaved edits is derived from it (see isDirty) rather than kept as a
   // flag: a flag has to be set by every way of editing and cleared by every way of not, and it
@@ -1610,6 +1611,7 @@
     // What the form held when Save was pressed. The awaits below — storage, the permission
     // prompt — leave the form editable, and anything typed in that window is not in `next`.
     const startJson = JSON.stringify(state);
+    const resetMark = resetPending ? resetSeq : -1; // the reset this save carries, if any
     const next = JSON.parse(startJson);
     // drop empty rules/templates
     next.rules = (next.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
@@ -1668,40 +1670,48 @@
     const kept = mergeForeignDomains(next, stored);
     const keptRules = mergeForeignRules(next, stored);
     const permOk = await requestHostPermissions(next);
+    // Read again after the prompt, which can stay up as long as the user likes: a rule picked
+    // or a site switched on meanwhile is in storage now, and a save built on the read above
+    // would write over it. The merges are idempotent, so the second only adds what is new.
+    let after = null;
+    try {
+      after = await peGetSettings();
+    } catch (_) {}
+    kept.push(...mergeForeignDomains(next, after));
+    keptRules.push(...mergeForeignRules(next, after));
     try {
       savingSelf = true;
       await peSaveSettings(next);
-      // Edited while the save was in flight: storage has what Save was pressed on, and the form
-      // keeps what is on it now. Replacing state with `next` threw the newer edit away and drew
-      // the form without it, under "Saved.". What the save carried across from elsewhere goes
-      // into the form as well, or the next save would read it as deleted here.
-      const editedSince = JSON.stringify(state) !== startJson;
-      if (editedSince) {
-        const ids = new Set((state.rules || []).map((r) => r && r.id));
-        state.rules = (state.rules || []).concat(keptRules.filter((r) => !ids.has(r.id)));
-        state.domains = (state.domains || []).concat(kept.filter((d) => (state.domains || []).indexOf(d) === -1));
-        if (kept.length) el.domains.value = state.domains.join("\n");
-        if (keptRules.length) renderRules();
-      } else {
-        state = next;
-      }
       if (permOk) await revokeStalePermissions(next);
       // Only after the settings write succeeded: a failed save leaves the flag set, so the
-      // save that does go through is the one that clears it.
-      if (resetPending) {
+      // save that does go through is the one that clears it. And only for the reset this save
+      // carried: one confirmed while it was in flight is not in what was written.
+      if (resetPending && resetSeq === resetMark) {
         resetPending = false;
         await peSaveRecent([]);
         await peSavePins([]);
         await peSaveTplRecent([]);
       }
       syncedJson = JSON.stringify(next); // storage now matches this; late events are no-ops
-      knownDomains = [...new Set((next.domains || []).concat(state.domains || []))];
-      knownRuleIds = [...new Set((next.rules || []).concat(state.rules || []).map((r) => r && r.id).filter(Boolean))];
+      // Edited while the save was in flight — decided after the last await, because every one
+      // of them leaves the form open to typing. Storage has what Save was pressed on, and the
+      // form keeps what is on it now: replacing state with `next` threw the newer edit away and
+      // drew the form without it, under "Saved.". The form is not redrawn either, which would
+      // take the caret out of the field being typed in. Its baseline is what was written, so
+      // the newer edit reads as unsaved, and taking it back reads as nothing to lose.
+      //
+      // What the save carried across from elsewhere is left out of the form and out of the
+      // known lists, so the next save carries it again rather than reading it as deleted here.
+      const editedSince = resetPending || JSON.stringify(state) !== startJson;
       if (editedSince) {
-        // The form is not redrawn — that would take the caret out of the field being typed in.
-        // Its baseline is what was saved, so the newer edit still reads as unsaved.
+        const shown = JSON.parse(startJson);
+        knownDomains = [...new Set(knownDomains.concat(shown.domains || []))];
+        knownRuleIds = [...new Set(knownRuleIds.concat((shown.rules || []).map((r) => r && r.id).filter(Boolean)))];
         cleanJson = startJson;
       } else {
+        state = next;
+        knownDomains = (state.domains || []).slice();
+        knownRuleIds = (state.rules || []).map((r) => r && r.id).filter(Boolean);
         render();
         settle();
       }
@@ -1712,7 +1722,7 @@
       // Both kinds at once is what the picker and the popup produce together, and naming only
       // one of them leaves the other arriving unexplained.
       if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
-      else if (editedSince) flash(peMsg("msgSavedEditsPending"));
+      else if (editedSince) flash(peMsg("msgSavedEditsPending"), false, true);
       else if (kept.length && keptRules.length)
         flash(peMsg("msgKeptDomains", [kept.join(", ")]) + " " + peMsg("msgKeptRulesToo", [quotedRules(keptRules)]));
       else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
@@ -1816,6 +1826,7 @@
     if (!confirm(peMsg("msgResetConfirm"))) return;
     state = peDeepMerge(PE_DEFAULTS, {});
     resetPending = true;
+    resetSeq++;
     render();
     scheduleMeter(); // the same as an import: drawn, not saved, so not settle()
     flash(peMsg("msgResetDone"));
@@ -1825,11 +1836,12 @@
   // A success may fade; an error stays until the next message replaces it. An error names
   // something to go and change, often on another tab, and in Korean it is a sentence or two to
   // read first — three seconds was gone before the reader had found the field it named.
-  function flash(msg, isError) {
+  // `stay` is for a success that still asks something of the reader — an edit not yet saved.
+  function flash(msg, isError, stay) {
     el.status.textContent = msg;
     el.status.style.color = isError ? "#dc2626" : "";
     clearTimeout(flashTimer);
-    if (!isError) flashTimer = setTimeout(() => (el.status.textContent = ""), 4000);
+    if (!isError && !stay) flashTimer = setTimeout(() => (el.status.textContent = ""), 4000);
   }
 
   // header "about" line: show the version straight from the manifest (never goes stale).
