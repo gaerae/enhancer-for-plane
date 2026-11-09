@@ -1635,6 +1635,17 @@
     if (added.length) target.rules = (target.rules || []).concat(added);
     return added;
   }
+  // The master switch's version, for the popup's toggle. It is one value, not a list, so the
+  // question is not "has this page seen it" but "has this page changed it": a switch still where
+  // this page last loaded or saved it (`base`) is not an opinion the user has expressed here, and
+  // storage's position is carried; one flipped here is the user's and is written. The two cannot
+  // disagree — if both moved off `base`, they moved to the same place. Returns whether it carried.
+  function carriedEnabled(target, stored, base) {
+    if (!stored || typeof stored.enabled !== "boolean" || target.enabled !== base) return false;
+    if (stored.enabled === target.enabled) return false;
+    target.enabled = stored.enabled;
+    return true;
+  }
   // The page has had these on screen: the lists the merges above read. Every way the page takes
   // its state from storage, or writes it there, goes through here, so none can forget one.
   function remember(settings, add) {
@@ -1767,6 +1778,8 @@
     // prompt — leave the form editable, and anything typed in that window is not in `next`.
     const startJson = JSON.stringify(state);
     const startCanon = canon(state);
+    // The master switch as this page last loaded or saved it. See carriedEnabled.
+    const baseEnabled = JSON.parse(cleanJson || "{}").enabled;
     const resetMark = resetPending ? resetSeq : -1; // the reset this save carries, if any
     const next = JSON.parse(startJson);
     // drop empty rules/templates
@@ -1849,6 +1862,7 @@
     }
     kept.push(...mergeForeignDomains(next, after, known));
     keptRules.push(...mergeForeignRules(next, after, known));
+    const switchCarried = carriedEnabled(next, after || stored, baseEnabled);
     const refusalsSeen = refusals; // what this save has read; anything refused later is newer
     // A source whose URL was edited is a different file under the same name, and gets a new
     // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
@@ -1903,6 +1917,12 @@
           if (renamed.has(row.dataset.src)) row.dataset.src = renamed.get(row.dataset.src);
         });
         remember(base, true);
+        // The switch is one field, not a list the form would have to redraw: if it has not been
+        // touched since Save was pressed, it shows what was written, and the baseline says so.
+        if (switchCarried && state.enabled === base.enabled) {
+          state.enabled = base.enabled = next.enabled;
+          el.enabled.checked = !!next.enabled;
+        }
         cleanJson = canon(base);
         baseGen++;
       } else {
