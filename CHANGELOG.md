@@ -10,6 +10,18 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.14.0 — 2026-11-10
+
+Schema 9, unchanged. No permission changes.
+
+### Fixed
+- **Settings no longer turns the extension back on after the popup turned it off.** With
+  unsaved edits in Settings, switching the extension off in the popup was refused as a change
+  made elsewhere, and the next Save wrote the page's older "on" back. The same happened when
+  the popup flipped the switch while Save waited on Chrome's permission prompt. The master
+  switch now keeps whatever the popup last set unless you flipped it on the Settings page
+  itself, and the switch on the page shows the saved value after the save.
+
 ## v1.13.0 — 2026-11-10
 
 Schema 9: the two description presets below are appended to existing settings. Nothing you
