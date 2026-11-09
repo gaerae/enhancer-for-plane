@@ -36,6 +36,9 @@ const PE_FIELD_SEP = String.fromCharCode(0);
 // for the sync quota. Shape: { bySource: { <sourceId>: { version, fetchedAt, status,
 // lastError, count, dropped, templates: [ … ] } } }.
 const PE_SYNC_CACHE_KEY = "peSyncCache";
+// storage.session, extension pages only: "open Settings on this tab", left by the worker for a
+// Settings page that may not exist yet, and removed by the page that uses it.
+const PE_OPEN_TAB_KEY = "peOpenTab";
 
 // Rule health — whether a rule's selector has ever actually matched anything.
 //
@@ -2548,6 +2551,46 @@ function peGroupSourceTemplates(entry) {
     .map(([label, items]) => ({ label, items }));
 }
 
+// A source's cached result, if it is a result for the URL the source names now. A source keeps
+// its id when its URL is edited, and the cache is keyed by id, so without this the old file's
+// templates went on showing under the new file's name until the new URL had been fetched — six
+// hours on the default interval, and for good if that fetch failed. An entry written before
+// the URL was recorded carries none and is taken as matching: refusing those would empty every
+// existing menu until the next fetch, to guard against an edit that almost never happened.
+function peSourceEntry(src, cache) {
+  const entry = (src && cache && cache.bySource && cache.bySource[src.id]) || null;
+  if (!entry) return null;
+  if (entry.url && src.url && entry.url !== String(src.url).trim()) return null;
+  return entry;
+}
+
+// Why a source failed, in the reader's language. The worker records a code and its arguments
+// beside the English it always wrote; this words the code. Every key is spelled out rather than
+// built from the code, so the i18n check can see each one is used. An entry from before codes
+// existed, or a code this build does not know, falls back to the English.
+function peSyncErrorText(entry) {
+  const e = entry || {};
+  const a = Array.isArray(e.errorArgs) ? e.errorArgs.map(String) : [];
+  const say = {
+    badUrl: () => peMsg("syncErrBadUrl"),
+    noAccess: () => peMsg("syncErrNoAccess"),
+    badRedirect: () => peMsg("syncErrBadRedirect"),
+    redirect: () => peMsg("syncErrRedirect", [a[0] || ""]),
+    http: () => peMsg("syncErrHttp", [a[0] || ""]),
+    tooLarge: () => peMsg("syncErrTooLarge", [a[0] || ""]),
+    json: () => peMsg("syncErrJson"),
+    shapeGroups: () => peMsg("syncErrShapeGroups"),
+    shapeItems: () => peMsg("syncErrShapeItems"),
+    shapeNotList: () => peMsg("syncErrShapeNotList"),
+    shapeNone: () => peMsg("syncErrShapeNone"),
+    noUsable: () => peMsg("syncErrNoUsable", [a[0] || ""]),
+    timeout: () => peMsg("syncErrTimeout", [a[0] || ""]),
+    network: () => peMsg("syncErrNetwork")
+  };
+  const fn = Object.prototype.hasOwnProperty.call(say, e.errorCode) ? say[e.errorCode] : null;
+  return (fn && fn()) || e.lastError || "error";
+}
+
 // Combine personal + synced templates into ordered picker sections.
 //   personal → { kind: "personal", items } — one leading block (v1 has no personal groups)
 //   synced   → { kind: "synced", source, url, groups: [{ label, items }] } — ONE block
@@ -2565,7 +2608,7 @@ function peBuildTemplateSections(settings, cache) {
   if (sync.enabled) {
     for (const src of sync.sources || []) {
       if (!src || !src.id || src.enabled === false) continue;
-      const entry = (cache && cache.bySource && cache.bySource[src.id]) || null;
+      const entry = peSourceEntry(src, cache);
       if (!entry || !Array.isArray(entry.templates) || !entry.templates.length) continue;
       // Groups the user switched off in Settings. This is a view preference, not a
       // delete — the next sync still fetches them, they just stay out of the picker.

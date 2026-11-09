@@ -395,6 +395,16 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   rather than against intuition: the first such filter dropped "```" at a paragraph's start,
   but the rule only fires when a space follows it, and the filter hid exactly the deletion a
   code review found next.
+- **An edit that is not typing is still an edit.** Settings marked itself dirty on `input` and
+  `change` events only, so a deleted row, an import and a Restore defaults all left the form
+  "clean" — and a clean form adopts the next change from the picker or another device, which
+  replaced the deletion, the import or the reset without a word. Anything that changes `state`
+  from a button calls `markDirty()`. The mirror image is `knownRuleIds` beside `knownDomains`:
+  a dirty form refuses a foreign change, so Save has to carry across what the other surface
+  added and this page never showed, or it writes the older list over it.
+- **Judge an insert by whether the editor changed, not by whether it grew.** Replacing a
+  selection with a shorter template shrinks the text, and a length check read that as failure
+  and inserted the template again by the next path down.
 - **`redirect: "manual"` cannot tell you where you went.** It reads like the safe choice
   and is not: Chrome hands back an opaque response — status 0, no headers, no `Location` —
   so you cannot follow it, report it, or even say it happened. Follow the redirect and

@@ -87,6 +87,29 @@ const notV9Preset = (ctx) => {
 // a per-item cap, a total cap, and errors reported through runtime.lastError rather than
 // thrown. Settings live across many items now, so a stub that stores a single blob would
 // agree with any packing whatsoever — including one that loses templates.
+// common.js with chrome.i18n answering from one catalogue, placeholders and all, so a test
+// can read what a message actually says in that language.
+function sayInLocale(cat, fn) {
+  const ctx = { console, URL, Date, TextEncoder };
+  ctx.chrome = {
+    i18n: {
+      getMessage: (key, subs) => {
+        const e = cat[key];
+        if (!e) return "";
+        let m = e.message || "";
+        for (const [name, spec] of Object.entries(e.placeholders || {})) {
+          const i = parseInt(String(spec.content).replace("$", ""), 10) - 1;
+          m = m.split(new RegExp("\\$" + name + "\\$", "i")).join(subs && subs[i] != null ? String(subs[i]) : "");
+        }
+        return m;
+      }
+    }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(COMMON + EXPORT_GLOBALS, ctx);
+  return fn(ctx);
+}
+
 function loadCommonWithSyncStorage(seed = {}) {
   const store = clone(seed);
   const ctx = { console, URL, Date, TextEncoder };
@@ -285,6 +308,10 @@ function loadWorker({ settings, respond, granted = true }) {
             cb();
           }
         },
+        // Where the worker leaves "open on this tab" for a Settings page that may not exist yet.
+        session: {
+          set: async (o) => { state.session = Object.assign(state.session || {}, clone(o)); }
+        },
         onChanged: noop
       }
     }
@@ -446,6 +473,22 @@ test("sections: a source with no cached templates is skipped", () => {
   };
   eq(ctx.peBuildTemplateSections(settings, { bySource: {} }).length, 0, "no entry");
   eq(ctx.peBuildTemplateSections(settings, { bySource: { srcA: { templates: [] } } }).length, 0, "empty entry");
+});
+
+// A source keeps its id when its URL is edited, and the cache is keyed by id. So until the new
+// URL had been fetched — up to six hours on the default interval, and for good if it failed —
+// the picker showed the old file's templates under the new file's name. Nothing in the menu
+// says where a template came from except that name, so it was a wrong answer that looked right.
+test("sections: templates fetched from another URL are not this source's", () => {
+  const ctx = loadCommon();
+  const norm = ctx.peNormalizeRemoteTemplates({ name: "Old", templates: SAMPLE }, "srcA");
+  const settings = { templates: [], templateSync: { enabled: true, sources: [{ id: "srcA", url: "https://new.test/f.json" }] } };
+  const at = (url) => ctx.peBuildTemplateSections(settings, { bySource: { srcA: { url, templates: norm.templates } } }).length;
+  eq(at("https://old.test/f.json"), 0, "the old file's templates under the new URL");
+  eq(at("https://new.test/f.json"), 1, "the same URL");
+  // Entries written before the URL was recorded carry none. Dropping those would empty every
+  // existing user's menu until the next fetch, for a mismatch that almost never happened.
+  eq(at(undefined), 1, "an entry from before the URL was recorded");
 });
 
 test("recent templates: newest first, once each, three at most", () => {
@@ -887,6 +930,85 @@ test("sync: per-source interval is respected unless forced", async () => {
   eq(hits, 1, "scheduled run skips a source that is not due");
   await ctx.syncSources(true); // "Sync now"
   eq(hits, 2, "force fetches regardless");
+});
+
+test("sync: a source whose URL changed is fetched at once, and never keeps the old file", async () => {
+  let fail = false;
+  const { ctx, state } = loadWorker({
+    settings: oneSource(),
+    respond: () => {
+      if (fail) throw new Error("offline");
+      return jsonResponse(feed([{ id: "a", name: "A", content: "c" }]));
+    }
+  });
+  await ctx.syncSources(true);
+  eq(state.cache.bySource.src1.url, "https://x.test/t.json", "the URL it came from is recorded");
+  state.settings.templateSync.sources[0].url = "https://y.test/t.json";
+  fail = true;
+  await ctx.syncSources(false); // a scheduled run, well inside the interval
+  eq(state.fetched.length, 2, "a new URL is due now, not in six hours");
+  const e = state.cache.bySource.src1;
+  eq(e.status, "error");
+  eq((e.templates || []).length, 0, "the old file's templates stayed under the new URL");
+  eq(e.url, "https://y.test/t.json");
+});
+
+// The worker writes these, and in Korean they arrived as "동기화 실패: Site access not granted"
+// — the one line a first-time user has to act on, in the one language they may not read. So a
+// failure carries a code and its arguments, and the page words it. The English stays as the
+// fallback for an entry written before codes existed.
+// "Manage templates" asks for a tab by name. The name comes from a content script, which runs
+// in a page we do not control, so only a known tab is passed on and anything else just opens
+// Settings — the same page, never a different one.
+test("settings: a request to open on a tab names a known one, or none", async () => {
+  const { state } = loadWorker({ settings: oneSource(), respond: () => jsonResponse(feed([])) });
+  const ask = async (msg) => {
+    state.session = undefined;
+    state.openedOptions = false;
+    state.onWorkerMessage(msg, {}, () => {});
+    await new Promise((r) => setTimeout(r, 0));
+    return { tab: state.session && state.session.peOpenTab, opened: state.openedOptions };
+  };
+  eq(await ask({ type: "pe-open-options", tab: "templates" }), { tab: "templates", opened: true });
+  eq(await ask({ type: "pe-open-options", tab: "../../evil" }), { tab: undefined, opened: true });
+  eq(await ask({ type: "pe-open-options" }), { tab: undefined, opened: true });
+});
+
+test("sync: every failure carries a code both locales can say", async () => {
+  const cats = { en: JSON.parse(read("_locales/en/messages.json")), ko: JSON.parse(read("_locales/ko/messages.json")) };
+  const big = "x".repeat(10);
+  const cases = [
+    { settings: oneSource({ url: "ftp://x.test/t.json" }) },
+    { granted: false },
+    { respond: () => ({ ok: false, status: 404, headers: { get: () => null }, text: async () => "" }) },
+    { respond: () => jsonResponse("{not json") },
+    { respond: () => jsonResponse(JSON.stringify({ groups: [] })) },
+    { respond: () => jsonResponse(JSON.stringify({ items: [] })) },
+    { respond: () => jsonResponse(JSON.stringify({ templates: {} })) },
+    { respond: () => jsonResponse(JSON.stringify({ name: "x" })) },
+    { respond: () => jsonResponse(JSON.stringify({ templates: [{ group: "x" }] })) },
+    { respond: () => { throw new Error("Failed to fetch"); } }
+  ];
+  const seen = new Set();
+  for (const c of cases) {
+    const { ctx, state } = loadWorker({
+      settings: c.settings || oneSource(),
+      granted: c.granted !== false,
+      respond: c.respond || (() => jsonResponse(big))
+    });
+    await ctx.syncSources(true);
+    const e = state.cache.bySource.src1;
+    ok(e && e.status === "error", "not an error: " + JSON.stringify(e));
+    ok(e.errorCode, "no code for: " + e.lastError);
+    seen.add(e.errorCode);
+    for (const lang of ["en", "ko"]) {
+      const text = sayInLocale(cats[lang], (common) => common.peSyncErrorText(e));
+      ok(text && text.trim(), lang + " has nothing to say for " + e.errorCode);
+      // "HTTP 404" may sit inside the Korean sentence; the English sentence may not stand in for it.
+      if (lang === "ko") ok(/[\uac00-\ud7a3]/.test(text) && text !== e.lastError, "ko falls back to the English: " + text);
+    }
+  }
+  ok(seen.size >= 8, "codes collapsed into too few: " + [...seen].join());
 });
 
 test("sync: disabled sources are not fetched", async () => {

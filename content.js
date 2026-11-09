@@ -819,11 +819,31 @@
 
   /* ---- menu ---- */
   function ensureMenu() {
+    ensureLive();
     if (menu) return;
     menu = document.createElement("div");
     menu.id = "pe-tmpl-menu";
     menu.addEventListener("mousedown", (e) => e.preventDefault());
     document.body.appendChild(menu);
+  }
+
+  // One live region of ours, for everything this script says that is not focused: the row the
+  // arrows have reached (focus stays in the editor, so nothing else announces it) and every
+  // toast. It exists before anything is written to it, because a region inserted with its text
+  // already in it is not reliably read. Plane's own markup is never given an aria attribute.
+  let live = null;
+  function ensureLive() {
+    if (live && live.isConnected) return live;
+    live = document.createElement("div");
+    live.id = "pe-live";
+    live.className = "pe-sr";
+    live.setAttribute("role", "status");
+    live.setAttribute("aria-live", "polite");
+    document.body.appendChild(live);
+    return live;
+  }
+  function announce(text) {
+    ensureLive().textContent = text || "";
   }
 
   function renderMenu() {
@@ -998,7 +1018,7 @@
       });
     }
 
-    menu.appendChild(makeMenuFooter(peMsg("menuManage")));
+    menu.appendChild(makeMenuFooter(peMsg("menuManage"), "templates"));
   }
 
   // Read the stored list again rather than trusting `tplRecent`: another tab may have written
@@ -1014,7 +1034,7 @@
   // Shared by both menu modes. The door is the same Settings page, but the label is not:
   // "Manage templates" under a list of copy formats sends the user looking for the wrong
   // card.
-  function makeMenuFooter(label) {
+  function makeMenuFooter(label, tab) {
     const footer = document.createElement("div");
     footer.className = "pe-menu-footer";
     const cfg = document.createElement("button");
@@ -1025,7 +1045,7 @@
     cfg.addEventListener("click", (e) => {
       e.preventDefault();
       try {
-        chrome.runtime.sendMessage({ type: "pe-open-options" });
+        chrome.runtime.sendMessage({ type: "pe-open-options", tab });
       } catch (_) {}
       hideMenu();
     });
@@ -1071,7 +1091,7 @@
       wrap.appendChild(item);
     });
     menu.appendChild(wrap);
-    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy")));
+    menu.appendChild(makeMenuFooter(peMsg("menuManageCopy"), "items"));
   }
 
   function positionMenu(btn) {
@@ -1122,6 +1142,8 @@
     menu.querySelectorAll(".pe-menu-active").forEach((r) => r.classList.remove("pe-menu-active"));
     if (!row) return;
     row.classList.add("pe-menu-active");
+    const title = row.querySelector(".pe-menu-item-title");
+    announce((title || row).textContent);
     try {
       row.scrollIntoView({ block: "nearest" });
     } catch (_) {}
@@ -1309,15 +1331,19 @@
     // Rich insert, path 1: synthetic paste of HTML — the full detail-view editor
     // parses this into real headings/lists/checkboxes.
     const html = mdToHtml(text);
+    // Did a path insert anything? Asked of the markup, not of the text's length: replacing a
+    // selection with a shorter template shrinks the text, and judging by growth read that as
+    // a failure and inserted the template a second time by the next path down.
+    const changed = (before) => editor.innerHTML !== before;
     try {
-      const beforeLen = (editor.textContent || "").length;
+      const before = editor.innerHTML;
       const dt = new DataTransfer();
       dt.setData("text/html", html);
       dt.setData("text/plain", text);
       editor.dispatchEvent(
         new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })
       );
-      if ((editor.textContent || "").length > beforeLen) {
+      if (changed(before)) {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
         return; // rich content inserted
       }
@@ -1326,8 +1352,8 @@
     // "Create work item" modal ignores the synthetic paste but renders this into
     // headings/lists (task-list checkboxes may degrade to plain list items there).
     try {
-      const beforeLen = (editor.textContent || "").length;
-      if (document.execCommand("insertHTML", false, html) && (editor.textContent || "").length > beforeLen) {
+      const before = editor.innerHTML;
+      if (document.execCommand("insertHTML", false, html) && changed(before)) {
         editor.dispatchEvent(new Event("input", { bubbles: true }));
         return;
       }
@@ -1512,6 +1538,7 @@
   }
 
   function toast(msg) {
+    announce(msg);
     const t = document.createElement("div");
     t.className = "pe-toast";
     t.textContent = msg;

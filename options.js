@@ -17,6 +17,10 @@
   // the list the user has actually had in front of them, which is the only list they can be
   // said to have an opinion about. See mergeForeignDomains.
   let knownDomains = [];
+  // The same, for rules: the ids of the rules this page has had on screen. The picker adds a
+  // rule from a Plane tab, and a dirty form refuses to adopt it — so without this the next Save
+  // wrote the page's older list over the rule the user had just picked. See mergeForeignRules.
+  let knownRuleIds = [];
   // Ignore the storage changes our own save triggers. It has to span the whole save, not
   // absorb a single event: one save writes the settings and — when the template shards
   // shrink — prunes the ones it no longer needs, which is a second storage operation and
@@ -264,6 +268,16 @@
       const del = node.querySelector(".rule-del");
 
       enabled.checked = rule.enabled !== false;
+      // The switch has no text of its own, so it carries the rule's name; a screen reader
+      // otherwise heard a row of identical unnamed checkboxes.
+      const nameSwitch = () =>
+        enabled.setAttribute(
+          "aria-label",
+          (state.rules[idx].label || "").trim()
+            ? peMsg("optRuleEnableAria", [state.rules[idx].label.trim()])
+            : peMsg("optRuleEnableUnnamed")
+        );
+      nameSwitch();
       focus.checked = rule.focus === true;
       label.value = rule.label || "";
       selector.value = rule.selector || "";
@@ -272,7 +286,10 @@
 
       enabled.addEventListener("change", () => (state.rules[idx].enabled = enabled.checked));
       focus.addEventListener("change", () => (state.rules[idx].focus = focus.checked));
-      label.addEventListener("input", () => (state.rules[idx].label = label.value));
+      label.addEventListener("input", () => {
+        state.rules[idx].label = label.value;
+        nameSwitch();
+      });
       selector.addEventListener("input", () => {
         state.rules[idx].selector = selector.value;
         markSelector(selector);
@@ -281,6 +298,7 @@
       value.addEventListener("input", () => (state.rules[idx].value = value.value));
       del.addEventListener("click", () => {
         state.rules.splice(idx, 1);
+        markDirty();
         renderRules();
       });
 
@@ -377,6 +395,7 @@
       content.addEventListener("input", () => (state.templates[idx].content = content.value));
       del.addEventListener("click", () => {
         state.templates.splice(idx, 1);
+        markDirty();
         renderTemplates();
       });
       el.templateList.appendChild(node);
@@ -418,6 +437,7 @@
       value.addEventListener("input", () => (state.variables[idx].value = value.value));
       del.addEventListener("click", () => {
         state.variables.splice(idx, 1);
+        markDirty();
         renderVariables();
       });
 
@@ -469,6 +489,7 @@
       });
       del.addEventListener("click", () => {
         state.copyFormats.splice(idx, 1);
+        markDirty();
         renderCopyFormats();
       });
 
@@ -528,8 +549,7 @@
     renderQuickLinks();
     // Pushed programmatically, so no input event fired to mark the form dirty — and an
     // unmarked form adopts the next foreign storage change, taking the new row with it.
-    // Same reason the example-feed button sets this by hand.
-    dirty = true;
+    markDirty();
     // Put the caret on the first thing left to replace, selected, so the next keystroke
     // overwrites it. With nothing left, send it to whichever field still needs a decision:
     // a numbered tracker needs a prefix to spend, and everything else needs a name.
@@ -765,6 +785,7 @@
       });
       del.addEventListener("click", () => {
         state.quickLinks.splice(idx, 1);
+        markDirty();
         renderQuickLinks();
       });
 
@@ -834,19 +855,63 @@
 
   function sourceStatusText(src) {
     if (!src.url || !src.url.trim()) return { text: peMsg("msgSrcEnterUrl"), cls: "" };
-    const entry = (syncCache.bySource || {})[src.id];
+    const entry = peSourceEntry(src, syncCache);
     if (!entry) return { text: peMsg("msgSrcNotSynced"), cls: "" };
     if (entry.status === "ok") {
       let t = peMsg("msgSrcSynced", [fmtTime(entry.fetchedAt), String(entry.count || 0)]);
       if (entry.dropped) t += peMsg("msgSrcSkipped", [String(entry.dropped)]);
       return { text: t, cls: "ok" };
     }
-    let t = peMsg("msgSrcFailed", [entry.lastError || "error"]);
+    let t = peMsg("msgSrcFailed", [peSyncErrorText(entry)]);
     if (entry.fetchedAt) t += peMsg("msgSrcLastGood", [fmtTime(entry.fetchedAt)]);
-    return { text: t, cls: "err" };
+    // The worker's own English rides along as a tooltip: it is the line to paste into a bug
+    // report, and the sentence above is the one to act on.
+    return { text: t, cls: "err", raw: entry.lastError || "" };
+  }
+
+  // Where the reader is in the source list, so a rebuild can put them back. A cache update
+  // redraws every row — and Save starts a sync that commits per source — so typing a URL while
+  // a result landed lost the caret, the selection and any group list that was open.
+  function sourceListPlace() {
+    const rows = [...el.sourceList.querySelectorAll(".src-item")];
+    const a = document.activeElement;
+    const row = a && a.closest ? a.closest(".src-item") : null;
+    const place = { open: rows.map((r) => !!(r.querySelector(".src-detail") || {}).open), focus: null };
+    if (row && rows.indexOf(row) > -1) {
+      const cls = [...a.classList].find((c) => /^src-/.test(c));
+      if (cls) {
+        place.focus = { row: rows.indexOf(row), cls };
+        try {
+          place.focus.sel = [a.selectionStart, a.selectionEnd];
+        } catch (_) {}
+      }
+    }
+    return place;
+  }
+  function restoreSourceListPlace(place) {
+    const rows = [...el.sourceList.querySelectorAll(".src-item")];
+    place.open.forEach((open, i) => {
+      const d = rows[i] && rows[i].querySelector(".src-detail");
+      if (d && open) d.open = true;
+    });
+    const f = place.focus;
+    const field = f && rows[f.row] && rows[f.row].querySelector("." + f.cls);
+    if (!field) return;
+    field.focus();
+    if (f.sel && f.sel[0] != null) {
+      try {
+        field.setSelectionRange(f.sel[0], f.sel[1]);
+      } catch (_) {}
+    }
   }
 
   function renderSources() {
+    const place = sourceListPlace();
+    renderSourceRows();
+    restoreSourceListPlace(place);
+  }
+
+  function renderSourceRows() {
     const sync = ensureSync();
     el.syncEnabled.checked = !!sync.enabled;
     el.sourceList.innerHTML = "";
@@ -868,7 +933,7 @@
       interval.value = String(src.intervalMinutes || 360);
       // Unnamed source → the placeholder IS the name the picker falls back to, so the
       // header is never a surprise.
-      const entry = (syncCache.bySource || {})[src.id];
+      const entry = peSourceEntry(src, syncCache);
       nameInput.placeholder = src.url ? peSourceDisplayName({ url: src.url }, entry) : peMsg("optSrcNamePh");
 
       enabled.addEventListener("change", () => (sync.sources[idx].enabled = enabled.checked));
@@ -879,16 +944,19 @@
         markSourceUrl(url);
         const s = sourceStatusText(sync.sources[idx]);
         statusEl.textContent = s.text;
+        statusEl.title = s.raw || "";
         statusEl.className = "src-status " + s.cls;
       });
       interval.addEventListener("change", () => (sync.sources[idx].intervalMinutes = parseInt(interval.value, 10) || 360));
       del.addEventListener("click", () => {
         sync.sources.splice(idx, 1);
+        markDirty();
         renderSources();
       });
 
       const s = sourceStatusText(src);
       statusEl.textContent = s.text;
+      statusEl.title = s.raw || "";
       statusEl.className = "src-status " + s.cls;
       renderSourceGroups(node, sync.sources[idx], entry);
       el.sourceList.appendChild(node);
@@ -983,11 +1051,27 @@
     el.addRule.addEventListener("click", () => addRule({ label: "", selector: "", property: "max-width", value: "" }));
 
     document.querySelectorAll(".chip[data-preset]").forEach((chip) => {
-      chip.addEventListener("click", () => addRule(PRESETS[chip.dataset.preset]));
+      chip.addEventListener("click", () => {
+        const p = PRESETS[chip.dataset.preset];
+        // A preset already in the list is pointed at rather than copied: a second identical
+        // row is two places to keep in step, and the one that wins is whichever is last.
+        const at = state.rules.findIndex(
+          (r) => (r.selector || "").trim() === p.selector && (r.property || "").trim() === p.property
+        );
+        if (at > -1) {
+          const row = el.ruleList.querySelectorAll(".rule-item")[at];
+          const field = row && row.querySelector(".rule-value");
+          if (field) field.focus();
+          flash(peMsg("msgPresetExists"));
+          return;
+        }
+        addRule(p);
+      });
     });
 
     el.addTemplate.addEventListener("click", () => {
       state.templates.push({ id: uid("tpl"), name: "", title: "", content: "" });
+      markDirty();
       renderTemplates();
       focusLast(".tpl-name");
     });
@@ -999,6 +1083,7 @@
         return;
       }
       state.variables.push({ name: "", value: "" });
+      markDirty();
       renderVariables();
       focusLast(".var-name");
     });
@@ -1010,6 +1095,7 @@
         return;
       }
       state.copyFormats.push({ id: uid("cpy"), name: "", format: "" });
+      markDirty();
       renderCopyFormats();
       focusLast(".cpy-name");
     });
@@ -1033,7 +1119,12 @@
         flash(peMsg("msgSrcLimit", [String(PE_SYNC_LIMITS.maxSources)]), true);
         return;
       }
-      ensureSync().sources.push({
+      // A source is a request for sync, so it switches sync on, as the example button always
+      // did. Left off, the row told the user to enter a URL and Save, they did, and "Sync now"
+      // then reported "Synced 0 source(s)" because nothing had run.
+      const sync = ensureSync();
+      sync.enabled = true;
+      sync.sources.push({
         id: uid("src"),
         url: "",
         name: "",
@@ -1041,6 +1132,7 @@
         enabled: true,
         hiddenGroups: []
       });
+      markDirty();
       renderSources();
       focusLast(".src-name");
     });
@@ -1072,8 +1164,7 @@
         hiddenGroups: []
       });
       renderSources();
-      dirty = true; // pushed programmatically, so no input event fired to mark it
-      scheduleMeter();
+      markDirty(); // pushed programmatically, so no input event fired to mark it
       flash(peMsg("msgExampleAdded"));
     });
 
@@ -1123,6 +1214,17 @@
     // reflect settings changed elsewhere (e.g. the picker)
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
+        // A page already open, asked to show a tab (see takeOpenTab).
+        if (area === "session") {
+          const c = changes[PE_OPEN_TAB_KEY];
+          if (c && c.newValue) {
+            openRequestedTab(c.newValue);
+            try {
+              chrome.storage.session.remove(PE_OPEN_TAB_KEY);
+            } catch (_) {}
+          }
+          return;
+        }
         // Synced-template cache updated by the service worker (scheduled/now) → refresh statuses.
         if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
@@ -1169,6 +1271,7 @@
           state = s;
           resetPending = false; // the reset this was waiting to save is gone
           knownDomains = (s.domains || []).slice();
+          knownRuleIds = (s.rules || []).map((r) => r && r.id).filter(Boolean);
           render();
           if (grew) showTab("appearance");
           flash(peMsg("msgLoadedPicked"));
@@ -1275,6 +1378,10 @@
         // what just changed. Leaving them there meant "review, then Save" pointed at panels
         // that were hidden. Send them to the first tab so reviewing can actually start.
         showTab(PE_TABS[0]);
+        // render() marks the form clean, which is right for a page drawn from storage and wrong
+        // here: nothing is saved yet, and a clean form adopts the next change from elsewhere,
+        // which would replace the whole import without a word.
+        markDirty();
         flash(peMsg("msgImported"));
       } catch (e) {
         flash(peMsg("msgImportInvalid"), true);
@@ -1293,6 +1400,7 @@
       property: base.property || "max-width",
       value: base.value || ""
     });
+    markDirty();
     renderRules();
     focusLast(base.selector ? ".rule-value" : ".rule-selector");
   }
@@ -1367,6 +1475,25 @@
     return added;
   }
 
+  // The picker's version of the same thing. It adds a rule from a Plane tab while this page may
+  // be open with unsaved edits, and a dirty page announces the change without adopting it — so
+  // the Save that follows wrote this page's older list over the rule just picked. A rule in
+  // storage whose id this page has never shown cannot be one the user meant to delete, so it
+  // is carried into the save; one that was on screen and deleted stays deleted. Returns the
+  // carried rules' names, for the message.
+  async function mergeForeignRules(target) {
+    let stored = null;
+    try {
+      stored = await peGetSettings();
+    } catch (_) {
+      return [];
+    }
+    const mine = new Set((target.rules || []).map((r) => r && r.id));
+    const added = (stored.rules || []).filter((r) => r && r.id && knownRuleIds.indexOf(r.id) === -1 && !mine.has(r.id));
+    if (added.length) target.rules = (target.rules || []).concat(added);
+    return added.map((r) => (r.label || r.selector || "").trim()).filter(Boolean);
+  }
+
   // Two halves, on either side of the write. Asking comes first, because the Save click is
   // the gesture the prompt needs. Handing access back comes only after storage took the
   // settings: revoking first meant a save that then failed had already switched the extension
@@ -1392,6 +1519,25 @@
     } catch (_) {}
   }
 
+  // The first variable row Save could not keep, and what to say about it — or null.
+  function variableProblem() {
+    const seen = new Set();
+    const vars = state.variables || [];
+    for (let i = 0; i < vars.length; i++) {
+      const name = ((vars[i] && vars[i].name) || "").trim();
+      const value = (vars[i] && vars[i].value) || "";
+      if (!name) {
+        if (value.trim()) return { index: i, msg: peMsg("msgVarNoName") };
+        continue;
+      }
+      if (!PE_VAR_NAME_RE.test(name)) return { index: i, msg: peMsg("msgVarBadSave", [name]) };
+      const k = name.toLowerCase();
+      if (seen.has(k)) return { index: i, msg: peMsg("msgVarDupeSave", [name]) };
+      seen.add(k);
+    }
+    return null;
+  }
+
   async function saveAll() {
     // Refuse BEFORE touching state. A URL we cannot turn into a host permission is one
     // the worker will never fetch, so the save cannot go ahead — but bailing out after
@@ -1407,6 +1553,20 @@
     if (badSrc) {
       flash(peMsg("msgInvalidSrcUrl"), true);
       return; // state untouched, so every row's bindings still line up
+    }
+
+    // A variable Save cannot keep stops the save, the same way: it used to be dropped with
+    // "Saved." on screen, and a name in Korean, or a second "team", lost its value without a
+    // word beyond a tooltip on a red border. A row with neither a name nor a value is just an
+    // empty row and goes quietly, like any other.
+    const varBad = variableProblem();
+    if (varBad) {
+      showTab("templates");
+      const field = el.variableList.querySelectorAll(".var-item")[varBad.index];
+      const input = field && field.querySelector(".var-name");
+      if (input) input.focus();
+      flash(varBad.msg, true);
+      return;
     }
 
     // Everything Save writes is built on a copy. State is replaced only once storage has taken
@@ -1468,6 +1628,7 @@
       }));
     // Before the permission pass, because that is what would hand the origin back.
     const kept = await mergeForeignDomains(next);
+    const keptRules = await mergeForeignRules(next);
     const permOk = await requestHostPermissions(next);
     try {
       savingSelf = true;
@@ -1484,6 +1645,7 @@
       }
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       knownDomains = (state.domains || []).slice();
+      knownRuleIds = (state.rules || []).map((r) => r && r.id).filter(Boolean);
       render();
       // A failed grant outranks the good news. These two can happen together — and when
       // they do it is not a coincidence: the origin Chrome refused is the one that was just
@@ -1491,6 +1653,7 @@
       // happened.
       if (!permOk) flash(peMsg("msgSavedNoPerm"), true);
       else if (kept.length) flash(peMsg("msgKeptDomains", [kept.join(", ")]));
+      else if (keptRules.length) flash(peMsg("msgKeptRules", [keptRules.join(", ")]));
       else flash(peMsg("msgSaved"));
       // Fetch sources now (don't wait for the scheduled alarm), then refresh statuses.
       if (permOk && ensureSync().enabled && ensureSync().sources.length) {
@@ -1550,6 +1713,12 @@
       flash(peMsg("msgSaveFirst"), true);
       return;
     }
+    // Asking the worker with sync off runs nothing and reports "Synced 0 source(s)", which
+    // reads as a sync that found nothing rather than one that never happened.
+    if (!ensureSync().enabled) {
+      flash(peMsg("msgSyncOff"), true);
+      return;
+    }
     flash(peMsg("msgSyncing"));
     try {
       chrome.runtime.sendMessage({ type: "pe-sync-now" }, (resp) => {
@@ -1585,15 +1754,28 @@
     state = peDeepMerge(PE_DEFAULTS, {});
     resetPending = true;
     render();
+    markDirty(); // the same as an import: drawn, not saved
     flash(peMsg("msgResetDone"));
   }
 
   let flashTimer = null;
+  // A success may fade; an error stays until the next message replaces it. An error names
+  // something to go and change, often on another tab, and in Korean it is a sentence or two to
+  // read first — three seconds was gone before the reader had found the field it named.
   function flash(msg, isError) {
     el.status.textContent = msg;
     el.status.style.color = isError ? "#dc2626" : "";
     clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => (el.status.textContent = ""), 3000);
+    if (!isError) flashTimer = setTimeout(() => (el.status.textContent = ""), 4000);
+  }
+
+  // Every edit that is not typing has to say so: a deleted row, an added one, an import, a
+  // reset. Only input events marked the form, so a deletion left it "clean", and a change from
+  // the picker or another device that arrived before Save was adopted over it — the deletion
+  // simply undone, the import or the reset simply gone.
+  function markDirty() {
+    dirty = true;
+    scheduleMeter();
   }
 
   // header "about" line: show the version straight from the manifest (never goes stale).
@@ -1660,6 +1842,7 @@
     state = s;
     syncedJson = JSON.stringify(s); // baseline for the storage-change handler
     knownDomains = (s.domains || []).slice();
+    knownRuleIds = (s.rules || []).map((r) => r && r.id).filter(Boolean);
     syncCache = c;
     ruleHealth = h;
     anchorHealth = a;
@@ -1670,5 +1853,29 @@
     // Not inside render(): that also runs after every save, and it would throw the user
     // back to the default tab each time they pressed Save.
     showTab(initialTab());
+    takeOpenTab();
+  });
+
+  // "Open Settings on this tab", left in storage.session by the worker for a page that may not
+  // have existed yet — "Manage templates" asks for Templates. Used once, then removed, so a
+  // later plain open lands where it normally would. Only a tab this page has is honoured.
+  function openRequestedTab(tab) {
+    if (typeof tab === "string" && PE_TABS.indexOf(tab) !== -1) showTab(tab);
+  }
+  function takeOpenTab() {
+    try {
+      chrome.storage.session.get(PE_OPEN_TAB_KEY).then((o) => {
+        if (!o || !o[PE_OPEN_TAB_KEY]) return;
+        openRequestedTab(o[PE_OPEN_TAB_KEY]);
+        chrome.storage.session.remove(PE_OPEN_TAB_KEY);
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
+  // Edits live in this page until Save, and closing the tab used to drop them without a word.
+  window.addEventListener("beforeunload", (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = "";
   });
 })();
