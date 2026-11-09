@@ -1516,6 +1516,92 @@ const suites = [
       });`
   },
   {
+    // A rule carried by the first read can still change while the prompt is up — edited, or
+    // deleted, on another page. Keeping the first read's copy wrote the old value back over it.
+    name: "options · a carried rule edited while the prompt is up is saved as edited",
+    page: { name: "opt-save-prompt-edit", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const put = (rules) => {
+        const f = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+        f.rules = rules;
+        window.__SEED.peSettings = f;
+        window.__onChanged({ peSettings: { newValue: f } }, "sync");
+      };
+      const base = window.__SEED.peSettings.rules;
+      put(base.concat([{ id: "R", enabled: true, label: "R", selector: ".r", property: "width", value: "320px" }]));
+      await sleep(50);
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      put(base.concat([{ id: "R", enabled: true, label: "R", selector: ".r", property: "width", value: "640px" }]));
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the newer value is what is saved", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq((w.rules.find((r) => r.id === "R") || {}).value, "640px");
+      });`
+  },
+  {
+    // A second click on Save while the first is still out ran a second save beside it, which
+    // then read the first one's tidying as an edit of the user's: "not saved yet", and a form
+    // that asked before closing over settings already in storage.
+    name: "options · a double-click on Save is one save",
+    page: { name: "opt-save-twice", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + "  "; // trailing space: Save tidies it, so state and copy differ
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("addTemplate").click(); // and an empty row Save drops
+      document.getElementById("save").click();
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(300);
+      check("it reports one plain save", () => eq(document.getElementById("status").textContent, peMsg("msgSaved")));
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      check("and leaves nothing unsaved", () => ok(!leave(), "it asks before closing over a saved form"));`
+  },
+  {
+    // A source saved under a new id while newer edits were pending kept its old id in the form,
+    // and the next save wrote the old one back: the new file's cache pruned, fetched again.
+    name: "options · a source's new id survives a save made with edits pending",
+    page: {
+      name: "opt-src-newid-pending",
+      ...OPTIONS,
+      seed: seedOf({ templateSync: { enabled: true, sources: [{ id: "s1", url: "https://plane.example.com/t.json", name: "", intervalMinutes: 360, enabled: true, hiddenGroups: [] }] } }),
+      env: { hold: true }
+    },
+    body: `
+      ${TAB_READY}
+      const url = document.querySelector("#sourceList .src-url");
+      url.value = "https://plane.example.com/other.json";
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the first save");
+      await sleep(100);
+      const ids = () => window.__written.map((o) => o.peSettings).filter(Boolean).map((w) => w.templateSync.sources[0].id);
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the second prompt");
+      window.__answer();
+      await waitFor(() => ids().length > 1, "the second save");
+      check("both saves wrote the same new id", () => {
+        const all = ids();
+        ok(all[0] !== "s1", "first save kept the old id");
+        eq(all[1], all[0], "the second save wrote " + all[1]);
+      });`
+  },
+  {
     // A reset confirmed while a save is in flight is not part of what that save wrote, so that
     // save must not clear what the reset promised to clear — the recents and the pins go when
     // the reset itself is saved, and not before.
@@ -1563,6 +1649,11 @@ const suites = [
       nm.value = was + "x"; nm.dispatchEvent(new Event("input", { bubbles: true }));
       nm.value = was; nm.dispatchEvent(new Event("input", { bubbles: true }));
       check("nor does a letter typed and taken back", () => ok(!leave(), "it asked about an edit that was undone"));
+      // A switch ticked and unticked is no edit either, even on a rule stored without the key.
+      const fsw = document.querySelector("#ruleList .rule-focus");
+      fsw.checked = true; fsw.dispatchEvent(new Event("change", { bubbles: true }));
+      fsw.checked = false; fsw.dispatchEvent(new Event("change", { bubbles: true }));
+      check("nor a switch flipped and flipped back", () => ok(!leave(), "it asked about a switch put back"));
       document.querySelector("#templateList .tpl-del").click();
       check("a deletion not yet saved asks", () => ok(leave(), "it let the deletion go"));
       document.getElementById("save").click();
@@ -1605,7 +1696,23 @@ const suites = [
       group().focus();
       window.__onChanged({ peSyncCache: { newValue: { bySource: { s1: ${JSON.stringify(SRC_ENTRY(2))} } } } }, "local");
       await sleep(50);
-      check("a group's checkbox keeps focus too", () => eq(document.activeElement, group(), "focus is on " + document.activeElement.tagName));`
+      check("a group's checkbox keeps focus too", () => eq(document.activeElement, group(), "focus is on " + document.activeElement.tagName));
+      // Sync now, and the sync Save starts, end in a reply that reloads the cache — the other
+      // way a result reaches the list while someone types in it.
+      const field = document.querySelector("#sourceList .src-name");
+      field.focus();
+      chrome.runtime.sendMessage = (m, cb) => setTimeout(() => cb && cb({ ok: 1, err: 0 }), 0);
+      document.getElementById("syncNow").click();
+      await sleep(100);
+      check("a sync's reply does not replace the field either", () => ok(field.isConnected && document.activeElement === field, "rebuilt under the caret"));
+      // Leaving the list rebuilds it — but a press on a label in it takes focus away before its
+      // click lands, and a rebuild in between swallows the click.
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      field.blur();
+      check("not while a button is held", () => ok(field.isConnected, "rebuilt between mousedown and click"));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      await sleep(50);
+      check("but once it is let go", () => ok(!field.isConnected, "never rebuilt"));`
   },
   {
     // Deleting is not a re-render that should put you back: the row is gone. Restoring by
@@ -2451,6 +2558,13 @@ const suites = [
         ok(document.activeElement !== document.body, "focus fell to <body>");
         ok(!menu().contains(document.activeElement), "focus is still on a hidden row");
       });
+      // Alt+T is a toggle. With a row focused there is no editor in focus to match it against,
+      // and it used to move the menu to the first editor on the page instead of closing it.
+      btn("box-b").click();
+      shown(".pe-menu-item")[1].focus();
+      key({ altKey: true, code: "KeyT", key: "\\u2020" });
+      check("Alt+T on a focused row closes the menu", () => ok(!isOpen(), "it moved instead"));
+      await sleep(50);
       // Moving the menu to the other editor redraws its rows, and the focused one with them.
       btn("box-a").click();
       shown(".pe-menu-item")[1].focus();

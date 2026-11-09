@@ -142,6 +142,8 @@ async function fetchSource(src) {
   } catch (_) {}
   if (!allowed) return fail("Site access not granted", "noAccess");
 
+  // Which half failed: reaching the server and reading its reply, or making sense of the file.
+  let reading = true;
   try {
     const resp = await fetch(src.url, {
       method: "GET",
@@ -175,6 +177,7 @@ async function fetchSource(src) {
       return fail("Response too large", "tooLarge", [Math.round(PE_SYNC_LIMITS.maxResponseBytes / 1024)]);
     const text = await readCapped(resp, PE_SYNC_LIMITS.maxResponseBytes);
     if (text === null) return fail("Response too large", "tooLarge", [Math.round(PE_SYNC_LIMITS.maxResponseBytes / 1024)]);
+    reading = false;
     let json;
     try {
       json = JSON.parse(text);
@@ -215,9 +218,10 @@ async function fetchSource(src) {
     if (e && e.name === "TimeoutError")
       return fail("Timed out after " + PE_FETCH_TIMEOUT_MS / 1000 + "s", "timeout", [PE_FETCH_TIMEOUT_MS / 1000]);
     // fetch() rejects with a TypeError when it cannot reach the server, and a body that breaks
-    // off mid-stream does the same. Anything else is not a connection failure, and calling it
-    // one sends the reader to debug their network: with no code the page shows these words.
-    return fail((e && e.message) || "Fetch failed", e && e.name === "TypeError" ? "network" : "");
+    // off mid-stream does the same. Anything else — and anything once the file is in hand — is
+    // not a connection failure, and calling it one sends the reader to debug their network:
+    // with no code the page shows these words.
+    return fail((e && e.message) || "Fetch failed", reading && e && e.name === "TypeError" ? "network" : "");
   }
 }
 

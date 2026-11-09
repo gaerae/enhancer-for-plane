@@ -10,7 +10,7 @@ first read, never rewritten by hand.
 
 ---
 
-## v1.13.0 — 2026-11-09
+## v1.13.0 — 2026-11-10
 
 Schema 9: the two description presets below are appended to existing settings. Nothing you
 deleted comes back, and no permission changes.

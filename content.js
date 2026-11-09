@@ -1825,6 +1825,13 @@
     // Alt+T (macOS: ⌥ Option+T): open the template menu for the description being edited.
     // On macOS, Option+T changes e.key (e.g. "†"), so detect it via the layout-independent e.code.
     if (e.altKey && (e.code === "KeyT" || e.key === "t" || e.key === "T")) {
+      // From inside the open menu it is the toggle it is everywhere else: there is no editor
+      // in focus to match against, and falling back to the first one moved the menu instead.
+      if (menuOpen && menu && menu.contains(document.activeElement)) {
+        e.preventDefault();
+        hideMenu();
+        return;
+      }
       let btns = [...document.querySelectorAll(".pe-body-tmpl-btn")];
       if (!btns.length) {
         // self-heal: the toolbar may have mounted late — inject now and retry

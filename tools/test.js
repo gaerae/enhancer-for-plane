@@ -1026,6 +1026,15 @@ test("sync: every failure carries a code both locales can say", async () => {
 
 // Anything else thrown is not a connection failure, and calling it one sends the reader off to
 // debug their network. With no code the page shows the worker's own words instead.
+test("sync: a TypeError after the file arrived is not a network failure", async () => {
+  const { ctx, state } = loadWorker({ settings: oneSource(), respond: () => jsonResponse(feed([{ id: "a", name: "A", content: "c" }])) });
+  ctx.peNormalizeRemoteTemplates = () => { throw new TypeError("Cannot read properties of undefined"); };
+  await ctx.syncSources(true);
+  const e = state.cache.bySource.src1;
+  eq(e.status, "error");
+  eq(e.errorCode, "", "a fault in reading the file was called a connection failure");
+});
+
 test("sync: only a failed fetch is called a network failure", async () => {
   const { ctx, state } = loadWorker({ settings: oneSource(), respond: () => { throw new RangeError("Invalid array length"); } });
   await ctx.syncSources(true);

@@ -227,12 +227,20 @@
   // reset counts even when the defaults are what was there: saving it still clears the lists
   // the confirm promised to clear.
   function isDirty() {
-    return resetPending || (!!state && JSON.stringify(state) !== cleanJson);
+    return resetPending || (!!state && canon(state) !== cleanJson);
+  }
+  // The settings as compared for "anything unsaved": a switch ticked and unticked writes
+  // `focus: false` onto a rule that was stored without the key, and a group hidden and shown
+  // again moves to the end of the list. Neither is an edit, and both used to read as one.
+  function canon(v) {
+    return JSON.stringify(v, (k, x) =>
+      k === "focus" && x === false ? undefined : k === "hiddenGroups" && Array.isArray(x) ? x.slice().sort() : x
+    );
   }
   // Called wherever state is taken from storage or written to it, after render() — which may
   // fill in an absent section, and that is not an edit.
   function settle() {
-    cleanJson = JSON.stringify(state);
+    cleanJson = canon(state);
   }
 
   // What the templates card and the copy card say about whether their button has been
@@ -961,17 +969,37 @@
     restoreSourceListPlace(place);
   }
 
+  function paintSourceStatus(statusEl, src) {
+    const st = sourceStatusText(src);
+    statusEl.textContent = st.text;
+    statusEl.title = st.raw || "";
+    statusEl.className = "src-status " + st.cls;
+  }
   function refreshSourceStatuses() {
     const list = ensureSync().sources || [];
     el.sourceList.querySelectorAll(".src-item").forEach((row) => {
       const src = list.find((x) => x && x.id === row.dataset.src);
       const statusEl = row.querySelector(".src-status");
-      if (!src || !statusEl) return;
-      const st = sourceStatusText(src);
-      statusEl.textContent = st.text;
-      statusEl.title = st.raw || "";
-      statusEl.className = "src-status " + st.cls;
+      if (src && statusEl) paintSourceStatus(statusEl, src);
     });
+  }
+  // A new sync result, from the storage event or from the reply to Sync now and to Save. With
+  // someone in the source list — typing a URL, perhaps in Hangul mid-syllable — a rebuild
+  // replaces the field under them, and putting the caret back does not put an IME composition
+  // back. So the status lines change in place, and the rows are rebuilt once focus leaves.
+  function sourcesChanged() {
+    if (el.sourceList.contains(document.activeElement)) {
+      refreshSourceStatuses();
+      sourcesStale = true;
+    } else renderSources();
+  }
+  // Leaving the list is when a held-back rebuild happens — but not while a button is held: a
+  // press on a label in the list takes focus away before its click lands, and a rebuild in
+  // between replaces the label, so the click goes nowhere. Then it waits for the release.
+  let mouseHeld = false;
+  let rebuildOnRelease = false;
+  function rebuildIfLeft() {
+    if (sourcesStale && !el.sourceList.contains(document.activeElement)) renderSources();
   }
 
   function renderSourceRows() {
@@ -1006,10 +1034,7 @@
       url.addEventListener("input", () => {
         sync.sources[idx].url = url.value.trim();
         markSourceUrl(url);
-        const s = sourceStatusText(sync.sources[idx]);
-        statusEl.textContent = s.text;
-        statusEl.title = s.raw || "";
-        statusEl.className = "src-status " + s.cls;
+        paintSourceStatus(statusEl, sync.sources[idx]);
       });
       interval.addEventListener("change", () => (sync.sources[idx].intervalMinutes = parseInt(interval.value, 10) || 360));
       del.addEventListener("click", () => {
@@ -1019,10 +1044,7 @@
         renderSources();
       });
 
-      const s = sourceStatusText(src);
-      statusEl.textContent = s.text;
-      statusEl.title = s.raw || "";
-      statusEl.className = "src-status " + s.cls;
+      paintSourceStatus(statusEl, src);
       renderSourceGroups(node, sync.sources[idx], entry);
       el.sourceList.appendChild(node);
     });
@@ -1187,8 +1209,21 @@
 
     el.syncEnabled.addEventListener("change", () => (ensureSync().enabled = el.syncEnabled.checked));
     el.sourceList.addEventListener("focusout", (e) => {
-      if (sourcesStale && !el.sourceList.contains(e.relatedTarget)) renderSources();
+      if (!sourcesStale || el.sourceList.contains(e.relatedTarget)) return;
+      if (mouseHeld) rebuildOnRelease = true;
+      else renderSources();
     });
+    document.addEventListener("mousedown", () => (mouseHeld = true), true);
+    document.addEventListener(
+      "mouseup",
+      () => {
+        mouseHeld = false;
+        if (!rebuildOnRelease) return;
+        rebuildOnRelease = false;
+        setTimeout(rebuildIfLeft, 0); // after the click this release produces
+      },
+      true
+    );
 
     el.addSource.addEventListener("click", () => {
       if (ensureSync().sources.length >= PE_SYNC_LIMITS.maxSources) {
@@ -1296,14 +1331,7 @@
         if (area === "local" && changes[PE_SYNC_CACHE_KEY]) {
           const nv = changes[PE_SYNC_CACHE_KEY].newValue;
           syncCache = { bySource: (nv && nv.bySource) || {} };
-          // Someone is in the source list — typing a URL, perhaps in Hangul mid-syllable. A
-          // rebuild replaces the field under them, and putting the caret back does not put an
-          // IME composition back. So the status lines change in place, and the rows are rebuilt
-          // once focus leaves the list.
-          if (el.sourceList.contains(document.activeElement)) {
-            refreshSourceStatuses();
-            sourcesStale = true;
-          } else renderSources();
+          sourcesChanged();
           renderAnchorHealth(); // templates that arrive only from a source change its gate
           return;
         }
@@ -1622,6 +1650,9 @@
   }
 
   async function saveAll() {
+    // One at a time: a second click while the first save is out ran a second save beside it,
+    // which read the first one's tidying as an edit of the user's.
+    if (saveInFlight) return;
     // Refuse BEFORE touching state. A URL we cannot turn into a host permission is one
     // the worker will never fetch, so the save cannot go ahead — but bailing out after
     // the filters below have already rebuilt state.rules/templates/variables leaves every
@@ -1662,6 +1693,7 @@
     // What the form held when Save was pressed. The awaits below — storage, the permission
     // prompt — leave the form editable, and anything typed in that window is not in `next`.
     const startJson = JSON.stringify(state);
+    const startCanon = canon(state);
     const resetMark = resetPending ? resetSeq : -1; // the reset this save carries, if any
     const next = JSON.parse(startJson);
     // drop empty rules/templates
@@ -1722,8 +1754,8 @@
     try {
       stored = await peGetSettings();
     } catch (_) {}
-    const kept = mergeForeignDomains(next, stored, known);
-    const keptRules = mergeForeignRules(next, stored, known);
+    let kept = mergeForeignDomains(next, stored, known);
+    let keptRules = mergeForeignRules(next, stored, known);
     const permOk = await requestHostPermissions(next);
     // Read again after the prompt, which can stay up as long as the user likes: a rule picked
     // or a site switched on meanwhile is in storage now, and a save built on the read above
@@ -1732,15 +1764,29 @@
     try {
       after = await peGetSettings();
     } catch (_) {}
+    // What the first read carried may itself have changed meanwhile — edited or deleted on
+    // another page — so it is taken again from this read, not kept from the first.
+    if (after) {
+      const now = new Map((after.rules || []).filter((r) => r && r.id).map((r) => [r.id, r]));
+      const carried = new Set(keptRules.map((r) => r.id));
+      next.rules = next.rules.filter((r) => !carried.has(r.id) || now.has(r.id)).map((r) => (carried.has(r.id) ? now.get(r.id) : r));
+      keptRules = keptRules.filter((r) => now.has(r.id)).map((r) => now.get(r.id));
+      const nowDomains = after.domains || [];
+      next.domains = next.domains.filter((d) => kept.indexOf(d) === -1 || nowDomains.indexOf(d) !== -1);
+      kept = kept.filter((d) => nowDomains.indexOf(d) !== -1);
+    }
     kept.push(...mergeForeignDomains(next, after, known));
     keptRules.push(...mergeForeignRules(next, after, known));
     // A source whose URL was edited is a different file under the same name, and gets a new
     // id: its old cache entry is pruned with the templates in it. Comparing URLs in the cache
     // does the same for entries that recorded theirs, and those from before that cannot.
     const savedUrl = new Map((((after || stored || {}).templateSync || {}).sources || []).map((x) => [x && x.id, x && x.url]));
-    next.templateSync.sources = next.templateSync.sources.map((x) =>
-      savedUrl.has(x.id) && savedUrl.get(x.id) !== x.url ? Object.assign({}, x, { id: uid("src") }) : x
-    );
+    const renamed = new Map();
+    next.templateSync.sources = next.templateSync.sources.map((x) => {
+      if (!savedUrl.has(x.id) || savedUrl.get(x.id) === x.url) return x;
+      renamed.set(x.id, uid("src"));
+      return Object.assign({}, x, { id: renamed.get(x.id) });
+    });
     try {
       savingSelf = true;
       await peSaveSettings(next);
@@ -1764,10 +1810,21 @@
       //
       // What the save carried across from elsewhere is left out of the form and out of the
       // known lists, so the next save carries it again rather than reading it as deleted here.
-      const editedSince = resetPending || JSON.stringify(state) !== startJson;
+      const editedSince = resetPending || canon(state) !== startCanon;
       if (editedSince) {
-        remember(JSON.parse(startJson), true);
-        cleanJson = startJson;
+        // A source saved under a new id takes it in the form too, and in the baseline, or the
+        // next save would write the old id back and the new file's cache would be pruned.
+        const base = JSON.parse(startJson);
+        [state, base].forEach((o) =>
+          ((o.templateSync || {}).sources || []).forEach((x) => {
+            if (x && renamed.has(x.id)) x.id = renamed.get(x.id);
+          })
+        );
+        el.sourceList.querySelectorAll(".src-item").forEach((row) => {
+          if (renamed.has(row.dataset.src)) row.dataset.src = renamed.get(row.dataset.src);
+        });
+        remember(base, true);
+        cleanJson = canon(base);
       } else {
         state = next;
         remember(state);
@@ -1845,7 +1902,7 @@
   function reloadSyncCache() {
     return peGetSyncCache().then((c) => {
       syncCache = c;
-      renderSources();
+      sourcesChanged();
     });
   }
 
