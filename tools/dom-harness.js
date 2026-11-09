@@ -1400,6 +1400,104 @@ const suites = [
       });`
   },
   {
+    // A team pack puts the template you use every day under a source header and a group, nine
+    // rows down. The recent block is a shortcut to it, and only on a list long enough to need
+    // one. Seeded with a hidden group and an id that no longer exists, because the block is
+    // read off what the menu shows, and those are the two ways an id stops being shown.
+    name: "content · recent templates in the menu",
+    page: {
+      name: "ct-menu-recent",
+      plane: PLANE + anchorBox("box-a", `<div class="ProseMirror" contenteditable="true" id="ed-a"><p>first</p></div>`),
+      seed: seedOf({
+        allDomains: true,
+        templates: [
+          { id: "t1", name: "Bug", title: "", content: "steps" },
+          { id: "t2", name: "Task", title: "", content: "goal" },
+          { id: "t3", name: "Spike", title: "", content: "question" }
+        ],
+        templateSync: { enabled: true, sources: [{ id: "s1", url: "https://example.com/t.json", enabled: true, hiddenGroups: ["Hidden"] }] }
+      }),
+      local: {
+        peTplRecent: ["e", "x", "t3", "h"],
+        peSyncCache: {
+          bySource: {
+            s1: {
+              remoteName: "Team pack",
+              templates: [
+                { id: "a", name: "Deploy", group: "Ops", title: "", content: "the rollback plan" },
+                { id: "b", name: "Incident", group: "Ops", title: "", content: "timeline" },
+                { id: "c", name: "On-call", group: "Ops", title: "", content: "handover" },
+                { id: "d", name: "RFC", group: "Review", title: "", content: "proposal" },
+                { id: "e", name: "ADR", group: "Review", title: "", content: "decision" },
+                { id: "f", name: "Postmortem", group: "Review", title: "", content: "causes" },
+                { id: "h", name: "Secret", group: "Hidden", title: "", content: "kept out" }
+              ]
+            }
+          }
+        }
+      }
+    },
+    body: `
+      await waitFor(() => document.querySelector("#box-a .pe-body-tmpl-btn"), "the template button");
+      const open = () => document.querySelector("#box-a .pe-body-tmpl-btn").click();
+      const menu = () => document.getElementById("pe-tmpl-menu");
+      const shown = (sel) => [...menu().querySelectorAll(sel)].filter((n) => n.getClientRects().length > 0);
+      const names = () => shown(".pe-menu-item-title").map((n) => n.textContent);
+      const recent = () => {
+        const head = menu().querySelector(".pe-menu-section-recent");
+        if (!head || !head.getClientRects().length) return null;
+        return [...head.nextElementSibling.querySelectorAll(".pe-menu-item-title")].map((n) => n.textContent);
+      };
+      const filter = (q) => {
+        const f = menu().querySelector(".pe-menu-filter-input");
+        f.value = q;
+        f.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+
+      open();
+      check("a long menu opens on the templates used last, under their own header", () => {
+        eq(shown(".pe-menu-section-label")[0].textContent, peMsg("menuRecent"), "first header");
+        eq(recent(), ["ADR", "Spike"], "in the order they were used");
+      });
+      check("an id the menu does not show is not offered", () => {
+        ok(names().indexOf("Secret") === -1, "a template in a hidden group came back through the recent block");
+      });
+      check("they are shortcuts, not moves: each is still in its own group", () => {
+        eq(names().length, 9 + 2, "rows");
+        eq(names().filter((n) => n === "ADR").length, 2, "ADR in the block and under Review");
+      });
+      filter("decision");
+      check("a search lists each hit once, and the block steps aside", () => {
+        eq(names(), ["ADR"]);
+        eq(recent(), null, "the recent header is hidden while typing");
+      });
+      filter("");
+      check("an empty box brings it back", () => eq(recent(), ["ADR", "Spike"]));
+
+      // Another tab wrote while this menu was open, and its event has not arrived — Chrome does
+      // not promise it will first. A write built on the copy this tab loaded would drop "f".
+      window.__LOCAL.peTplRecent = ["f", "e", "x"];
+      shown(".pe-menu-item").find((n) => n.textContent.indexOf("Deploy") === 0).click();
+      await waitFor(() => (window.__LOCAL.peTplRecent || [])[0] === "a", "the insert to be remembered");
+      check("inserting one puts it first, on top of what is stored now, three long", () => {
+        eq(window.__LOCAL.peTplRecent, ["a", "f", "e"]);
+        ok(document.getElementById("ed-a").textContent.indexOf("the rollback plan") > -1, "and it was inserted");
+      });
+
+      // Another tab inserted something meanwhile; the next menu here has to know.
+      // A personal template among them, so the short list below has something it could show.
+      window.__LOCAL.peTplRecent = ["f", "t2", "a"];
+      window.__onChanged({ peTplRecent: { newValue: ["f", "t2", "a"] } }, "local");
+      open();
+      check("another tab's insert reaches this menu", () => eq(recent(), ["Postmortem", "Task", "Deploy"]));
+
+      window.__onChanged({ peSyncCache: { newValue: { bySource: {} } } }, "local");
+      check("on a short list every row is in view already, so there is no block", () => {
+        eq(names(), ["Bug", "Task", "Spike"]);
+        eq(recent(), null);
+      });`
+  },
+  {
     // The extension's biggest feature, and until this suite no browser check had ever opened
     // it: the anchors were proved and the insert paths were not. Two editors, because which
     // box a template lands in is decided by the button that opened the menu, and with one

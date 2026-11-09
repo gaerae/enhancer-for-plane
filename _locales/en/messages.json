@@ -656,6 +656,10 @@
   "menuFilterPh": {
     "message": "Filter templates…"
   },
+  "menuRecent": {
+    "message": "Recently used",
+    "description": "Header over the last templates inserted on this device, shown at the top of a long template menu."
+  },
   "menuYours": {
     "message": "Yours"
   },

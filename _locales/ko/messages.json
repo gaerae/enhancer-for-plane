@@ -652,6 +652,10 @@
   "menuFilterPh": {
     "message": "템플릿 검색…"
   },
+  "menuRecent": {
+    "message": "최근 사용",
+    "description": "Header over the last templates inserted on this device, shown at the top of a long template menu."
+  },
   "menuYours": {
     "message": "내 템플릿"
   },

@@ -9,6 +9,7 @@
 
   let settings = null;
   let syncCache = { bySource: {} }; // synced templates (chrome.storage.local)
+  let tplRecent = []; // ids of the templates this device inserted last (chrome.storage.local)
 
   // styles
   let sheetObj = null;
@@ -830,9 +831,12 @@
     const total = peCountTemplates(sections);
     const hasSynced = sections.some((s) => s.kind === "synced");
 
-    // Filter box — only worth showing once the list is long (a source can push many).
+    // Filter box — only worth showing once the list is long (a source can push many). The
+    // recent block below waits for the same line: on a short list every row is already in
+    // view, and repeating three of them would only make it longer.
+    const isLong = total > 8;
     let filterInput = null;
-    if (total > 8) {
+    if (isLong) {
       const fwrap = document.createElement("div");
       fwrap.className = "pe-menu-filter";
       filterInput = document.createElement("input");
@@ -851,7 +855,7 @@
     // null) and `ownerEl` is the source header the group belongs to (may be null).
     // The filter uses these to hide empty headers, and a source header once all of its
     // groups are filtered out.
-    const wraps = []; // { wrap, headerEl, ownerEl }
+    const wraps = []; // { wrap, headerEl, ownerEl, recent }
 
     // One-line preview. The body is Markdown, so strip the syntax rather than showing
     // "## Environment - Version:" — the markers carry no meaning at a glance.
@@ -874,7 +878,7 @@
       return parts.join(" · ").slice(0, 90);
     }
 
-    function addItems(items, headerEl, ownerEl) {
+    function addItems(items, headerEl, ownerEl, recent) {
       const wrap = document.createElement("div");
       wrap.className = "pe-menu-group";
       items.forEach((t) => {
@@ -894,12 +898,27 @@
         item.addEventListener("click", (e) => {
           e.preventDefault();
           applyTemplate(t, menuOwnerBtn);
+          rememberTemplate(t);
           hideMenu();
         });
         wrap.appendChild(item);
       });
       list.appendChild(wrap);
-      wraps.push({ wrap, headerEl, ownerEl });
+      wraps.push({ wrap, headerEl, ownerEl, recent: !!recent });
+    }
+
+    // Copies of rows that also appear in their own group below, so the place a template
+    // lives does not move under the reader's hand — only a shortcut to it is added.
+    const recentItems = isLong ? peTplRecentPick(sections, tplRecent) : [];
+    if (recentItems.length) {
+      const head = document.createElement("div");
+      head.className = "pe-menu-section pe-menu-section-recent";
+      const label = document.createElement("span");
+      label.className = "pe-menu-section-label";
+      label.textContent = peMsg("menuRecent");
+      head.appendChild(label);
+      list.appendChild(head);
+      addItems(recentItems, head, null, true);
     }
 
     sections.forEach((section) => {
@@ -956,17 +975,19 @@
         const q = filterInput.value.trim().toLowerCase();
         let shown = 0;
         const ownerHits = new Map(); // source header → surviving item count
-        wraps.forEach(({ wrap, headerEl, ownerEl }) => {
+        wraps.forEach(({ wrap, headerEl, ownerEl, recent }) => {
           let groupShown = 0;
           wrap.querySelectorAll(".pe-menu-item").forEach((it) => {
-            const hit = !q || it._haystack.indexOf(q) !== -1;
+            // A search finds each template once, in its own group: the recent block is a
+            // shortcut for an empty box, and while typing it would only list hits twice.
+            const hit = recent ? !q : !q || it._haystack.indexOf(q) !== -1;
             it.style.display = hit ? "" : "none";
             if (hit) groupShown++;
           });
           wrap.style.display = groupShown ? "" : "none";
           if (headerEl) headerEl.style.display = groupShown ? "" : "none";
           if (ownerEl) ownerHits.set(ownerEl, (ownerHits.get(ownerEl) || 0) + groupShown);
-          shown += groupShown;
+          if (!recent) shown += groupShown;
         });
         // A source header disappears only when every group under it is empty.
         ownerHits.forEach((n, el) => (el.style.display = n ? "" : "none"));
@@ -975,6 +996,16 @@
     }
 
     menu.appendChild(makeMenuFooter(peMsg("menuManage")));
+  }
+
+  // Read the stored list again rather than trusting `tplRecent`: another tab may have written
+  // since this one last heard, and a write built on a stale copy would drop its entry.
+  function rememberTemplate(t) {
+    if (!t || !t.id) return;
+    tplRecent = peTplRecentAdd(tplRecent, t.id);
+    peGetTplRecent()
+      .then((list) => peSaveTplRecent(peTplRecentAdd(list, t.id)))
+      .catch(() => {});
   }
 
   // Shared by both menu modes. The door is the same Settings page, but the label is not:
@@ -2018,9 +2049,10 @@
 
   let bootstrapTimer = null;
   function refresh() {
-    return Promise.all([peGetSettings(), peGetSyncCache()]).then(([s, c]) => {
+    return Promise.all([peGetSettings(), peGetSyncCache(), peGetTplRecent()]).then(([s, c, r]) => {
       settings = s;
       syncCache = c;
+      tplRecent = r;
       recountTemplates();
       // Read once per load, before the first applyStyles: on a settings change this
       // re-reads the same value, and nothing else in the browser writes that key.
@@ -2065,6 +2097,9 @@
         try {
           injectAll();
         } catch (_) {}
+      } else if (area === "local" && changes[PE_TPL_RECENT_KEY]) {
+        // Another tab inserted a template; the next menu here should know.
+        tplRecent = peTplRecentAdd(changes[PE_TPL_RECENT_KEY].newValue, "");
       }
     });
   } catch (_) {}

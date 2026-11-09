@@ -1459,6 +1459,7 @@
         resetPending = false;
         await peSaveRecent([]);
         await peSavePins([]);
+        await peSaveTplRecent([]);
       }
       syncedJson = JSON.stringify(state); // storage now matches state; late events are no-ops
       knownDomains = (state.domains || []).slice();
