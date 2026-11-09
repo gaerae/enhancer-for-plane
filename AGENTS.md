@@ -439,12 +439,18 @@ lies:
   `store-submit.js` reads releases through the endpoint that serves published ones only, so
   Run workflow cannot get past it. Upload and submission are automated and nothing else can
   be: the API has no call for listing text, and the audit before v1.12.0 found a storage
-  justification that had fallen behind the code. So when `store-assets/` differs from what the
+  justification that had fallen behind the code. So when the listing differs from what the
   store is serving, the run uploads, refuses to submit, and goes red. Red on purpose: a green
   run here would read as "submitted", and a person has to act. The comparison is against the
   version `fetchStatus` says is published, not the previous tag, because a tag that never
   reached the store says nothing about what reviewers last saw. A comparison that failed
   counts as a change.
+
+  "The listing" is the sections of `STORE_LISTING.md` that go into the dashboard, and the
+  images — not the folder. The first version compared files, and the edit that documented
+  the setup touched only Packaging, so the next release would have stopped red with nothing to
+  paste. Notes are skipped by name (`LISTING_NOTES`), never fields by name: a section nobody
+  listed counts, so a new heading errs toward a red run rather than a stale listing.
 
   There is no key to leak or rotate. The run's GitHub identity is exchanged at Google for a
   token that lasts fifteen minutes, on a service account whose only power is that the dashboard

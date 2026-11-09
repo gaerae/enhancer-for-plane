@@ -486,9 +486,9 @@ Chrome으로 페이지를 띄워서 봅니다(콘텐츠 스크립트에는 배�
 5. Publish를 누르면 스토어로도 갑니다.
    [.github/workflows/store.yml](.github/workflows/store.yml)이 그 zip을 Chrome 웹스토어에
    올리고 심사를 요청합니다.
-6. 스토어에 게시된 버전 이후로 `store-assets/`가 바뀌었다면, 실행은 zip만 올리고 실패로
-   멈춥니다. API로는 등록 정보 문구를 고칠 수 없기 때문입니다. 대시보드에서 문구를 고친 뒤
-   거기서 **Submit for review**를 누릅니다.
+6. 스토어에 게시된 버전 이후로 등록 정보가 바뀌었다면, 실행은 zip만 올리고 실패로
+   멈춥니다. API로는 등록 정보 문구를 고칠 수 없기 때문입니다. 실행 결과에 바뀐 섹션과
+   이미지가 나오니, 대시보드에서 그 부분을 고친 뒤 거기서 **Submit for review**를 누릅니다.
 
 실행이 실패했을 때처럼 게시된 릴리스를 다시 보내려면 **Actions ▸ Store ▸ Run workflow**를
 씁니다. Google 쪽 최초 설정은 [Packaging](store-assets/STORE_LISTING.md#packaging)에 있습니다.

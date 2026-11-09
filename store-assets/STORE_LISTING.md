@@ -432,10 +432,11 @@ CI builds the upload zip automatically — bump `version` in manifest.json, push
 LICENSE, .github, and icons/icon.svg are excluded).
 
 Publishing that release runs `.github/workflows/store.yml`, which uploads the zip and
-submits it for review. If `store-assets/` changed since the version the store is
-serving, it uploads and stops red: paste what changed into the dashboard, then press
-Submit for review there. The API has no call for listing text, screenshots, or
-permission justifications.
+submits it for review. If the listing changed since the version the store is serving,
+it uploads and stops red, naming each section and image that changed: paste those into
+the dashboard, then press Submit for review there. The API has no call for listing text,
+screenshots, or permission justifications. This section, the assets checklist and the
+notes on captures are for whoever publishes, so editing them does not stop a release.
 
 ### One-time setup
 

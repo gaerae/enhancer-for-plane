@@ -4262,26 +4262,74 @@ test("store: the listing comparison reads real git, and failure is not 'unchange
   const dir = fs.mkdtempSync(path.join(require("os").tmpdir(), "pe-store-"));
   const git = (...args) =>
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir, stdio: "pipe" });
+  const put = (file, text) => fs.writeFileSync(path.join(dir, "store-assets", file), text);
+  const listing = (o) =>
+    [
+      "# Listing copy",
+      o.preamble || "Paste these into the dashboard.",
+      "## Detailed description  (max 16,000)",
+      o.description || "Opens a work item from its key.",
+      "## 한국어 (Korean listing)",
+      "### 상세 설명 (max 16,000)",
+      o.korean || "키로 작업 항목을 엽니다.",
+      ...(o.extra || []),
+      "## Assets checklist",
+      "- five screenshots",
+      "## Packaging",
+      o.packaging || "CI builds the zip.",
+      "### By hand",
+      o.byHand || "zip -r"
+    ].join("\n\n");
+  const release = (tag) => {
+    git("add", "-A");
+    git("commit", "-qm", tag);
+    git("tag", tag);
+  };
   try {
     git("init", "-q");
     fs.mkdirSync(path.join(dir, "store-assets"));
-    fs.writeFileSync(path.join(dir, "store-assets/STORE_LISTING.md"), "one");
+    put("STORE_LISTING.md", listing({}));
+    put("shot.css", "a {}");
+    put("screenshot-1.html", "<p>1</p>");
+    put("screenshot-1.png", "png-1");
     fs.writeFileSync(path.join(dir, "manifest.json"), "{}");
-    git("add", ".");
-    git("commit", "-qm", "a");
-    git("tag", "v1.0.0");
+    release("v1.0.0");
     fs.writeFileSync(path.join(dir, "manifest.json"), '{"a":1}');
-    git("commit", "-qam", "b");
-    git("tag", "v1.1.0");
-    fs.writeFileSync(path.join(dir, "store-assets/STORE_LISTING.md"), "two");
-    git("commit", "-qam", "c");
-    git("tag", "v1.2.0");
-    eq(store.listingChanges("v1.0.0", "v1.1.0", dir), [], "a release that left the copy alone");
-    eq(store.listingChanges("v1.1.0", "v1.2.0", dir), ["store-assets/STORE_LISTING.md"], "a release that changed it");
+    release("v1.1.0");
+    // What v1.12.0 to v1.13.0 looked like: only the notes for whoever publishes moved, and
+    // the run that compared files stopped a release whose listing was untouched.
+    put("STORE_LISTING.md", listing({ preamble: "Paste them.", packaging: "CI builds and uploads the zip.", byHand: "zip -r -x" }));
+    put("shot.css", "a { color: red }");
+    put("screenshot-1.html", "<p>one</p>");
+    release("v1.2.0");
+    put("STORE_LISTING.md", listing({ description: "Opens every key in a selection.", korean: "선택한 키를 모두 엽니다." }));
+    put("screenshot-1.png", "png-1b");
+    release("v1.3.0");
+    put("STORE_LISTING.md", listing({ description: "Opens every key in a selection.", korean: "선택한 키를 모두 엽니다.", extra: ["## Support URL", "https://example.com"] }));
+    release("v1.4.0");
+
+    eq(store.listingChanges("v1.0.0", "v1.1.0", dir), [], "a release that left store-assets alone");
+    eq(store.listingChanges("v1.1.0", "v1.2.0", dir), [], "notes and image sources are not the listing");
+    eq(store.listingChanges("v1.2.0", "v1.3.0", dir), ["Detailed description", "한국어 ▸ 상세 설명", "screenshot-1.png"], "named the way the dashboard is laid out");
+    eq(store.listingChanges("v1.3.0", "v1.4.0", dir), ["Support URL"], "a section nobody listed counts");
+    eq(store.listingChanges("v1.0.0", "v1.3.0", dir), ["Detailed description", "한국어 ▸ 상세 설명", "screenshot-1.png"], "across several releases");
     eq(store.listingChanges("v0.9.0", "v1.2.0", dir), null, "an unknown tag means unknown, not unchanged");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// A note section renamed in the file would quietly start counting as listing copy, and every
+// release after it would stop for nothing.
+test("store: every section skipped as a note is a heading in the real listing", () => {
+  const headings = read("store-assets/STORE_LISTING.md")
+    .split("\n")
+    .filter((l) => l.startsWith("## "))
+    .map((l) => l.slice(3).replace(/\s*\(.*\)\s*$/, "").trim());
+  for (const name of store.LISTING_NOTES) {
+    if (name) ok(headings.includes(name), JSON.stringify(name) + " is a heading");
+  }
+  ok(headings.includes("Detailed description") && !store.LISTING_NOTES.has("Detailed description"), "the description is not a note");
 });
 
 test("store: the workflow waits for the Publish click and keeps the store credential to itself", () => {
