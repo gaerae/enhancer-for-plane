@@ -416,12 +416,16 @@ const QUICK = [
   { id: "qlk-plane", name: "Plane", prefix: "", url: "https://plane.example.com/acme/browse/{{key}}", enabled: true },
   { id: "qlk-linear", name: "Linear", prefix: "ENG-", url: "https://linear.app/acme/issue/{{key}}", enabled: true }
 ];
+// Read rather than written down: a number copied here goes stale on the next bump, and a stale
+// one quietly makes every seed an upgrade — the v9 presets turned up as two extra rows on every
+// options page the day the schema moved.
+const SCHEMA = Number(/^const PE_SCHEMA = (\d+);/m.exec(fs.readFileSync(path.join(ROOT, "common.js"), "utf8"))[1]);
 const settings = (over) =>
   Object.assign(
     {
       // A current install, so a suite sees the rules it seeded and nothing else. The
-      // migration that appends the focus presets to an older one is its own suite below.
-      schema: 7,
+      // migrations that append presets to an older one have their own suites below.
+      schema: SCHEMA,
       enabled: true,
       allDomains: false,
       domains: ["plane.example.com"],
@@ -511,6 +515,33 @@ const PLANE = `
   <div class="relations">
     <a href="/acme/browse/PROJ-77"><button type="button" disabled>PROJ-77</button></a>
   </div>
+</div>`;
+
+// Plane's "Show all" collapse (DescriptionOverflow), as makeplane/plane efa46d284 renders it
+// while clipping: an inline height on the box, the editor and the fade inside it, the toggle
+// right after it. Taken from the source, not from a live page — Cloud was not measured when
+// this was written. The two after it are the near misses. The same component clips a cycle's
+// description, a textarea, and that is not a work item description; and an editor box with a
+// disclosure button after it but no clip is not the collapse at all. Only on ct-focus, because
+// another editor on PLANE would be one more place for the Template button to consider.
+const DESCRIPTION_CLIP = `
+<div>
+  <div id="probe-desc" class="relative overflow-hidden transition-[height] duration-300 ease-in-out motion-reduce:transition-none" style="height: 140px;">
+    <div><div class="ProseMirror" contenteditable="true" style="height: 400px">a description long enough to be clipped</div></div>
+    <div id="probe-desc-fade" class="pointer-events-none absolute bottom-0 left-0 h-24 w-full bg-gradient-to-t from-surface-1 to-transparent"></div>
+  </div>
+  <button id="probe-desc-toggle" type="button" class="mt-1 text-left" aria-expanded="false" aria-controls="probe-desc">Show all</button>
+</div>
+<div>
+  <div id="probe-cycle-desc" class="relative overflow-hidden" style="height: 140px;">
+    <div><div class="flex w-full"><textarea style="height: 400px">a cycle's description</textarea></div></div>
+    <div id="probe-cycle-fade" class="pointer-events-none absolute bottom-0 left-0 h-24 w-full"></div>
+  </div>
+  <button id="probe-cycle-toggle" type="button" aria-expanded="false" aria-controls="probe-cycle-desc">Show all</button>
+</div>
+<div>
+  <div class="relative"><div class="ProseMirror" contenteditable="true">a comment</div></div>
+  <button id="probe-menu-toggle" type="button" aria-expanded="false" aria-controls="probe-menu">⋯</button>
 </div>`;
 
 // A description editor with an attach button six levels up — self-hosted Plane 1.4's shape,
@@ -2089,14 +2120,24 @@ const suites = [
       ${TAB_READY}
       document.getElementById("tab-appearance").click();
       const rows = () => [...document.querySelectorAll("#ruleList .rule-item")];
-      const rowFor = (id) => rows()[peFocusPresetRules().findIndex((r) => r.id === id) + 1];
+      // The order the migration appends in: the user's rule, v7's focus presets, v9's.
+      const order = ["r1", ...peFocusPresetRules().map((r) => r.id), ...peDescriptionPresetRules().map((r) => r.id)];
+      const rowFor = (id) => rows()[order.indexOf(id)];
       check("an upgraded install shows its own rule first, then the presets", () => {
-        eq(rows().length, 1 + peFocusPresetRules().length, "row count");
+        eq(rows().length, order.length, "row count");
         eq(rows()[0].querySelector(".rule-label").value, "Module name", "the user's rule kept its place");
       });
-      check("only the presets are marked focus-only", () => {
+      check("only the focus presets are marked focus-only", () => {
         const marked = rows().map((r) => r.querySelector(".rule-focus").checked);
-        eq(marked.join(), "false,true,true,true");
+        eq(marked.join(), "false,true,true,true,false,false");
+      });
+      check("the description presets arrive switched on, and always on", () => {
+        for (const r of peDescriptionPresetRules()) {
+          const row = rowFor(r.id);
+          eq(row.querySelector(".rule-label").value, r.label, r.id + " is the row it should be");
+          eq(row.querySelector(".rule-enabled").checked, true, r.id + " is on");
+          eq(row.querySelector(".rule-focus").checked, false, r.id + " does not wait for focus mode");
+        }
       });
       check("the reading-width preset is present but switched off", () => {
         const row = rowFor("rule-focus-reading-width");
@@ -3066,7 +3107,7 @@ const suites = [
     // JSON.stringify drops the undefined keys, which is what puts peMigrate at version 1.
     page: {
       name: "ct-focus",
-      plane: PLANE,
+      plane: PLANE + DESCRIPTION_CLIP,
       seed: seedOf({
         allDomains: true,
         schema: undefined,
@@ -3106,6 +3147,21 @@ const suites = [
           ok(getComputedStyle(document.getElementById(id)).width !== "320px",
              id + " was caught by the dropdown rule");
         }
+      });
+      // The height is read off the box against the editor inside it, not against a number:
+      // "not 140" would also pass on a box the rule collapsed to nothing.
+      check("a clipped work item description is shown whole", () => {
+        const box = document.getElementById("probe-desc");
+        eq(Math.round(box.getBoundingClientRect().height), Math.round(box.querySelector(".ProseMirror").getBoundingClientRect().height),
+          "the box is as tall as the description in it");
+        ok(!shown(document.getElementById("probe-desc-fade")), "the fade over its last lines is gone");
+        ok(!shown(document.getElementById("probe-desc-toggle")), "and so is a Show all with nothing left to show");
+      });
+      check("and nothing else that collapses or toggles is touched", () => {
+        eq(getComputedStyle(document.getElementById("probe-cycle-desc")).height, "140px", "a cycle's description keeps Plane's clip");
+        ok(shown(document.getElementById("probe-cycle-fade")), "and its fade");
+        ok(shown(document.getElementById("probe-cycle-toggle")), "and its toggle");
+        ok(shown(document.getElementById("probe-menu-toggle")), "a disclosure after an editor that is not clipped stays");
       });
       check("nothing is hidden until it is asked for", () => {
         ok(shown(props), "the properties panel is where Plane put it");

@@ -91,6 +91,14 @@
   "optPresetDropdown": {
     "message": "Search dropdown width"
   },
+  "optPresetDescFull": {
+    "message": "Work item description: show all of it",
+    "description": "Plane clips a long description behind a Show all toggle; this preset undoes the clipping."
+  },
+  "optPresetDescToggle": {
+    "message": "Work item description: hide the fade and Show all",
+    "description": "Show all is Plane's own label for that toggle (모두 보기 in Plane's Korean UI)."
+  },
   "optPresetFocusProps": {
     "message": "Focus: hide the work item properties panel"
   },
