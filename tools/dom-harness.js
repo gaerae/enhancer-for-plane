@@ -1567,6 +1567,110 @@ const suites = [
       });`
   },
   {
+    // The master switch had no carry-across. Flipped in the popup while this form had edits, the
+    // change was refused — and the Save that followed wrote the form's older switch back over it,
+    // turning the extension on again a moment after the user turned it off.
+    name: "options · the master switch flipped in the popup survives a save with edits",
+    page: { name: "opt-save-enabled-foreign", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(100);
+      check("the dirty form refused it", () => ok(document.getElementById("enabled").checked, "the form took the change"));
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the switch stays off in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.enabled, false);
+      });
+      check("and the form shows what was saved", () => ok(!document.getElementById("enabled").checked, "the switch still reads on"));`
+  },
+  {
+    // The same switch, flipped while a clean form's save waits on the permission prompt: the save
+    // was built on the form before the flip, and wrote it.
+    name: "options · the master switch flipped while the prompt is up survives the save",
+    page: { name: "opt-save-enabled-prompt", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the switch stays off in storage", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.enabled, false);
+      });`
+  },
+  {
+    // And with typing going on while the prompt is up, the form is not redrawn after the save —
+    // so the switch kept reading "on" over storage's "off", and was one untouched field away from
+    // a baseline that would write "on" back the next time.
+    name: "options · the master switch carried by a save with edits pending is on the form",
+    page: { name: "opt-save-enabled-pending", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(50);
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      nm.value = nm.value + " again";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the first save");
+      await sleep(100);
+      check("the form shows the switch that was saved", () => ok(!document.getElementById("enabled").checked, "the switch still reads on"));
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the second prompt");
+      window.__answer();
+      await waitFor(() => window.__written.filter((o) => o.peSettings).length > 1, "the second save");
+      await sleep(100);
+      check("and the next save writes it again", () => {
+        const all = window.__written.map((o) => o.peSettings).filter(Boolean).map((w) => w.enabled);
+        eq(all.join(), "false,false");
+      });`
+  },
+  {
+    // The other half of the rule: a switch flipped on this page is the user's, and storage still
+    // holding the old position must not undo it. (A boolean cannot truly conflict: if the page and
+    // storage have both moved off what the page last loaded, they moved to the same place.)
+    name: "options · the master switch flipped on this page is what is saved",
+    page: { name: "opt-save-enabled-mine", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const sw = document.getElementById("enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      ${FOREIGN_DOMAIN}
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > 0, "the save to write");
+      await sleep(100);
+      check("the page's switch is what is saved", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.enabled, false);
+        ok(w.domains.indexOf("elsewhere.example.com") > -1, "domains: " + w.domains.join());
+      });`
+  },
+  {
     // A second click on Save while the first is still out ran a second save beside it, which
     // then read the first one's tidying as an edit of the user's: "not saved yet", and a form
     // that asked before closing over settings already in storage.
