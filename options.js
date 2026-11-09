@@ -1297,14 +1297,13 @@
     focusLast(base.selector ? ".rule-value" : ".rule-selector");
   }
 
+  // Keyed by the field's prefix. A prefix missing here used to fall through to the template
+  // list, find nothing, and leave focus wherever it was — on <body>, or on a chooser button
+  // that had just been hidden — so a new copy format or quick link got no caret.
+  const FOCUS_LISTS = { rule: "ruleList", src: "sourceList", var: "variableList", tpl: "templateList", cpy: "copyList", qlk: "quickList" };
   function focusLast(sel) {
-    const listKey = sel.startsWith(".rule")
-      ? "ruleList"
-      : sel.startsWith(".src")
-        ? "sourceList"
-        : sel.startsWith(".var")
-          ? "variableList"
-          : "templateList";
+    const listKey = FOCUS_LISTS[(/^\.([a-z]+)-/.exec(sel) || [])[1]];
+    if (!listKey) return;
     const nodes = el[listKey].querySelectorAll(sel);
     if (nodes.length) nodes[nodes.length - 1].focus();
   }
@@ -1315,7 +1314,7 @@
   // Host access needed = active-domain patterns (content script) + template-source
   // origins (background fetch). Requesting already-granted origins is a silent no-op,
   // so the user is only prompted for newly added domains/sources.
-  const desiredOrigins = () => peDesiredOrigins(state);
+  const desiredOrigins = (settings) => peDesiredOrigins(settings || state);
 
   // Host permissions do not sync across devices, only settings do — so a profile synced to
   // a new device can list domains and sources it has never granted, and nothing runs until
@@ -1355,28 +1354,35 @@
   // meant to remove, so it is carried into the save rather than dropped. Deliberate removal
   // still works: a domain that WAS on screen is in knownDomains, so deleting it and saving
   // removes it, and Restore defaults still clears the list it just showed you.
-  async function mergeForeignDomains() {
+  async function mergeForeignDomains(target) {
     let stored = null;
     try {
       stored = await peGetSettings();
     } catch (_) {
       return []; // cannot read storage: save what we have rather than refusing
     }
-    const mine = state.domains || [];
+    const mine = target.domains || [];
     const added = (stored.domains || []).filter((d) => knownDomains.indexOf(d) === -1 && mine.indexOf(d) === -1);
-    if (added.length) state.domains = mine.concat(added);
+    if (added.length) target.domains = mine.concat(added);
     return added;
   }
 
-  async function syncHostPermissions() {
-    const desired = desiredOrigins();
-    if (desired.length) {
-      let ok = false;
-      try {
-        ok = await chrome.permissions.request({ origins: desired });
-      } catch (_) {}
-      if (!ok) return false;
-    }
+  // Two halves, on either side of the write. Asking comes first, because the Save click is
+  // the gesture the prompt needs. Handing access back comes only after storage took the
+  // settings: revoking first meant a save that then failed had already switched the extension
+  // off on a domain that storage still listed.
+  async function requestHostPermissions(settings) {
+    const desired = desiredOrigins(settings);
+    if (!desired.length) return true;
+    let ok = false;
+    try {
+      ok = await chrome.permissions.request({ origins: desired });
+    } catch (_) {}
+    return !!ok;
+  }
+
+  async function revokeStalePermissions(settings) {
+    const desired = desiredOrigins(settings);
     // Drop grants for origins no longer listed (domains or sources); no gesture needed.
     // Source origins may be specific hosts (https://host/*), so match those too.
     try {
@@ -1384,7 +1390,6 @@
       const stale = (perms.origins || []).filter((o) => /^(\*|https?):\/\//.test(o) && !desired.includes(o));
       if (stale.length) await chrome.permissions.remove({ origins: stale });
     } catch (_) {}
-    return true;
   }
 
   async function saveAll() {
@@ -1404,15 +1409,23 @@
       return; // state untouched, so every row's bindings still line up
     }
 
+    // Everything Save writes is built on a copy. State is replaced only once storage has taken
+    // it, so a save that fails — a template too big for its item, a full quota — leaves every
+    // rendered row bound to the entry it was drawn from, and the user can fix what the message
+    // names in the rows in front of them. Filtering state in place dropped the empty rows from
+    // under their DOM: typing into one renamed the template below it, and editing the oversized
+    // one threw, so its shrink never landed.
+    ensureSync();
+    const next = JSON.parse(JSON.stringify(state));
     // drop empty rules/templates
-    state.rules = (state.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
-    state.templates = (state.templates || []).filter(
+    next.rules = (next.rules || []).filter((r) => (r.selector && r.selector.trim()) || (r.label && r.label.trim()));
+    next.templates = (next.templates || []).filter(
       (t) => (t.name && t.name.trim()) || (t.title && t.title.trim()) || (t.content && t.content.trim())
     );
     // A variable with no usable name can never be referenced; a duplicate would make the
     // winner depend on array order. Drop both rather than save something inert.
     const seenVar = new Set();
-    state.variables = (state.variables || [])
+    next.variables = (next.variables || [])
       .map((v) => ({ name: (v.name || "").trim(), value: v.value || "" }))
       .filter((v) => {
         if (!PE_VAR_NAME_RE.test(v.name)) return false;
@@ -1425,19 +1438,19 @@
 
     // A format with no format string copies nothing — the name is only a label for it.
     // Kept in sync with peSanitizeSettings, which applies the same rule to an import.
-    state.copyFormats = (state.copyFormats || [])
+    next.copyFormats = (next.copyFormats || [])
       .filter((c) => c && (c.format || "").trim())
       .slice(0, PE_MAX_COPY_FORMATS);
 
     // A quick link with no url opens nothing. Same rule peSanitizeSettings applies to an
     // import; trim the url so a stray space cannot make an otherwise-empty row survive.
-    state.quickLinks = (state.quickLinks || [])
+    next.quickLinks = (next.quickLinks || [])
       .map((q) => (q ? Object.assign({}, q, { url: (q.url || "").trim() }) : q))
       .filter((q) => q && q.url)
       .slice(0, PE_MAX_QUICK_LINKS);
 
     // drop empty sources; enforce the source cap
-    const sync = ensureSync();
+    const sync = next.templateSync;
     sync.sources = (sync.sources || [])
       .filter((s) => s && s.url && s.url.trim())
       // Backstop only: the Add button stops at the cap, so this can bite only for
@@ -1454,11 +1467,13 @@
           : []
       }));
     // Before the permission pass, because that is what would hand the origin back.
-    const kept = await mergeForeignDomains();
-    const permOk = await syncHostPermissions();
+    const kept = await mergeForeignDomains(next);
+    const permOk = await requestHostPermissions(next);
     try {
       savingSelf = true;
-      await peSaveSettings(state);
+      await peSaveSettings(next);
+      state = next;
+      if (permOk) await revokeStalePermissions(state);
       // Only after the settings write succeeded: a failed save leaves the flag set, so the
       // save that does go through is the one that clears it.
       if (resetPending) {

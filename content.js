@@ -187,7 +187,8 @@
         const n = document.querySelectorAll(sel).length;
         // Leaving a rule out of `counts` is what keeps a hit-only pass from recording a
         // miss: peRuleHealthUpdate only touches the ids it is given.
-        if (n > 0 || !hitsOnly) counts[r.id] = n;
+        // The same for a rule whose miss is no evidence (peRuleMissIsEvidence).
+        if (n > 0 || (!hitsOnly && peRuleMissIsEvidence(r))) counts[r.id] = n;
       } catch (_) {}
     });
     // Read-modify-write, and two tabs on two routes can interleave. The lost update costs
@@ -992,6 +993,8 @@
         // A source header disappears only when every group under it is empty.
         ownerHits.forEach((n, el) => (el.style.display = n ? "" : "none"));
         noHits.style.display = shown ? "none" : "block";
+        // The highlight may be on a row the filter just hid; Enter takes the first hit.
+        setMenuActive(menuRows()[0] || null);
       });
     }
 
@@ -1099,10 +1102,48 @@
     menu.style.display = "block";
     positionMenu(btn);
     menuOpen = true;
+    setMenuActive(menuRows()[0] || null);
   }
   function hideMenu() {
     if (menu) menu.style.display = "none";
     menuOpen = false;
+  }
+
+  // The keyboard half of both menus. The menu never takes focus: Alt+T is pressed while
+  // writing, the caret is where the template lands, and moving it into the menu would lose
+  // the spot. So the arrows move a highlight and Enter presses it. Before this the menus took
+  // no key but Escape, and Alt+T opened something only a mouse could answer.
+  function menuRows() {
+    if (!menu) return [];
+    return [...menu.querySelectorAll(".pe-menu-item, .pe-menu-config")].filter((r) => r.getClientRects().length > 0);
+  }
+  function setMenuActive(row) {
+    if (!menu) return;
+    menu.querySelectorAll(".pe-menu-active").forEach((r) => r.classList.remove("pe-menu-active"));
+    if (!row) return;
+    row.classList.add("pe-menu-active");
+    try {
+      row.scrollIntoView({ block: "nearest" });
+    } catch (_) {}
+  }
+  function menuKey(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return false;
+    const rows = menuRows();
+    if (!rows.length) return false;
+    const cur = rows.indexOf(menu.querySelector(".pe-menu-active"));
+    let to = null;
+    if (e.key === "ArrowDown") to = rows[(cur + 1) % rows.length];
+    else if (e.key === "ArrowUp") to = rows[cur < 1 ? rows.length - 1 : cur - 1];
+    else if (e.key === "Enter" && cur > -1) {
+      e.preventDefault();
+      e.stopPropagation();
+      rows[cur].click();
+      return true;
+    } else return false;
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuActive(to);
+    return true;
   }
 
   /* ---- apply (title + body) ---- */
@@ -1690,6 +1731,7 @@
       hideMenu();
       return;
     }
+    if (menuOpen && menuKey(e)) return;
     if (!isActive() || pickerActive) return;
     // Alt+T (macOS: ⌥ Option+T): open the template menu for the description being edited.
     // On macOS, Option+T changes e.key (e.g. "†"), so detect it via the layout-independent e.code.

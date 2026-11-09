@@ -2879,6 +2879,22 @@ test("domains: a pasted address works the same as the hostname it names", () => 
   eq(ctx.peSanitizeSettings({ domains: ["https://plane.acme.com:8080/x"] }).domains, ["plane.acme.com"], "an import is cleaned the same way");
 });
 
+// Both description presets match only while Plane is clipping a long description, so a miss
+// says nothing about whether they still fit: it says nobody opened a long description. On a
+// self-hosted Plane that never clips — 1.4.3 has no such component — they would cross the
+// "never matched" bar after twenty pages and be reported, forever, as two broken presets
+// the user never added. A miss is not recorded for them; a hit still is. Only while the
+// selector is the shipped one: an edited copy is the user's own rule and gets the warning.
+test("description: a miss is no evidence against the presets, but an edit is the user's own", () => {
+  const ctx = loadCommon();
+  const [full, toggle] = ctx.peDescriptionPresetRules();
+  ok(ctx.peRuleMissIsEvidence(full) === false, "the full-height preset");
+  ok(ctx.peRuleMissIsEvidence(toggle) === false, "the toggle preset");
+  ok(ctx.peRuleMissIsEvidence(Object.assign({}, full, { selector: ".mine" })) === true, "an edited copy");
+  ok(ctx.peRuleMissIsEvidence({ id: "rule-module-name", selector: ".max-w-40" }) === true, "every other rule");
+  ok(ctx.peRuleMissIsEvidence(null) === true, "and a rule it cannot read");
+});
+
 test("description: the presets are always on, and switched on", () => {
   const ctx = loadCommon();
   for (const r of ctx.peDescriptionPresetRules()) {

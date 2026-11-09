@@ -91,7 +91,10 @@ function darkCss(name) {
 
 // The chrome API surface these pages actually touch — no more than that, so an
 // implementation cannot pass here by calling something production does not have.
-function stub(seed, lang, local) {
+// `env` is what the browser knows and storage does not: the tab the popup was opened on, and
+// whether this device has granted the site. Both default to the ordinary case — an item page
+// on a granted host — so only a suite about the other cases has to say anything.
+function stub(seed, lang, local, env) {
   return `<script>
 const __CAT = ${CATALOGUES[lang] || CATALOGUES.en};
 function __msg(key, subs) {
@@ -109,6 +112,7 @@ function __msg(key, subs) {
 }
 window.__SEED = ${JSON.stringify(seed)};
 window.__LOCAL = ${JSON.stringify(local || {})};
+window.__ENV = ${JSON.stringify(env || {})};
 window.__localWrites = 0;
 window.__written = [];
 window.__optionsOpened = false;
@@ -152,10 +156,10 @@ window.chrome = {
   // callback-only stub resolves to undefined, which reads as "refused" and sent every save
   // down the no-permission branch.
   permissions: {
-    contains: (o, cb) => (cb ? cb(true) : Promise.resolve(true)),
-    request: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
-    getAll: (cb) => { const v = { origins: [] }; cb && cb(v); return Promise.resolve(v); },
-    remove: (o, cb) => { cb && cb(true); return Promise.resolve(true); },
+    contains: (o, cb) => { const v = window.__ENV.granted !== false; return cb ? cb(v) : Promise.resolve(v); },
+    request: (o, cb) => { const v = window.__ENV.grant !== false; cb && cb(v); return Promise.resolve(v); },
+    getAll: (cb) => { const v = { origins: (window.__ENV.origins || []).slice() }; cb && cb(v); return Promise.resolve(v); },
+    remove: (o, cb) => { (window.__removed = window.__removed || []).push(...(o.origins || [])); cb && cb(true); return Promise.resolve(true); },
     onAdded: { addListener: () => {} },
     onRemoved: { addListener: () => {} }
   },
@@ -163,7 +167,7 @@ window.chrome = {
     // A title as well as a URL, because that pair is the whole input to the popup's copy
     // block — it reads a tab, never a page. The shape is the one Plane and Linear both
     // write, measured 2026-08-08: "{KEY} {title}".
-    query: (o, cb) => cb([{ id: 1, url: "https://plane.example.com/acme/browse/PROJ-7", title: "PROJ-7 Fix the login redirect" }]),
+    query: (o, cb) => cb([window.__ENV.tab || { id: 1, url: "https://plane.example.com/acme/browse/PROJ-7", title: "PROJ-7 Fix the login redirect" }]),
     create: (o) => { window.__opened = o.url; },
     update: () => {},
     sendMessage: () => {}
@@ -203,7 +207,7 @@ const bg = (sel) => getComputedStyle(typeof sel === "string" ? document.querySel
 const report = () => { const el = document.createElement("pre"); el.id = "pe-results"; el.textContent = JSON.stringify(__out); document.body.appendChild(el); };
 `;
 
-function buildPage({ name, html, css, js, seed, local, dark, lang, body }) {
+function buildPage({ name, html, css, js, seed, local, env, dark, lang, body }) {
   let src = fs.readFileSync(path.join(ROOT, html), "utf8");
   const cssPath = dark ? darkCss(css) : path.join(ROOT, css);
   // Every insertion goes through a replacer function, never a replacement string. A string
@@ -217,7 +221,7 @@ function buildPage({ name, html, css, js, seed, local, dark, lang, body }) {
     put(new RegExp(`src="${f}"`), `src="${fileUrl(path.join(ROOT, f))}"`);
   }
   // The stub has to define `chrome` before the page's own scripts run.
-  put(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
+  put(/<script src="file:[^"]*common\.js"><\/script>/, stub(seed, lang, local, env) + "\n" + `<script src="${fileUrl(path.join(ROOT, "common.js"))}"></script>`);
   // Transitions off. Virtual time advances timers but not the compositor clock that drives
   // a CSS transition, so a colour read after a toggle came back mid-interpolation — the
   // toggle knob measured 1.1:1 here while a real browser settled at 9.5:1. Asserting the
@@ -420,6 +424,16 @@ const QUICK = [
 // one quietly makes every seed an upgrade — the v9 presets turned up as two extra rows on every
 // options page the day the schema moved.
 const SCHEMA = Number(/^const PE_SCHEMA = (\d+);/m.exec(fs.readFileSync(path.join(ROOT, "common.js"), "utf8"))[1]);
+// The shipped description presets, read from common.js rather than copied: the point of the
+// suite that uses them is that the exemption follows the shipped selector character for
+// character, so a copy here would be a second definition free to drift from the first.
+const DESC_PRESETS = (() => {
+  const vm = require("vm");
+  const ctx = { console, URL, TextEncoder };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "common.js"), "utf8") + "\n;globalThis.__D = peDescriptionPresetRules();", ctx);
+  return JSON.parse(JSON.stringify(ctx.__D));
+})();
 const settings = (over) =>
   Object.assign(
     {
@@ -1099,6 +1113,79 @@ const suites = [
       });`
   },
   {
+    // A save that fails must leave the page as it was. It used to drop empty rows from state
+    // before the write, and on failure nothing re-rendered, so every row below a dropped one
+    // was bound to the wrong template: typing into the empty row renamed the template under
+    // it, and editing the too-large one threw — so the very shrink the error asked for never
+    // landed and the next save failed the same way. A domain taken off the list had also
+    // already lost its access, while storage still listed it.
+    name: "options · a save that fails changes nothing",
+    page: {
+      name: "opt-save-fails",
+      ...OPTIONS,
+      seed: seedOf({ domains: ["plane.example.com", "old.example.com"] }),
+      env: { origins: ["*://plane.example.com/*", "*://old.example.com/*"] }
+    },
+    body: `
+      ${TAB_READY}
+      const rows = () => [...document.querySelectorAll("#templateList .tpl-item")];
+      const type = (node, v) => { node.value = v; node.dispatchEvent(new Event("input", { bubbles: true })); };
+      const before = rows().length;
+      document.getElementById("addTemplate").click(); // left empty: Save drops it
+      document.getElementById("addTemplate").click();
+      const big = rows()[rows().length - 1];
+      type(big.querySelector(".tpl-name"), "Huge");
+      type(big.querySelector(".tpl-content"), "x".repeat(12288));
+      const box = document.getElementById("domains");
+      type(box, "plane.example.com");
+      const written = window.__written.length;
+      document.getElementById("save").click();
+      await waitFor(() => (document.getElementById("status").textContent || "").indexOf("Huge") > -1, "the save to refuse the template");
+      check("nothing was written and no access was handed back", () => {
+        eq(window.__written.length, written, "a write");
+        eq((window.__removed || []).join(","), "", "access revoked by a save that did not happen");
+      });
+      // Now do what the message says, in the rows as they are on screen.
+      type(rows()[before].querySelector(".tpl-name"), "Typed");
+      type(big.querySelector(".tpl-content"), "small");
+      document.getElementById("status").textContent = "";
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.length > written, "the second save to write");
+      check("each row still edits its own template", () => {
+        // Templates are packed into their own items, so read the latest value of every key.
+        const latest = Object.assign({}, ...window.__written);
+        ok(latest.peSettings, "no settings written");
+        const t = Object.keys(latest).filter((k) => k.indexOf("peTpl.") === 0).sort().map((k) => latest[k]).flat();
+        const names = t.map((x) => x.name);
+        ok(names.indexOf("Typed") > -1, "the row typed into lost its text: " + names.join(", "));
+        const huge = t.filter((x) => x.name === "Huge")[0];
+        ok(huge, "the shrunk template is gone: " + names.join(", "));
+        eq(huge.content, "small", "the shrink did not land");
+      });
+      check("and the domain comes off only once the save went through", () => {
+        ok((window.__removed || []).indexOf("*://old.example.com/*") > -1, "never revoked: " + JSON.stringify(window.__removed));
+      });`
+  },
+  {
+    // Add, then type. focusLast knew the rule, source and variable lists and sent everything
+    // else to the template list, so a new copy format got no caret at all, and picking "Blank
+    // row" in the quick link chooser hid the chooser with focus inside it — dropping it on
+    // <body>, where the next keystroke goes nowhere.
+    name: "options · a new row gets the caret",
+    page: { name: "opt-new-row-focus", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const last = (sel) => { const all = document.querySelectorAll(sel); return all[all.length - 1]; };
+      document.getElementById("addCopyFormat").click();
+      check("a new copy format", () => eq(document.activeElement, last("#copyList .cpy-name"), "focus is on " + document.activeElement.tagName));
+      document.getElementById("addQuickLink").click();
+      const blank = [...document.querySelectorAll(".qlk-ex")].filter((b) => b.textContent.indexOf(peMsg("optQuickExamplesBlank")) > -1)[0];
+      ok(blank, "no Blank row in the chooser");
+      blank.focus();
+      blank.click();
+      check("a blank quick link", () => eq(document.activeElement, last("#quickList .qlk-name"), "focus is on " + document.activeElement.tagName));`
+  },
+  {
     // What people paste into the domain box is the address bar. peNormalizeDomain makes such a
     // line work wherever it is read; this is the half only a page can show — that the box says
     // what will actually be used, and that the hostname is what gets saved.
@@ -1698,7 +1785,22 @@ const suites = [
         ok(isOpen(), "no menu");
         eq(document.activeElement.id, "ed-b", "focus");
       });
-      pick("Body only");
+      // Opened from the keyboard, it has to be usable from the keyboard: it used to take no key
+      // but Escape, so Alt+T put a menu up that only a mouse could answer. The caret stays in
+      // the editor — that is where the template lands — so the arrows move a highlight.
+      const active = () => shown(".pe-menu-active .pe-menu-item-title").map((n) => n.textContent).join();
+      check("the first row is highlighted, so Enter takes it", () => eq(active(), "Bug"));
+      const down = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+      document.activeElement.dispatchEvent(down);
+      key({ key: "ArrowDown" });
+      check("the arrows move the highlight, not the caret", () => {
+        eq(active(), "Body only");
+        ok(down.defaultPrevented, "the editor would have moved its caret too");
+        eq(document.activeElement.id, "ed-b", "focus");
+      });
+      const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      document.activeElement.dispatchEvent(enter);
+      check("and Enter inserts it instead of a new line", () => ok(enter.defaultPrevented, "Enter reached the editor"));
       check("and the template lands in the editor being written in", () => {
         ok(edB.textContent.indexOf("check") > -1, "the second editor got nothing: " + edB.textContent);
         eq(document.getElementById("ed-a").textContent, before, "the first editor");
@@ -2649,6 +2751,41 @@ const suites = [
       });`
   },
   {
+    // The key half of the case above. Routing skips a link still holding an example's
+    // ⟨blank⟩, so a key normally lands on another link — but picking that link in the target
+    // menu, or having no other, ended in jumpTo's silent return: Enter did nothing. The
+    // omnibox and the context menu open Settings here.
+    name: "popup · a key no link can open",
+    page: {
+      name: "pop-nokey",
+      ...POPUP,
+      seed: seedOf({
+        quickLinks: [
+          { id: "q1", name: "Linear", prefix: "ENG-", enabled: true, url: "https://linear.app/acme/issue/{{key}}" },
+          { id: "q2", name: "Plane", prefix: "", enabled: true, url: "https://plane.example.com/⟨workspace⟩/browse/{{key}}" }
+        ]
+      })
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent.indexOf("Checking") === -1, "the popup to resolve");
+      const submit = (v, target) => {
+        window.__opened = null;
+        window.__optionsOpened = false;
+        document.getElementById("jumpTarget").value = target || "";
+        document.getElementById("jumpKey").value = v;
+        document.getElementById("jumpForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      };
+      check("a key routed to a working link still opens", () => {
+        submit("ENG-9");
+        eq(window.__opened, "https://linear.app/acme/issue/ENG-9");
+      });
+      check("a key sent to a link with a blank opens Settings rather than nothing", () => {
+        submit("PROJ-9", "q2");
+        eq(window.__opened, null, "it opened an address with a blank in it");
+        ok(window.__optionsOpened, "Enter did nothing at all");
+      });`
+  },
+  {
     // Recents and the copy block: the two things the popup can do from a tab alone. Neither
     // injects anything or reads a page, which is what lets them work on a tracker the rest
     // of the extension never runs on — the stub tab is a Plane URL only because QUICK's
@@ -2859,6 +2996,52 @@ const suites = [
       });`
   },
   {
+    // Settings sync across devices and host access does not, so a listed site can be one this
+    // device never approved — and so can one whose prompt was refused, because the prompt
+    // closes the popup and the rollback written for that case never got to run. The status
+    // used to read settings alone and said "Active" with Pick element and Re-scan beside it,
+    // over a page where nothing was running. What it says has to come from the grant.
+    name: "popup · a listed site this device has not approved",
+    page: { name: "pop-ungranted", ...POPUP, seed: seedOf({ domains: ["plane.example.com"] }), env: { granted: false, grant: false } },
+    body: `
+      const status = () => document.getElementById("domainStatus").textContent;
+      await waitFor(() => status() === peMsg("popPermNeeded", ["plane.example.com"]), "the status to come from the grant");
+      check("it says access is needed, not that the site is active", () => {
+        eq(document.getElementById("domainStatus").className.indexOf("on"), -1, "styled as active");
+      });
+      check("and offers the one click that grants it", () => ok(!document.getElementById("addDomain").hidden));
+      check("with nothing beside it that needs the script to be running", () => {
+        ok(document.getElementById("pickEl").hidden, "Pick element is offered");
+        ok(document.getElementById("rescan").hidden, "Re-scan is offered");
+      });
+      // The list is synced. Refusing the prompt on this device used to run the rollback written
+      // for a site the click had just added, and took this one off the list for every machine.
+      document.getElementById("addDomain").click();
+      check("refusing the prompt here leaves the synced list alone", () => {
+        for (const w of window.__written) {
+          if (w.peSettings) ok((w.peSettings.domains || []).indexOf("plane.example.com") > -1, "written without it: " + JSON.stringify(w.peSettings.domains));
+        }
+        eq(status(), peMsg("popPermNeeded", ["plane.example.com"]));
+      });`
+  },
+  {
+    // chrome://, the store and our own pages have hostnames too — "newtab", "extensions", the
+    // extension id — and the popup offered to enable the extension on them, writing a junk
+    // domain and asking for a pattern that can never match a page.
+    name: "popup · a browser page is not a site",
+    page: {
+      name: "pop-chrome-page",
+      ...POPUP,
+      seed: seedOf({ allDomains: true }),
+      env: { tab: { id: 1, url: "chrome://extensions/", title: "Extensions" } }
+    },
+    body: `
+      await waitFor(() => document.getElementById("domainStatus").textContent === peMsg("popUnknown"), "the popup to resolve");
+      check("nothing is offered for it", () => {
+        for (const id of ["addDomain", "pickEl", "rescan"]) ok(document.getElementById(id).hidden, id + " is offered");
+      });`
+  },
+  {
     name: "popup · extension off",
     page: { name: "pop-off", ...POPUP, seed: seedOf({ enabled: false }) },
     body: `
@@ -3002,7 +3185,11 @@ const suites = [
           { id: "r-live", enabled: true, selector: "#main-sidebar", property: "display", value: "none" },
           { id: "r-dead", enabled: true, selector: ".not-on-this-page", property: "display", value: "none" },
           { id: "r-off", enabled: false, selector: "#probe-props", property: "display", value: "none" },
-          { id: "r-broken", enabled: true, selector: "((", property: "display", value: "none" }
+          { id: "r-broken", enabled: true, selector: "((", property: "display", value: "none" },
+          // Matches only while Plane clips a long description, and this page has none.
+          DESC_PRESETS[0],
+          // The same kind of preset with the user's own selector: theirs, so judged like theirs.
+          Object.assign({}, DESC_PRESETS[1], { selector: ".edited-by-the-user" })
         ]
       })
     },
@@ -3024,6 +3211,12 @@ const suites = [
       check("a disabled rule and an unreadable selector are not measured", () => {
         ok(!("r-off" in health()), "disabled");
         ok(!("r-broken" in health()), "unreadable");
+      });
+      // On a self-hosted Plane that never clips, a recorded miss would add up to a "never
+      // matched" warning about a preset the user never added and cannot use.
+      check("a shipped description preset's miss is not recorded, an edited one's is", () => {
+        ok(!("${DESC_PRESETS[0].id}" in health()), "the shipped preset was counted as missing");
+        eq((health()["${DESC_PRESETS[1].id}"] || {}).checks, 1, "the edited copy");
       });
 
       // Once per route, not once per mutation burst — injectAll runs on every one of those,
@@ -3639,7 +3832,19 @@ if (!chrome) {
   process.exit(0);
 }
 
-for (const suite of suites) {
+// PE_ONLY=popup runs the suites whose name contains it, for a quick loop while working on one
+// surface. CI never sets it. A filter that matches nothing is a failure, not a quiet zero: that
+// is the one result a check must never be able to produce by accident.
+const only = process.env.PE_ONLY || "";
+const chosen = only ? suites.filter((s) => s.name.indexOf(only) > -1) : suites;
+if (only) {
+  console.log(`PE_ONLY=${JSON.stringify(only)}: ${chosen.length} of ${suites.length} suite(s)`);
+  if (!chosen.length) {
+    console.error("no suite matches PE_ONLY");
+    process.exit(1);
+  }
+}
+for (const suite of chosen) {
   const build = suite.page.plane ? buildPlanePage : buildPage;
   const page = build({ ...suite.page, body: suite.body });
   for (const r of run(chrome, page, suite.hash, suite.name)) {
@@ -3674,7 +3879,7 @@ try {
 }
 console.log(
   `\ndom: ${results.length - failed.length} passed, ${failed.length} failed, ${results.length} total` +
-    ` · ${suites.length} page(s) in ${path.basename(chrome)}` +
+    ` · ${chosen.length} page(s) in ${path.basename(chrome)}` +
     (hangs.length ? ` · ${hangs.length} hang(s) absorbed, see WARN above` : "") +
     "\n"
 );

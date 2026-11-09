@@ -409,6 +409,17 @@ function peRuleHealthUpdate(prev, counts, now) {
   return out;
 }
 
+// Whether a miss counts toward "never matched" for this rule. For nearly every rule it does.
+// The description presets are the exception: they select a clipped description, so they match
+// exactly when there is something to undo and a miss only means nobody opened a long item —
+// and on a Plane that never clips, they would be reported as broken for good. A hit is still
+// recorded, so a working one shows when it last applied. The exemption holds only while the
+// selector is the shipped one; an edited copy is the user's own rule, and is judged like one.
+function peRuleMissIsEvidence(rule) {
+  if (!rule || typeof rule !== "object") return true;
+  return !peDescriptionPresetRules().some((p) => p.id === rule.id && p.selector === rule.selector);
+}
+
 // Drop records for rules that no longer exist, and hard-cap what is left. Called on the
 // same write as the update: a deleted rule's history is not evidence about anything, and a
 // rule id that comes back is a new rule that happens to share a name.
