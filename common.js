@@ -103,15 +103,15 @@ const PE_MAX_VARIABLES = 5;
 // no post-processing: the markdown preset carries its own "[…](…)" because the user
 // must be able to see, and edit, the thing that lands on their clipboard.
 const PE_ITEM_PREFIX = "item.";
+// The fields a page supplies are deliberately three: key, title, url. A "slug" field (title
+// lowercased into `a-b-c` for a branch name) was cut — a Korean or emoji title slugs to the
+// empty string, and some projects' identifiers are numeric ("42-7"), so half the team would
+// get a branch name with a dangling separator and no title in it. Half-support is worse
+// than none.
+//
 // Built fresh on every call. A /g regex carries lastIndex between uses, so one shared
 // constant would make the expander and the missing-token scan depend on which ran last.
 const peItemTokenRe = () => /\{\{\s*item\.([a-zA-Z0-9_-]+)\s*\}\}/gi;
-// The fields we can actually read off a work item page. Deliberately three: key, title,
-// url. A "slug" field (title lowercased into `a-b-c` for a branch name) was cut — a
-// Korean or emoji title slugs to the empty string, and some projects' identifiers are
-// numeric ("42-7"), so half the team would get a branch name with a dangling separator
-// and no title in it. Half-support is worse than none.
-const PE_ITEM_FIELDS = ["key", "title", "url"];
 const PE_MAX_COPY_FORMATS = 5;
 // A work item key as Plane prints it: project identifier + "-" + sequence number. The
 // identifier is not always letters — a project's can be all digits, e.g. "42", so a key can
@@ -1263,11 +1263,6 @@ function peSettingsUsage(settings) {
     overTotal: total > PE_SYNC_QUOTA_BYTES,
     overItem: worst > PE_SYNC_ITEM_BYTES
   };
-}
-
-// Total bytes one save would occupy, against PE_SYNC_QUOTA_BYTES.
-function peSettingsBytes(settings) {
-  return peSettingsUsage(settings).total;
 }
 
 // Reassemble settings from a raw chrome.storage.sync dump. Split out so the assembly

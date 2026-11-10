@@ -66,7 +66,6 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__ERR_TPL_BIG = PE_ERR_TEMPLATE_TOO_LARGE;" +
   "\n;globalThis.__MAX_COPY = PE_MAX_COPY_FORMATS;" +
   "\n;globalThis.__MAX_QUICK = PE_MAX_QUICK_LINKS;" +
-  "\n;globalThis.__ITEM_FIELDS = PE_ITEM_FIELDS;" +
   "\n;globalThis.__ITEM_KEY_RE = PE_ITEM_KEY_RE;" +
   "\n;globalThis.__EXAMPLE_FEED_URL = PE_EXAMPLE_FEED_URL;" +
   "\n;globalThis.__EXAMPLE_FEED_URLS = PE_EXAMPLE_FEED_URLS;";
@@ -3877,7 +3876,7 @@ test("storage: the ceiling moved — a settings object far past one item now sav
   const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
   s.templates = Array.from({ length: 60 }, (_, i) => tplOfBytes("t" + i, 1000));
   // The whole thing is ~60 KB: it could not have been stored at all before sharding.
-  ok(ctx.peSettingsBytes(s) > ctx.__ITEM_BYTES * 4, "the fixture must exceed the old single-item ceiling");
+  ok(ctx.peSettingsUsage(s).total > ctx.__ITEM_BYTES * 4, "the fixture must exceed the old single-item ceiling");
   await ctx.peSaveSettings(s);
   const back = await ctx.peGetSettings();
   eq(back.templates.length, 60, "all 60 survive");
@@ -4121,7 +4120,7 @@ test("storage: the meter measures the items the save actually writes", async () 
   const { ctx, storage } = loadCommonWithSyncStorage();
   const s = ctx.peDeepMerge(ctx.__DEFAULTS, {});
   s.templates = Array.from({ length: 15 }, (_, i) => tplOfBytes("t" + i, 1000));
-  const predicted = ctx.peSettingsBytes(s);
+  const predicted = ctx.peSettingsUsage(s).total;
   await ctx.peSaveSettings(s);
   const actual = Object.keys(storage.store).reduce(
     (n, k) => n + chromeItemBytes(k, storage.store[k]),

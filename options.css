@@ -231,8 +231,7 @@ body {
   font-size: 12.5px;
   color: var(--muted-2);
 }
-.desc code,
-.row-title code {
+.desc code {
   background: #f1f2f4;
   padding: 1px 5px;
   border-radius: 4px;
@@ -1066,18 +1065,6 @@ button {
 .ghost:hover {
   background: #f3f4f6;
 }
-.link-btn {
-  margin-top: 8px;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 0;
-}
-.link-btn:hover {
-  text-decoration: underline;
-}
 .icon-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -1145,8 +1132,7 @@ kbd {
   textarea,
   input[type="text"],
   input[type="url"],
-  select,
-  .row-ctrl input[type="number"] {
+  select {
     background: #14171b;
     color: var(--text);
   }
