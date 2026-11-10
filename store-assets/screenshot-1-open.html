@@ -4,184 +4,30 @@
 <link rel="stylesheet" href="shot.css" />
 <style>
   .left { top: 236px; }
-  .win { top: 214px; }
-
-  /* The omnibox is the whole feature, so the capture is the address bar rather than a
-     page: a keyword chip, the typed key, and the suggestion Chrome draws underneath. */
-  .bar { padding: 16px 18px; }
-  .omni {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    height: 34px;
-    padding: 0 13px;
-    border-radius: 999px;
-    background: #fff;
-    border: 1px solid #e3e5e9;
-    box-shadow: 0 1px 2px rgba(18, 18, 18, 0.05);
-  }
-  .kw {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: #fff;
-    background: #121212;
-    border-radius: 5px;
-    padding: 2px 7px;
-  }
-  .typed {
-    font-size: 14px;
-    font-weight: 600;
-    color: #121212;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .caret {
-    width: 1.5px;
-    height: 17px;
-    background: #121212;
-    margin-left: -3px;
-  }
-  .page { padding: 0; }
-
-  /* Suggestion list, drawn as the omnibox dropdown: flush under the bar, full width. */
-  .sugg { border-top: 1px solid #eceef1; }
-  .sugg .row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 20px;
-  }
-  .sugg .row + .row { border-top: 1px solid #f4f5f7; }
-  .sugg .row.on { background: #f7f8fa; }
-  .go {
-    width: 22px;
-    height: 22px;
-    flex: 0 0 22px;
-    border-radius: 6px;
-    background: #eceef1;
-    color: #121212;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .sname { font-size: 13.5px; font-weight: 650; letter-spacing: -0.01em; }
-  .surl {
-    margin-left: auto;
-    font-size: 12px;
-    color: #79818c;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .lang-ko .sname { font-weight: 700; }
-
-  /* The same input on the toolbar popup, so the poster shows both ways in. */
-  .panel.pop { left: 742px; top: 486px; width: 264px; }
-  .panel.pop .head {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #9aa1aa;
-  }
-  .jumprow { display: flex; gap: 7px; padding: 11px 15px 13px; }
-  .jumpkey {
-    flex: 1;
-    height: 30px;
-    border: 1px solid #e3e5e9;
-    border-radius: 8px;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    font-size: 12.5px;
-    color: #121212;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  /* The popup carries the same list, so the poster shows it there too. */
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 15px 14px; }
-  .chip {
-    font-size: 11.5px; color: #79818c; border: 1px solid #e3e5e9;
-    border-radius: 999px; padding: 3px 9px;
-  }
-  .chip b { color: #121212; font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .sugg .row.hint .sname { color: #79818c; font-weight: 500; }
-  .jumpgo {
-    width: 34px;
-    height: 30px;
-    border-radius: 8px;
-    background: #121212;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-  }
+  /* Three real captures of Chrome's own UI, taken from a screen recording of a real window:
+     the address bar's dropdown, the right-click menu on a key in a comment, and the popup. */
+  .shot.omni { left: 548px; top: 104px; width: 680px; }
+  .shot.ctx { left: 548px; top: 352px; width: 400px; }
+  .shot.pop { left: 984px; top: 292px; width: 244px; height: 440px; border-radius: 10px; }
+  .tag.omni { left: 564px; top: 76px; }
+  .tag.ctx { left: 564px; top: 324px; }
+  .tag.pop { left: 1000px; top: 264px; }
+  .caption { bottom: 22px; }
 </style>
-
 <div class="left">
   <div class="brand"></div>
   <h1 data-t="head"></h1>
   <p class="lede" data-t="lede"></p>
-  <div class="pill"><span data-t="pill"></span><span class="dot">·</span>Enter</div>
+  <div class="pill" data-t="pill"></div>
 </div>
-
-<div class="win">
-  <div class="bar">
-    <div class="omni">
-      <span class="kw">issue</span>
-      <span class="caret"></span>
-    </div>
-  </div>
-  <div class="page">
-    <div class="sugg">
-      <!-- Chrome draws the default suggestion first, and with nothing typed that is the
-           hint — the one row that says a key opens and words search. Quoted from
-           omniboxHint. The rows under it are recentRows(), which is what the extension
-           offers at exactly this moment: the keyword is up and the cursor is waiting. -->
-      <div class="row hint">
-        <span class="go">→</span>
-        <span class="sname" data-t="hint"></span>
-      </div>
-      <div class="row on">
-        <span class="go">↺</span>
-        <span class="sname" data-t="s1"></span>
-        <span class="surl">plane.example.com/acme/browse/PROJ-142</span>
-      </div>
-      <div class="row">
-        <span class="go">↺</span>
-        <span class="sname" data-t="s2"></span>
-        <span class="surl">jira.acme.com/browse/OPS-214</span>
-      </div>
-      <div class="row">
-        <span class="go">↺</span>
-        <span class="sname" data-t="s3"></span>
-        <span class="surl">linear.app/acme/issue/ENG-77</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="panel pop">
-  <div class="head" data-t="popLabel"></div>
-  <div class="jumprow">
-    <span class="jumpkey" data-t="jumpPh"></span>
-    <span class="jumpgo">→</span>
-  </div>
-  <div class="chips">
-    <span class="chip"><b>PROJ-142</b> Plane</span>
-    <span class="chip"><b>OPS-214</b> Jira</span>
-  </div>
-</div>
-
+<span class="tag omni" data-t="tOmni"></span>
+<div class="shot omni"><img data-src="real/omnibox" alt="" /></div>
+<span class="tag ctx" data-t="tCtx"></span>
+<div class="shot ctx"><img data-src="real/ctxmenu" alt="" /></div>
+<span class="tag pop" data-t="tPop"></span>
+<div class="shot pop"><img data-src="real/popup" alt="" /></div>
 <div class="caption" data-t="caption"></div>
-
 <script>
-  // The keyword is the one declared in manifest.omnibox, the suggestion wording is
-  // omniboxOpen, and the popup label is popJumpLabel — quoted from the shipped catalogue
-  // rather than invented, so the poster cannot promise a string the extension does not say.
   window.T = {
     en: {
       head: "You do not have to<br />remember the key.",
@@ -189,32 +35,26 @@
         "In the address bar type <b>issue</b> and a space. The items you opened last are " +
         "already there — keep typing a key to narrow them, or type <b>words</b> to search " +
         "your tracker instead.",
-      hint: "Type a work item key to open it, or words to search",
-      pill: "issue checkout fails",
-      s1: "Recent · PROJ-142 · Plane",
-      s2: "Recent · OPS-214 · Jira",
-      s3: "Recent · ENG-77 · Linear",
-      popLabel: "Go to work item",
-      jumpPh: "Key, or search…",
+      pill: "issue SHOP",
+      tOmni: "Address bar",
+      tCtx: "Right-click",
+      tPop: "Popup",
       caption:
-        "A key in someone else's message works too — select it and right-click. It only " +
-        "opens a URL, so it needs <b>no site access</b> and works on any tab"
+        "It only opens a URL, so it needs <b>no site access</b> and works on any tab — " +
+        "Plane, Jira, Linear, GitHub or GitLab"
     },
     ko: {
       head: "키를 외우고<br />있지 않아도 됩니다.",
       lede:
         "주소창에 <b>issue</b>를 입력하고 한 칸 띄우면, 마지막에 연 항목들이 이미 떠 있습니다. " +
         "키를 이어 입력하면 좁혀지고, <b>낱말</b>을 입력하면 트래커 검색으로 갑니다.",
-      hint: "작업 항목 키를 입력하면 열고, 여러 낱말을 입력하면 검색합니다",
-      pill: "issue 결제 실패",
-      s1: "최근 · PROJ-142 · Plane",
-      s2: "최근 · OPS-214 · Jira",
-      s3: "최근 · ENG-77 · Linear",
-      popLabel: "작업 항목으로 이동",
-      jumpPh: "키 또는 검색어…",
+      pill: "issue STORE",
+      tOmni: "주소창",
+      tCtx: "우클릭",
+      tPop: "팝업",
       caption:
-        "남의 메시지 속 키도 됩니다 — 드래그하고 우클릭하세요. URL만 열기 때문에 " +
-        "<b>사이트 접근 권한이 없어도</b> 어느 탭에서나 동작합니다"
+        "URL만 열기 때문에 <b>사이트 접근 권한이 없어도</b> 어느 탭에서나 동작합니다 — " +
+        "Plane, Jira, Linear, GitHub, GitLab"
     }
   };
 </script>

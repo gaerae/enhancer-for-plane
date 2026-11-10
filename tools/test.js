@@ -4632,6 +4632,10 @@ test("store: the listing comparison reads real git, and failure is not 'unchange
     put("STORE_LISTING.md", listing({ preamble: "Paste them.", packaging: "CI builds and uploads the zip.", byHand: "zip -r -x" }));
     put("shot.css", "a { color: red }");
     put("screenshot-1.html", "<p>one</p>");
+    // A screen capture a poster is composited from is a source too, png or not: only the
+    // images beside STORE_LISTING.md are uploaded.
+    fs.mkdirSync(path.join(dir, "store-assets", "real"));
+    put("real/focus.en.png", "capture");
     release("v1.2.0");
     put("STORE_LISTING.md", listing({ description: "Opens every key in a selection.", korean: "선택한 키를 모두 엽니다." }));
     put("screenshot-1.png", "png-1b");

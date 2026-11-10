@@ -110,3 +110,18 @@ h1 {
 }
 .caption b { color: #4b525c; font-weight: 650; }
 .caption .em { color: #4b525c; font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ---- real captures ----
+ * A card holding a screen capture from a real browser (real/<name>.<lang>.png, which
+ * shot.js picks for the page's language), and the dark label that says which way in it
+ * shows. A page positions its own cards; this is only what they share. */
+.shot {
+  position: absolute; background: #fff; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 26px 60px rgba(20, 26, 38, 0.16), 0 3px 10px rgba(20, 26, 38, 0.07);
+}
+.shot img { display: block; width: 100%; }
+.tag {
+  position: absolute; z-index: 2; font-size: 12px; font-weight: 700; padding: 6px 11px;
+  border-radius: 999px; background: #121212; color: #fff;
+  box-shadow: 0 6px 16px rgba(20, 26, 38, 0.14);
+}

@@ -34,6 +34,11 @@
 
     var b = document.querySelector(".brand");
     if (b && !b.firstElementChild) b.innerHTML = MARK;
+    // A real capture exists once per listing language, as real/<name>.<lang>.png; the
+    // page names it without the suffix. Set once, so the second paint does not reload it.
+    var imgs = document.querySelectorAll("img[data-src]:not([src])");
+    for (var i = 0; i < imgs.length; i++) imgs[i].src = imgs[i].getAttribute("data-src") + "." + lang + ".png";
+
     var bar = document.querySelector(".bar");
     if (bar && !bar.querySelector(".lights")) bar.insertAdjacentHTML("afterbegin", TRAFFIC);
 
