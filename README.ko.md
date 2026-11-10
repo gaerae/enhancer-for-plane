@@ -113,7 +113,7 @@
 - **규칙마다 실제로 적용되는지 표시함**: 마지막으로 적용된 시점, 또는 한 번도 못 찾았다는 사실.
   Plane 개편은 오래된 날짜 하나로 드러남.
 
-![자체 호스팅 Plane을 본떠 그린 그림: 작업 항목 목록에서 잘린 이름과, 폭 규칙을 적용한 같은 목록](store-assets/screenshot-3-width.ko.png)
+![Plane Cloud 작업 항목 목록을 찍은 화면: 224px에서 잘린 모듈 이름과, 폭 규칙으로 320px까지 넓힌 같은 행](store-assets/screenshot-3-width.ko.png)
 
 ### 🧘 집중 모드
 

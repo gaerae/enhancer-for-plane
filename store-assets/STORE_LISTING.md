@@ -365,7 +365,7 @@ Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자�
 
 Three kinds of image live here, and the difference matters when you go to replace one.
 
-`real/*.png` are **screen captures of a real Chrome window**, and captures 1, 2, 4 and 5 are
+`real/*.png` are **screen captures of a real Chrome window**, and all five captures are
 built from them: each `screenshot-N-*.html` lays two or three of them out as cards, and
 `shot.js` picks `real/<name>.<lang>.png` for the page's language. They are the only way to
 show the omnibox dropdown, the right-click menu and the toolbar popup as Chrome draws them,
@@ -397,10 +397,14 @@ next set matches:
   at 2x with `screencapture -l` for the page and with `-R` on the window's rectangle for the
   omnibox, the popup and the menu, which are separate windows on top of it.
 
-`screenshot-3-width.html` and `promo-*.html` are still **illustrations**: every pixel is drawn
-in CSS. Capture 3 is still drawn although the preset reaches Cloud's `max-w-[224px]` chip
-since v1.15.0: Cloud shows the module chip only on a row wide enough for it, and at 1280px it
-folds the chip into "+1". Retake it at a wider window.
+Capture 3 is the exception to the window size: its rows were taken in a 1728px-wide window,
+because Cloud shows the module chip only on a row wide enough for it and folds it into "+1"
+below that. The "before" frame is the same page with the extension's stylesheet taken off
+for the moment of the capture, and the rule is the shipped preset at its shipped 320px. The
+English module names are longer than that and stay cut, just later; that is what the rule
+really does with them, so the frame is left that way.
+
+`promo-*.html` are still **illustrations**: every pixel is drawn in CSS.
 
 `ui/*.png` are **real pages**: `node store-assets/capture-ui.js` renders the shipped
 `popup.html` and `options.html`, with the shipped CSS byte for byte, in a real browser at 2x.
@@ -442,9 +446,9 @@ Every screenshot is rendered from a page, not composited by hand. Each `screensh
 is a 1280×800 page sharing `shot.css` and `shot.js` (the brand mark there is the real path
 from `icons/icon.svg`), and carries its own copy for both languages in a `window.T`
 block, applied by `?lang=`. One layout serves both listings, so a fix to the copy cannot
-land in one language and not the other. What the pages hold differs: captures 1, 2, 4
-and 5 lay out frames from `real/`, which the repo cannot regenerate — only a retake
-replaces them — while capture 3 and the promo tiles are drawn in CSS end to end:
+land in one language and not the other. What the pages hold differs: the captures lay
+out frames from `real/`, which the repo cannot regenerate — only a retake replaces them —
+while the promo tiles are drawn in CSS end to end:
 
     sh store-assets/render.sh        # every capture and promo tile, both languages
     sh store-assets/render.sh 4      # just screenshot-4-*
@@ -452,8 +456,8 @@ replaces them — while capture 3 and the promo tiles are drawn in CSS end to en
 
 The promo tiles work the same way, except each carries its size in its filename
 (`promo-<name>-<W>x<H>.html`) and is rendered at exactly that — `shot.css` fixes the
-capture canvas at 1280×800, so a tile overrides it. Both tiles are drawn, so like capture 3
-they regenerate from the repo alone. The tiles are dark where the captures are light: `#121212` is half the brand, the white mark
+capture canvas at 1280×800, so a tile overrides it. Both tiles are drawn, so they regenerate from
+the repo alone. The tiles are dark where the captures are light: `#121212` is half the brand, the white mark
 reads best on it, and a dark tile is what separates this listing from a grid of pale ones.
 They pull `../icons/icon.svg` directly rather than a copy of its path, so a tile and the
 icon beside it in the store cannot drift apart.
@@ -469,7 +473,7 @@ demo workspace holds them in the reader's language.
 Keep the pictures honest — they must show what the extension currently draws. The drawn
 template menu once still showed a "TEMPLATES (TITLE + BODY)" header the picker had long
 stopped rendering, and no "＋ Manage templates" footer, which the picker had gained. That is
-what moved four of the five to real captures. A real capture is only true on the day it was
+what moved all five to real captures. A real capture is only true on the day it was
 taken, so when the UI moves, retake it.
 
 None of this ships: release.yml lists the packaged files explicitly and store-assets is

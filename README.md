@@ -117,7 +117,7 @@ you do something.
 - **Each rule says whether it does anything**: when it last applied, or that it has never
   matched. A Plane redesign shows up as one stale date.
 
-![A drawn illustration, modelled on self-hosted Plane: cut-off names in the work item list, and the same list with a width rule applied](store-assets/screenshot-3-width.png)
+![Plane Cloud's work item list, captured: module names cut at 224px, and the same rows with the width rule at 320px](store-assets/screenshot-3-width.png)
 
 ### 🧘 Focus mode
 

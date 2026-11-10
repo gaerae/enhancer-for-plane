@@ -42,9 +42,10 @@ changes.
 - The 100 KB capacity figures in the READMEs are measured again: about 212 English or 79
   Korean templates of 400 characters, down from the 218 and 81 quoted. The default style
   rules come out of the same budget, and they had grown since the figures were taken.
-- Store screenshots 1, 2, 4 and 5 are real captures of Chrome and Plane Cloud now, not
-  drawings. The store run counts only the images at the top of `store-assets/` as a listing
-  change; its subfolders hold the capture sources, which no reviewer sees.
+- All five store screenshots are real captures of Chrome and Plane Cloud now, not
+  drawings; the third shows the item-name width on Cloud's work item list. The store run
+  counts only the images at the top of `store-assets/` as a listing change; its subfolders
+  hold the capture sources, which no reviewer sees.
 - The middle-dot rule for Korean prose covers the store posters too. Two chains sat in their
   Korean captions while every checked file was clean.
 
