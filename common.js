@@ -7,7 +7,7 @@
 // adds/edits/removes "selector + property + value" rules.
 
 const PE_STORAGE_KEY = "peSettings";
-const PE_SCHEMA = 9;
+const PE_SCHEMA = 10;
 
 // Templates live in their own chrome.storage.sync items, "peTpl.0", "peTpl.1", … — see
 // peSettingsWriteSet for why, and how many.
@@ -299,12 +299,42 @@ const PE_V7_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
 // an inline `height` that a rule's !important outranks — so this is CSS, not a click on
 // Plane's toggle. Its handles are the ones it writes for its own sake rather than for
 // styling: the clipping box carries an inline height only while it clips, and the toggle
-// right after it is a button with aria-expanded and aria-controls. The editor inside is what
-// keeps this to work items: the same component clips a cycle's description, a plain
-// textarea, which is not what the preset's name promises. The fade is the box's second child.
+// after it is a button with aria-expanded. The editor inside is what keeps this to work
+// items: the same component clips a cycle's description, a plain textarea, which is not what
+// the preset's name promises. The fade is the box's second child.
+//
+// The toggle comes in two shapes, and the presets have to fit both:
+//   - open source (makeplane/plane `preview`, efa46d284): the button is the box's next
+//     sibling and carries aria-controls naming the box.
+//   - Plane Cloud, measured 2026-11-10 on an item's own page and in the peek panel: the
+//     button has no aria-controls and sits alone inside a class-less div (inline
+//     `pointer-events: auto`), which is the box's next sibling.
+// v1.13.0 shipped the first shape only, so on Cloud — where the clip is — both presets
+// matched nothing for a release. `:only-child` is what keeps the wrapped shape narrow: a
+// toolbar after an editor holds a dropdown button with aria-expanded among others.
+//
+// Both rule selectors must stay within PE_SYNC_LIMITS.maxFieldLen (300), which an import
+// clamps every field to: past it, an export read back cuts the selector mid-token and the
+// whole rule stops parsing. `:has()` cannot nest, so the wrapped toggle is matched as a
+// relative selector inside the box's `:has()`, and the toggle rule hides the wrapper rather
+// than the button — the wrapper has no height of its own, so either leaves no gap.
 // Self-hosted 1.4.3 does not have the component at all, so there the presets match nothing.
 const PE_DESCRIPTION_BOX = 'div.relative[style*="height"]:has(.ProseMirror)';
 const PE_DESCRIPTION_TOGGLE = "button[aria-expanded][aria-controls]";
+const PE_DESCRIPTION_TOGGLE_WRAPPED = "div > button[aria-expanded]:only-child";
+const PE_DESCRIPTION_CLIPPED = `${PE_DESCRIPTION_BOX}:has(+ ${PE_DESCRIPTION_TOGGLE}, + ${PE_DESCRIPTION_TOGGLE_WRAPPED})`;
+
+// What v9 — v1.13.0 and v1.14.0 — shipped for the two description presets, kept only so the
+// migration can tell an untouched preset from one the user edited. Written out rather than
+// derived from the constants above, which have moved on: the point is the exact string that
+// is in somebody's storage. The same licence as PE_V7_FOCUS_SELECTORS, and the same limit.
+const PE_V9_DESCRIPTION_SELECTORS = {
+  "rule-description-full":
+    'div.relative[style*="height"]:has(.ProseMirror):has(+ button[aria-expanded][aria-controls])',
+  "rule-description-toggle":
+    'div.relative[style*="height"]:has(.ProseMirror):has(+ button[aria-expanded][aria-controls]) > div + div, ' +
+    'div.relative[style*="height"]:has(.ProseMirror) + button[aria-expanded][aria-controls]'
+};
 
 function peDescriptionPresetRules() {
   return [
@@ -312,7 +342,7 @@ function peDescriptionPresetRules() {
       id: "rule-description-full",
       enabled: true,
       label: peMsg("optPresetDescFull") || "Work item description: show all of it",
-      selector: `${PE_DESCRIPTION_BOX}:has(+ ${PE_DESCRIPTION_TOGGLE})`,
+      selector: PE_DESCRIPTION_CLIPPED,
       property: "height",
       value: "auto"
     },
@@ -320,7 +350,9 @@ function peDescriptionPresetRules() {
       id: "rule-description-toggle",
       enabled: true,
       label: peMsg("optPresetDescToggle") || "Work item description: hide the fade and Show all",
-      selector: `${PE_DESCRIPTION_BOX}:has(+ ${PE_DESCRIPTION_TOGGLE}) > div + div, ${PE_DESCRIPTION_BOX} + ${PE_DESCRIPTION_TOGGLE}`,
+      selector:
+        `${PE_DESCRIPTION_CLIPPED} > div + div, ` +
+        `${PE_DESCRIPTION_BOX} + :is(${PE_DESCRIPTION_TOGGLE}, div:has(> button[aria-expanded]:only-child))`,
       property: "display",
       value: "none"
     }
@@ -907,6 +939,13 @@ function peDeepMerge(def, cur) {
 //   v8 → v9: the description presets (see peDescriptionPresetRules), appended the way
 //            v6 → v7 appended the focus ones and for the same reason. New ids, so nothing
 //            deleted comes back; an install that already carries one keeps its copy.
+//   v9 → v10: both description presets matched nothing on Plane Cloud, whose toggle lost
+//            aria-controls and moved into a wrapper (see PE_DESCRIPTION_BOX). Repointed the
+//            way v7 → v8 repointed the focus ones: ONLY while the stored selector is
+//            character-for-character what v9 shipped (PE_V9_DESCRIPTION_SELECTORS). An
+//            edited copy is the user's own rule and keeps what they typed; a deleted preset
+//            stays deleted, because this appends nothing. An install older than 9 gets the
+//            current presets from the v9 step and passes through here untouched.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -973,6 +1012,15 @@ function peMigrate(raw) {
       if (!have.has(r.id)) rules.push(r);
     });
     raw.rules = rules;
+  }
+  if (from < 10) {
+    const shipped = {};
+    peDescriptionPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+    (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
+      if (!r || typeof r !== "object") return;
+      const was = PE_V9_DESCRIPTION_SELECTORS[r.id];
+      if (was && r.selector === was) r.selector = shipped[r.id];
+    });
   }
   raw.schema = PE_SCHEMA;
   return raw;

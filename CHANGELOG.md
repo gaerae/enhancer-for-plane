@@ -10,6 +10,24 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.15.0 — unreleased
+
+Schema 10: the two description presets are repointed in existing settings, but only where
+their selector is still exactly what v1.13.0 shipped. An edited selector is kept, a deleted
+preset stays deleted, and nothing is added. No permission changes.
+
+### Fixed
+- **A long work item description is shown whole on Plane Cloud.** The two rules from v1.13.0
+  matched nothing there: Cloud renders **Show all** without the attribute they looked for, and
+  wraps it in an extra element. Since Cloud is where the clip is, the feature did nothing for
+  anyone. The rules now fit Cloud's markup and the open-source one, on an item's own page and
+  in the peek panel, and a cycle's description is still left alone.
+
+### Internal
+- The 100 KB capacity figures in the READMEs are measured again: about 212 English or 79
+  Korean templates of 400 characters, down from the 218 and 81 quoted. The default style
+  rules come out of the same budget, and they had grown since the figures were taken.
+
 ## v1.14.0 — 2026-11-10
 
 Schema 9, unchanged. No permission changes.

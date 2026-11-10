@@ -45,6 +45,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.PE_STORAGE_KEY = PE_STORAGE_KEY;" +
   "\n;globalThis.__V7_FOCUS_SELECTORS = PE_V7_FOCUS_SELECTORS;" +
   "\n;globalThis.__V7_DROPDOWN_SELECTOR = PE_V7_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.__V9_DESCRIPTION_SELECTORS = PE_V9_DESCRIPTION_SELECTORS;" +
   "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
@@ -1845,7 +1846,7 @@ test("quick: only http(s) urls are treated as navigable", () => {
 
 test("quick: the schema is stamped and a v5 user gains an empty quickLinks list", () => {
   const ctx = loadCommon();
-  eq(ctx.__SCHEMA, 9, "PE_SCHEMA is 9");
+  eq(ctx.__SCHEMA, 10, "PE_SCHEMA is 10");
   // A v5 object predates quickLinks; the merge fills the absent array as [] (it ships empty),
   // and the stamp advances so the migration does not run forever.
   const merged = ctx.peDeepMerge(ctx.__DEFAULTS, ctx.peMigrate({ schema: 5, copyFormats: [] }));
@@ -3010,7 +3011,7 @@ test("description: a v8 install gains the presets, and only once", () => {
   const out = ctx.peMigrate({ schema: 8, rules: [mine] });
   eq(out.rules[0], mine, "the user's rule keeps its place");
   eq(out.rules.slice(1), ctx.peDescriptionPresetRules(), "both presets arrived, as shipped");
-  eq(out.schema, 9, "and the stamp moved");
+  eq(out.schema, ctx.__SCHEMA, "and the stamp moved");
   eq(ctx.peMigrate({ schema: 9, rules: [mine] }).rules.length, 1, "a deletion after that is final");
 });
 
@@ -3030,6 +3031,68 @@ test("description: a fresh install and an upgraded one get the same presets", ()
   eq(pick(ctx.__DEFAULTS.rules), ctx.peDescriptionPresetRules(), "fresh");
   eq(pick(ctx.peMigrate({ schema: 8, rules: [] }).rules), ctx.peDescriptionPresetRules(), "from v8");
   eq(pick(ctx.peMigrate({ widths: { moduleName: { px: 320 } } }).rules), ctx.peDescriptionPresetRules(), "from the oldest shape");
+  // The v9 install — the one that carries the presets already, in their v9 form — is the one
+  // the other three cannot speak for: it is the only one that reaches the repointing step with
+  // something to repoint.
+  const v9 = ctx.peDescriptionPresetRules().map((r) => Object.assign({}, r, { selector: ctx.__V9_DESCRIPTION_SELECTORS[r.id] }));
+  eq(pick(ctx.peMigrate({ schema: 9, rules: v9 }).rules), ctx.peDescriptionPresetRules(), "from v9");
+});
+
+// v1.13.0 shipped selectors for the toggle as the open-source component renders it. Plane Cloud
+// — the one place the clip had reached — renders it without aria-controls and inside a wrapper,
+// so both presets matched nothing there for a release. Measured 2026-11-10 on an item's own page
+// and in the peek panel. A union, not a replacement: the open-source shape is what a self-hosted
+// Plane gets when the component reaches a release.
+test("description: v10 repoints an untouched v9 preset onto both shapes", () => {
+  const ctx = loadCommon();
+  const was = ctx.__V9_DESCRIPTION_SELECTORS;
+  const now = {};
+  ctx.peDescriptionPresetRules().forEach((r) => (now[r.id] = r.selector));
+  eq(Object.keys(was).sort(), Object.keys(now).sort(), "the table names exactly the shipped presets");
+  for (const id of Object.keys(was)) {
+    ok(now[id] !== was[id], id + ": the selector actually changed");
+    match(now[id], /\[aria-controls\]/, id + ": the open-source toggle is still in it");
+    match(now[id], /div > button\[aria-expanded\]:only-child/, id + ": and Cloud's wrapped one");
+  }
+  const mine = { id: "mine", enabled: true, selector: ".x", property: "width", value: "1px" };
+  const out = ctx.peMigrate({
+    schema: 9,
+    rules: [
+      mine,
+      { id: "rule-description-full", enabled: false, selector: was["rule-description-full"], property: "height", value: "auto" },
+      { id: "rule-description-toggle", enabled: true, selector: was["rule-description-toggle"], property: "display", value: "none" }
+    ]
+  });
+  eq(out.rules.map((r) => r.selector), [".x", now["rule-description-full"], now["rule-description-toggle"]], "repointed, in place");
+  eq(out.rules[1].enabled, false, "a preset switched off stays off: only the selector is ours to move");
+  eq(out.rules.length, 3, "and the step appended nothing");
+  eq(out.schema, 10, "the stamp moved");
+});
+
+test("description: v10 leaves an edited selector, and a deleted preset, alone", () => {
+  const ctx = loadCommon();
+  const was = ctx.__V9_DESCRIPTION_SELECTORS["rule-description-full"];
+  // Anyone who worked Cloud's markup out by hand before we did keeps what they typed — and
+  // so does anyone whose edit differs from the v9 string by a single space.
+  for (const mine of ['div.relative[style*="height"]:has(.ProseMirror):has(+ div > button)', was + " "]) {
+    const out = ctx.peMigrate({ schema: 9, rules: [{ id: "rule-description-full", selector: mine, property: "height", value: "auto" }] });
+    eq(out.rules[0].selector, mine, "kept: " + JSON.stringify(mine));
+  }
+  eq(ctx.peMigrate({ schema: 9, rules: [] }).rules, [], "a deleted preset stays deleted");
+  // A v10 install is past the step, so a v9 selector it carries is the user's to keep.
+  const v10 = ctx.peMigrate({ schema: 10, rules: [{ id: "rule-description-full", selector: was, property: "height", value: "auto" }] });
+  eq(v10.rules[0].selector, was, "the step does not run twice");
+});
+
+// An export read back goes through peSanitizeSettings, which clamps every field to
+// maxFieldLen. A shipped selector past it would come back cut mid-token, and a selector list
+// with one unreadable entry is thrown away whole — so the round trip would quietly kill the
+// preset. The toggle preset carries two shapes and is the one closest to the line.
+test("description: both presets fit what an import keeps", () => {
+  const ctx = loadCommon();
+  for (const r of ctx.peDescriptionPresetRules()) {
+    ok(r.selector.length <= ctx.__LIMITS.maxFieldLen, r.id + " is " + r.selector.length + " characters, past " + ctx.__LIMITS.maxFieldLen);
+  }
 });
 
 // The three tests above compare PE_DEFAULTS against the migration, and every one of them passed
@@ -3717,7 +3780,7 @@ test("import: a genuine export round-trips unchanged", () => {
   eq(restored.templates.length, original.templates.length, "templates survive");
   eq(restored.rules.length, original.rules.length, "rules survive");
   eq(restored.templates[0].name, original.templates[0].name, "content intact");
-  eq(restored.rules[0].selector, original.rules[0].selector, "selectors intact");
+  eq(restored.rules.map((r) => r.selector), original.rules.map((r) => r.selector), "every selector intact, not just the first");
 });
 
 test("import: sanitizing keeps every key the form renders", () => {
@@ -3795,7 +3858,9 @@ test("storage: the capacity the docs quote is the capacity you get", () => {
 
   ok(fits(200, en), "200 English templates of ~400 characters fit");
   ok(!fits(260, en), "…and it does run out; 260 must not fit");
-  ok(fits(80, ko), "80 Korean templates of ~400 characters fit");
+  // Every preset that ships comes out of this budget: the two description shapes took it from
+  // 80 to 79. Move the README with it, not the number up.
+  ok(fits(79, ko), "79 Korean templates of ~400 characters fit");
   ok(!fits(100, ko), "…and 100 do not — three bytes a character is the whole difference");
 
   // PE_IMPORT_LIMITS.maxTemplates is an anti-abuse bound on parsing a hostile file, not a

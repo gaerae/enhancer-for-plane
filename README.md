@@ -490,8 +490,8 @@ carries none of your data. See [PRIVACY.md](PRIVACY.md).
 
   | | fits in 100 KB | longest single template |
   |---|---|---|
-  | English, ~400 chars each | ~218 | ~8,100 chars |
-  | Korean, ~400 chars each | ~81 | ~2,700 chars |
+  | English, ~400 chars each | ~212 | ~8,100 chars |
+  | Korean, ~400 chars each | ~79 | ~2,700 chars |
   | Markdown with inline HTML | ~160 | ~1,350 chars |
 
   **One template must still fit one 8 KB item** — nothing can split it further — and

@@ -374,6 +374,11 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   selector must *not* catch: focus mode is global CSS, and `.shrink-0.bg-surface-1` without the
   `.z-[5]` also matches an unrelated chip on Cloud's cycles route. Any preset that names a
   vendor class needs a probe per generation, and reverting either half has to fail.
+  It happened again with the description presets, and the source was the trap: they were
+  written from makeplane/plane's own component, and Plane Cloud — the only place the clip had
+  shipped — runs a build that renders the toggle without `aria-controls` and inside a wrapper.
+  The open-source tree is one generation, not a stand-in for Cloud. Measure Cloud before
+  shipping a preset aimed at it.
 - **A migration may rewrite what the user already has, but only what it recognises.** Every
   migration before v8 was additive; v8 repoints two preset selectors that are already in
   storage. What makes that safe is `PE_V7_FOCUS_SELECTORS` — a rule is repointed only while its
