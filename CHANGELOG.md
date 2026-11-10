@@ -11,7 +11,7 @@ first read, never rewritten by hand.
 
 ---
 
-## v1.15.0 — unreleased
+## v1.15.0 — 2026-11-10
 
 Schema 10: the two description presets and the item-name width are repointed in existing
 settings, but only where their selector is still exactly what the last release shipped. An
@@ -48,6 +48,8 @@ changes.
   hold the capture sources, which no reviewer sees.
 - The middle-dot rule for Korean prose covers the store posters too. Two chains sat in their
   Korean captions while every checked file was clean.
+- Three stylesheet rules that matched nothing, and two values in `common.js` that only the
+  tests read, are gone.
 
 ## v1.14.0 — 2026-11-10
 

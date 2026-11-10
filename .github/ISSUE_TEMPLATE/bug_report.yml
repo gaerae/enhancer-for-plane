@@ -72,7 +72,7 @@ body:
     attributes:
       label: Extension version and Chrome version
       description: chrome://extensions shows the first, chrome://version the second.
-      placeholder: "1.14.0 / Chrome 142"
+      placeholder: "1.15.0 / Chrome 142"
     validations:
       required: true
 
