@@ -4428,6 +4428,37 @@ test("store copy: no description line is wide enough to wrap in the middle of a 
   eq(bad, [], "a description line past 140 columns — split it at a sentence end: " + bad.join(", "));
 });
 
+// The review form is a set of textareas, and the dashboard stops each one at 1,000 characters.
+// Nothing here knew that: three answers had grown past it (single purpose 1,020, storage 1,045,
+// host permissions 1,069), and the first anyone heard of it was the box refusing the paste
+// while the v1.15.0 listing was being entered. An answer is one paragraph per line under its
+// heading, and a multi-paragraph answer pastes with a newline between them, so that is how it
+// is counted. The Clipboard entry has no box (its heading says so) and is not counted.
+test("store copy: every review-form answer fits the dashboard's 1,000-character box", () => {
+  const doc = read("store-assets/STORE_LISTING.md");
+  const section = (heading) => {
+    const at = doc.indexOf(heading);
+    ok(at > 0, `the ${heading} section is findable`);
+    const from = doc.indexOf("\n", at) + 1;
+    return doc.slice(from, doc.indexOf("\n---\n", from));
+  };
+  const answers = { "single purpose": [section("## Single purpose").trim()] };
+  let cur = null;
+  for (const line of section("## Permission justifications").split("\n")) {
+    if (!line.trim()) continue;
+    if (!/^\s/.test(line)) {
+      cur = /NOT a dashboard field/.test(line) ? null : line.trim();
+      if (cur) answers[cur] = [];
+    } else if (cur) answers[cur].push(line.trim());
+  }
+  ok(Object.keys(answers).length >= 8, "found the answers: " + Object.keys(answers).join(", "));
+  const over = Object.entries(answers)
+    .map(([name, paras]) => [name, paras.join("\n").length])
+    .filter(([, n]) => n > 1000)
+    .map(([name, n]) => `${name.slice(0, 40)} (${n})`);
+  eq(over, [], "past the dashboard's 1,000 characters: " + over.join(", "));
+});
+
 test("copy: Korean prose enumerates with commas, not a chain of middots", () => {
   // 가운뎃점 is correct Korean and almost nobody types it, so a run of three or more in a
   // sentence reads as machine-written — it is one of the clearest tells. AGENTS.md has said
