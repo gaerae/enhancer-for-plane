@@ -71,14 +71,15 @@
     font-size: 11px; border: 1px solid #e8eaee; border-radius: 6px; padding: 2px 7px;
     color: #3f4650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* 160px is Plane's own max-w-40, and it is what makes three different modules read as one
-     word and a half. The rule replaces it with 320. */
+  /* Drawn from self-hosted 1.4, where the cap is max-w-40 (160px) and the shipped preset
+     replaces it with 320. Plane Cloud caps the same chips with max-w-[224px] (measured
+     2026-11-10), so the copy below names no number and no class. */
   .grp.before .ti { max-width: 132px; }
   .grp.before .cp { max-width: 84px; }
   .grp.after .cp { border-color: #d8ead f; }
   .grp.after .cp { background: #f7fbf8; border-color: #d6ecdd; }
 
-  /* The dropdown keeps a place: it is the same rule and the same 160px, one surface over. */
+  /* The dropdown keeps a place: a second rule, one surface over. */
   .panel.drop { left: 700px; top: 566px; width: 306px; }
   .panel.drop .head { border-bottom: 1px solid #f3f4f6; }
   .dsearch { display: flex; align-items: center; gap: 7px; padding: 9px 13px; font-size: 12px; color: #79818c; }
@@ -158,11 +159,11 @@
     en: {
       head: "Tell your<br />items apart.",
       lede:
-        "Plane caps names at 160px, so a list of work items in the same module reads as three " +
+        "Plane cuts long names short, so a list of work items in the same module reads as three " +
         "copies of one word — and you click into each to find out which. A width rule shows " +
-        "the title, the module and the cycle <b>in full</b>, in the list and in every dropdown.",
+        "the title, the module and the cycle <b>in full</b>, in the list and in the dropdowns.",
       crumb: "work items",
-      before: "Plane's 160px cap",
+      before: "As Plane draws it",
       after: "With the width rule",
       t1: "Checkout fails on Safari 17",
       t2: "Checkout fails on the second attempt",
@@ -171,20 +172,20 @@
       m2: "Billing — Refunds",
       m3: "Billing — Invoicing",
       c1: "Q3 Sprint 4",
-      dropHead: "The same rule, in the module dropdown",
+      dropHead: "A second rule, in the module dropdown",
       query: "Billing",
       caption:
-        "Titles, modules, cycles, labels and breadcrumbs all share that cap — one rule, or " +
-        "click <b>Pick element</b> in the popup and point at whichever one is bothering you"
+        "One rule per place you want widened — or click <b>Pick element</b> in the popup " +
+        "and point at whichever name is bothering you"
     },
     ko: {
       head: "어느 항목인지<br />한눈에.",
       lede:
-        "Plane은 이름을 160px에서 자릅니다. 같은 모듈에 속한 작업 항목 목록이 같은 낱말 세 개로 " +
-        "보이고, 어느 것인지 확인하려면 하나씩 눌러 봐야 합니다. 폭 규칙 하나면 제목도 모듈도 " +
-        "사이클도 <b>전부</b> 보입니다 — 목록에서도, 모든 드롭다운에서도.",
+        "Plane은 긴 이름을 잘라서 보여 줍니다. 같은 모듈에 속한 작업 항목 목록이 같은 낱말 세 개로 " +
+        "보이고, 어느 것인지 확인하려면 하나씩 눌러 봐야 합니다. 폭 규칙을 쓰면 제목도 모듈도 " +
+        "사이클도 <b>전부</b> 보입니다 — 목록에서도, 드롭다운에서도.",
       crumb: "작업 항목",
-      before: "Plane 기본 160px",
+      before: "Plane 기본 화면",
       after: "폭 규칙 적용",
       t1: "Safari 17에서 결제 실패",
       t2: "두 번째 시도에서 결제 실패",
@@ -193,11 +194,11 @@
       m2: "빌링 — 환불",
       m3: "빌링 — 인보이스",
       c1: "3분기 스프린트 4",
-      dropHead: "같은 규칙, 모듈 드롭다운에서",
+      dropHead: "규칙 하나 더, 모듈 드롭다운에서",
       query: "빌링",
       caption:
-        "제목·모듈·사이클·라벨·상단 경로가 모두 같은 제한을 씁니다 — 규칙 하나로 끝내거나, " +
-        "팝업의 <b>요소 선택</b>으로 거슬리는 것을 직접 가리키면 됩니다"
+        "넓히고 싶은 곳마다 규칙 하나씩 — 제목, 모듈, 사이클, 라벨, 상단 경로 어디든 됩니다. " +
+        "팝업의 <b>요소 선택</b>으로 거슬리는 이름을 직접 가리켜도 됩니다"
     }
   };
 </script>

@@ -3,11 +3,10 @@
 Rules for anyone changing this extension — human or AI. Everything mechanically
 checkable already lives in `tools/`; this file only covers what a script cannot judge.
 
-**This is the only file of rules.** `CLAUDE.md` is one line — an import of this one — so
-Claude Code inlines it rather than leaving it to be found, and every other tool reads
-`AGENTS.md` natively. Nothing goes in `CLAUDE.md` but that import: prose there is loaded on
-every session for no one's benefit, and two files that almost agree are how they start
-disagreeing. If you want to say something to whoever changes this repo, say it here.
+**This is the only file of rules.** Claude Code reads `AGENTS.md` natively since 2.1.277,
+as every other agent does, so there is no `CLAUDE.md`. Do not add one: while a `CLAUDE.md`
+exists Claude Code reads that instead of this, and two files that almost agree are how they
+start disagreeing. If you want to say something to whoever changes this repo, say it here.
 
 ## Before you claim it works
 
@@ -15,11 +14,16 @@ disagreeing. If you want to say something to whoever changes this repo, say it h
 node tools/test.js            # behaviour: sync engine, normalization, sections
 node tools/check-i18n.js      # translation contract (--strict in CI)
 node tools/check-source.js    # architectural invariants
-node tools/dom-harness.js     # options.html + popup.html in a real browser
+node tools/dom-harness.js     # options, popup and content.js in a real browser
 ```
 
-CI runs all four on every push and PR. They are fast and have no dependencies —
-there is no reason to skip them.
+CI runs all four on every push to `main` and every PR. They are fast and have no
+dependencies — there is no reason to skip them.
+
+`check-source.js` holds what a reviewer would otherwise have to remember: network access
+only in the worker, no `innerHTML` for data that is not ours, every remote field clamped, a
+dark-mode counterpart for every light surface, and a release zip that contains every file
+the extension loads.
 
 `dom-harness.js` needs a Chrome or Chromium on the machine (`PE_CHROME=/path` to
 point it at one). Locally it skips loudly when there is none; in CI, where the
@@ -32,9 +36,10 @@ deterministically instead of being slept on. A suite can ask for either locale
 differently, and the header that wrapped in Korean at full width fit perfectly in
 English. Reach for it whenever a layout has to hold text it did not choose.
 
-`PE_ONLY=popup node tools/dom-harness.js` runs only the suites whose name contains the
-string, for a quick loop on one surface; a filter that matches nothing fails. CI runs all of
-them, and so should you before you push.
+`PE_ONLY=popup node tools/dom-harness.js` runs only the suites whose title contains the string
+(`PE_ONLY="focus mode"`, `PE_ONLY="template menu"`; page names like `ct-focus` are not titles
+and match nothing), for a quick loop on one surface; a filter that matches nothing fails. CI
+runs all of them, and so should you before you push.
 
 Do not give it `--user-data-dir` unless you have measured it on your platform: a
 fresh profile directory never finishes initialising on macOS and every launch hangs.
@@ -54,9 +59,11 @@ changed anything a user sees, drive it:
   Keep the positive and negative cases on one page — `settings` arrives asynchronously, and
   while it is null the script reports "not active" for the same reason an unenabled site does,
   so a suite that opens on an inactive site cannot tell a refusal from a slow start.
-- **Template picker (`content.js`)**: needs a page with a `.ProseMirror` element. `ct-tmpl`
-  builds one, as does `ANCHOR_EDITOR`, and `ct-menu` drives the menu itself; start from those
-  rather than guessing. `ct-picker` is the element picker, a different feature.
+- **Template picker (`content.js`)**: needs a page with a `.ProseMirror` element. The
+  `ct-tmpl` page builds one, as does `ANCHOR_EDITOR`, and the `ct-menu` page drives the menu
+  itself; start from those rather than guessing. The `ct-picker` page is the element picker, a
+  different feature. Those are page names; to run their suites alone, filter on the titles
+  (`PE_ONLY="template button"`, `"template menu"`, `"picker"`).
 - **Copy reference (`content.js`)**: needs an item header — a `#title-input` next to a
   leaf `<button>` whose text is a key — and, for the peek-panel path, a second harness
   page on a list route (`…/issues/`) whose panel a mousedown outside it tears down. The
@@ -89,9 +96,10 @@ changed anything a user sees, drive it:
   `seedOf` carries a synthetic `.max-w-40` rule, and for a long time that meant no shipped
   preset except the focus ones was ever applied in a browser — which is how the search
   dropdown selector died on Plane Cloud for a release while every check stayed green. The
-  `ct-focus` page now seeds pre-schema `widths` with no rules, so `peMigrate` builds the
-  presets the page is measured against. If you add a preset, put its markup on `PLANE` and
-  let the seed reach it the same way.
+  `ct-focus` page (the "content · focus mode" suite) now seeds pre-schema `widths` with no
+  rules, so `peMigrate` builds the presets the page is measured against. If you add a preset,
+  put its markup on `PLANE` — or, when it would disturb other suites, on a fragment only
+  `ct-focus` appends, as `DESCRIPTION_CLIP` does — and let the seed reach it the same way.
 - **Anything the harness substitutes into a page** — a catalogue, a suite body, a path —
   goes in through `put()`, whose replacement is a function. A replacement *string* reads
   `$&`, `` $` ``, `$'` and `$1` as instructions, and all of this is authored prose. One
@@ -103,15 +111,55 @@ changed anything a user sees, drive it:
   and `window.__peLoaded` blocks re-injection — so you will be testing old code and
   not know it.
 
+## Where things live
+
+| File | Role |
+|------|------|
+| `manifest.json` | MV3 manifest |
+| `common.js` | Settings defaults, storage, domain matching, sync cache and normalization, i18n runtime (shared by the worker, content script and pages) |
+| `content.js` / `content.css` | Style-rule injection, focus mode and its toggle beside the key, template insertion UI, copy reference, copied-text cleanup, element picker, and the health records for rules and the two button anchors |
+| `background.js` | Service worker: registers the content script on granted origins and reconciles on permission or settings changes; the omnibox keyword and the right-click entry for keys; opens the options page; relays the focus-mode command to the tab in front. The only file that touches the network — it runs template sync |
+| `options.html/js/css` | Settings — tabs (Work items, Templates, Appearance, Sites, Backup, Shortcuts) over one form with one Save. Shortcuts is reference only |
+| `popup.html/js/css` | Toolbar popup: the go-to input, recent items, pins, copy reference, the on/off switch and site status, focus mode, the element picker, re-scan |
+| `_locales/` | `en` + `ko` catalogues |
+| `tools/` | The four checks (not shipped) |
+| `examples/` | The team-template packs and the feed format, [`examples/README.md`](examples/README.md) (not shipped) |
+
+How the parts meet, where the reason is not written down elsewhere in this file:
+
+- **No static content scripts.** Enabling a domain requests that origin; the worker registers
+  the script and CSS for it with `chrome.scripting`, injects any open matching tab, and
+  reconciles the registration whenever permissions or settings change.
+- **Sync is an alarm, not a timer.** `chrome.alarms` wakes the worker, because an MV3 worker is
+  evicted when idle and a `setTimeout` would never fire. It fetches due sources, clamps them and
+  writes `chrome.storage.local`; everything else reads that cache.
+- **Styles go in through `adoptedStyleSheets`.** Plane is a Next.js/React SPA, and a `<style>`
+  node in `<head>` or `<body>` can be removed by a hydration mismatch, taking the rules with it.
+  Fallback: a `<style>` directly under `<html>`, re-inserted by a MutationObserver.
+- **A rule is `selector { property: value !important }`, sanitised on the way in:** `;{}`
+  stripped from values, property names through a whitelist regex, selectors parse-validated.
+- **The full-document observer is connected only on enabled domains.**
+- **Inserting.** The title is filled with `execCommand("insertText")`, so one undo takes a
+  template back, with a native setter plus an `input` event as the fallback for React's
+  controlled field. The description editor is TipTap/ProseMirror, so a body goes in as HTML
+  through a synthetic paste (headings, lists and checkboxes arrive as real nodes), with an
+  `execCommand` text fallback.
+- **Anchors are language-independent.** The toolbar is found by the button wrapping a hidden
+  `input[type="file"]` and the title by `#title-input`; `attach`/`첨부` text is a fallback only.
+- **Injection heals itself.** Focusing the description editor or pressing
+  <kbd>Alt</kbd>/<kbd>⌥</kbd>+<kbd>T</kbd> re-scans; the popup's Re-scan forces it, and says so
+  when the tab has no content script at all (a tab left open across an extension update).
+- **The extension's own surfaces follow Plane's monochrome** (`#121212` and white) and the
+  system light or dark theme, so they do not look bolted on.
+
 ## Invariants a script cannot check
 
-**Do not couple to Plane's internals.** Plane's class names change between versions —
-a single page mixes `max-w-40`, `max-w-48`, `max-w-[150px]`. That is why the extension
-ships a generic "selector + property + value" engine instead of hardcoded rules, and
-why the template button is found via structure (a button wrapping a file input) rather
-than text. Anything that reaches into Plane's editor schema or DOM shape is a future
-breakage. This is the project's core design principle; weigh it before adding features
-that need it.
+**Do not couple to Plane's internals.** Plane's class names change between versions — a single
+page mixes `max-w-40`, `max-w-48`, `max-w-[150px]`, `max-w-[224px]`. That is why the extension
+ships a generic "selector + property + value" engine instead of hardcoded rules, and why the
+template button is found via structure (a button wrapping a file input) rather than text.
+Anything that reaches into Plane's editor schema or DOM shape is a future breakage. This is
+the project's core design principle; weigh it before adding features that need it.
 
 **Never drive Plane's own UI state; put the change in our own layer.** Focus mode wants the
 work item's properties panel gone, and Plane already has a flag for exactly that
@@ -126,7 +174,8 @@ to implement, not theirs to be observed.
 
 **The most precise selector is the least durable one, and the picker must not recommend by
 precision.** A uuid id matches exactly the element under the cursor and dies with the next
-render; `.max-w-40` matches thirty things and outlives the release. The picker ranked on "is
+render; `.max-w-40` matches thirty things and usually outlives a release (not always: by
+2026-11-10 Plane Cloud had moved those chips to `max-w-[224px]`). The picker ranked on "is
 this a Tailwind width class", which is a statement about the feature's first use and not
 about survival, so it put `#editor-container-{uuid}` at the top of the list on Plane Cloud
 and a content hash at the top on Linear. Rank by how the handle was authored, and *say* which
@@ -187,21 +236,24 @@ add an anchor whose opportunity is not that precise, it does not get "lost" eith
 
 And it must not assume the thing being watched is on screen. The first version sampled once
 per route, which quietly accused every rule aimed at transient UI: the shipped "search
-dropdown width" preset selects `[id^="headlessui-combobox-options"] > div`, measured on Plane
-Cloud as 0 matches closed and 1 open, so no routine sample ever saw it and Settings called a
-working preset dead. The rescue is a second sampling taken after a click — when a menu or a
-modal is actually up — that records **hits only**. Hits-only is what makes extra sampling
-safe: it can promote a rule to "working" and can never move one toward "never matched", so
-adding sampling opportunities cannot make the warning noisier.
+dropdown width" preset selected `[id^="headlessui-combobox-options"] > div` (now one half of
+`PE_DROPDOWN_SELECTOR`), measured on self-hosted Plane 1.4 as 0 matches closed and 1 open, so
+no routine sample ever saw it and Settings called a working preset dead. The rescue is a
+second sampling taken after a click — when a menu or a modal is actually up — that records
+**hits only**. Hits-only is what makes extra sampling safe: it can promote a rule to "working"
+and can never move one toward "never matched", so adding sampling opportunities cannot make
+the warning noisier.
 
-What that must not become is a per-page verdict. Measured on Plane Cloud: `.max-w-40` matches
-35 elements on the work item list and zero on the item page, the projects list, the labels
-page and the states page. A healthy rule matches nothing on most routes, so "no match here" is
-the normal case and a check that fires on it is noise — and noise is what gets switched off,
-which costs more than the silence it replaced. Record whether it has **ever** matched, and
-when it last did; let the reader compare one stale date against a column of today's. Any
-threshold has to sit above what normal use produces (`PE_RULE_HEALTH_MIN_CHECKS` is 20 for
-exactly that reason), and a rule the user disabled is not evidence of anything.
+What that must not become is a per-page verdict. Measured on Plane Cloud on 2026-08-08:
+`.max-w-40` matched 35 elements on the work item list and zero on the item page, the projects
+list, the labels page and the states page. (By 2026-11-10 Cloud had moved those chips to
+`max-w-[224px]` and `.max-w-40` matched nothing at all; the point stands.) A healthy rule
+matches nothing on most routes, so "no match here" is the normal case and a check that fires
+on it is noise — and noise is what gets switched off, which costs more than the silence it
+replaced. Record whether it has **ever** matched, and when it last did; let the reader compare
+one stale date against a column of today's. Any threshold has to sit above what normal use
+produces (`PE_RULE_HEALTH_MIN_CHECKS` is 20 for exactly that reason), and a rule the user
+disabled is not evidence of anything.
 
 **A feature reachable only from the popup exists for whoever already knows it exists.** Focus
 mode shipped its first draft with a shortcut and a popup switch, which is two places nobody
@@ -317,7 +369,9 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   which is right in Plane (the column is the flex child filling its parent) — but the first
   assertion for it set a width on the probe itself, read back the 2.25rem floor, and would have
   passed on a value the engine had thrown away entirely. If a check on a computed value can be
-  satisfied by the fallback, it is not checking the value. Nest the probe.
+  satisfied by the fallback, it is not checking the value. Nest the probe. The real number,
+  measured on Plane Cloud 2026-08-08 with focus mode on: the body column went 1056px → 1658px,
+  and the preset left exactly `(1658 − 960) / 2` = 349px of gutter.
 - **An Alt-letter shortcut in a capture-phase handler eats that letter.** `onKeyDown` is
   registered with capture `true` and calls `preventDefault`, so a shortcut keyed on
   `e.code` fires before the page — and on macOS `Option`+a letter IS a character (`⌥C` =
@@ -374,19 +428,22 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   selector must *not* catch: focus mode is global CSS, and `.shrink-0.bg-surface-1` without the
   `.z-[5]` also matches an unrelated chip on Cloud's cycles route. Any preset that names a
   vendor class needs a probe per generation, and reverting either half has to fail.
+  The item-name width preset (`rule-module-name`, `.max-w-40`) is dead on Plane Cloud as of
+  2026-11-10 — the chips there are `max-w-[224px]` — and `PLANE` carries no Cloud probe for it.
   It happened again with the description presets, and the source was the trap: they were
   written from makeplane/plane's own component, and Plane Cloud — the only place the clip had
   shipped — runs a build that renders the toggle without `aria-controls` and inside a wrapper.
   The open-source tree is one generation, not a stand-in for Cloud. Measure Cloud before
   shipping a preset aimed at it.
 - **A migration may rewrite what the user already has, but only what it recognises.** Every
-  migration before v8 was additive; v8 repoints two preset selectors that are already in
-  storage. What makes that safe is `PE_V7_FOCUS_SELECTORS` — a rule is repointed only while its
-  selector is character-for-character what the previous version shipped. Anyone who edited
-  theirs (including anyone who worked Cloud's selector out by hand before we did) keeps it, and
-  a preset the user deleted is not resurrected, because the step appends nothing. Never widen
-  that table into "any selector we ever shipped": a value in it is a licence to overwrite
-  somebody's storage.
+  migration before v8 was additive. v8 repoints three preset selectors already in storage (the
+  two focus ones and the search dropdown: `PE_V7_FOCUS_SELECTORS`, `PE_V7_DROPDOWN_SELECTOR`),
+  and v10 two more (the description presets: `PE_V9_DESCRIPTION_SELECTORS`). What makes that
+  safe is those tables — a rule is repointed only while its selector is character-for-character
+  what the last released version shipped. Anyone who edited theirs (including anyone who worked
+  Cloud's selector out by hand before we did) keeps it, and a preset the user deleted is not
+  resurrected, because neither step appends anything. Never widen a table into "any selector we
+  ever shipped": a value in it is a licence to overwrite somebody's storage.
 - **A transform judged against examples looked right four times over.** The copy clean-up
   (`peTidyCopiedText`) passed every hand-written case and still shipped a miss, then had four
   more classes found in an afternoon — two of them deleting a character the author typed —
@@ -483,11 +540,13 @@ lies:
   reached the store says nothing about what reviewers last saw. A comparison that failed
   counts as a change.
 
-  "The listing" is the sections of `STORE_LISTING.md` that go into the dashboard, and the
-  images — not the folder. The first version compared files, and the edit that documented
-  the setup touched only Packaging, so the next release would have stopped red with nothing to
-  paste. Notes are skipped by name (`LISTING_NOTES`), never fields by name: a section nobody
-  listed counts, so a new heading errs toward a red run rather than a stale listing.
+  "The listing" is the sections of `STORE_LISTING.md` that go into the dashboard, and the images
+  at the top of `store-assets/` — not the folder, and not its subfolders (`ui/`, `real/`),
+  which hold what the images are made from and a reviewer never sees. The first version
+  compared files, and the edit that documented the setup touched only Packaging, so the next
+  release would have stopped red with nothing to paste. Notes are skipped by name
+  (`LISTING_NOTES`), never fields by name: a section nobody listed counts, so a new heading
+  errs toward a red run rather than a stale listing.
 
   There is no key to leak or rotate. The run's GitHub identity is exchanged at Google for a
   token that lasts fifteen minutes, on a service account whose only power is that the dashboard

@@ -30,7 +30,7 @@ Enhancer for Plane — Quick Open & Issue Templates
 > they stay in the summary and at the foot of the description, out of the name (which they
 > only lengthen) and out of the extension's own description (where the reader is already
 > looking at a Plane extension). "Jira" stays out of the name too: quick open works
-> there, but the other five features need Plane's own pages, and a name must not promise
+> there, but most of the other features need Plane's own pages, and a name must not promise
 > otherwise.
 
 > The brand alone — "Enhancer for Plane" — is what the popup and settings headers show
@@ -59,7 +59,7 @@ Every issue tracker leaves the same gaps.
 No reusable templates for the tickets you file over and over, and no way to open an item from its key.
 Nothing hands one to a chat message without retyping it, and nothing puts the side panels away so you can read.
 This fills them inside the Plane UI, on any plan, with no changes to your Plane server.
-Plane Cloud and self-hosted alike — each release is checked against a live instance of each.
+It runs on Plane Cloud and on self-hosted Plane, and each release is checked against a live instance of each.
 
 ✨ WHAT YOU GET — at a glance
 ⚡ Quick open — a work item from its key: address bar, popup, or right-click
@@ -69,7 +69,7 @@ Plane Cloud and self-hosted alike — each release is checked against a live ins
 🧘 Focus mode — put the side panels away
 🎯 Element picker — build a rule without DevTools
 🔄 Template sync — one set of templates for the whole team
-Every one of them is off, empty or inert until you ask for it.
+Nothing runs inside a page until you enable a site for it.
 
 ⚡ Go straight to a work item — quick open
 Type "issue" in the address bar, a space, then a key like PROJ-142, and Enter opens it.
@@ -100,7 +100,8 @@ It works on the item's own page, in the preview panel a list opens, and from the
 Plane cuts long names off in lists and dropdowns until you can't tell items apart.
 One "selector → property → value" rule forces any width, and the names come back.
 It's a generic CSS engine, so if Plane's class names change between versions you just edit the selector.
-Settings tells you when a rule has stopped matching anything, so a redesign is one line to fix instead of a feature that quietly went away.
+Settings shows when each rule last matched anything, and flags one that never has.
+A redesign is then one line to fix instead of a feature that quietly went away.
 Plane Cloud folds a long description behind "Show all" every time an item opens; two rules that ship switched on show all of it.
 
 🧘 Just the description — focus mode
@@ -122,10 +123,13 @@ Inserting reads a local cache, so it works offline, and synced templates stay re
 New to it? "Try our example" fills in a live feed so you can watch it work.
 
 🏠 Your instance, wherever it runs
-Add the domain you use — plane.your-company.com, or app.plane.so. Wildcards (*.example.com) supported.
+Add the domain you use — plane.your-company.com, or app.plane.so.
+Wildcards (*.example.com) are supported.
 Self-hosted is where this started, and Plane Cloud is checked against a live instance every release.
-The two do not draw the same page.
+The two do not draw the same page, so a rule that ships can fit one and not the other.
+The item-name width rule was written for self-hosted Plane and does not match on Plane Cloud yet.
 It ships with no site access: enabling a domain asks Chrome for that one site, and it stays completely inert everywhere else.
+"Run on all sites" in Settings asks Chrome for every site instead; it is off unless you turn it on.
 Your settings back up to a JSON file and restore on another machine.
 
 🔒 PRIVACY — nothing leaves your browser
@@ -138,7 +142,7 @@ It carries none of your data.
 1. Open your Plane instance — self-hosted or Plane Cloud.
 2. Click the toolbar icon and "Enable on this site" (grant access when Chrome prompts).
 3. In Settings, paste the address of any work item you have open: that one paste sets up opening, searching and copying at once.
-4. Add templates and width rules whenever you want them. Everything else is optional.
+4. Add templates whenever you want them, and adjust the two width rules that ship if they need it. Everything else is optional.
 
 Open source. Feedback and issues welcome.
 
@@ -150,14 +154,14 @@ An independent, unofficial add-on: not affiliated with or endorsed by Plane, and
 
 ## Single purpose  (review form)
 
-Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, adjusting element widths via CSS rules, and reaching a work item from its key via a user-configured link — on the Plane instances the user chooses. Reaching a work item covers the several places a key can be typed or found: the address bar, the toolbar popup, the list of keys the user opened most recently, the items the user pinned, and a key selected in text on any page. All of them build a URL from the same user-configured link and navigate to it.
+Enhancer for Plane has one purpose: to let users customize the Plane (makeplane) project-management web app in their own browser — inserting reusable title/body templates into work items, copying a work item's own reference to the clipboard in a user-defined format, changing how the page is laid out via user-editable CSS rules (element widths, a focus mode that hides the side panels, and showing a long description in full), and reaching a work item from its key via a user-configured link — on the Plane instances the user chooses. Reaching a work item covers the several places a key can be typed or found: the address bar, the toolbar popup, the list of keys the user opened most recently, the items the user pinned, and a key selected in text on any page. All of them build a URL from the same user-configured link and navigate to it. Two helpers serve the same purpose: an element picker that helps the user write a CSS rule, and a tidy-up of text the user copies out of a Plane description so it pastes cleanly.
 
 ---
 
 ## Permission justifications  (review form)
 
 storage
-  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds five device-only records: the team templates downloaded from the user's own source URLs, so the picker can read them without a network request; the last few work item keys the user opened, so the address bar and popup can offer them again; the work items the user pinned in the popup (key, address, target name and tab title), written only when the user presses "Pin"; a count of how often each style rule has matched an element; and a count of how often each of the extension's two buttons (Template, copy) has been placed. The two counts are numbers and timestamps only, shown in Settings. None of this is sent anywhere, and the storage.local records are not synced.
+  Stores the user's own settings (active domains, style rules, templates, user-defined template variables, copy formats, quick-open links, and team-template source URLs) so they persist across sessions and sync via Chrome. storage.local holds six device-only records: the team templates downloaded from the user's own source URLs, so the picker can read them without a network request; the last few work item keys the user opened, so the address bar and popup can offer them again; the work items the user pinned in the popup (key, address, target name and tab title), written only when the user presses "Pin"; the ids of the last three templates the user inserted (ids only, never a template's text), so a long template menu can offer them first; a count of how often each style rule has matched an element; and a count of how often each of the extension's two buttons (Template, copy) has been placed. The two counts are numbers and timestamps only, shown in Settings. None of this is sent anywhere, and the storage.local records are not synced.
 
 alarms
   Refreshes team templates on the interval the user selects (hourly to daily). An MV3 service worker is terminated when idle, so a timer cannot survive; chrome.alarms is the only supported way to run a periodic refresh. Used solely to trigger that refresh — no alarm exists unless the user has enabled template sync and added a source.
@@ -172,10 +176,11 @@ omnibox (manifest key, not a permission)
   Registers the keyword "issue" in the address bar. The extension receives what the user types only AFTER they have typed that keyword and a space — Chrome sends nothing before the keyword is active, and nothing from any other omnibox input. What is typed is matched against a key pattern to build a URL from the user's configured link, or, when it is not shaped like a key, put into the user's configured search URL for that tracker. Either way it is turned into an address in the browser and navigated to. Nothing is sent to the developer or to any search service the user has not configured.
 
 scripting
-  Registers/injects the content script (style rules + template button) on the specific origins the user grants. No script is registered until the user enables a domain.
+  Registers the content script on exactly the origins the user granted, and right after a grant injects it into tabs of that origin that were already open, so the site works without a reload. That script is the whole in-page extension: it applies the user's style rules (including the ones reserved for focus mode and the two that show a long description in full), places the Template button and the copy-reference button, runs the element picker when the user starts it from the popup, tidies a copy the user makes inside a Plane description, and records whether each rule and each button found anything (the counts described under storage). No script is registered or injected until the user enables a domain.
 
 Optional host permissions (requested per site at runtime, NOT at install)
   Plane can be self-hosted on ANY domain, so the target host is not known at build time and cannot be a fixed match list. The extension therefore declares optional host permissions and requests access to a single origin only when the user enables that domain (via the popup's "Enable on this site" or Settings) — Chrome shows a per-site prompt. It requests no host access at install, holds access only for the domains the user granted, and releases it when a domain is removed. This is the least-privilege way to support arbitrary user-provided self-hosted Plane hosts.
+  One setting widens this, and only by the user's own choice: "Run on all sites" in Settings, off by default, requests `*://*/*` through the same optional-permission prompt, for users whose Plane hosts are too many to list. Unticking it and saving hands that access back.
   The same mechanism covers team-template sync: a source URL can be on any host (an intranet server, a Git host), so adding a source prompts for that one origin, and the extension refuses to fetch any origin the user has not granted.
 
 Clipboard (NOT a dashboard field — there is no box to paste this into)
@@ -225,12 +230,8 @@ Standard for open-source extensions — gives users a support/contact path.
 
 ## 한국어 (Korean listing)
 
-아래는 스토어 등록 페이지에 넣을 한국어 번역입니다. `_locales/ko` 없이 단일
-리스팅으로 낼 경우, 영문 설명 뒤에 "— 한국어 —" 구분선을 넣고 이 텍스트를 이어
-붙이세요.
-
 ### 이름 (max 75)
-Enhancer for Plane — 이슈 템플릿 & 바로 열기
+Enhancer for Plane — 바로 열기 & 이슈 템플릿
 
 > 이 형태로 정한 이유: 이름은 남에게 그대로 옮길 수 있어야 하므로 브랜드가 앞에 옵니다 —
 > "Enhancer for Plane 설치하세요"는 말이 되지만 서술형 문구는 그렇지 않습니다. 붙임표
@@ -252,8 +253,9 @@ Enhancer for Plane — 이슈 템플릿 & 바로 열기
 어느 이슈 트래커든 비어 있는 곳은 같습니다.
 반복해 등록하는 티켓에 쓸 템플릿이 없고, 키로 항목을 바로 열 방법이 없습니다.
 남에게 넘기려면 매번 다시 타이핑해야 하고, 측면 패널을 치워 본문만 볼 방법도 없습니다.
-그 빈 곳을 Plane UI 안에서 채웁니다. 어느 플랜에서든 되고, Plane 서버는 전혀 건드리지 않습니다.
-Plane Cloud와 자체 호스팅 모두에서 동작하며, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다.
+그 빈 곳을 Plane UI 안에서 채웁니다.
+어느 플랜에서든 되고, Plane 서버는 전혀 건드리지 않습니다.
+Plane Cloud와 자체 호스팅 양쪽에서 쓸 수 있고, 릴리스마다 양쪽 실제 인스턴스에서 확인합니다.
 
 ✨ 무엇을 제공하나 — 한눈에
 ⚡ 바로 열기 — 키로 작업 항목에 닿기: 주소창, 팝업, 우클릭
@@ -263,27 +265,30 @@ Plane Cloud와 자체 호스팅 모두에서 동작하며, 릴리스마다 양�
 🧘 집중 모드 — 측면 패널 치우기
 🎯 요소 피커 — DevTools 없이 규칙 만들기
 🔄 템플릿 동기화 — 팀 전체가 한 벌의 템플릿을
-전부 요청하기 전까지는 꺼져 있거나, 비어 있거나, 아무 일도 하지 않습니다.
+사이트를 켜기 전에는 어느 페이지 안에서도 아무것도 실행되지 않습니다.
 
 ⚡ 키만 입력해 작업 항목 열기 — 바로 열기
 주소창에 "issue"를 입력하고 한 칸 띄운 뒤 PROJ-142 같은 키를 넣으면 Enter로 열립니다.
 같은 입력칸이 툴바 팝업에도 있고, 두 곳 모두 최근에 연 항목을 보여 줍니다.
 자주 여는 항목은 고정해 두면 팝업에 남습니다.
-키는 키의 모습으로 오지 않습니다. Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
+키는 키의 모습으로 오지 않습니다.
+Slack 메시지나 풀 리퀘스트 제목처럼 문장 속에 섞여 옵니다.
 그 부분을 드래그하고 우클릭해 "선택한 텍스트에서 작업 항목 열기"를 고르세요 — 입력할 것도, 따로 준비할 것도 없습니다.
 키가 여러 개면 각각 새 탭으로, 한 번에 10개까지 열립니다.
-링크 설정은 붙여넣기 한 번입니다. 열어 둔 작업 항목의 주소를 복사해 붙여넣으면 검색 주소까지 그대로 나옵니다.
+링크 설정은 붙여넣기 한 번입니다.
+열어 둔 작업 항목의 주소를 복사해 붙여넣으면 검색 주소까지 그대로 나옵니다.
 Plane, Jira, Linear, GitHub, GitLab은 이름으로 알아보고, 여러 개를 함께 둘 수 있습니다(ENG-는 Linear로, 나머지는 Plane으로).
 키 대신 낱말을 넣으면 검색으로 갑니다.
 URL만 열기 때문에 사이트 접근 권한을 전혀 요청하지 않고, 어느 탭에서나 동작합니다.
 
 📝 작업 항목을 한 번에 채우기 — 이슈 템플릿(제목 + 본문)
 템플릿을 한 번 등록해 두면 어떤 작업 항목에도 클릭 한 번으로 넣습니다 — 제목과 본문을 함께.
-설명 툴바와 "신규 작업항목 생성" 창에 네이티브 "Template" 버튼이 붙습니다(Alt/⌥+T).
+설명 툴바와 "신규 작업항목 생성" 창에 네이티브 "템플릿" 버튼이 붙습니다(Alt/⌥+T).
 본문은 마크다운입니다 — 제목, 목록, 체크박스.
 메뉴가 길면 마지막으로 쓴 템플릿 세 개가 맨 위에 와서, 팀 템플릿이 많아도 매번 스크롤할 필요가 없습니다.
 삽입할 때 변수가 채워집니다 — {{date}}, 마감일용 {{date+7}}, {{week}}, {{month}}, 그리고 직접 만든 변수 5개까지.
-Plane 자체의 작업 항목 템플릿은 Pro 기능입니다. 이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작합니다.
+Plane 자체의 작업 항목 템플릿은 Pro 기능입니다.
+이 템플릿은 무료 자체 호스팅을 포함해 어느 인스턴스에서든 동작합니다.
 
 📋 작업 항목을 한 번에 넘기기 — 참조 복사
 작업 항목 번호 옆 버튼(또는 Alt/⌥+C)이 일반 텍스트, 마크다운 링크, 브랜치명 중 원하는 형식으로 클립보드에 담습니다.
@@ -294,18 +299,21 @@ Plane 자체의 작업 항목 템플릿은 Pro 기능입니다. 이 템플릿은
 Plane은 목록과 드롭다운에서 긴 이름을 잘라 어느 항목인지 구분하기 어렵게 만듭니다.
 "선택자 → 속성 → 값" 규칙 하나로 원하는 폭을 지정하면 이름이 돌아옵니다.
 범용 CSS 엔진이라 버전이 바뀌어 클래스명이 달라져도 선택자만 고치면 됩니다.
-규칙이 아무것도 찾지 못하게 되면 설정이 알려 줍니다. 개편이 있어도 기능이 조용히 사라지지 않고 고칠 줄 하나로 드러납니다.
+설정에는 규칙마다 마지막으로 적용된 때가 나오고, 한 번도 적용된 적 없는 규칙은 따로 표시됩니다.
+그래서 개편이 있어도 기능이 조용히 사라지지 않고, 고칠 줄 하나로 드러납니다.
 Plane Cloud는 항목을 열 때마다 긴 설명을 "모두 보기" 뒤로 접는데, 켜진 채로 들어 있는 규칙 두 개가 전부 보여 줍니다.
 
 🧘 본문만 남기기 — 집중 모드
-Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 본문만 남습니다. 작업 항목 번호 옆 토글과 팝업 스위치로도 됩니다.
+Alt+Shift+F(macOS는 ⌥+⇧+F)로 속성 패널과 왼쪽 내비게이션을 숨기면 본문만 남습니다.
+작업 항목 번호 옆 토글과 팝업 스위치로도 됩니다.
 Plane은 그 속성 패널을 오른쪽에 고정해 두고 접는 방법을 주지 않는데, 이 기능이 접어 줍니다.
 어떤 규칙이든 "집중 모드에서만 적용"으로 표시할 수 있어 무엇을 숨길지는 직접 정합니다.
 켠 탭에서만 적용되고 그 탭에서는 새로 고쳐도 유지되며, 다른 기기로는 동기화되지 않습니다.
 
 🎯 DevTools 없이 규칙 만들기 — 비주얼 요소 피커
 팝업에서 "요소 선택 → 규칙 추가"를 누르고 Plane 화면의 요소를 클릭하세요.
-후보 선택자가 "다음 달에도 살아 있을까" 순서로, 매칭 개수와 함께 나옵니다. 빌드가 만든 것은 색이 아니라 "곧 바뀜"이라는 말로 적힙니다.
+후보 선택자가 "다음 달에도 살아 있을까" 순서로, 매칭 개수와 함께 나옵니다.
+빌드가 만든 것은 색이 아니라 "바뀔 수 있음"이라는 말로 적힙니다.
 
 🔄 팀 전체가 한 벌의 템플릿을 — 팀 템플릿 동기화
 JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키면 팀 전체가 같은 템플릿을 씁니다.
@@ -314,26 +322,35 @@ JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키�
 처음이라면 "예시 사용해 보기"가 살아 있는 피드를 채워 넣어 바로 확인할 수 있습니다.
 
 🏠 쓰는 곳이 어디든
-쓰는 도메인을 추가하세요 — plane.your-company.com도, app.plane.so도 됩니다. 와일드카드(*.example.com)도 지원합니다.
-자체 호스팅에서 출발했고, Plane Cloud도 릴리스마다 실제 인스턴스에서 확인합니다. 둘은 같은 화면을 같은 방식으로 그리지 않기 때문입니다.
-설치 시점에는 사이트 접근 권한이 하나도 없습니다. 도메인을 켜면 Chrome이 그 사이트 하나를 묻고, 그 외의 사이트에서는 완전히 비활성입니다.
+쓰는 도메인을 추가하세요 — plane.your-company.com도, app.plane.so도 됩니다.
+와일드카드(*.example.com)도 지원합니다.
+자체 호스팅에서 출발했고, Plane Cloud도 릴리스마다 실제 인스턴스에서 확인합니다.
+둘은 같은 화면도 다르게 그리기 때문에, 기본으로 들어 있는 규칙이 한쪽에만 맞을 수 있습니다.
+항목 이름 폭 규칙은 자체 호스팅에 맞춰 쓴 것이라 Plane Cloud에서는 아직 맞지 않습니다.
+설치 시점에는 사이트 접근 권한이 하나도 없습니다.
+도메인을 켜면 Chrome이 그 사이트 하나를 묻고, 그 외의 사이트에서는 완전히 비활성입니다.
+설정의 "모든 사이트에서 실행"을 켜면 모든 사이트 접근을 요청합니다.
+이 설정은 직접 켜지 않는 한 꺼져 있습니다.
 설정은 JSON 파일로 백업해 다른 기기에서 되돌릴 수 있습니다.
 
 🔒 개인정보 — 브라우저 밖으로 나가지 않습니다
 계정도, 추적도, 분석도, 서버도 없습니다.
 설정은 브라우저 자체 저장소에 보관되고, Chrome 동기화를 쓰는 경우에만 본인 Google 계정으로 동기화됩니다.
-익스텐션이 보내는 요청은 하나뿐입니다 — 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것. 그 요청에도 사용자의 데이터는 담기지 않습니다.
+익스텐션이 보내는 요청은 직접 등록한 URL에서 팀 템플릿 파일을 내려받는 것 하나뿐입니다.
+그 요청에도 사용자의 데이터는 담기지 않습니다.
 
 🚀 시작하기
 1. 쓰는 Plane을 엽니다 — 자체 호스팅이든 Plane Cloud든.
 2. 툴바 아이콘을 눌러 "이 사이트에서 사용"을 클릭합니다(Chrome 프롬프트에서 접근 허용).
 3. 설정에서 열어 둔 작업 항목의 주소를 붙여넣으세요. 이 붙여넣기 한 번으로 열기와 검색, 복사가 한꺼번에 준비됩니다.
-4. 템플릿과 폭 규칙은 필요할 때 추가하면 됩니다. 나머지는 전부 선택 사항입니다.
+4. 템플릿은 필요할 때 추가하고, 기본으로 들어 있는 폭 규칙 두 개는 필요하면 고치면 됩니다. 나머지는 전부 선택 사항입니다.
 
 오픈소스입니다. 피드백과 이슈를 환영합니다.
 
 makeplane / plane.so — 프로젝트 관리와 이슈, 위키를 함께 다루는 오픈소스 도구이자 Jira의 자체 호스팅 대안인 Plane에서 동작합니다.
-독립적인 비공식 애드온입니다. Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다. (비행기와는 무관합니다.)
+독립적인 비공식 애드온입니다.
+Plane과 제휴하거나 승인받지 않았으며 "Plane"은 해당 소유자의 상표입니다.
+(비행기와는 무관합니다.)
 
 ---
 
@@ -371,7 +388,11 @@ next set matches:
   by hand for the other language: the copy format names, the team template source
   (`examples/team-templates.json` or `-ko.json`), and the recent keys, which come from
   actually opening `issue SHOP-…` or `issue STORE-…`.
-- Plane's own UI stays English in both sets, because Plane has no Korean UI to show.
+- Plane's own UI was left in English in both sets. Plane does have a Korean UI, but its
+  language is a setting in Plane, not in Chrome, and this set was taken without switching
+  it, so the Korean frames show Korean content and the extension's Korean strings inside an
+  English Plane. A retake in Korean would match the Korean listing, which already quotes
+  Plane's Korean labels ("신규 작업항목 생성"); keep the two the same language.
 - A 1280×900 window (1600×1000 for the create dialog, which a narrower one squeezes), captured
   at 2x with `screencapture -l` for the page and with `-R` on the window's rectangle for the
   omnibox, the popup and the menu, which are separate windows on top of it.
@@ -418,11 +439,13 @@ The Korean listing gets its own set: `screenshot-N-*.ko.png`. The store keeps sc
 per language, so a Korean visitor sees Korean captures — which is the point of shipping
 `_locales/ko` at all. Upload them in the same order under Store listing ▸ 한국어.
 
-Every screenshot is generated, not hand-composited. Each `screenshot-N-*.html` is a
-1280×800 page sharing `shot.css` and `shot.js` (the brand mark there is the real path
+Every screenshot is rendered from a page, not composited by hand. Each `screenshot-N-*.html`
+is a 1280×800 page sharing `shot.css` and `shot.js` (the brand mark there is the real path
 from `icons/icon.svg`), and carries its own copy for both languages in a `window.T`
-block, applied by `?lang=`. One layout serves both listings, so a fix to a mock cannot
-land in one language and not the other:
+block, applied by `?lang=`. One layout serves both listings, so a fix to the copy cannot
+land in one language and not the other. What the pages hold differs: captures 1, 2, 4
+and 5 lay out frames from `real/`, which the repo cannot regenerate — only a retake
+replaces them — while capture 3 and the promo tiles are drawn in CSS end to end:
 
     sh store-assets/render.sh        # every capture and promo tile, both languages
     sh store-assets/render.sh 4      # just screenshot-4-*
@@ -430,25 +453,25 @@ land in one language and not the other:
 
 The promo tiles work the same way, except each carries its size in its filename
 (`promo-<name>-<W>x<H>.html`) and is rendered at exactly that — `shot.css` fixes the
-capture canvas at 1280×800, so a tile overrides it. Both tiles have a source, so every
-published asset here can be regenerated from the repo — nothing is hand-composited. The
-tiles are dark where the captures are light: `#121212` is half the brand, the white mark
+capture canvas at 1280×800, so a tile overrides it. Both tiles are drawn, so like capture 3
+they regenerate from the repo alone. The tiles are dark where the captures are light: `#121212` is half the brand, the white mark
 reads best on it, and a dark tile is what separates this listing from a grid of pale ones.
 They pull `../icons/icon.svg` directly rather than a copy of its path, so a tile and the
 icon beside it in the store cannot drift apart.
 
-What is translated and what is quoted differ. Headlines, ledes and captions are ours to
-write in each language. The strings inside a mocked menu are not: "＋ 템플릿 관리",
-"1개 일치", "선택자로 규칙 만들기" are copied from `_locales/ko/messages.json`, because a
-poster showing a Korean UI the extension does not render is a promise it cannot keep.
-Sample templates and item titles are user content, so those are written in the reader's
-language.
+What is translated and what is quoted differ. Headlines, ledes, captions and tags are ours
+to write in each language. The extension's own strings are not: inside a real capture they
+are whatever Chrome's UI language made the extension render, and where a page's own copy
+names a control (capture 3's `요소 선택`) it uses the words in
+`_locales/ko/messages.json`, because a poster showing a Korean UI the extension does not
+render is a promise it cannot keep. Item titles and template bodies are user content, so the
+demo workspace holds them in the reader's language.
 
-Keep the mocks honest — they must show what the extension currently draws. Capture 1's
-menu once still showed a "TEMPLATES (TITLE + BODY)" header that the picker had long
+Keep the pictures honest — they must show what the extension currently draws. The drawn
+template menu once still showed a "TEMPLATES (TITLE + BODY)" header the picker had long
 stopped rendering, and no "＋ Manage templates" footer, which the picker had gained. That is
-what moved four of the five to real captures, and it still applies to them in a quieter
-form: a real capture is true on the day it was taken. When the UI moves, retake it.
+what moved four of the five to real captures. A real capture is only true on the day it was
+taken, so when the UI moves, retake it.
 
 None of this ships: release.yml lists the packaged files explicitly and store-assets is
 not among them.
@@ -456,9 +479,18 @@ not among them.
 ## Packaging
 
 CI builds the upload zip automatically — bump `version` in manifest.json, push to
-`main`, and `.github/workflows/release.yml` publishes a GitHub Release with
-`enhancer-for-plane-<version>.zip` (only the shipping files; store-assets, docs,
-LICENSE, .github, and icons/icon.svg are excluded).
+`main`, and `.github/workflows/release.yml` creates a draft GitHub Release with
+`enhancer-for-plane-<version>.zip` attached (the files on its allowlist, and everything
+not on that allowlist left out). Nobody tags by hand. If that version already has a release,
+draft or published, the run skips, so an unrelated push never makes a duplicate. Someone then
+writes the release notes over the generated commit list and presses Publish; the tag is
+created on Publish.
+
+Both steps can be started by hand: **Actions ▸ Release extension ▸ Run workflow** makes the
+draft, and **Actions ▸ Store ▸ Run workflow** sends a published release again, for example
+after a failed run. If the release step fails with a 403, enable **Settings ▸ Actions ▸
+General ▸ Workflow permissions ▸ Read and write permissions** so it can create tags and
+releases.
 
 Publishing that release runs `.github/workflows/store.yml`, which uploads the zip and
 submits it for review. If the listing changed since the version the store is serving,

@@ -1,9 +1,10 @@
 # Changelog
 
-Every release is one minor version, cut by `release.yml` when `manifest.json`'s version
-changes on `main`. Entries are grouped as **New** (a feature that was not there),
-**Improved** (something that already worked, working better), **Fixed** (it was wrong),
-and **Internal** (nothing a user sees, but it is why the rest holds).
+Every release is one minor version. `release.yml` drafts it when `manifest.json`'s version
+changes on `main`, and it is released when someone publishes the draft. Entries are grouped
+as **New** (a feature that was not there), **Improved** (something that already worked,
+working better), **Fixed** (it was wrong), and **Internal** (nothing a user sees, but it is
+why the rest holds).
 
 `Schema` is the settings-storage version; a bump means installed settings are migrated on
 first read, never rewritten by hand.
@@ -22,11 +23,20 @@ preset stays deleted, and nothing is added. No permission changes.
   wraps it in an extra element. Since Cloud is where the clip is, the feature did nothing for
   anyone. The rules now fit Cloud's markup and the open-source one, on an item's own page and
   in the peek panel, and a cycle's description is still left alone.
+- **Messages that said something untrue.** A failed copy sent you to a Settings preview that
+  only ever shows a sample; a full sync block blamed domains and rules alone; the address-bar
+  hint said only several words are searched; the permission card said the whole extension was
+  off when one site was. Each now says what happens. The rule placeholders no longer teach
+  `.max-w-40`, which matches nothing on Plane Cloud, and the Korean catalogue uses one word for
+  the extension and for selectors throughout.
 
 ### Internal
 - The 100 KB capacity figures in the READMEs are measured again: about 212 English or 79
   Korean templates of 400 characters, down from the 218 and 81 quoted. The default style
   rules come out of the same budget, and they had grown since the figures were taken.
+- Store screenshots 1, 2, 4 and 5 are real captures of Chrome and Plane Cloud now, not
+  drawings. The store run counts only the images at the top of `store-assets/` as a listing
+  change; its subfolders hold the capture sources, which no reviewer sees.
 
 ## v1.14.0 — 2026-11-10
 

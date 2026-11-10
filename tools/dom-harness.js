@@ -4953,8 +4953,7 @@ const suites = [
   },
   {
     // The feature end to end, in the script that performs it. allDomains rather than a host,
-    // because a file:// page has no hostname to match; schema 6 because that is how the
-    // presets reach an existing install, and this asserts what they do once they arrive.
+    // because a file:// page has no hostname to match.
     name: "content · focus mode",
     // Seeded as the OLDEST install there is — pre-schema `widths`, no rules — so every
     // preset on the page is the one peMigrate builds, not one hand-copied into this file.

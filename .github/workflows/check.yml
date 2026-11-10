@@ -1,7 +1,8 @@
 name: Checks
 
-# Runs on every push/PR so a feature change cannot quietly ship a missing
-# translation, an undeclared placeholder, or an inconsistent term.
+# Runs all four checks in tools/ on every push to main and every PR, so a change
+# cannot quietly ship broken behaviour, a missing translation, a broken invariant
+# or a layout that only a real browser shows.
 on:
   push:
     branches: [main]
@@ -50,9 +51,10 @@ jobs:
       - name: Behaviour tests
         run: node tools/test.js
 
-      # Drives options.html and popup.html in the Chrome that ubuntu-latest already
-      # carries — tabs, labels, and dark-mode contrast are only true of a real layout
-      # engine, and every one of them has shipped broken while the checks above passed.
+      # Drives options.html, popup.html and content.js (on a synthetic Plane page) in
+      # the Chrome that ubuntu-latest already carries — tabs, labels, dark-mode contrast
+      # and the rules content.js applies are only true of a real layout engine, and
+      # every one of them has shipped broken while the checks above passed.
       # CI is set, so a missing browser fails here rather than skipping quietly.
       - name: DOM harness
         run: node tools/dom-harness.js

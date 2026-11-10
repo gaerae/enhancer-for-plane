@@ -1,6 +1,6 @@
 # Privacy Policy — Enhancer for Plane
 
-_Last updated: 2026-11-09_
+_Last updated: 2026-11-10_
 
 Enhancer for Plane ("the extension") is a browser add-on that customizes the
 appearance and editing experience of the Plane (makeplane / plane.so) web app in
@@ -32,6 +32,9 @@ Everything is stored in the browser's own extension storage, on your device.
 - your copy formats — the name and format string of each entry in "Copy
   reference". These hold only what you type; the work item values they refer to
   are read from the page at the moment you copy and are never stored,
+- your Quick open links — for each one, its name, the key prefix it answers to,
+  the address a work item opens at, and, if you gave one, the address a search goes
+  to,
 - your template sync settings: source URLs, their labels, sync interval, and
   which groups you have hidden.
 
@@ -79,7 +82,10 @@ by Chrome Sync):
   on origins you have explicitly granted. It ships with no host access; when you
   enable a domain, Chrome asks you to grant access to that single site, and the
   extension is registered only there. It has no access to any other website and
-  reads nothing on them.
+  reads nothing on them. The one exception is a switch you have to turn on
+  yourself: **Run on all sites**, in Settings, is off by default; turning it on asks
+  Chrome for access to every site (`*://*/*`) and runs the extension on all of them,
+  and turning it off and saving hands that access back.
 - **The clipboard, only inside a copy you made.** Choosing a format in "Copy
   reference" writes that one string to your clipboard. And when you copy inside a
   Plane description, the extension edits *that* copy on its way out: Plane replaces
@@ -146,8 +152,8 @@ When it runs (on the interval you pick, and when you press "Sync now"):
   size, parsed as data, and rendered as plain text — never executed as code and
   never inserted as markup.
 
-Turning sync off, or deleting a source, stops the requests and clears that
-source's cached templates.
+Turning sync off stops the requests. Deleting a source stops them for that source
+and also clears the templates cached from it.
 
 ## What is NOT done
 
@@ -168,8 +174,8 @@ and their cached templates — and because it also empties the list of sites, sa
 after it hands Chrome's access to those sites back as well, so switching one on
 again means approving it again. The confirmation says so before you commit to it. There are two exports, and they carry different
 things. "Export JSON" is a backup: it includes your domains, source URLs and
-variable values in plain text, so keep it to yourself. "Export my templates as a
-feed" is meant to be handed to teammates, and carries your templates and nothing
+variable values in plain text, so keep it to yourself. "Share with your team…"
+exports a feed meant to be handed to teammates, and carries your templates and nothing
 else — no domains, no rules, no variable values, no source URLs. Both write a file
 to your device; neither uploads anything. Template sync can be switched off, or individual
 sources disabled or removed, at any time. Uninstalling the extension removes its

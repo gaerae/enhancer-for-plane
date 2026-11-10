@@ -57,19 +57,22 @@ body:
   - type: textarea
     id: rule-health
     attributes:
-      label: For a style rule or focus mode — what does Settings say about the rule?
+      label: For a style rule, focus mode, or a missing button — what does Settings say?
       description: >
         Settings ▸ Appearance lists, per rule, when it last applied or that it has never
-        matched anything. "Never matched" and "last applied three weeks ago" are different
-        bugs: the first is a selector that does not fit your Plane, the second is one that
-        stopped fitting. Paste the line, or say which it is.
+        matched anything; focus mode is made of rules too, so its rules are listed there.
+        "Never matched" and "last applied three weeks ago" are different bugs: the first is
+        a selector that does not fit your Plane, the second is one that stopped fitting.
+        For a missing button, Settings reports whether it found its place: the Template
+        button under Settings ▸ Templates, the copy button under Settings ▸ Work items.
+        Paste the line, or say which it is.
 
   - type: input
     id: versions
     attributes:
       label: Extension version and Chrome version
       description: chrome://extensions shows the first, chrome://version the second.
-      placeholder: "1.8.0 / Chrome 141"
+      placeholder: "1.14.0 / Chrome 142"
     validations:
       required: true
 
@@ -79,8 +82,9 @@ body:
       label: Before reporting
       options:
         - label: >
-            I reloaded the Plane tab after enabling the domain (a tab opened before the
-            domain was enabled has no content script in it).
+            I reloaded the Plane tab after installing, updating or reloading the extension
+            (a tab already open then keeps running the old script, or none; tabs open when
+            a domain is enabled get the script without a reload).
         - label: >
             For a missing Template button — I tried the popup's "Re-scan this page", which
             reports whether the content script is running at all.

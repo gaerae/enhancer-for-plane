@@ -17,7 +17,7 @@ on:
   workflow_dispatch: # manual run also works (ignores the path filter)
 
 permissions:
-  contents: write # create tags + releases
+  contents: write # create a draft release; the tag is created on Publish
 
 jobs:
   release:
@@ -65,7 +65,7 @@ jobs:
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
           unzip -l "$ZIP"
 
-      - name: Create tag + Release with zip
+      - name: Create draft release with zip
         if: steps.check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}

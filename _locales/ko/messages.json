@@ -19,7 +19,7 @@
     "message": "Enhancer for Plane — 설정"
   },
   "optTagline": {
-    "message": "바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 스타일 규칙.\n바로 열기는 Jira와 Linear에서도 동작합니다."
+    "message": "바로 열기, 이슈 템플릿, 참조 복사, 집중 모드, 스타일 규칙.\n바로 열기는 Jira, Linear, GitHub, GitLab에서도 동작합니다."
   },
   "optGitHub": {
     "message": "GitHub"
@@ -116,7 +116,7 @@
     "description": "Beside a rule whose selector has been checked several times without ever finding an element."
   },
   "optRuleHealthWarn": {
-    "message": "아직 아무 요소도 찾지 못한 규칙이 $COUNT$개 있습니다. Plane 마크업이 바뀌었을 수 있으니 셀렉터를 고치거나 요소를 다시 집어 보세요.",
+    "message": "아직 아무 요소도 찾지 못한 규칙이 $COUNT$개 있습니다. Plane 마크업이 바뀌었을 수 있으니 선택자를 고치거나 요소를 다시 선택해 보세요.",
     "description": "Above the rule list. Phrased so it reads correctly for a count of one. One line, no break: a script reads it, and a status line is not a pre-line sink.",
     "placeholders": {
       "count": {
@@ -185,10 +185,10 @@
     }
   },
   "optRuleLabelPh": {
-    "message": "설명 (예: 모듈 이름 폭)"
+    "message": "이름 (예: 왼쪽 내비게이션 숨기기)"
   },
   "optRuleSelectorPh": {
-    "message": "CSS 선택자 (예: .max-w-40)"
+    "message": "CSS 선택자 (예: #main-sidebar)"
   },
   "optRulePropPh": {
     "message": "속성"
@@ -310,7 +310,7 @@
     "message": "모든 설정을 JSON 파일로 내보내거나 가져옵니다.\n가져온 설정은 양식에 채워지고, <b>저장</b>해야 적용됩니다."
   },
   "optBackupDesc2": {
-    "message": "파일에는 도메인, 소스 주소, 변수 값이 평문으로 들어가므로, 비공개인 값이 있다면 파일도 내부 자료로 다루세요.\n동기화된 템플릿은 들어가지 않으며, 저장한 뒤 소스에서 다시 받아옵니다."
+    "message": "파일에는 도메인, 링크 주소, 소스 주소, 변수 값이 평문으로 들어가므로, 비공개인 값이 있다면 파일도 내부 자료로 다루세요.\n동기화된 템플릿은 들어가지 않으며, 저장한 뒤 소스에서 다시 받아옵니다."
   },
   "optBackupExport": {
     "message": "↓ JSON 내보내기"
@@ -411,7 +411,7 @@
     }
   },
   "msgChangedElsewhere": {
-    "message": "다른 곳(예: 요소 선택기)에서 설정이 바뀌었습니다. 저장하면 그쪽에서 추가한 사이트와 규칙은 유지하고, 나머지는 이 페이지 내용으로 저장합니다. 먼저 보려면 새로고침하세요. 저장하지 않은 편집은 사라집니다."
+    "message": "다른 곳(예: 요소 선택기)에서 설정이 바뀌었습니다. 저장하면 그쪽에서 추가한 사이트와 규칙, 그쪽에서 바꾼 “확장 프로그램 사용” 상태는 유지하고, 나머지는 이 페이지 내용으로 저장합니다. 먼저 보려면 새로고침하세요. 저장하지 않은 편집은 사라집니다."
   },
   "msgLoadedPicked": {
     "message": "요소 선택기로 추가한 규칙을 불러왔습니다."
@@ -451,13 +451,13 @@
     "message": "가져오기 실패: 올바른 설정 JSON이 아닙니다."
   },
   "msgImportNotOurs": {
-    "message": "가져오기 실패: 이 확장에서 내보낸 파일이 아닙니다."
+    "message": "가져오기 실패: 이 확장 프로그램에서 내보낸 파일이 아닙니다."
   },
   "msgImportIsSyncFile": {
     "message": "설정 백업이 아니라 템플릿 동기화 소스 파일로 보입니다. 대신 “템플릿 동기화”에 URL을 추가하세요."
   },
   "msgImportNewer": {
-    "message": "가져오기 실패: 더 새로운 버전의 백업입니다. 파일의 schema는 $FILE$이고 이 빌드가 읽는 것은 $HERE$입니다. 확장을 먼저 업데이트하세요.",
+    "message": "가져오기 실패: 더 새로운 버전의 백업입니다. 파일의 schema는 $FILE$이고 이 빌드가 읽는 것은 $HERE$입니다. 확장 프로그램을 먼저 업데이트하세요.",
     "placeholders": {
       "file": {
         "content": "$1"
@@ -536,7 +536,7 @@
     }
   },
   "msgSaveQuotaItem": {
-    "message": "저장 실패: 도메인과 스타일 규칙을 합친 크기가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 일부를 지우거나 JSON 백업을 보관하세요.",
+    "message": "저장 실패: 템플릿을 뺀 나머지 설정(도메인, 스타일 규칙, 바로 열기 링크, 참조 복사 형식, 변수, 소스)을 합친 크기가 Chrome 동기화의 블록 한도 약 $LIMIT$ KB를 넘습니다. 일부를 지우거나 JSON 백업을 보관하세요.",
     "placeholders": {
       "limit": {
         "content": "$1"
@@ -723,7 +723,7 @@
     "description": "Per-row verdict on a picker candidate whose handle a person wrote. On every row, not only the bad ones: a mark that shows up only on the exception says nothing on a list with no exception, which is most lists here."
   },
   "pickLifeChanges": {
-    "message": "곧 바뀜",
+    "message": "바뀔 수 있음",
     "description": "Per-row verdict on a picker candidate whose handle the build generated. Pairs with pickLifeLasts — the two chips differ in word and in colour so either one is readable alone."
   },
   "pickGroupExpiring": {
@@ -835,7 +835,7 @@
     }
   },
   "msgCopyFailed": {
-    "message": "클립보드에 쓰지 못했습니다. 설정의 미리보기에서 직접 복사해 주세요."
+    "message": "클립보드에 쓰지 못했습니다. 페이지를 한 번 클릭한 뒤 다시 시도하세요."
   },
   "msgCopyNoItem": {
     "message": "이 화면에는 작업 항목이 없습니다. 항목을 열거나 목록에서 한 줄을 눌러 패널을 여세요."
@@ -882,7 +882,7 @@
     "message": "이 기기에서 접근 승인이 필요합니다"
   },
   "optPermDesc": {
-    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트와 소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 확장이 동작하지 않습니다.",
+    "message": "설정은 이 기기로 동기화됐지만 Chrome은 사이트 접근 권한을 기기별로 관리합니다 — 그래서 목록의 사이트와 소스 $COUNT$개가 이 기기에서 아직 승인되지 않았습니다. 승인하기 전까지 이 기기에서는 해당 사이트에서 확장 프로그램이 동작하지 않고, 해당 소스도 동기화되지 않습니다.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -956,7 +956,7 @@
     "message": "집중 모드 전환"
   },
   "optKeysFocusWhere": {
-    "message": "확장이 동작하는 곳이면 어디서나, 입력 중에도"
+    "message": "확장 프로그램이 동작하는 곳이면 어디서나, 입력 중에도"
   },
   "optKeysCtx": {
     "message": "선택한 텍스트에서 작업 항목 열기"
@@ -1043,7 +1043,7 @@
     "description": "Shown when the pasted text yields nothing. Refusing matters: a template built from a page that is not a work item opens the wrong address forever, silently."
   },
   "optQuickExamplesLegend": {
-    "message": "⟨…⟩는 직접 채우고, {{key}}는 확장이 채웁니다.",
+    "message": "⟨…⟩는 직접 채우고, {{key}}는 확장 프로그램이 채웁니다.",
     "description": "One line at the top of the chooser. The two look alike and mean opposite things, and nothing said so."
   },
   "optQuickExampleSearchLine": {
@@ -1222,7 +1222,7 @@
     }
   },
   "omniboxHint": {
-    "message": "작업 항목 키를 입력하면 열고, 여러 낱말을 입력하면 검색합니다"
+    "message": "작업 항목 키를 입력하면 열고, 그 밖의 낱말은 검색합니다"
   },
   "omniboxNoTarget": {
     "message": "설정된 링크 없음 — Enter로 설정 열기"
@@ -1247,7 +1247,7 @@
     "description": "Settings › Body templates, inside More."
   },
   "optFocusMore": {
-    "message": "속성 패널 숨기기와 왼쪽 내비게이션 숨기기 규칙은 처음부터 켜져 있고, 본문 읽기 폭 규칙은 꺼진 채로 들어 있습니다.\n집중 모드는 켠 탭에서만 적용되고, 새로 고쳐도 유지되며, 탭을 닫으면 끝납니다.\n다른 기기로는 동기화되지 않습니다.\n단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요.",
+    "message": "속성 패널 숨기기와 왼쪽 내비게이션 숨기기 규칙은 처음부터 켜져 있고, 본문 읽기 폭 규칙은 꺼진 채로 들어 있습니다.\n집중 모드는 켠 탭에서만 적용되고, 새로고침해도 유지되며, 탭을 닫으면 끝납니다.\n다른 기기로는 동기화되지 않습니다.\n단축키를 바꾸려면 <code>chrome://extensions/shortcuts</code>를 여세요.",
     "description": "Settings › Focus mode, inside More."
   },
   "optKeysWhyTitle": {

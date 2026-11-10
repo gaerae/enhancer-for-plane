@@ -3571,8 +3571,9 @@ test("copy: a quoted UI label is one the matching locale actually shows", () => 
     en: doc.slice(0, koStart) + "\n" + read("README.md"),
     ko: doc.slice(koStart) + "\n" + read("README.ko.md")
   };
-  // Plane's own UI, quoted as it appears in Plane rather than in this extension.
-  const FOREIGN = new Set(["Template", "Attach", "Create work item", "신규 작업항목 생성"]);
+  // Plane's own UI, quoted as it appears in Plane rather than in this extension. Not
+  // "Template": that button is ours, and the Korean UI draws it as "템플릿".
+  const FOREIGN = new Set(["Attach", "Create work item", "신규 작업항목 생성"]);
   for (const [loc, text] of Object.entries(sections)) {
     const cat = JSON.parse(read("_locales/" + loc + "/messages.json"));
     const messages = Object.values(cat).map((e) => String(e.message || ""));

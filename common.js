@@ -49,11 +49,12 @@ const PE_OPEN_TAB_KEY = "peOpenTab";
 // `querySelectorAll(sel).length` is one call — nobody asked it.
 //
 // What is deliberately NOT recorded is a per-page verdict. Measured on Plane Cloud
-// (2026-08-08): `.max-w-40` matches 35 elements on the work item list and zero on the item
-// detail page, the projects list, the labels page and the states page. "No match on this
-// page" is the normal case for a healthy rule, so any check that fires on it is noise, and
-// noise is what gets switched off. Two facts survive that: whether the selector has EVER
-// matched, and when it last did.
+// (2026-08-08): `.max-w-40` matched 35 elements on the work item list and zero on the item
+// detail page, the projects list, the labels page and the states page. (By 2026-11-10 Cloud
+// had moved those chips to `max-w-[224px]` and `.max-w-40` matched nothing anywhere; the
+// argument does not depend on that rule.) "No match on this page" is the normal case for a
+// healthy rule, so any check that fires on it is noise, and noise is what gets switched off.
+// Two facts survive that: whether the selector has EVER matched, and when it last did.
 //
 // Per rule id: { checks, hits, at } — page checks, checks where it matched, and the time of
 // the last match. Per device, so chrome.storage.local (see "Store config and state
@@ -63,11 +64,12 @@ const PE_RULE_HEALTH_KEY = "peRuleHealth";
 // opened yet has genuinely never matched, and saying so after one page load would be right
 // but useless.
 //
-// 20 rather than a handful, and the measurement above is why: `.max-w-40` is a healthy rule
-// that matches on one route in five, so somebody who spends a morning in work item detail
-// pages can rack up a long run of honest misses. A threshold they can reach by working
-// normally would put a warning on a rule that is fine, and a warning that cries wolf is
-// one people learn to scroll past — which would cost more than the silence it replaced.
+// 20 rather than a handful, and the measurement above is why: `.max-w-40`, as measured on
+// 2026-08-08, was a healthy rule that matched on one route in five, so somebody who spends a
+// morning in work item detail pages can rack up a long run of honest misses. A threshold
+// they can reach by working normally would put a warning on a rule that is fine, and a
+// warning that cries wolf is one people learn to scroll past — which would cost more than
+// the silence it replaced.
 // Twenty consecutive routes with no match is still under a day for a genuinely dead rule.
 const PE_RULE_HEALTH_MIN_CHECKS = 20;
 // A bound on the record for a settings file that churns rule ids. Pruning to the current
@@ -276,14 +278,14 @@ const PE_FOCUS_WIDTH_SELECTOR = ".overflow-y-auto.px-9.py-5, .overflow-y-auto.px
 const PE_DROPDOWN_SELECTOR =
   '[id^="headlessui-combobox-options"] > div, [data-base-ui-portal] [role="dialog"]:has(input)';
 
-// What v7 — the last released version — shipped for the three selectors that stopped
-// matching Plane Cloud, kept only so the migration can tell an untouched preset from one the
-// user edited. Never widen this into "any selector we ever shipped": a value here is a
-// licence to overwrite what is in somebody's storage.
+// What v7 — the last released version when this was written, before v1.8.0 — shipped for
+// the three selectors that stopped matching Plane Cloud, kept only so the migration can tell
+// an untouched preset from one the user edited. Never widen this into "any selector we
+// ever shipped": a value here is a licence to overwrite what is in somebody's storage.
 //
 // The dropdown one arrived a day after the other two and got its own schema step at first,
-// which was churn: v8 has not been released, so no install is at 8 and a `from < 9` branch
-// could never have run for anybody. One unreleased version, one schema number.
+// which was churn: v8 had not been released yet, so no install was at 8 and a `from < 9`
+// branch could never have run for anybody. One unreleased version, one schema number.
 const PE_V7_FOCUS_SELECTORS = {
   "rule-focus-item-properties": ".fixed.right-0.border-l.min-w-\\[300px\\]",
   "rule-focus-reading-width": ".overflow-y-auto.px-9.py-5"

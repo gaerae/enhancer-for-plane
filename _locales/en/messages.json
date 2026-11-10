@@ -19,7 +19,7 @@
     "message": "Enhancer for Plane — Settings"
   },
   "optTagline": {
-    "message": "Quick open, issue templates, copy reference, focus mode, style rules.\nQuick open works on Jira and Linear too.",
+    "message": "Quick open, issue templates, copy reference, focus mode, style rules.\nQuick open works on Jira, Linear, GitHub and GitLab too.",
     "description": "Sub-line under the settings header: the feature list, then the one thing about it that surprises people. No lead clause — the product name is directly above it, and \"fills the gaps in Plane\" was doing its work in the store listing anyway. Order matches extName: quick open first. Two lines is the budget, one sentence each, and the harness measures it in both locales."
   },
   "optGitHub": {
@@ -34,7 +34,7 @@
   },
   "optChangelog": {
     "message": "Changelog",
-    "description": "Tooltip on the version number in the Settings header, which links to CHANGELOG.md. The number itself is the link because \"what is in this version\" is the question a version number raises, and a fourth named link in that row would cost the row a line."
+    "description": "Tooltip on the version number in the Settings header, which links to the GitHub releases page. The number itself is the link because \"what is in this version\" is the question a version number raises, and a fourth named link in that row would cost the row a line."
   },
   "optEnabled": {
     "message": "Extension enabled"
@@ -189,10 +189,10 @@
     }
   },
   "optRuleLabelPh": {
-    "message": "Description (e.g. Module name width)"
+    "message": "Name (e.g. Hide the left navigation)"
   },
   "optRuleSelectorPh": {
-    "message": "CSS selector (e.g. .max-w-40)"
+    "message": "CSS selector (e.g. #main-sidebar)"
   },
   "optRulePropPh": {
     "message": "Property"
@@ -314,7 +314,7 @@
     "message": "Export every setting to a JSON file, or import one.\nAn import fills the form, and applies when you <b>Save</b>."
   },
   "optBackupDesc2": {
-    "message": "The file holds your domains, source addresses and variable values in plain text, so if any of them is private, keep the file internal.\nSynced templates are not in it: they download again from their source after you Save."
+    "message": "The file holds your domains, quick link addresses, source addresses and variable values in plain text, so if any of them is private, keep the file internal.\nSynced templates are not in it: they download again from their source after you Save."
   },
   "optBackupExport": {
     "message": "↓ Export JSON"
@@ -415,7 +415,7 @@
     }
   },
   "msgChangedElsewhere": {
-    "message": "Settings changed elsewhere (e.g. the element picker). Saving keeps the sites and rules added there and replaces anything else with this page. Reload to see them first — unsaved edits will be lost."
+    "message": "Settings changed elsewhere (e.g. the element picker). Saving keeps the sites and rules added there, and “Extension enabled” if it was switched there, and replaces anything else with this page. Reload to see them first — unsaved edits will be lost."
   },
   "msgLoadedPicked": {
     "message": "Loaded the rule added by the picker."
@@ -540,7 +540,7 @@
     }
   },
   "msgSaveQuotaItem": {
-    "message": "Save failed: your domains and style rules together exceed the ~$LIMIT$ KB Chrome sync allows for one block. Remove some, or keep a JSON backup.",
+    "message": "Save failed: everything except templates — domains, style rules, quick links, copy formats, variables and sources — has to fit in one ~$LIMIT$ KB block of Chrome sync, and together they no longer do. Remove some, or keep a JSON backup.",
     "placeholders": {
       "limit": {
         "content": "$1"
@@ -839,7 +839,7 @@
     }
   },
   "msgCopyFailed": {
-    "message": "Could not reach the clipboard. Copy it by hand from the preview in Settings."
+    "message": "Could not reach the clipboard. Click the page once, then try again."
   },
   "msgCopyNoItem": {
     "message": "No work item on this page — open one, or click a row to open its panel."
@@ -886,7 +886,7 @@
     "message": "This device needs to approve access"
   },
   "optPermDesc": {
-    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ of the sites and sources you listed are not approved on this one yet. Until you approve them, the extension stays inactive here.",
+    "message": "Your settings synced here, but Chrome keeps site access per device — so $COUNT$ of the sites and sources you listed are not approved on this one yet. Until you approve them, those sites stay inactive and those sources do not sync on this device.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1226,7 +1226,7 @@
     }
   },
   "omniboxHint": {
-    "message": "Type a work item key to open it, or words to search"
+    "message": "Type a work item key to open it, or anything else to search"
   },
   "omniboxNoTarget": {
     "message": "No quick link set — Enter opens Settings"
