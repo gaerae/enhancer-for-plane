@@ -10,6 +10,22 @@ first read, never rewritten by hand.
 
 ---
 
+## v1.14.0 — 2026-11-10
+
+Schema 9, unchanged. No permission changes.
+
+### Fixed
+- **Settings no longer undoes the popup's master switch.** With unsaved edits in Settings,
+  switching the extension off in the popup was refused as a change made elsewhere, and the next
+  Save wrote the page's older "on" back. The same happened when the popup flipped the switch
+  while Save waited on Chrome's permission prompt. Save now writes whichever switch spoke last:
+  the popup's, unless you flipped it on the Settings page afterwards. **Enable on this site**
+  counts as switching the extension on, so it outranks an older unsaved "off" in Settings, while
+  a rule picked from a Plane tab says nothing about the switch and leaves yours alone. **Restore
+  defaults** and an import set the switch like every other setting. After a save the page shows
+  the switch that was written, unless you clicked it while the save was out; then your click
+  stays, as an unsaved edit.
+
 ## v1.13.0 — 2026-11-10
 
 Schema 9: the two description presets below are appended to existing settings. Nothing you

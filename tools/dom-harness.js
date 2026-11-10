@@ -1651,16 +1651,21 @@ const suites = [
   },
   {
     // The other half of the rule: a switch flipped on this page is the user's, and storage still
-    // holding the old position must not undo it. (A boolean cannot truly conflict: if the page and
-    // storage have both moved off what the page last loaded, they moved to the same place.)
+    // holding the old position must not undo it — nor a site added elsewhere before the flip,
+    // which is older than it.
     name: "options · the master switch flipped on this page is what is saved",
     page: { name: "opt-save-enabled-mine", ...OPTIONS, seed: seedOf() },
     body: `
       ${TAB_READY}
+      // Edits first, so the domain added elsewhere is refused and has to be carried; then the
+      // flip, which is newer than that domain and so outranks it.
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      ${FOREIGN_DOMAIN}
       const sw = document.getElementById("enabled");
       sw.checked = false;
       sw.dispatchEvent(new Event("change", { bubbles: true }));
-      ${FOREIGN_DOMAIN}
       document.getElementById("save").click();
       await waitFor(() => window.__written.length > 0, "the save to write");
       await sleep(100);
@@ -1668,6 +1673,166 @@ const suites = [
         const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
         eq(w.enabled, false);
         ok(w.domains.indexOf("elsewhere.example.com") > -1, "domains: " + w.domains.join());
+      });`
+  },
+  {
+    // The switch carried from storage, then clicked on this page while the prompt was up. The
+    // save wrote the click, but the baseline kept the switch from before the carry, so a saved
+    // form read as unsaved — and clicking it back on read as clean, with storage still off, so
+    // the next Save carried "off" over the user's "on".
+    name: "options · the master switch clicked during a save that carried it",
+    page: { name: "opt-save-enabled-touched", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const leave = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(100);
+      const sw = document.getElementById("enabled");
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      window.__answer();
+      await waitFor(() => window.__written.length > 0, "the first save");
+      await sleep(100);
+      check("what was written is off", () => eq(window.__written.map((o) => o.peSettings).filter(Boolean).pop().enabled, false));
+      check("and nothing is left unsaved", () => ok(!leave(), "a saved form reads as edited"));
+      sw.checked = true;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      check("switching it back on is an edit", () => ok(leave(), "the click reads as nothing to save"));
+      window.__answer = null;
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the second prompt");
+      window.__answer();
+      await waitFor(() => window.__written.filter((o) => o.peSettings).length > 1, "the second save");
+      await sleep(100);
+      check("and the next save writes it", () => eq(window.__written.map((o) => o.peSettings).filter(Boolean).pop().enabled, true));`
+  },
+  {
+    // Restore defaults promises every setting at its default, the switch included. Whether it
+    // kept that promise depended on an earlier popup click: with the switch already off in
+    // storage, the default "on" equalled the stale baseline and storage's "off" was carried.
+    name: "options · Restore defaults saves the default master switch",
+    page: { name: "opt-save-enabled-reset", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(100);
+      window.confirm = () => true;
+      document.getElementById("reset").click();
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.some((o) => o.peSettings), "the save to write");
+      await sleep(100);
+      check("the switch is the default", () => eq(window.__written.map((o) => o.peSettings).filter(Boolean).pop().enabled, true));`
+  },
+  {
+    // An import is the same: the backup's switch is what the user chose to load.
+    name: "options · an imported master switch is what is saved",
+    page: { name: "opt-save-enabled-import", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const nm = document.querySelector("#templateList .tpl-name");
+      nm.value = nm.value + " (edited)";
+      nm.dispatchEvent(new Event("input", { bubbles: true }));
+      const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+      foreign.enabled = false;
+      window.__SEED.peSettings = foreign;
+      window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+      await sleep(100);
+      const file = new File([JSON.stringify({
+        _app: "enhancer-for-plane",
+        settings: {
+          schema: 6, enabled: true, allDomains: false, domains: ["imported.example.com"],
+          rules: [], templates: [], variables: [], copyFormats: [], quickLinks: [],
+          templateSync: { enabled: false, sources: [] }
+        }
+      })], "backup.json", { type: "application/json" });
+      const input = document.getElementById("importFile");
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => document.getElementById("domains").value.indexOf("imported.example.com") !== -1, "the import");
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.some((o) => o.peSettings), "the save to write");
+      await sleep(100);
+      check("the backup's switch is saved", () => eq(window.__written.map((o) => o.peSettings).filter(Boolean).pop().enabled, true));`
+  },
+  {
+    // Newest wins. The switch flipped off here and left unsaved, then "Enable on this site" in
+    // the popup, which adds the site and switches the extension on — but on is where storage
+    // already was, so nothing read as moved, and the Save wrote the older "off": the site just
+    // enabled did nothing.
+    name: "options · Enable on this site after an unsaved flip turns the extension on",
+    page: { name: "opt-save-enabled-site", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const sw = document.getElementById("enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      ${FOREIGN_DOMAIN}
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.some((o) => o.peSettings), "the save to write");
+      await sleep(100);
+      check("the site is kept and the extension is on", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.enabled, true);
+        ok(w.domains.indexOf("elsewhere.example.com") > -1, "domains: " + w.domains.join());
+      });
+      check("and the form shows it", () => ok(sw.checked, "the switch still reads off"));`
+  },
+  {
+    // The same, with the popup speaking while this page's save waits on the prompt: the save was
+    // built on the page's "off", but the popup's "on" is newer than it.
+    name: "options · Enable on this site during the prompt outranks the flip the save was built on",
+    page: { name: "opt-save-enabled-site-prompt", ...OPTIONS, seed: seedOf(), env: { hold: true } },
+    body: `
+      ${TAB_READY}
+      const sw = document.getElementById("enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      document.getElementById("save").click();
+      await waitFor(() => typeof window.__answer === "function", "the permission prompt");
+      ${FOREIGN_DOMAIN}
+      window.__answer();
+      await waitFor(() => window.__written.some((o) => o.peSettings), "the save to write");
+      await sleep(100);
+      check("the extension is on", () => eq(window.__written.map((o) => o.peSettings).filter(Boolean).pop().enabled, true));`
+  },
+  {
+    // But a change elsewhere that says nothing about the switch — a rule picked in a Plane tab —
+    // is not a newer opinion about it, and must not undo a flip made here.
+    name: "options · a rule picked elsewhere leaves an unsaved flip alone",
+    page: { name: "opt-save-enabled-picked", ...OPTIONS, seed: seedOf() },
+    body: `
+      ${TAB_READY}
+      const sw = document.getElementById("enabled");
+      sw.checked = false;
+      sw.dispatchEvent(new Event("change", { bubbles: true }));
+      {
+        const foreign = JSON.parse(JSON.stringify(window.__SEED.peSettings));
+        foreign.rules = (foreign.rules || []).concat([{ id: "picked", selector: ".picked", property: "max-width", value: "none", enabled: true }]);
+        window.__SEED.peSettings = foreign;
+        window.__onChanged({ peSettings: { newValue: foreign } }, "sync");
+        await sleep(300);
+      }
+      document.getElementById("save").click();
+      await waitFor(() => window.__written.some((o) => o.peSettings), "the save to write");
+      await sleep(100);
+      check("the page's off is saved, with the rule carried", () => {
+        const w = window.__written.map((o) => o.peSettings).filter(Boolean).pop();
+        eq(w.enabled, false);
+        ok(w.rules.some((r) => r.id === "picked"), "the picked rule was dropped");
       });`
   },
   {
