@@ -416,6 +416,9 @@
   "msgLoadedPicked": {
     "message": "요소 선택기로 추가한 규칙을 불러왔습니다."
   },
+  "msgLoadedElsewhere": {
+    "message": "다른 곳에서 바뀐 설정을 불러왔습니다."
+  },
   "msgExported": {
     "message": "설정 JSON을 내보냈습니다."
   },
@@ -772,6 +775,10 @@
         "content": "$1"
       }
     }
+  },
+  "pickRuleLabel": {
+    "message": "선택한 요소",
+    "description": "Name given to a style rule created with the element picker; the user can rename it in Settings."
   },
   "pickRuleFailed": {
     "message": "규칙 저장 실패 (스토리지 오류)."

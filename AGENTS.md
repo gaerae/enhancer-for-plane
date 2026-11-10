@@ -428,8 +428,9 @@ Each of these shipped, or nearly did. They are now covered by tests — do not r
   selector must *not* catch: focus mode is global CSS, and `.shrink-0.bg-surface-1` without the
   `.z-[5]` also matches an unrelated chip on Cloud's cycles route. Any preset that names a
   vendor class needs a probe per generation, and reverting either half has to fail.
-  The item-name width preset (`rule-module-name`, `.max-w-40`) is dead on Plane Cloud as of
-  2026-11-10 — the chips there are `max-w-[224px]` — and `PLANE` carries no Cloud probe for it.
+  The item-name width preset (`rule-module-name`) rotted the same way: a bare `.max-w-40` matched
+  nothing on Plane Cloud, whose chips are `max-w-[224px]`, until schema 10 made it a union.
+  `PLANE` carries a chip of each generation now (`probe-width`, `probe-width-cloud`).
   It happened again with the description presets, and the source was the trap: they were
   written from makeplane/plane's own component, and Plane Cloud — the only place the clip had
   shipped — runs a build that renders the toggle without `aria-controls` and inside a wrapper.

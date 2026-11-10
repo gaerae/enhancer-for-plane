@@ -420,6 +420,9 @@
   "msgLoadedPicked": {
     "message": "Loaded the rule added by the picker."
   },
+  "msgLoadedElsewhere": {
+    "message": "Loaded the settings changed elsewhere."
+  },
   "msgExported": {
     "message": "Exported settings JSON."
   },
@@ -776,6 +779,10 @@
         "content": "$1"
       }
     }
+  },
+  "pickRuleLabel": {
+    "message": "Picked element",
+    "description": "Name given to a style rule created with the element picker; the user can rename it in Settings."
   },
   "pickRuleFailed": {
     "message": "Failed to save the rule (storage error)."

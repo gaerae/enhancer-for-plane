@@ -1437,7 +1437,10 @@
           const grew = (s.rules || []).length > ((state && state.rules) || []).length;
           adoptSettings(s); // the reset this was waiting to save, if any, is gone with it
           if (grew) showTab("appearance");
-          flash(peMsg("msgLoadedPicked"));
+          // Only the picker is announced as the picker. The popup's master switch, Enable on
+          // this site and a change synced from another device arrive here too, and calling
+          // those "the rule added by the picker" described a rule nobody picked.
+          flash(peMsg(grew ? "msgLoadedPicked" : "msgLoadedElsewhere"));
         });
         };
         read();

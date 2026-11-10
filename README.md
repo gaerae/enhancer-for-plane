@@ -111,8 +111,9 @@ you do something.
 - **Shipped on**: item name width, search dropdown width, and two rules that show a long
   description whole (no **Show all** clip on Plane Cloud). **Quick add** seeds the cycle /
   breadcrumb width.
-- **The item name width fits self-hosted Plane 1.4 only** (`.max-w-40`; Cloud's chips are
-  `max-w-[224px]`). On Cloud, pick a name once with the element picker.
+- **The item name width fits both** (`.max-w-40` on self-hosted 1.4, `max-w-[224px]` on
+  Cloud). Cloud shows a module chip only on a wide enough row; a narrower one folds it into
+  "+1 more property".
 - **Each rule says whether it does anything**: when it last applied, or that it has never
   matched. A Plane redesign shows up as one stale date.
 
@@ -172,7 +173,7 @@ you do something.
   `plane.your-company.com`, or `app.plane.so`) with **Enable on this site** or in Settings;
   Chrome asks once for that site. Inert everywhere else.
 - The two draw the same screens with different classes, so a preset naming a class may fit one
-  generation only. The item name width matches self-hosted 1.4 only; the other presets carry both.
+  generation only. The presets that ship switched on carry both.
 - Anything a preset misses is one selector edit or one pick with the element picker.
 
 ## Install
