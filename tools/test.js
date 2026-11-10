@@ -47,6 +47,7 @@ const EXPORT_GLOBALS =
   "\n;globalThis.__V7_DROPDOWN_SELECTOR = PE_V7_DROPDOWN_SELECTOR;" +
   "\n;globalThis.__V9_DESCRIPTION_SELECTORS = PE_V9_DESCRIPTION_SELECTORS;" +
   "\n;globalThis.PE_DROPDOWN_SELECTOR = PE_DROPDOWN_SELECTOR;" +
+  "\n;globalThis.PE_NAME_WIDTH_SELECTOR = PE_NAME_WIDTH_SELECTOR;" +
   "\n;globalThis.__HEALTH_MIN = PE_RULE_HEALTH_MIN_CHECKS;" +
   "\n;globalThis.__HEALTH_MAX = PE_RULE_HEALTH_MAX;" +
   "\n;globalThis.__MAX_RECENT = PE_MAX_RECENT;" +
@@ -2961,8 +2962,10 @@ test("dropdown: v8 repoints the search dropdown preset onto both generations", (
     ]
   });
   eq(out.rules.find((r) => r.id === "rule-combobox-dropdown").selector, now, "repointed");
-  eq(out.rules.find((r) => r.id === "rule-module-name").selector, ".max-w-40",
-    "the rule that never broke is untouched");
+  // Not by v8, that is. It broke on Cloud later, and v10 is the step that moves it — which
+  // this install passes through on the way up.
+  eq(out.rules.find((r) => r.id === "rule-module-name").selector, ctx.PE_NAME_WIDTH_SELECTOR,
+    "the item-name rule is v10's to move, not v8's");
   eq(out.rules.filter(notV9Preset(ctx)).length, 2, "and the v8 step appended nothing");
 });
 
@@ -3082,6 +3085,49 @@ test("description: v10 leaves an edited selector, and a deleted preset, alone", 
   // A v10 install is past the step, so a v9 selector it carries is the user's to keep.
   const v10 = ctx.peMigrate({ schema: 10, rules: [{ id: "rule-description-full", selector: was, property: "height", value: "auto" }] });
   eq(v10.rules[0].selector, was, "the step does not run twice");
+});
+
+// Plane Cloud moved its list property chips — the module, the state, the labels — from
+// max-w-40 to max-w-[224px], so the item-name preset matched nothing there. Measured
+// 2026-11-10 on a list row wide enough to show the module chip: 222px wide with its name cut,
+// and 318px once the rule reached it; the other chips are content-sized and never reach the
+// cap. A union again: self-hosted 1.4 still renders max-w-40.
+test("item name: v10 repoints an untouched .max-w-40 onto both generations", () => {
+  const ctx = loadCommon();
+  const now = ctx.PE_NAME_WIDTH_SELECTOR;
+  ok(now !== ".max-w-40", "the selector actually changed");
+  ok(now.indexOf(".max-w-40") === 0, "Plane 1.4's shape still leads: " + now);
+  ok(now.indexOf(".max-w-\\[224px\\]") > -1, "and Cloud's, escaped: " + now);
+  const out = ctx.peMigrate({
+    schema: 9,
+    rules: [
+      { id: "mine", enabled: true, selector: ".max-w-40", property: "width", value: "1px" },
+      { id: "rule-module-name", enabled: false, selector: ".max-w-40", property: "max-width", value: "400px" }
+    ]
+  });
+  eq(out.rules.map((r) => r.selector), [".max-w-40", now], "only the preset's id is repointed");
+  eq(out.rules[1].enabled, false, "a preset switched off stays off");
+  eq(out.rules[1].value, "400px", "and a width the user chose stays theirs");
+  eq(out.rules.length, 2, "and the step appended nothing");
+});
+
+test("item name: v10 leaves an edited selector, and a deleted preset, alone", () => {
+  const ctx = loadCommon();
+  for (const mine of [".max-w-\\[224px\\]", ".max-w-40 ", ".max-w-48"]) {
+    const out = ctx.peMigrate({ schema: 9, rules: [{ id: "rule-module-name", selector: mine, property: "max-width", value: "320px" }] });
+    eq(out.rules[0].selector, mine, "kept: " + JSON.stringify(mine));
+  }
+  ok(!ctx.peMigrate({ schema: 9, rules: [] }).rules.some((r) => r.id === "rule-module-name"), "a deleted preset stays deleted");
+  const v10 = ctx.peMigrate({ schema: 10, rules: [{ id: "rule-module-name", selector: ".max-w-40", property: "max-width", value: "320px" }] });
+  eq(v10.rules[0].selector, ".max-w-40", "the step does not run twice");
+});
+
+// Two homes again: a fresh install and the oldest one have to arrive at the same selector.
+test("item name: a fresh install and a migrated one carry the same selector", () => {
+  const ctx = loadCommon();
+  const of = (rules) => rules.find((r) => r.id === "rule-module-name").selector;
+  eq(of(ctx.__DEFAULTS.rules), ctx.PE_NAME_WIDTH_SELECTOR, "fresh");
+  eq(of(ctx.peMigrate({ widths: { moduleName: { px: 320 } } }).rules), ctx.PE_NAME_WIDTH_SELECTOR, "from the oldest shape");
 });
 
 // An export read back goes through peSanitizeSettings, which clamps every field to
@@ -4398,7 +4444,14 @@ test("copy: Korean prose enumerates with commas, not a chain of middots", () => 
     "_locales/ko/messages.json",
     "_locales/en/messages.json",
     "options.html",
-    "popup.html"
+    "popup.html",
+    // The store posters carry their copy in a `window.T` block per language, and a chain
+    // there sat in the Korean caption of screenshot 3 and the marquee tile while every file
+    // above was clean.
+    ...fs
+      .readdirSync(path.join(ROOT, "store-assets"))
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => "store-assets/" + f)
     // Not AGENTS.md: it quotes "영문·숫자·하이픈·밑줄" as the example of what not to write,
     // and a check that cannot tell a rule from a violation of it would push the rule toward
     // being stated in a way that does not demonstrate itself. Same reasoning as the

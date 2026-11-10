@@ -292,6 +292,17 @@ const PE_V7_FOCUS_SELECTORS = {
 };
 const PE_V7_DROPDOWN_SELECTOR = '[id^="headlessui-combobox-options"] > div';
 
+// The item-name width preset: the chip a long module name is cut short in. Self-hosted 1.4
+// caps it with `max-w-40` (160px); Plane Cloud, measured 2026-11-10, caps every property chip
+// in a list row with `max-w-[224px]`, and `.max-w-40` matches nothing there. The other chips
+// sharing the class are sized by their content and never reach either cap, so widening the
+// class widens only a name that was being cut. Cloud shows the module chip only on a row
+// wide enough for it; a narrower one folds it into "+1 more property", where there is
+// nothing to widen.
+const PE_NAME_WIDTH_SELECTOR = ".max-w-40, .max-w-\\[224px\\]";
+// What every release up to v1.14.0 shipped for it, for the same guarded repoint as above.
+const PE_V9_NAME_WIDTH_SELECTOR = ".max-w-40";
+
 // Plane's "Show all". Since makeplane/plane efa46d284 (2026-11-02), a work item description
 // taller than 140px is clipped to that height behind a fade and a toggle, on the item's own
 // page and in the peek panel, every time the item opens. People asked Plane for a way to keep
@@ -765,9 +776,9 @@ const PE_DEFAULTS = {
       id: "rule-module-name",
       enabled: true,
       label: peMsg("optPresetModuleName") || "Module / item name width",
-      selector: ".max-w-40",
+      selector: PE_NAME_WIDTH_SELECTOR,
       property: "max-width",
-      value: "320px" // Plane default 160px (max-w-40) → widened to 320px
+      value: "320px" // Plane caps it at 160px (1.4) or 224px (Cloud) → widened to 320px
     },
     {
       id: "rule-combobox-dropdown",
@@ -948,6 +959,9 @@ function peDeepMerge(def, cur) {
 //            edited copy is the user's own rule and keeps what they typed; a deleted preset
 //            stays deleted, because this appends nothing. An install older than 9 gets the
 //            current presets from the v9 step and passes through here untouched.
+//            The same step, under the same guard, moves the item-name width preset off a
+//            bare `.max-w-40` (PE_V9_NAME_WIDTH_SELECTOR), which Plane Cloud stopped
+//            rendering; see PE_NAME_WIDTH_SELECTOR.
 // The version is decided by `schema`, falling back to the shape for pre-schema data.
 // (An earlier gate returned early whenever `rules` existed, which silently blocked
 // every future migration and left the stored `schema` stamp stuck at its old value.)
@@ -968,7 +982,7 @@ function peMigrate(raw) {
         id: "rule-module-name",
         enabled: w.moduleName.enabled !== false,
         label: peMsg("optPresetModuleName") || "Module / item name width",
-        selector: ".max-w-40",
+        selector: PE_NAME_WIDTH_SELECTOR,
         property: "max-width",
         value: (w.moduleName.px || 320) + "px"
       });
@@ -1016,12 +1030,12 @@ function peMigrate(raw) {
     raw.rules = rules;
   }
   if (from < 10) {
-    const shipped = {};
+    const shipped = { "rule-module-name": PE_NAME_WIDTH_SELECTOR };
     peDescriptionPresetRules().forEach((r) => (shipped[r.id] = r.selector));
+    const was = Object.assign({ "rule-module-name": PE_V9_NAME_WIDTH_SELECTOR }, PE_V9_DESCRIPTION_SELECTORS);
     (Array.isArray(raw.rules) ? raw.rules : []).forEach((r) => {
       if (!r || typeof r !== "object") return;
-      const was = PE_V9_DESCRIPTION_SELECTORS[r.id];
-      if (was && r.selector === was) r.selector = shipped[r.id];
+      if (was[r.id] && r.selector === was[r.id]) r.selector = shipped[r.id];
     });
   }
   raw.schema = PE_SCHEMA;

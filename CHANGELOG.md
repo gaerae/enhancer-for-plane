@@ -13,9 +13,10 @@ first read, never rewritten by hand.
 
 ## v1.15.0 — unreleased
 
-Schema 10: the two description presets are repointed in existing settings, but only where
-their selector is still exactly what v1.13.0 shipped. An edited selector is kept, a deleted
-preset stays deleted, and nothing is added. No permission changes.
+Schema 10: the two description presets and the item-name width are repointed in existing
+settings, but only where their selector is still exactly what the last release shipped. An
+edited selector is kept, a deleted preset stays deleted, and nothing is added. No permission
+changes.
 
 ### Fixed
 - **A long work item description is shown whole on Plane Cloud.** The two rules from v1.13.0
@@ -23,6 +24,13 @@ preset stays deleted, and nothing is added. No permission changes.
   wraps it in an extra element. Since Cloud is where the clip is, the feature did nothing for
   anyone. The rules now fit Cloud's markup and the open-source one, on an item's own page and
   in the peek panel, and a cycle's description is still left alone.
+- **A long module name is widened on Plane Cloud too.** The item-name width named `.max-w-40`,
+  which Cloud no longer renders, so it did nothing there. It now covers Cloud's chip as well,
+  and the other chips in the row, which never reach the cap, are unchanged.
+- **Settings no longer credits the element picker with changes it did not make.** Switching
+  the extension off in the popup, **Enable on this site** or a change from another device
+  announced "Loaded the rule added by the picker". It now says the settings changed elsewhere.
+- **A rule made with the element picker is named in your language.** It was always "Picked".
 - **Messages that said something untrue.** A failed copy sent you to a Settings preview that
   only ever shows a sample; a full sync block blamed domains and rules alone; the address-bar
   hint said only several words are searched; the permission card said the whole extension was
@@ -37,6 +45,8 @@ preset stays deleted, and nothing is added. No permission changes.
 - Store screenshots 1, 2, 4 and 5 are real captures of Chrome and Plane Cloud now, not
   drawings. The store run counts only the images at the top of `store-assets/` as a listing
   change; its subfolders hold the capture sources, which no reviewer sees.
+- The middle-dot rule for Korean prose covers the store posters too. Two chains sat in their
+  Korean captions while every checked file was clean.
 
 ## v1.14.0 — 2026-11-10
 

@@ -1873,7 +1873,7 @@
         s.rules.push({
           id: "rule-picked-" + Math.random().toString(36).slice(2, 8),
           enabled: true,
-          label: "Picked",
+          label: peMsg("pickRuleLabel") || "Picked element",
           selector: sel,
           property: "max-width",
           value: "" // empty value → the rule stays inactive until you set a value in Settings

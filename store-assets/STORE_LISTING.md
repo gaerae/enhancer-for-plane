@@ -127,7 +127,7 @@ Add the domain you use — plane.your-company.com, or app.plane.so.
 Wildcards (*.example.com) are supported.
 Self-hosted is where this started, and Plane Cloud is checked against a live instance every release.
 The two do not draw the same page, so a rule that ships can fit one and not the other.
-The item-name width rule was written for self-hosted Plane and does not match on Plane Cloud yet.
+The rules that ship switched on carry both, and Settings shows whether each has ever applied.
 It ships with no site access: enabling a domain asks Chrome for that one site, and it stays completely inert everywhere else.
 "Run on all sites" in Settings asks Chrome for every site instead; it is off unless you turn it on.
 Your settings back up to a JSON file and restore on another machine.
@@ -326,7 +326,7 @@ JSON 파일 하나(사내 서버, Git 호스트, 아무 URL이나)를 가리키�
 와일드카드(*.example.com)도 지원합니다.
 자체 호스팅에서 출발했고, Plane Cloud도 릴리스마다 실제 인스턴스에서 확인합니다.
 둘은 같은 화면도 다르게 그리기 때문에, 기본으로 들어 있는 규칙이 한쪽에만 맞을 수 있습니다.
-항목 이름 폭 규칙은 자체 호스팅에 맞춰 쓴 것이라 Plane Cloud에서는 아직 맞지 않습니다.
+켜진 채로 들어 있는 규칙은 양쪽을 모두 담고 있고, 규칙마다 실제로 적용된 적이 있는지 설정에서 보여 줍니다.
 설치 시점에는 사이트 접근 권한이 하나도 없습니다.
 도메인을 켜면 Chrome이 그 사이트 하나를 묻고, 그 외의 사이트에서는 완전히 비활성입니다.
 설정의 "모든 사이트에서 실행"을 켜면 모든 사이트 접근을 요청합니다.
@@ -398,10 +398,9 @@ next set matches:
   omnibox, the popup and the menu, which are separate windows on top of it.
 
 `screenshot-3-width.html` and `promo-*.html` are still **illustrations**: every pixel is drawn
-in CSS. Capture 3 stays drawn because there is no honest real frame for it on Plane Cloud
-today: the module chip it shows being cut is a `max-w-[224px]` button there, not the
-`.max-w-40` the preset names, and at 1280px Cloud folds a second module into "+1". Retake it
-once the width presets are measured against Cloud again.
+in CSS. Capture 3 is still drawn although the preset reaches Cloud's `max-w-[224px]` chip
+since v1.15.0: Cloud shows the module chip only on a row wide enough for it, and at 1280px it
+folds the chip into "+1". Retake it at a wider window.
 
 `ui/*.png` are **real pages**: `node store-assets/capture-ui.js` renders the shipped
 `popup.html` and `options.html`, with the shipped CSS byte for byte, in a real browser at 2x.

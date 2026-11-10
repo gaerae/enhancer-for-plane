@@ -542,6 +542,11 @@ const PLANE = `
 <div class="overflow-y-auto px-8 py-5" id="probe-body-decoy">neither generation's body column</div>
 <div id="main-sidebar" class="z-20 h-full border-r border-subtle">navigation</div>
 <div class="max-w-40" id="probe-width">a module name long enough to be truncated</div>
+<!-- The same chip on Plane Cloud, as its list layout renders a module on a row wide enough
+     to show it (narrower rows fold it into "+1 more property"). Measured 2026-11-10: every
+     property chip in the row carries max-w-[224px], and only a long name ever reaches it. -->
+<button type="button" aria-label="Modules, a module name long enough to be truncated"
+        class="flex h-5 max-w-[224px] items-center gap-1 rounded-sm px-2" id="probe-width-cloud"><span class="truncate">a module name long enough to be truncated</span></button>
 <!-- The search dropdown, in both generations, exactly as each renders it with the module
      picker open. Plane 1.4 (self-hosted) uses Headless UI; Cloud has moved to Base UI, and
      the shipped preset went on selecting only the first for a release. Measured 2026-08-08.
@@ -2546,6 +2551,25 @@ const suites = [
       check("a rule arriving from the picker reveals the tab holding it", () => eq(sel(), "appearance"));
       check("…and the message points at something now visible", () => {
         ok(!document.getElementById("panel-appearance").hidden, "the rules panel is shown");
+        eq(document.querySelectorAll("#ruleList .rule-item").length, 2, "rule rows");
+        eq(document.getElementById("status").textContent, peMsg("msgLoadedPicked"));
+      });
+      // Every other change a clean form adopts — the popup's master switch, Enable on this
+      // site, an edit synced from another device — used to flash the same "rule added by the
+      // picker" line, about a rule nobody picked.
+      // Every line the status shows is recorded, because the line clears itself after a few
+      // seconds and an empty line would match a message key that does not exist.
+      const said = [];
+      new MutationObserver(() => said.push(document.getElementById("status").textContent))
+        .observe(document.getElementById("status"), { childList: true, characterData: true, subtree: true });
+      const flipped = JSON.parse(JSON.stringify(window.__SEED));
+      flipped.peSettings.enabled = !flipped.peSettings.enabled;
+      window.__SEED = flipped;
+      window.__onChanged({ peSettings: { newValue: flipped.peSettings } }, "sync");
+      await waitFor(() => said.some(Boolean), "the next message");
+      check("a change that adds no rule is not announced as the picker's", () => {
+        ok(peMsg("msgLoadedElsewhere"), "the message exists");
+        eq(said.filter(Boolean).join(" / "), peMsg("msgLoadedElsewhere"));
         eq(document.querySelectorAll("#ruleList .rule-item").length, 2, "rule rows");
       });`
   },
@@ -4690,6 +4714,24 @@ const suites = [
       check("the counts are still real", () => {
         const row = rows().find((r) => r.querySelector(".pe-pick-sel").textContent === ".max-w-40");
         eq(row.querySelector(".pe-pick-count").textContent, peMsg("pickMatches", ["2"]), "two elements carry it");
+      });
+      // The rule a pick creates is named in the reader's language. It was the literal
+      // "Picked", which a Korean Settings page then listed, and quoted in its messages.
+      const writes = [];
+      const set = chrome.storage.sync.set;
+      chrome.storage.sync.set = function (o) { writes.push(JSON.parse(JSON.stringify(o))); return set.apply(this, arguments); };
+      rows().find((r) => r.querySelector(".pe-pick-sel").textContent === ".max-w-40").click();
+      const pickedIn = () => {
+        for (const w of writes) for (const v of Object.values(w)) {
+          const r = v && Array.isArray(v.rules) && v.rules.find((x) => /^rule-picked-/.test(x.id));
+          if (r) return r;
+        }
+      };
+      await waitFor(() => pickedIn(), "the picked rule to be written");
+      const picked = pickedIn();
+      check("the picked rule's name comes from the catalogue", () => {
+        ok(peMsg("pickRuleLabel"), "the message exists");
+        eq(picked && picked.label, peMsg("pickRuleLabel"));
       });`
   },
   {
@@ -4985,6 +5027,13 @@ const suites = [
       const toasts = () => [...document.querySelectorAll(".pe-toast")].map((t) => t.textContent);
 
       await waitFor(() => getComputedStyle(width).maxWidth === "320px", "the always-on rules to be injected");
+      // The item-name width preset, which matched nothing on Plane Cloud from the day Cloud
+      // moved its chips off max-w-40. Built here by peMigrate from the oldest install there
+      // is, so this proves the shipped selector and not a copy of it.
+      check("the item-name width reaches both generations of the chip", () => {
+        eq(getComputedStyle(width).maxWidth, "320px", "self-hosted 1.4");
+        eq(getComputedStyle(document.getElementById("probe-width-cloud")).maxWidth, "320px", "Plane Cloud");
+      });
       // The search dropdown preset, which went a release matching nothing on Plane Cloud
       // after Plane moved these popovers from Headless UI to Base UI. Both generations are
       // on this page now, so a selector that covers one and not the other fails here rather
