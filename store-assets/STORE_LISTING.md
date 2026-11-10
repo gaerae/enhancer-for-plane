@@ -346,26 +346,50 @@ makeplane / plane.so — 프로젝트 관리와 이슈, 위키를 함께 다루�
 
 ## Real captures vs drawn templates
 
-Two kinds of image live here, and the difference matters when you go to replace one.
+Three kinds of image live here, and the difference matters when you go to replace one.
 
-`screenshot-*.html` and `promo-*.html` are **illustrations**: every pixel, including the
-window frame and the address bar, is drawn in CSS. That is the only way to picture the
-omnibox at all — the dropdown Chrome shows under the address bar is browser UI, outside
-every page's viewport, so no page-level tool can photograph it. It also means those images
-are only as honest as whoever drew them, and they date the moment the product moves.
+`real/*.png` are **screen captures of a real Chrome window**, and captures 1, 2, 4 and 5 are
+built from them: each `screenshot-N-*.html` lays two or three of them out as cards, and
+`shot.js` picks `real/<name>.<lang>.png` for the page's language. They are the only way to
+show the omnibox dropdown, the right-click menu and the toolbar popup as Chrome draws them,
+because all three are browser UI outside every page's viewport. How they were taken, so the
+next set matches:
 
-`ui/*.png` are **real**: `node store-assets/capture-ui.js` renders the shipped `popup.html`
-and `options.html`, with the shipped CSS byte for byte, in a real browser at 2x. Only
-`chrome` is stubbed — the same technique `tools/dom-harness.js` asserts against — so these
-cannot drift from the product without the checks noticing first. Prefer embedding these in a
-template over drawing our own UI a second time.
+- A **demo workspace on Plane Cloud** holding invented content only: a `Storefront` project
+  (`SHOP`) for the English set and a `스토어프론트` project (`STORE`) for the Korean one, the
+  same twelve items in each language. A store image is published for as long as the listing
+  exists, and a real workspace's project names, item titles and colleagues are not ours to
+  publish.
+- The account's **avatar is replaced** before each capture: the page's `img` for it is
+  swapped for a grey "A" in the page, and in frames recorded from the screen, where the page
+  had already reloaded the photo, the same "A" is laid over it. Check the top-right corner and
+  every comment before committing a new one.
+- **Chrome's UI language decides the extension's strings**, not the page's: the menus, the
+  popup and the omnibox rows follow `chrome.i18n`. The English set was taken with Chrome
+  started as `open -a "Google Chrome" --args -AppleLanguages '(en-US)'`, which lasts until
+  Chrome quits. Three things are stored settings rather than strings and have to be switched
+  by hand for the other language: the copy format names, the team template source
+  (`examples/team-templates.json` or `-ko.json`), and the recent keys, which come from
+  actually opening `issue SHOP-…` or `issue STORE-…`.
+- Plane's own UI stays English in both sets, because Plane has no Korean UI to show.
+- A 1280×900 window (1600×1000 for the create dialog, which a narrower one squeezes), captured
+  at 2x with `screencapture -l` for the page and with `-R` on the window's rectangle for the
+  omnibox, the popup and the menu, which are separate windows on top of it.
 
-The seed in `capture-ui.js` is invented on purpose (`acme.atlassian.net`, PROJ-142). A store
-image is published for as long as the listing exists, and a real workspace's project names,
-item titles and colleagues' avatars are not ours to publish.
+`screenshot-3-width.html` and `promo-*.html` are still **illustrations**: every pixel is drawn
+in CSS. Capture 3 stays drawn because there is no honest real frame for it on Plane Cloud
+today: the module chip it shows being cut is a `max-w-[224px]` button there, not the
+`.max-w-40` the preset names, and at 1280px Cloud folds a second module into "+1". Retake it
+once the width presets are measured against Cloud again.
 
-What still needs a human with a screen recorder: the omnibox dropdown, the toolbar popup as
-Chrome frames it, and the in-page buttons on a workspace whose contents are safe to show.
+`ui/*.png` are **real pages**: `node store-assets/capture-ui.js` renders the shipped
+`popup.html` and `options.html`, with the shipped CSS byte for byte, in a real browser at 2x.
+Only `chrome` is stubbed — the same technique `tools/dom-harness.js` asserts against — so
+these cannot drift from the product without the checks noticing first. Its seed is invented
+for the same reason as the demo workspace (`acme.atlassian.net`, PROJ-142).
+
+Neither `real/` nor `ui/` is uploaded, so `tools/store-submit.js` does not count a change
+under either as a listing change; only the images beside this file are.
 
 ---
 
@@ -422,8 +446,9 @@ language.
 
 Keep the mocks honest — they must show what the extension currently draws. Capture 1's
 menu once still showed a "TEMPLATES (TITLE + BODY)" header that the picker had long
-stopped rendering, and no "＋ Manage templates" footer, which the picker had gained.
-When the UI moves, re-render.
+stopped rendering, and no "＋ Manage templates" footer, which the picker had gained. That is
+what moved four of the five to real captures, and it still applies to them in a quieter
+form: a real capture is true on the day it was taken. When the UI moves, retake it.
 
 None of this ships: release.yml lists the packaged files explicitly and store-assets is
 not among them.

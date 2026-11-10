@@ -150,8 +150,11 @@ function listingChanges(from, to, cwd) {
         if (!LISTING_NOTES.has(s.top) && body(before.get(name)) !== body(after.get(name))) changed.push(name);
       }
     }
+    // Only the images beside STORE_LISTING.md are uploaded; a subfolder holds what they are
+    // made from (ui/, real/), which a reviewer never sees.
     for (const f of files) {
-      if (/\.(png|jpe?g)$/i.test(f)) changed.push(f.slice(LISTING_PATH.length + 1));
+      const name = f.slice(LISTING_PATH.length + 1);
+      if (!name.includes("/") && /\.(png|jpe?g)$/i.test(name)) changed.push(name);
     }
     return changed;
   } catch {
