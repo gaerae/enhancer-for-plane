@@ -592,13 +592,20 @@ const PLANE = `
   </div>
 </div>`;
 
-// Plane's "Show all" collapse (DescriptionOverflow), as makeplane/plane efa46d284 renders it
-// while clipping: an inline height on the box, the editor and the fade inside it, the toggle
-// right after it. Taken from the source, not from a live page — Cloud was not measured when
-// this was written. The two after it are the near misses. The same component clips a cycle's
-// description, a textarea, and that is not a work item description; and an editor box with a
-// disclosure button after it but no clip is not the collapse at all. Only on ct-focus, because
-// another editor on PLANE would be one more place for the Template button to consider.
+// Plane's "Show all" collapse (DescriptionOverflow), in both shapes it comes in, each while
+// clipping: an inline height on the box, the editor and the fade inside it, then the toggle.
+//   - `probe-desc`: open source, as makeplane/plane efa46d284 renders it — the button right
+//     after the box, with aria-controls. Taken from the source.
+//   - `probe-desc-cloud`: Plane Cloud, measured 2026-11-10 on an item's page and in the peek
+//     panel — no aria-controls, the button alone in a class-less div with an inline
+//     pointer-events. v1.13.0's presets fit only the first and matched nothing on Cloud for a
+//     release while this page carried only that one.
+// The rest are near misses, one per thing a selector could be widened past. The same component
+// clips a cycle's description, a textarea, and that is not a work item description — in either
+// shape. An editor box with a disclosure after it but no clip is not the collapse at all, also
+// in either shape. And a clipped editor followed by a toolbar whose dropdown carries
+// aria-expanded is what `:only-child` is there to refuse. Only on ct-focus, because another
+// editor on PLANE would be one more place for the Template button to consider.
 const DESCRIPTION_CLIP = `
 <div>
   <div id="probe-desc" class="relative overflow-hidden transition-[height] duration-300 ease-in-out motion-reduce:transition-none" style="height: 140px;">
@@ -608,6 +615,13 @@ const DESCRIPTION_CLIP = `
   <button id="probe-desc-toggle" type="button" class="mt-1 text-left" aria-expanded="false" aria-controls="probe-desc">Show all</button>
 </div>
 <div>
+  <div id="probe-desc-cloud" class="relative overflow-hidden transition-[height] duration-300 ease-in-out" style="height: 140px;">
+    <div><div class="ProseMirror" contenteditable="true" style="height: 420px">a description long enough to be clipped (cloud)</div></div>
+    <div id="probe-desc-cloud-fade" class="absolute bottom-0 left-0 h-24 w-full bg-gradient-to-t from-surface-1 to-transparent pointer-events-none"></div>
+  </div>
+  <div id="probe-desc-cloud-wrap" style="pointer-events: auto;"><button id="probe-desc-cloud-toggle" type="button" aria-expanded="false" class="mt-1 text-accent-primary text-body-sm-regular text-left">Show all</button></div>
+</div>
+<div>
   <div id="probe-cycle-desc" class="relative overflow-hidden" style="height: 140px;">
     <div><div class="flex w-full"><textarea style="height: 400px">a cycle's description</textarea></div></div>
     <div id="probe-cycle-fade" class="pointer-events-none absolute bottom-0 left-0 h-24 w-full"></div>
@@ -615,8 +629,26 @@ const DESCRIPTION_CLIP = `
   <button id="probe-cycle-toggle" type="button" aria-expanded="false" aria-controls="probe-cycle-desc">Show all</button>
 </div>
 <div>
+  <div id="probe-cycle-desc-cloud" class="relative overflow-hidden" style="height: 140px;">
+    <div><div class="flex w-full"><textarea style="height: 400px">a cycle's description (cloud)</textarea></div></div>
+    <div id="probe-cycle-fade-cloud" class="pointer-events-none absolute bottom-0 left-0 h-24 w-full"></div>
+  </div>
+  <div style="pointer-events: auto;"><button id="probe-cycle-toggle-cloud" type="button" aria-expanded="false">Show all</button></div>
+</div>
+<div>
   <div class="relative"><div class="ProseMirror" contenteditable="true">a comment</div></div>
   <button id="probe-menu-toggle" type="button" aria-expanded="false" aria-controls="probe-menu">⋯</button>
+</div>
+<div>
+  <div class="relative"><div class="ProseMirror" contenteditable="true">a comment (cloud)</div></div>
+  <div style="pointer-events: auto;"><button id="probe-menu-toggle-cloud" type="button" aria-expanded="false">⋯</button></div>
+</div>
+<div>
+  <div id="probe-toolbar-box" class="relative overflow-hidden" style="height: 140px;">
+    <div><div class="ProseMirror" contenteditable="true" style="height: 400px">an editor in a fixed-height box</div></div>
+    <div id="probe-toolbar-box-second">its second child</div>
+  </div>
+  <div id="probe-toolbar"><button type="button">B</button><button id="probe-toolbar-menu" type="button" aria-expanded="false">More</button></div>
 </div>`;
 
 // A description editor with an attach button six levels up — self-hosted Plane 1.4's shape,
@@ -4973,19 +5005,41 @@ const suites = [
         }
       });
       // The height is read off the box against the editor inside it, not against a number:
-      // "not 140" would also pass on a box the rule collapsed to nothing.
-      check("a clipped work item description is shown whole", () => {
-        const box = document.getElementById("probe-desc");
+      // "not 140" would also pass on a box the rule collapsed to nothing. One check per shape,
+      // so a selector that drops either names the one it dropped.
+      // Rendered, not "display is not none": Cloud's toggle is hidden through its wrapper, and
+      // a button inside a hidden div still reports its own display. Read that way, the hide
+      // would look like it failed — and, worse, a near miss hidden through its wrapper would
+      // look untouched.
+      const rendered = (el) => el.getClientRects().length > 0;
+      const descShownWhole = (box, fade, toggle) => {
         eq(Math.round(box.getBoundingClientRect().height), Math.round(box.querySelector(".ProseMirror").getBoundingClientRect().height),
           "the box is as tall as the description in it");
-        ok(!shown(document.getElementById("probe-desc-fade")), "the fade over its last lines is gone");
-        ok(!shown(document.getElementById("probe-desc-toggle")), "and so is a Show all with nothing left to show");
+        ok(!rendered(fade), "the fade over its last lines is gone");
+        ok(!rendered(toggle), "and so is a Show all with nothing left to show");
+      };
+      check("a clipped work item description is shown whole (open source: toggle with aria-controls)", () => {
+        descShownWhole(document.getElementById("probe-desc"), document.getElementById("probe-desc-fade"),
+          document.getElementById("probe-desc-toggle"));
+      });
+      check("a clipped work item description is shown whole (Plane Cloud: wrapped toggle, no aria-controls)", () => {
+        descShownWhole(document.getElementById("probe-desc-cloud"), document.getElementById("probe-desc-cloud-fade"),
+          document.getElementById("probe-desc-cloud-toggle"));
+        // Hidden through its wrapper, which must not hold a line of empty space where it was.
+        eq(Math.round(document.getElementById("probe-desc-cloud-wrap").getBoundingClientRect().height), 0, "no gap where Show all was");
       });
       check("and nothing else that collapses or toggles is touched", () => {
-        eq(getComputedStyle(document.getElementById("probe-cycle-desc")).height, "140px", "a cycle's description keeps Plane's clip");
-        ok(shown(document.getElementById("probe-cycle-fade")), "and its fade");
-        ok(shown(document.getElementById("probe-cycle-toggle")), "and its toggle");
-        ok(shown(document.getElementById("probe-menu-toggle")), "a disclosure after an editor that is not clipped stays");
+        for (const sfx of ["", "-cloud"]) {
+          eq(getComputedStyle(document.getElementById("probe-cycle-desc" + sfx)).height, "140px", "a cycle's description keeps Plane's clip" + sfx);
+          ok(rendered(document.getElementById("probe-cycle-fade" + sfx)), "and its fade" + sfx);
+          ok(rendered(document.getElementById("probe-cycle-toggle" + sfx)), "and its toggle" + sfx);
+          ok(rendered(document.getElementById("probe-menu-toggle" + sfx)), "a disclosure after an editor that is not clipped stays" + sfx);
+        }
+        // A clipped editor followed by a toolbar: only :only-child tells its dropdown from
+        // Show all, so a selector that loses it unclips the box and hides the toolbar.
+        eq(getComputedStyle(document.getElementById("probe-toolbar-box")).height, "140px", "a fixed-height editor before a toolbar keeps its height");
+        ok(rendered(document.getElementById("probe-toolbar-box-second")), "and its second child");
+        ok(rendered(document.getElementById("probe-toolbar-menu")), "and the toolbar after it");
       });
       check("nothing is hidden until it is asked for", () => {
         ok(shown(props), "the properties panel is where Plane put it");
